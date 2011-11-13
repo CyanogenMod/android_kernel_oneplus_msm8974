@@ -2635,8 +2635,7 @@ int vfs_mknod2(struct vfsmount *mnt, struct inode *dir, struct dentry *dentry, u
 	if (error)
 		return error;
 
-	if ((S_ISCHR(mode) || S_ISBLK(mode)) &&
-	    !ns_capable(inode_userns(dir), CAP_MKNOD))
+	if ((S_ISCHR(mode) || S_ISBLK(mode)) && !capable(CAP_MKNOD))
 		return -EPERM;
 
 	if (!dir->i_op->mknod)
