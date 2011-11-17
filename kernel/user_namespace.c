@@ -69,6 +69,8 @@ int create_user_ns(struct cred *new)
 	/* Leave the reference to our user_ns with the new cred */
 	new->user_ns = ns;
 
+	put_user_ns(parent_ns);
+
 	return 0;
 }
 
