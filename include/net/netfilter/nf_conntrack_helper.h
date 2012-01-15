@@ -24,7 +24,7 @@ enum nf_ct_helper_flags {
 struct nf_conntrack_helper {
 	struct hlist_node hnode;	/* Internal use. */
 
-	const char *name;		/* name of the module */
+	char name[NF_CT_HELPER_NAME_LEN]; /* name of the module */
 	struct module *me;		/* pointer to self */
 	const struct nf_conntrack_expect_policy *expect_policy;
 
