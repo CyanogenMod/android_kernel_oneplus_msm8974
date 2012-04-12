@@ -40,12 +40,11 @@
  */
 static void free_substream(struct snd_usb_substream *subs)
 {
-	struct list_head *p, *n;
+	struct audioformat *fp, *n;
 
 	if (!subs->num_formats)
 		return; /* not initialized */
-	list_for_each_safe(p, n, &subs->fmt_list) {
-		struct audioformat *fp = list_entry(p, struct audioformat, list);
+	list_for_each_entry_safe(fp, n, &subs->fmt_list, list) {
 		kfree(fp->rate_table);
 		kfree(fp);
 	}
@@ -73,6 +72,33 @@ static void snd_usb_audio_pcm_free(struct snd_pcm *pcm)
 	}
 }
 
+/*
+ * initialize the substream instance.
+ */
+
+static void snd_usb_init_substream(struct snd_usb_stream *as,
+				   int stream,
+				   struct audioformat *fp)
+{
+	struct snd_usb_substream *subs = &as->substream[stream];
+
+	INIT_LIST_HEAD(&subs->fmt_list);
+	spin_lock_init(&subs->lock);
+
+	subs->stream = as;
+	subs->direction = stream;
+	subs->dev = as->chip->dev;
+	subs->txfr_quirk = as->chip->txfr_quirk;
+	subs->speed = snd_usb_get_speed(subs->dev);
+
+	snd_usb_set_pcm_ops(as->pcm, stream);
+
+	list_add_tail(&fp->list, &subs->fmt_list);
+	subs->formats |= fp->formats;
+	subs->num_formats++;
+	subs->fmt_type = fp->fmt_type;
+	subs->ep_num = fp->endpoint;
+}
 
 /*
  * add this endpoint to the chip instance.
@@ -83,20 +109,16 @@ int snd_usb_add_audio_stream(struct snd_usb_audio *chip,
 			     int stream,
 			     struct audioformat *fp)
 {
-	struct list_head *p;
 	struct snd_usb_stream *as;
 	struct snd_usb_substream *subs;
 	struct snd_pcm *pcm;
 	int err;
 
-	list_for_each(p, &chip->pcm_list) {
-		as = list_entry(p, struct snd_usb_stream, list);
+	list_for_each_entry(as, &chip->pcm_list, list) {
 		if (as->fmt_type != fp->fmt_type)
 			continue;
 		subs = &as->substream[stream];
-		if (!subs->endpoint)
-			continue;
-		if (subs->endpoint == fp->endpoint) {
+		if (subs->ep_num == fp->endpoint) {
 			list_add_tail(&fp->list, &subs->fmt_list);
 			subs->num_formats++;
 			subs->formats |= fp->formats;
@@ -104,12 +126,11 @@ int snd_usb_add_audio_stream(struct snd_usb_audio *chip,
 		}
 	}
 	/* look for an empty stream */
-	list_for_each(p, &chip->pcm_list) {
-		as = list_entry(p, struct snd_usb_stream, list);
+	list_for_each_entry(as, &chip->pcm_list, list) {
 		if (as->fmt_type != fp->fmt_type)
 			continue;
 		subs = &as->substream[stream];
-		if (subs->endpoint)
+		if (subs->ep_num)
 			continue;
 		err = snd_pcm_new_stream(as->pcm, stream, 1);
 		if (err < 0)
