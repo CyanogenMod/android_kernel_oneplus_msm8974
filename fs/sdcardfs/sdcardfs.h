@@ -649,7 +649,6 @@ static inline bool qstr_case_eq(const struct qstr *q1, const struct qstr *q2)
 	return q1->len == q2->len && str_n_case_eq(q1->name, q2->name, q2->len);
 }
 
-#define QSTR_INIT(n, l)      { .name = n, .len = l }
 #define QSTR_LITERAL(string) QSTR_INIT(string, sizeof(string)-1)
 
 #endif	/* not _SDCARDFS_H_ */

@@ -1586,7 +1586,7 @@ struct dentry *d_make_root(struct inode *root_inode)
 	struct dentry *res = NULL;
 
 	if (root_inode) {
-		static const struct qstr name = { .name = "/", .len = 1 };
+		static const struct qstr name = QSTR_INIT("/", 1);
 
 		res = __d_alloc(root_inode->i_sb, &name);
 		if (res)
@@ -1900,10 +1900,9 @@ struct dentry *__d_lookup_rcu(const struct dentry *parent,
 				const struct qstr *name,
 				unsigned *seqp, struct inode *inode)
 {
-	unsigned int len = name->len;
-	unsigned int hash = name->hash;
+	u64 hashlen = name->hash_len;
 	const unsigned char *str = name->name;
-	struct hlist_bl_head *b = d_hash(parent, hash);
+	struct hlist_bl_head *b = d_hash(parent, hashlen_hash(hashlen));
 	struct hlist_bl_node *node;
 	struct dentry *dentry;
 
@@ -1930,9 +1929,6 @@ struct dentry *__d_lookup_rcu(const struct dentry *parent,
 	hlist_bl_for_each_entry_rcu(dentry, node, b, d_hash) {
 		unsigned seq;
 
-		if (dentry->d_name.hash != hash)
-			continue;
-
 seqretry:
 		/*
 		 * The dentry sequence count protects us from concurrent
@@ -1957,6 +1953,8 @@ seqretry:
 		*seqp = seq;
 
 		if (unlikely(parent->d_flags & DCACHE_OP_COMPARE)) {
+			if (dentry->d_name.hash != hashlen_hash(hashlen))
+				continue;
 			switch (slow_dentry_cmp(parent, inode, dentry, seq, name)) {
 			case D_COMP_OK:
 				return dentry;
@@ -1967,9 +1965,9 @@ seqretry:
 			}
 		}
 
-		if (dentry->d_name.len != len)
+		if (dentry->d_name.hash_len != hashlen)
 			continue;
-		if (!dentry_cmp(dentry, str, len))
+		if (!dentry_cmp(dentry, str, hashlen_len(hashlen)))
 			return dentry;
 	}
 	return NULL;
