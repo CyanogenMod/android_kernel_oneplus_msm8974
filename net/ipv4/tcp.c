@@ -1413,11 +1413,11 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 				break;
 		}
 		if (tcp_hdr(skb)->fin) {
-			sk_eat_skb(sk, skb, 0);
+			sk_eat_skb(sk, skb, false);
 			++seq;
 			break;
 		}
-		sk_eat_skb(sk, skb, 0);
+		sk_eat_skb(sk, skb, false);
 		if (!desc->count)
 			break;
 		tp->copied_seq = seq;
@@ -1456,7 +1456,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	int target;		/* Read at least this many bytes */
 	long timeo;
 	struct task_struct *user_recv = NULL;
-	int copied_early = 0;
+	bool copied_early = false;
 	struct sk_buff *skb;
 	u32 urg_hole = 0;
 
@@ -1735,7 +1735,7 @@ do_prequeue:
 				dma_async_memcpy_issue_pending(tp->ucopy.dma_chan);
 
 				if ((offset + used) == skb->len)
-					copied_early = 1;
+					copied_early = true;
 
 			} else
 #endif
@@ -1769,7 +1769,7 @@ skip_copy:
 			goto found_fin_ok;
 		if (!(flags & MSG_PEEK)) {
 			sk_eat_skb(sk, skb, copied_early);
-			copied_early = 0;
+			copied_early = false;
 		}
 		continue;
 
@@ -1778,7 +1778,7 @@ skip_copy:
 		++*seq;
 		if (!(flags & MSG_PEEK)) {
 			sk_eat_skb(sk, skb, copied_early);
-			copied_early = 0;
+			copied_early = false;
 		}
 		break;
 	} while (len > 0);
