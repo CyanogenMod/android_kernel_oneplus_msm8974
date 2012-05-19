@@ -407,13 +407,6 @@ Who:	Jean Delvare <khali@linux-fr.org>
 
 ----------------------------
 
-What:	xt_connlimit rev 0
-When:	2012
-Who:	Jan Engelhardt <jengelh@medozas.de>
-Files:	net/netfilter/xt_connlimit.c
-
-----------------------------
-
 What:	ipt_addrtype match include file
 When:	2012
 Why:	superseded by xt_addrtype
