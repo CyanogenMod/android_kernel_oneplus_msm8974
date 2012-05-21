@@ -829,10 +829,11 @@ struct file *nameidata_to_filp(struct nameidata *nd)
 
 	/* Pick up the filp from the open intent */
 	filp = nd->intent.open.file;
-	nd->intent.open.file = NULL;
 
 	/* Has the filesystem initialised the file for us? */
-	if (filp->f_path.dentry == NULL) {
+	if (filp->f_path.dentry != NULL) {
+		nd->intent.open.file = NULL;
+	} else {
 		struct file *res;
 
 		path_get(&nd->path);
@@ -841,6 +842,7 @@ struct file *nameidata_to_filp(struct nameidata *nd)
 		if (!IS_ERR(res)) {
 			int error;
 
+			nd->intent.open.file = NULL;
 			BUG_ON(res != filp);
 
 			error = open_check_o_direct(filp);
@@ -849,7 +851,7 @@ struct file *nameidata_to_filp(struct nameidata *nd)
 				filp = ERR_PTR(error);
 			}
 		} else {
-			put_filp(filp);
+			/* Allow nd->intent.open.file to be recycled */
 			filp = res;
 		}
 	}
