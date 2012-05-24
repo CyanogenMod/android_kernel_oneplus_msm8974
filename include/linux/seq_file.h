@@ -13,6 +13,7 @@ struct file;
 struct path;
 struct inode;
 struct dentry;
+struct user_namespace;
 
 struct seq_file {
 	char *buf;
@@ -26,6 +27,9 @@ struct seq_file {
 	struct mutex lock;
 	const struct seq_operations *op;
 	int poll_event;
+#ifdef CONFIG_USER_NS
+	struct user_namespace *user_ns;
+#endif
 	void *private;
 };
 
@@ -175,6 +179,14 @@ static inline void seq_show_option(struct seq_file *m, const char *name,
 	strncpy(val_buf, value, length);		\
 	val_buf[length] = '\0';				\
 	seq_show_option(m, name, val_buf);		\
+static inline struct user_namespace *seq_user_ns(struct seq_file *seq)
+{
+#ifdef CONFIG_USER_NS
+	return seq->user_ns;
+#else
+	extern struct user_namespace init_user_ns;
+	return &init_user_ns;
+#endif
 }
 
 #define SEQ_START_TOKEN ((void *)1)
