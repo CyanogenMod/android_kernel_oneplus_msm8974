@@ -63,6 +63,9 @@ ata *);
 	void (*truncate_range)(struct inode *, loff_t, loff_t);
 	int (*fiemap)(struct inode *, struct fiemap_extent_info *, u64 start, u64 len);
 	void (*update_time)(struct inode *, struct timespec *, int);
+	struct file * (*atomic_open)(struct inode *, struct dentry *,
+				struct opendata *, unsigned open_flag,
+				umode_t create_mode, bool *created);
 
 locking rules:
 	all may block
@@ -91,6 +94,7 @@ removexattr:	yes
 truncate_range:	yes
 fiemap:		no
 update_time:	no
+atomic_open:	yes
 
 	Additionally, ->rmdir(), ->unlink() and ->rename() have ->i_mutex on
 victim.
