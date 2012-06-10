@@ -4187,7 +4187,7 @@ static void btrfs_dentry_release(struct dentry *dentry)
 }
 
 static struct dentry *btrfs_lookup(struct inode *dir, struct dentry *dentry,
-				   struct nameidata *nd)
+				   unsigned int flags)
 {
 	struct dentry *ret;
 

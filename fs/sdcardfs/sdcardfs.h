@@ -144,7 +144,7 @@ extern void sdcardfs_destroy_dentry_cache(void);
 extern int new_dentry_private_data(struct dentry *dentry);
 extern void free_dentry_private_data(struct dentry *dentry);
 extern struct dentry *sdcardfs_lookup(struct inode *dir, struct dentry *dentry,
-				    struct nameidata *nd);
+				    unsigned int flags);
 extern struct inode *sdcardfs_iget(struct super_block *sb,
 				 struct inode *lower_inode, userid_t id);
 extern int sdcardfs_interpose(struct dentry *dentry, struct super_block *sb,

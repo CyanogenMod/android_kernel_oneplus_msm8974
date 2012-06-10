@@ -448,7 +448,7 @@ out_unlock:
 }
 
 struct dentry *proc_lookup(struct inode *dir, struct dentry *dentry,
-		struct nameidata *nd)
+		unsigned int flags)
 {
 	return proc_lookup_de(PDE(dir), dir, dentry);
 }

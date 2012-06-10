@@ -263,7 +263,7 @@ out:
 }
 
 static struct dentry *f2fs_lookup(struct inode *dir, struct dentry *dentry,
-					struct nameidata *nd)
+					unsigned int flags)
 {
 	struct inode *inode = NULL;
 	struct f2fs_dir_entry *de;
