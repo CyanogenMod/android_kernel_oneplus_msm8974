@@ -858,7 +858,7 @@ error:
 static struct file *
 v9fs_vfs_atomic_open(struct inode *dir, struct dentry *dentry,
 		     struct opendata *od, unsigned flags, umode_t mode,
-		     bool *created)
+		     int *opened)
 {
 	int err;
 	u32 perm;
@@ -917,7 +917,7 @@ v9fs_vfs_atomic_open(struct inode *dir, struct dentry *dentry,
 		v9inode->writeback_fid = (void *) inode_fid;
 	}
 	mutex_unlock(&v9inode->v_mutex);
-	filp = finish_open(od, dentry, generic_file_open);
+	filp = finish_open(od, dentry, generic_file_open, opened);
 	if (IS_ERR(filp)) {
 		err = PTR_ERR(filp);
 		goto error;
@@ -929,7 +929,7 @@ v9fs_vfs_atomic_open(struct inode *dir, struct dentry *dentry,
 		v9fs_cache_inode_set_cookie(dentry->d_inode, filp);
 #endif
 
-	*created = true;
+	*opened |= FILE_CREATED;
 out:
 	dput(res);
 	return filp;
