@@ -1129,7 +1129,7 @@ static struct dentry *lookup_dcache(struct qstr *name, struct dentry *dir,
  * dir->d_inode->i_mutex must be held
  */
 static struct dentry *lookup_real(struct inode *dir, struct dentry *dentry,
-				  struct nameidata *nd)
+				  unsigned int flags)
 {
 	struct dentry *old;
 
@@ -1139,7 +1139,7 @@ static struct dentry *lookup_real(struct inode *dir, struct dentry *dentry,
 		return ERR_PTR(-ENOENT);
 	}
 
-	old = dir->i_op->lookup(dir, dentry, nd ? nd->flags : 0);
+	old = dir->i_op->lookup(dir, dentry, flags);
 	if (unlikely(old)) {
 		dput(dentry);
 		dentry = old;
@@ -1148,16 +1148,16 @@ static struct dentry *lookup_real(struct inode *dir, struct dentry *dentry,
 }
 
 static struct dentry *__lookup_hash(struct qstr *name,
-		struct dentry *base, struct nameidata *nd)
+		struct dentry *base, unsigned int flags)
 {
 	bool need_lookup;
 	struct dentry *dentry;
 
-	dentry = lookup_dcache(name, base, nd ? nd->flags : 0, &need_lookup);
+	dentry = lookup_dcache(name, base, flags, &need_lookup);
 	if (!need_lookup)
 		return dentry;
 
-	return lookup_real(base->d_inode, dentry, nd);
+	return lookup_real(base->d_inode, dentry, flags);
 }
 
 /*
@@ -1276,7 +1276,7 @@ static int lookup_slow(struct nameidata *nd, struct qstr *name,
 	BUG_ON(nd->inode != parent->d_inode);
 
 	mutex_lock(&parent->d_inode->i_mutex);
-	dentry = __lookup_hash(name, parent, nd);
+	dentry = __lookup_hash(name, parent, nd->flags);
 	mutex_unlock(&parent->d_inode->i_mutex);
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
@@ -1940,7 +1940,7 @@ int vfs_path_lookup(struct dentry *dentry, struct vfsmount *mnt,
  */
 static struct dentry *lookup_hash(struct nameidata *nd)
 {
-	return __lookup_hash(&nd->last, nd->path.dentry, nd);
+	return __lookup_hash(&nd->last, nd->path.dentry, nd->flags);
 }
 
 /**
@@ -1988,7 +1988,7 @@ struct dentry *lookup_one_len2(const char *name, struct vfsmount *mnt, struct de
 	if (err)
 		return ERR_PTR(err);
 
-	return __lookup_hash(&this, base, NULL);
+	return __lookup_hash(&this, base, 0);
 }
 EXPORT_SYMBOL(lookup_one_len2);
 
@@ -2419,7 +2419,7 @@ out:
 
 no_open:
 	if (need_lookup) {
-		dentry = lookup_real(dir, dentry, nd);
+		dentry = lookup_real(dir, dentry, nd->flags);
 		if (IS_ERR(dentry))
 			return PTR_ERR(dentry);
 
@@ -2482,7 +2482,7 @@ static int lookup_open(struct nameidata *nd, struct path *path,
 	if (need_lookup) {
 		BUG_ON(dentry->d_inode);
 
-		dentry = lookup_real(dir_inode, dentry, nd);
+		dentry = lookup_real(dir_inode, dentry, nd->flags);
 		if (IS_ERR(dentry))
 			return PTR_ERR(dentry);
 	}
