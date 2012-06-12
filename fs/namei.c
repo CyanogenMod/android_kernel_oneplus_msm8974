@@ -3026,6 +3026,7 @@ struct dentry *kern_path_create(int dfd, const char *pathname, struct path *path
 {
 	struct dentry *dentry = ERR_PTR(-EEXIST);
 	struct nameidata nd;
+	int err2;
 	int error = do_path_lookup(dfd, pathname, LOOKUP_PARENT, &nd);
 	if (error)
 		return ERR_PTR(error);
@@ -3039,6 +3040,8 @@ struct dentry *kern_path_create(int dfd, const char *pathname, struct path *path
 	nd.flags &= ~LOOKUP_PARENT;
 	nd.flags |= LOOKUP_CREATE | LOOKUP_EXCL;
 
+	/* don't fail immediately if it's r/o, at least try to report other errors */
+	err2 = mnt_want_write(nd.path.mnt);
 	/*
 	 * Do the final lookup.
 	 */
@@ -3060,9 +3063,10 @@ struct dentry *kern_path_create(int dfd, const char *pathname, struct path *path
 		error = -ENOENT;
 		goto fail;
 	}
-	error = mnt_want_write(nd.path.mnt);
-	if (error)
+	if (unlikely(err2)) {
+		error = err2;
 		goto fail;
+	}
 	*path = nd.path;
 	return dentry;
 fail:
@@ -3070,6 +3074,8 @@ fail:
 	dentry = ERR_PTR(error);
 unlock:
 	mutex_unlock(&nd.path.dentry->d_inode->i_mutex);
+	if (!err2)
+		mnt_drop_write(nd.path.mnt);
 out:
 	path_put(&nd.path);
 	return dentry;
@@ -3346,6 +3352,9 @@ static long do_rmdir(int dfd, const char __user *pathname)
 	}
 
 	nd.flags &= ~LOOKUP_PARENT;
+	error = mnt_want_write(nd.path.mnt);
+	if (error)
+		goto exit1;
 
 	mutex_lock_nested(&nd.path.dentry->d_inode->i_mutex, I_MUTEX_PARENT);
 	dentry = lookup_hash(&nd);
@@ -3356,21 +3365,15 @@ static long do_rmdir(int dfd, const char __user *pathname)
 		error = -ENOENT;
 		goto exit3;
 	}
-	error = mnt_want_write(nd.path.mnt);
-	if (error)
-		goto exit3;
 	error = security_path_rmdir(&nd.path, dentry);
 	if (error)
-		goto exit4;
-
+		goto exit3;
 	error = vfs_rmdir2(nd.path.mnt, nd.path.dentry->d_inode, dentry);
-
-exit4:
-	mnt_drop_write(nd.path.mnt);
 exit3:
 	dput(dentry);
 exit2:
 	mutex_unlock(&nd.path.dentry->d_inode->i_mutex);
+	mnt_drop_write(nd.path.mnt);
 exit1:
 	path_put(&nd.path);
 	putname(name);
@@ -3444,6 +3447,9 @@ static long do_unlinkat(int dfd, const char __user *pathname)
 		goto exit1;
 
 	nd.flags &= ~LOOKUP_PARENT;
+	error = mnt_want_write(nd.path.mnt);
+	if (error)
+		goto exit1;
 
 	mutex_lock_nested(&nd.path.dentry->d_inode->i_mutex, I_MUTEX_PARENT);
 	dentry = lookup_hash(&nd);
@@ -3456,21 +3462,17 @@ static long do_unlinkat(int dfd, const char __user *pathname)
 		if (!inode)
 			goto slashes;
 		ihold(inode);
-		error = mnt_want_write(nd.path.mnt);
-		if (error)
-			goto exit2;
 		error = security_path_unlink(&nd.path, dentry);
 		if (error)
-			goto exit3;
+			goto exit2;
 		error = vfs_unlink2(nd.path.mnt, nd.path.dentry->d_inode, dentry);
-exit3:
-		mnt_drop_write(nd.path.mnt);
-	exit2:
+exit2:
 		dput(dentry);
 	}
 	mutex_unlock(&nd.path.dentry->d_inode->i_mutex);
 	if (inode)
 		iput(inode);	/* truncate the inode here */
+	mnt_drop_write(nd.path.mnt);
 exit1:
 	path_put(&nd.path);
 	putname(name);
@@ -3866,6 +3868,10 @@ SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
 	if (newnd.last_type != LAST_NORM)
 		goto exit2;
 
+	error = mnt_want_write(oldnd.path.mnt);
+	if (error)
+		goto exit2;
+
 	oldnd.flags &= ~LOOKUP_PARENT;
 	newnd.flags &= ~LOOKUP_PARENT;
 	newnd.flags |= LOOKUP_RENAME_TARGET;
@@ -3901,23 +3907,19 @@ SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
 	if (new_dentry == trap)
 		goto exit5;
 
-	error = mnt_want_write(oldnd.path.mnt);
-	if (error)
-		goto exit5;
 	error = security_path_rename(&oldnd.path, old_dentry,
 				     &newnd.path, new_dentry);
 	if (error)
-		goto exit6;
+		goto exit5;
 	error = vfs_rename2(oldnd.path.mnt, old_dir->d_inode, old_dentry,
 				   new_dir->d_inode, new_dentry);
-exit6:
-	mnt_drop_write(oldnd.path.mnt);
 exit5:
 	dput(new_dentry);
 exit4:
 	dput(old_dentry);
 exit3:
 	unlock_rename(new_dir, old_dir);
+	mnt_drop_write(oldnd.path.mnt);
 exit2:
 	path_put(&newnd.path);
 	putname(to);
