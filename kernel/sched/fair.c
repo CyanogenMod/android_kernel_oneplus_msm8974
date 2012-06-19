@@ -890,6 +890,39 @@ static inline void update_cfs_shares(struct cfs_rq *cfs_rq)
 }
 #endif /* CONFIG_FAIR_GROUP_SCHED */
 
+static inline unsigned int task_load(struct task_struct *p)
+{
+	return p->ravg.demand;
+}
+
+static inline unsigned int max_task_load(void)
+{
+	return sched_ravg_window;
+}
+
+/* Return task demand in percentage scale */
+unsigned int pct_task_load(struct task_struct *p)
+{
+	unsigned int load;
+
+	load = div64_u64((u64)task_load(p) * 100, (u64)max_task_load());
+
+	return load;
+}
+
+void init_new_task_load(struct task_struct *p)
+{
+	int i;
+	u64 wallclock = sched_clock();
+
+	p->ravg.sum			= 0;
+	p->ravg.demand			= 0;
+	p->ravg.window_start		= wallclock;
+	p->ravg.mark_start		= wallclock;
+	for (i = 0; i < RAVG_HIST_SIZE; ++i)
+		p->ravg.sum_history[i] = 0;
+}
+
 /* Only depends on SMP, FAIR_GROUP_SCHED may be removed when useful in lb */
 #if defined(CONFIG_SMP) && defined(CONFIG_FAIR_GROUP_SCHED)
 /*
@@ -3620,6 +3653,7 @@ static unsigned long __read_mostly max_load_balance_interval = HZ/10;
 
 #define LBF_ALL_PINNED	0x01
 #define LBF_NEED_BREAK	0x02
+#define LBF_SOME_PINNED 0x04
 
 struct lb_env {
 	struct sched_domain	*sd;
@@ -3630,6 +3664,8 @@ struct lb_env {
 	int			dst_cpu;
 	struct rq		*dst_rq;
 
+	struct cpumask		*dst_grpmask;
+	int			new_dst_cpu;
 	enum cpu_idle_type	idle;
 	long			load_move;
 	unsigned int		flags;
@@ -3640,6 +3676,7 @@ struct lb_env {
 };
 
 static DEFINE_PER_CPU(bool, dbs_boost_needed);
+static DEFINE_PER_CPU(int, dbs_boost_load_moved);
 
 /*
  * move_task - move a task from one runqueue to another runqueue.
@@ -3701,9 +3738,34 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 	 * 3) are cache-hot on their current CPU.
 	 */
 	if (!cpumask_test_cpu(env->dst_cpu, tsk_cpus_allowed(p))) {
+		int cpu;
+
 		schedstat_inc(p, se.statistics.nr_failed_migrations_affine);
+
+		/*
+		 * Remember if this task can be migrated to any other cpu in
+		 * our sched_group. We may want to revisit it if we couldn't
+		 * meet load balance goals by pulling other tasks on src_cpu.
+		 *
+		 * Also avoid computing new_dst_cpu if we have already computed
+		 * one in current iteration.
+		 */
+		if (!env->dst_grpmask || (env->flags & LBF_SOME_PINNED))
+			return 0;
+
+		/* Prevent to re-select dst_cpu via env's cpus */
+		for_each_cpu_and(cpu, env->dst_grpmask, env->cpus) {
+			if (cpumask_test_cpu(cpu, tsk_cpus_allowed(p))) {
+				env->flags |= LBF_SOME_PINNED;
+				env->new_dst_cpu = cpu;
+				break;
+			}
+		}
+
 		return 0;
 	}
+
+	/* Record that we found atleast one task that could run on dst_cpu */
 	env->flags &= ~LBF_ALL_PINNED;
 
 	if (task_running(env->src_rq, p)) {
@@ -3761,6 +3823,8 @@ static int move_one_task(struct lb_env *env)
 		 * stats here rather than inside move_task().
 		 */
 		schedstat_inc(env->sd, lb_gained[env->idle]);
+		per_cpu(dbs_boost_load_moved, env->dst_cpu) += pct_task_load(p);
+
 		return 1;
 	}
 	return 0;
@@ -3819,6 +3883,7 @@ static int move_tasks(struct lb_env *env)
 		move_task(p, env);
 		pulled++;
 		env->load_move -= load;
+		per_cpu(dbs_boost_load_moved, env->dst_cpu) += pct_task_load(p);
 
 #ifdef CONFIG_PREEMPT
 		/*
@@ -4963,7 +5028,7 @@ static int load_balance(int this_cpu, struct rq *this_rq,
 			struct sched_domain *sd, enum cpu_idle_type idle,
 			int *balance)
 {
-	int ld_moved, active_balance = 0;
+	int ld_moved, cur_ld_moved, active_balance = 0;
 	struct sched_group *group;
 	unsigned long imbalance;
 	struct rq *busiest = NULL;
@@ -4974,12 +5039,21 @@ static int load_balance(int this_cpu, struct rq *this_rq,
 		.sd		= sd,
 		.dst_cpu	= this_cpu,
 		.dst_rq		= this_rq,
+		.dst_grpmask    = sched_group_cpus(sd->groups),
 		.idle		= idle,
 		.loop_break	= sched_nr_migrate_break,
 	};
 
+	/*
+	 * For NEWLY_IDLE load_balancing, we don't need to consider
+	 * other cpus in our group
+	 */
+	if (idle == CPU_NEWLY_IDLE)
+		env.dst_grpmask = NULL;
+
 	cpumask_copy(cpus, cpu_active_mask);
 
+	per_cpu(dbs_boost_load_moved, this_cpu) = 0;
 	schedstat_inc(sd, lb_count[idle]);
 
 redo:
@@ -5023,7 +5097,13 @@ more_balance:
 		double_rq_lock(this_rq, busiest);
 		if (!env.loop)
 			update_h_load(env.src_cpu);
-		ld_moved += move_tasks(&env);
+
+		/*
+		 * cur_ld_moved - load moved in current iteration
+		 * ld_moved     - cumulative load moved across iterations
+		 */
+		cur_ld_moved = move_tasks(&env);
+		ld_moved += cur_ld_moved;
 		double_rq_unlock(this_rq, busiest);
 		local_irq_restore(flags);
 
@@ -5035,8 +5115,46 @@ more_balance:
 		/*
 		 * some other cpu did the load balance for us.
 		 */
-		if (ld_moved && this_cpu != smp_processor_id())
-			resched_cpu(this_cpu);
+		if (cur_ld_moved && env.dst_cpu != smp_processor_id())
+			resched_cpu(env.dst_cpu);
+
+		/*
+		 * Revisit (affine) tasks on src_cpu that couldn't be moved to
+		 * us and move them to an alternate dst_cpu in our sched_group
+		 * where they can run. The upper limit on how many times we
+		 * iterate on same src_cpu is dependent on number of cpus in our
+		 * sched_group.
+		 *
+		 * This changes load balance semantics a bit on who can move
+		 * load to a given_cpu. In addition to the given_cpu itself
+		 * (or a ilb_cpu acting on its behalf where given_cpu is
+		 * nohz-idle), we now have balance_cpu in a position to move
+		 * load to given_cpu. In rare situations, this may cause
+		 * conflicts (balance_cpu and given_cpu/ilb_cpu deciding
+		 * _independently_ and at _same_ time to move some load to
+		 * given_cpu) causing exceess load to be moved to given_cpu.
+		 * This however should not happen so much in practice and
+		 * moreover subsequent load balance cycles should correct the
+		 * excess load moved.
+		 */
+		if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0) {
+
+			this_rq		 = cpu_rq(env.new_dst_cpu);
+			env.dst_rq	 = this_rq;
+			env.dst_cpu	 = env.new_dst_cpu;
+			env.flags	&= ~LBF_SOME_PINNED;
+			env.loop	 = 0;
+			env.loop_break	 = sched_nr_migrate_break;
+
+			/* Prevent to re-select dst_cpu via env's cpus */
+			cpumask_clear_cpu(env.dst_cpu, env.cpus);
+
+			/*
+			 * Go back to "more_balance" rather than "redo" since we
+			 * need to continue with same src_cpu.
+			 */
+			goto more_balance;
+		}
 
 		/* All tasks on this runqueue were pinned by CPU affinity */
 		if (unlikely(env.flags & LBF_ALL_PINNED)) {
@@ -5099,10 +5217,18 @@ more_balance:
 	} else {
 		sd->nr_balance_failed = 0;
 		if (per_cpu(dbs_boost_needed, this_cpu)) {
-			per_cpu(dbs_boost_needed, this_cpu) = false;
+			struct migration_notify_data mnd;
+
+			mnd.src_cpu = cpu_of(busiest);
+			mnd.dest_cpu = this_cpu;
+			mnd.load = per_cpu(dbs_boost_load_moved, this_cpu);
+			if (mnd.load > 100)
+				mnd.load = 100;
 			atomic_notifier_call_chain(&migration_notifier_head,
-						   this_cpu,
-						   (void *)cpu_of(busiest));
+						   0, (void *)&mnd);
+			per_cpu(dbs_boost_needed, this_cpu) = false;
+			per_cpu(dbs_boost_load_moved, this_cpu) = 0;
+
 		}
 	}
 	if (likely(!active_balance)) {
@@ -5216,6 +5342,8 @@ static int active_load_balance_cpu_stop(void *data)
 
 	raw_spin_lock_irq(&busiest_rq->lock);
 
+	per_cpu(dbs_boost_load_moved, target_cpu) = 0;
+
 	/* make sure the requested cpu hasn't gone down in the meantime */
 	if (unlikely(busiest_cpu != smp_processor_id() ||
 		     !busiest_rq->active_balance))
@@ -5266,10 +5394,18 @@ out_unlock:
 	busiest_rq->active_balance = 0;
 	raw_spin_unlock_irq(&busiest_rq->lock);
 	if (per_cpu(dbs_boost_needed, target_cpu)) {
-		per_cpu(dbs_boost_needed, target_cpu) = false;
+		struct migration_notify_data mnd;
+
+		mnd.src_cpu = cpu_of(busiest_rq);
+		mnd.dest_cpu = target_cpu;
+		mnd.load = per_cpu(dbs_boost_load_moved, target_cpu);
+		if (mnd.load > 100)
+			mnd.load = 100;
 		atomic_notifier_call_chain(&migration_notifier_head,
-					   target_cpu,
-					   (void *)cpu_of(busiest_rq));
+					   0, (void *)&mnd);
+
+		per_cpu(dbs_boost_needed, target_cpu) = false;
+		per_cpu(dbs_boost_load_moved, target_cpu) = 0;
 	}
 	return 0;
 }
