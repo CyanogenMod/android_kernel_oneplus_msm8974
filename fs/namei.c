@@ -1088,7 +1088,7 @@ static int follow_dotdot(struct nameidata *nd)
  * dir->d_inode->i_mutex must be held
  */
 static struct dentry *lookup_dcache(struct qstr *name, struct dentry *dir,
-				    struct nameidata *nd, bool *need_lookup)
+				    unsigned int flags, bool *need_lookup)
 {
 	struct dentry *dentry;
 	int error;
@@ -1099,7 +1099,7 @@ static struct dentry *lookup_dcache(struct qstr *name, struct dentry *dir,
 		if (d_need_lookup(dentry)) {
 			*need_lookup = true;
 		} else if (dentry->d_flags & DCACHE_OP_REVALIDATE) {
-			error = d_revalidate(dentry, nd ? nd->flags : 0);
+			error = d_revalidate(dentry, flags);
 			if (unlikely(error <= 0)) {
 				if (error < 0) {
 					dput(dentry);
@@ -1153,7 +1153,7 @@ static struct dentry *__lookup_hash(struct qstr *name,
 	bool need_lookup;
 	struct dentry *dentry;
 
-	dentry = lookup_dcache(name, base, nd, &need_lookup);
+	dentry = lookup_dcache(name, base, nd ? nd->flags : 0, &need_lookup);
 	if (!need_lookup)
 		return dentry;
 
@@ -2466,7 +2466,7 @@ static int lookup_open(struct nameidata *nd, struct path *path,
 	bool need_lookup;
 
 	*opened &= ~FILE_CREATED;
-	dentry = lookup_dcache(&nd->last, dir, nd, &need_lookup);
+	dentry = lookup_dcache(&nd->last, dir, nd->flags, &need_lookup);
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
 
