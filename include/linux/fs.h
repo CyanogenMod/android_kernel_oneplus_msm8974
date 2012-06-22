@@ -451,7 +451,6 @@ struct kstatfs;
 struct vm_area_struct;
 struct vfsmount;
 struct cred;
-struct opendata;
 struct fscrypt_info;
 struct fscrypt_operations;
 
@@ -1724,7 +1723,7 @@ struct inode_operations {
 		      u64 len);
 	int (*update_time)(struct inode *, struct timespec *, int);
 	int (*atomic_open)(struct inode *, struct dentry *,
-			   struct opendata *, unsigned open_flag,
+			   struct file *, unsigned open_flag,
 			   umode_t create_mode, int *opened);
 } ____cacheline_aligned;
 
@@ -2116,10 +2115,10 @@ enum {
 	FILE_CREATED = 1,
 	FILE_OPENED = 2
 };
-extern struct file *finish_open(struct opendata *od, struct dentry *dentry,
-				int (*open)(struct inode *, struct file *),
-				int *opened);
-extern void finish_no_open(struct opendata *od, struct dentry *dentry);
+extern int finish_open(struct file *file, struct dentry *dentry,
+			int (*open)(struct inode *, struct file *),
+			int *opened);
+extern void finish_no_open(struct file *file, struct dentry *dentry);
 
 /* fs/ioctl.c */
 

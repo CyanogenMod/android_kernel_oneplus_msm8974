@@ -366,7 +366,7 @@ struct inode_operations {
 	void (*truncate_range)(struct inode *, loff_t, loff_t);
 	void (*update_time)(struct inode *, struct timespec *, int);
 	int (*atomic_open)(struct inode *, struct dentry *,
-				struct opendata *, unsigned open_flag,
+				struct file *, unsigned open_flag,
 				umode_t create_mode, int *opened);
 };
 
