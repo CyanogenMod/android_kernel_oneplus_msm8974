@@ -468,7 +468,6 @@ nla_put_failure:
 	return -1;
 }
 
-#ifdef CONFIG_NF_CONNTRACK_EVENTS
 static inline size_t
 ctnetlink_proto_size(const struct nf_conn *ct)
 {
@@ -555,6 +554,7 @@ ctnetlink_nlmsg_size(const struct nf_conn *ct)
 	       ;
 }
 
+#ifdef CONFIG_NF_CONNTRACK_EVENTS
 static int
 ctnetlink_conntrack_event(unsigned int events, struct nf_ct_event *item)
 {
