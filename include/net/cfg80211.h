@@ -3774,7 +3774,7 @@ void cfg80211_tdls_oper_request(struct net_device *dev, const u8 *peer,
  *
  * return 0 if MCS index >= 32
  */
-u16 cfg80211_calculate_bitrate(struct rate_info *rate);
+u32 cfg80211_calculate_bitrate(struct rate_info *rate);
 
 /**
  * struct cfg80211_ft_event - FT Information Elements
