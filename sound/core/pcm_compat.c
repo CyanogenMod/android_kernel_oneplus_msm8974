@@ -190,7 +190,8 @@ struct snd_pcm_status32 {
 	u32 avail_max;
 	u32 overrange;
 	s32 suspended_state;
-	unsigned char reserved[60];
+	struct compat_timespec audio_tstamp;
+	unsigned char reserved[60-sizeof(struct compat_timespec)];
 } __attribute__((packed));
 
 
@@ -205,17 +206,16 @@ static int snd_pcm_status_user_compat(struct snd_pcm_substream *substream,
 		return err;
 
 	if (put_user(status.state, &src->state) ||
-	    put_user(status.trigger_tstamp.tv_sec, &src->trigger_tstamp.tv_sec) ||
-	    put_user(status.trigger_tstamp.tv_nsec, &src->trigger_tstamp.tv_nsec) ||
-	    put_user(status.tstamp.tv_sec, &src->tstamp.tv_sec) ||
-	    put_user(status.tstamp.tv_nsec, &src->tstamp.tv_nsec) ||
+	    compat_put_timespec(&status.trigger_tstamp, &src->trigger_tstamp) ||
+	    compat_put_timespec(&status.tstamp, &src->tstamp) ||
 	    put_user(status.appl_ptr, &src->appl_ptr) ||
 	    put_user(status.hw_ptr, &src->hw_ptr) ||
 	    put_user(status.delay, &src->delay) ||
 	    put_user(status.avail, &src->avail) ||
 	    put_user(status.avail_max, &src->avail_max) ||
 	    put_user(status.overrange, &src->overrange) ||
-	    put_user(status.suspended_state, &src->suspended_state))
+	    put_user(status.suspended_state, &src->suspended_state) ||
+	    compat_put_timespec(&status.audio_tstamp, &src->audio_tstamp))
 		return -EFAULT;
 
 	return err;
@@ -364,6 +364,7 @@ struct snd_pcm_mmap_status32 {
 	u32 hw_ptr;
 	struct compat_timespec tstamp;
 	s32 suspended_state;
+	struct compat_timespec audio_tstamp;
 } __attribute__((packed));
 
 struct snd_pcm_mmap_control32 {
@@ -426,12 +427,14 @@ static int snd_pcm_ioctl_sync_ptr_compat(struct snd_pcm_substream *substream,
 	sstatus.hw_ptr = status->hw_ptr % boundary;
 	sstatus.tstamp = status->tstamp;
 	sstatus.suspended_state = status->suspended_state;
+	sstatus.audio_tstamp = status->audio_tstamp;
 	snd_pcm_stream_unlock_irq(substream);
 	if (put_user(sstatus.state, &src->s.status.state) ||
 	    put_user(sstatus.hw_ptr, &src->s.status.hw_ptr) ||
-	    put_user(sstatus.tstamp.tv_sec, &src->s.status.tstamp.tv_sec) ||
-	    put_user(sstatus.tstamp.tv_nsec, &src->s.status.tstamp.tv_nsec) ||
+	    compat_put_timespec(&sstatus.tstamp, &src->s.status.tstamp) ||
 	    put_user(sstatus.suspended_state, &src->s.status.suspended_state) ||
+	    compat_put_timespec(&sstatus.audio_tstamp,
+		    &src->s.status.audio_tstamp) ||
 	    put_user(scontrol.appl_ptr, &src->c.control.appl_ptr) ||
 	    put_user(scontrol.avail_min, &src->c.control.avail_min))
 		return -EFAULT;
@@ -456,8 +459,26 @@ enum {
 	SNDRV_PCM_IOCTL_WRITEN_FRAMES32 = _IOW('A', 0x52, struct snd_xfern32),
 	SNDRV_PCM_IOCTL_READN_FRAMES32 = _IOR('A', 0x53, struct snd_xfern32),
 	SNDRV_PCM_IOCTL_SYNC_PTR32 = _IOWR('A', 0x23, struct snd_pcm_sync_ptr32),
-
 };
+
+static int snd_compressed_ioctl32(struct snd_pcm_substream *substream,
+				 unsigned int cmd, void __user *arg)
+{
+	struct snd_pcm_runtime *runtime;
+	int err = 0;
+
+	if (PCM_RUNTIME_CHECK(substream))
+		return -ENXIO;
+	runtime = substream->runtime;
+	if (substream->ops->compat_ioctl) {
+		err = substream->ops->compat_ioctl(substream, cmd, arg);
+	} else {
+		err = -ENOIOCTLCMD;
+		pr_err("%s failed cmd = %d\n", __func__, cmd);
+	}
+	pr_debug("%s called with cmd = %d\n", __func__, cmd);
+	return err;
+}
 
 static long snd_pcm_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -526,6 +547,9 @@ static long snd_pcm_ioctl_compat(struct file *file, unsigned int cmd, unsigned l
 		return snd_pcm_ioctl_rewind_compat(substream, argp);
 	case SNDRV_PCM_IOCTL_FORWARD32:
 		return snd_pcm_ioctl_forward_compat(substream, argp);
+	default:
+		if (_IOC_TYPE(cmd) == 'C')
+			return snd_compressed_ioctl32(substream, cmd, argp);
 	}
 
 	return -ENOIOCTLCMD;
