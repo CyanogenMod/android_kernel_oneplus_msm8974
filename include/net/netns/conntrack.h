@@ -28,6 +28,10 @@ struct netns_ct {
 	unsigned int		sysctl_log_invalid; /* Log invalid packets */
 	int			sysctl_auto_assign_helper;
 	bool			auto_assign_helper_warned;
+#ifdef CONFIG_NF_NAT_NEEDED
+	struct hlist_head	*nat_bysource;
+	unsigned int		nat_htable_size;
+#endif
 #ifdef CONFIG_SYSCTL
 	struct ctl_table_header	*sysctl_header;
 	struct ctl_table_header	*acct_sysctl_header;
