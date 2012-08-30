@@ -39,6 +39,14 @@ struct user_namespace init_user_ns = {
 			.count = 4294967295,
 		},
 	},
+	.projid_map = {
+		.nr_extents = 1,
+		.extent[0] = {
+			.first = 0,
+			.lower_first = 0,
+			.count = 4294967295U,
+		},
+	},
 	.kref = {
 		.refcount	= ATOMIC_INIT(3),
 	},
