@@ -2692,8 +2692,7 @@ static int select_idle_sibling(struct task_struct *p, int target)
 	if (target == prev_cpu && idle_cpu(prev_cpu))
 		return prev_cpu;
 
-	if (!sysctl_sched_wake_to_idle &&
-	    !(current->flags & PF_WAKE_UP_IDLE) &&
+	if (!(current->flags & PF_WAKE_UP_IDLE) &&
 	    !(p->flags & PF_WAKE_UP_IDLE))
 		return target;
 
