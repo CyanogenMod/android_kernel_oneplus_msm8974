@@ -352,7 +352,7 @@ static struct ion_handle *ion_handle_create(struct ion_client *client,
 	if (!handle)
 		return ERR_PTR(-ENOMEM);
 	kref_init(&handle->ref);
-	rb_init_node(&handle->node);
+	RB_CLEAR_NODE(&handle->node);
 	handle->client = client;
 	ion_buffer_get(buffer);
 	ion_buffer_add_to_handle(buffer);
