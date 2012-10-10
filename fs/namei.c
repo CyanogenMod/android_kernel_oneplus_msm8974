@@ -2715,7 +2715,7 @@ out_dput:
  */
 static int do_last(struct nameidata *nd, struct path *path,
 		   struct file *file, const struct open_flags *op,
-		   int *opened, const char *pathname)
+		   int *opened, struct filename *name)
 {
 	struct dentry *dir = nd->path.dentry;
 	int open_flag = op->open_flag;
@@ -2727,6 +2727,7 @@ static int do_last(struct nameidata *nd, struct path *path,
 	struct path save_parent = { .dentry = NULL, .mnt = NULL };
 	bool retried = false;
 	int error;
+	const char *pathname = name->name;
 
 	nd->flags &= ~LOOKUP_PARENT;
 	nd->flags |= op->intent;
@@ -2961,7 +2962,7 @@ stale_open:
 	goto retry_lookup;
 }
 
-static struct file *path_openat(int dfd, const char *pathname,
+static struct file *path_openat(int dfd, struct filename *pathname,
 		struct nameidata *nd, const struct open_flags *op, int flags)
 {
 	struct file *base = NULL;
@@ -2976,12 +2977,12 @@ static struct file *path_openat(int dfd, const char *pathname,
 
 	file->f_flags = op->open_flag;
 
-	error = path_init(dfd, pathname, flags | LOOKUP_PARENT, nd, &base);
+	error = path_init(dfd, pathname->name, flags | LOOKUP_PARENT, nd, &base);
 	if (unlikely(error))
 		goto out;
 
 	current->total_link_count = 0;
-	error = link_path_walk(pathname, nd);
+	error = link_path_walk(pathname->name, nd);
 	if (unlikely(error))
 		goto out;
 
@@ -3027,7 +3028,7 @@ out:
 	return file;
 }
 
-struct file *do_filp_open(int dfd, const char *pathname,
+struct file *do_filp_open(int dfd, struct filename *pathname,
 		const struct open_flags *op, int flags)
 {
 	struct nameidata nd;
@@ -3046,6 +3047,7 @@ struct file *do_file_open_root(struct dentry *dentry, struct vfsmount *mnt,
 {
 	struct nameidata nd;
 	struct file *file;
+	struct filename filename = { .name = name };
 
 	nd.root.mnt = mnt;
 	nd.root.dentry = dentry;
@@ -3055,11 +3057,11 @@ struct file *do_file_open_root(struct dentry *dentry, struct vfsmount *mnt,
 	if (dentry->d_inode->i_op->follow_link && op->intent & LOOKUP_OPEN)
 		return ERR_PTR(-ELOOP);
 
-	file = path_openat(-1, name, &nd, op, flags | LOOKUP_RCU);
+	file = path_openat(-1, &filename, &nd, op, flags | LOOKUP_RCU);
 	if (unlikely(file == ERR_PTR(-ECHILD)))
-		file = path_openat(-1, name, &nd, op, flags);
+		file = path_openat(-1, &filename, &nd, op, flags);
 	if (unlikely(file == ERR_PTR(-ESTALE)))
-		file = path_openat(-1, name, &nd, op, flags | LOOKUP_REVAL);
+		file = path_openat(-1, &filename, &nd, op, flags | LOOKUP_REVAL);
 	return file;
 }
 
