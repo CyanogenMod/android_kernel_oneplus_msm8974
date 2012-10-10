@@ -2008,22 +2008,31 @@ static int path_lookupat(int dfd, const char *name,
 	return err;
 }
 
-static int do_path_lookup(int dfd, const char *name,
+static int filename_lookup(int dfd, struct filename *name,
 				unsigned int flags, struct nameidata *nd)
 {
-	int retval = path_lookupat(dfd, name, flags | LOOKUP_RCU, nd);
+	int retval = path_lookupat(dfd, name->name, flags | LOOKUP_RCU, nd);
 	if (unlikely(retval == -ECHILD))
-		retval = path_lookupat(dfd, name, flags, nd);
+		retval = path_lookupat(dfd, name->name, flags, nd);
 	if (unlikely(retval == -ESTALE))
-		retval = path_lookupat(dfd, name, flags | LOOKUP_REVAL, nd);
+		retval = path_lookupat(dfd, name->name,
+						flags | LOOKUP_REVAL, nd);
 
 	if (likely(!retval)) {
 		if (unlikely(!audit_dummy_context())) {
 			if (nd->path.dentry && nd->inode)
-				audit_inode(name, nd->path.dentry);
+				audit_inode(name->name, nd->path.dentry);
 		}
 	}
 	return retval;
+}
+
+static int do_path_lookup(int dfd, const char *name,
+				unsigned int flags, struct nameidata *nd)
+{
+	struct filename filename = { .name = name };
+
+	return filename_lookup(dfd, &filename, flags, nd);
 }
 
 /* does lookup, returns the object with parent locked */
@@ -2157,7 +2166,7 @@ int user_path_at_empty(int dfd, const char __user *name, unsigned flags,
 
 		BUG_ON(flags & LOOKUP_PARENT);
 
-		err = do_path_lookup(dfd, tmp->name, flags, &nd);
+		err = filename_lookup(dfd, tmp, flags, &nd);
 		putname(tmp);
 		if (!err)
 			*path = nd.path;
@@ -2171,6 +2180,12 @@ int user_path_at(int dfd, const char __user *name, unsigned flags,
 	return user_path_at_empty(dfd, name, flags, path, NULL);
 }
 
+/*
+ * NB: most callers don't do anything directly with the reference to the
+ *     to struct filename, but the nd->last pointer points into the name string
+ *     allocated by getname. So we must hold the reference to it until all
+ *     path-walking is complete.
+ */
 static struct filename *
 user_path_parent(int dfd, const char __user *path, struct nameidata *nd)
 {
@@ -2180,7 +2195,7 @@ user_path_parent(int dfd, const char __user *path, struct nameidata *nd)
 	if (IS_ERR(s))
 		return s;
 
-	error = do_path_lookup(dfd, s->name, LOOKUP_PARENT, nd);
+	error = filename_lookup(dfd, s, LOOKUP_PARENT, nd);
 	if (error) {
 		putname(s);
 		return ERR_PTR(error);
