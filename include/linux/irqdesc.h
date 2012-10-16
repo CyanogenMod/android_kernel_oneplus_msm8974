@@ -12,6 +12,8 @@ struct irq_affinity_notify;
 struct proc_dir_entry;
 struct timer_rand_state;
 struct module;
+struct irq_desc;
+
 /**
  * struct irq_desc - interrupt descriptor
  * @irq_data:		per irq and chip data passed down to chip functions
@@ -71,6 +73,7 @@ struct irq_desc {
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry	*dir;
 #endif
+	int			parent_irq;
 	struct module		*owner;
 	const char		*name;
 } ____cacheline_internodealigned_in_smp;
