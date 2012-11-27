@@ -175,6 +175,7 @@
 #define   SDHCI_CTRL_DRV_TYPE_D		0x0030
 #define  SDHCI_CTRL_EXEC_TUNING		0x0040
 #define  SDHCI_CTRL_TUNED_CLK		0x0080
+#define  SDHCI_CTRL_ASYNC_INT_ENABLE	0x4000
 #define  SDHCI_CTRL_PRESET_VAL_ENABLE	0x8000
 
 #define SDHCI_CAPABILITIES	0x40
@@ -195,6 +196,7 @@
 #define  SDHCI_CAN_VDD_300	0x02000000
 #define  SDHCI_CAN_VDD_180	0x04000000
 #define  SDHCI_CAN_64BIT	0x10000000
+#define  SDHCI_ASYNC_INTR	0x20000000
 
 #define  SDHCI_SUPPORT_SDR50	0x00000001
 #define  SDHCI_SUPPORT_SDR104	0x00000002
@@ -233,6 +235,18 @@
 #define SDHCI_ADMA_ADDRESS	0x58
 
 /* 60-FB reserved */
+
+#define SDHCI_PRESET_FOR_SDR12 0x66
+#define SDHCI_PRESET_FOR_SDR25 0x68
+#define SDHCI_PRESET_FOR_SDR50 0x6A
+#define SDHCI_PRESET_FOR_SDR104        0x6C
+#define SDHCI_PRESET_FOR_DDR50 0x6E
+#define SDHCI_PRESET_DRV_MASK  0xC000
+#define SDHCI_PRESET_DRV_SHIFT  14
+#define SDHCI_PRESET_CLKGEN_SEL_MASK   0x400
+#define SDHCI_PRESET_CLKGEN_SEL_SHIFT	10
+#define SDHCI_PRESET_SDCLK_FREQ_MASK   0x3FF
+#define SDHCI_PRESET_SDCLK_FREQ_SHIFT	0
 
 #define SDHCI_SLOT_INT_STATUS	0xFC
 
@@ -295,7 +309,11 @@ struct sdhci_ops {
 	unsigned int	(*get_max_segments)(void);
 	void	(*platform_bus_voting)(struct sdhci_host *host, u32 enable);
 	void    (*disable_data_xfer)(struct sdhci_host *host);
+	void	(*dump_vendor_regs)(struct sdhci_host *host);
 	int	(*enable_controller_clock)(struct sdhci_host *host);
+	int	(*config_auto_tuning_cmd)(struct sdhci_host *host,
+					  bool enable,
+					  u32 type);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

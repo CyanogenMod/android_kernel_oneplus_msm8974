@@ -142,7 +142,6 @@ struct mmc_host_ops {
 
 	/* The tuning command opcode value is different for SD and eMMC cards */
 	int	(*execute_tuning)(struct mmc_host *host, u32 opcode);
-	void	(*enable_preset_value)(struct mmc_host *host, bool enable);
 	int	(*select_drive_strength)(unsigned int max_dtr, int host_drv, int card_drv);
 	void	(*hw_reset)(struct mmc_host *host);
 	unsigned long (*get_max_frequency)(struct mmc_host *host);
@@ -195,6 +194,12 @@ struct mmc_context_info {
 struct mmc_hotplug {
 	unsigned int irq;
 	void *handler_priv;
+};
+
+enum dev_state {
+	DEV_SUSPENDING = 1,
+	DEV_SUSPENDED,
+	DEV_RESUMED,
 };
 
 struct mmc_host {
@@ -421,6 +426,7 @@ struct mmc_host {
 		struct delayed_work work;
 		enum mmc_load	state;
 	} clk_scaling;
+	enum dev_state dev_status;
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
