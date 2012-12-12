@@ -175,11 +175,18 @@ __v7_ca15mp_setup:
 #endif
 __v7_setup:
 	adr	r12, __v7_setup_stack		@ the local stack
+	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
+	ubfx	r10, r0, #4, #28
+	ldr	r6, =0x00f0000
+	bic	r10, r10, r6
+	ldr	r6, =0x410fc0f			@ ARM cortex A15
+	teq	r10, r6
+	beq	4f
 	stmia	r12, {r0-r5, r7, r9, r11, lr}
 	bl      v7_flush_dcache_louis
 	ldmia	r12, {r0-r5, r7, r9, r11, lr}
 
-	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
+4:
 	and	r10, r0, #0xff000000		@ ARM?
 	teq	r10, #0x41000000
 	bne	3f
