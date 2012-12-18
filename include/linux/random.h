@@ -67,6 +67,7 @@ unsigned long get_random_long(void);
 unsigned long randomize_range(unsigned long start, unsigned long end, unsigned long len);
 
 u32 prandom_u32(void);
+void prandom_bytes(void *buf, int nbytes);
 void prandom_seed(u32 seed);
 
 /*
@@ -77,6 +78,7 @@ void prandom_seed(u32 seed);
 #define srandom32(seed) prandom_seed(seed)
 
 u32 prandom_u32_state(struct rnd_state *);
+void prandom_bytes_state(struct rnd_state *state, void *buf, int nbytes);
 
 /*
  * Handle minimum values for seeds
