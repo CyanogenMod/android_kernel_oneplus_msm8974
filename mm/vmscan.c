@@ -2450,12 +2450,16 @@ static bool zone_balanced(struct zone *zone, int order,
 }
 
 /*
- * pgdat_balanced is used when checking if a node is balanced for high-order
- * allocations. Only zones that meet watermarks and are in a zone allowed
- * by the callers classzone_idx are added to balanced_pages. The total of
- * balanced pages must be at least 25% of the zones allowed by classzone_idx
- * for the node to be considered balanced. Forcing all zones to be balanced
- * for high orders can cause excessive reclaim when there are imbalanced zones.
+ * pgdat_balanced() is used when checking if a node is balanced.
+ *
+ * For order-0, all zones must be balanced!
+ *
+ * For high-order allocations only zones that meet watermarks and are in a
+ * zone allowed by the callers classzone_idx are added to balanced_pages. The
+ * total of balanced pages must be at least 25% of the zones allowed by
+ * classzone_idx for the node to be considered balanced. Forcing all zones to
+ * be balanced for high orders can cause excessive reclaim when there are
+ * imbalanced zones.
  * The choice of 25% is due to
  *   o a 16M DMA zone that is balanced will not balance a zone on any
  *     reasonable sized machine
@@ -2465,27 +2469,49 @@ static bool zone_balanced(struct zone *zone, int order,
  *     Similarly, on x86-64 the Normal zone would need to be at least 1G
  *     to balance a node on its own. These seemed like reasonable ratios.
  */
-static bool pgdat_balanced(pg_data_t *pgdat, unsigned long balanced_pages,
-						int classzone_idx)
+static bool pgdat_balanced(pg_data_t *pgdat, int order, int classzone_idx)
 {
 	unsigned long present_pages = 0;
+	unsigned long balanced_pages = 0;
 	int i;
 
-	for (i = 0; i <= classzone_idx; i++)
-		present_pages += pgdat->node_zones[i].present_pages;
+	/* Check the watermark levels */
+	for (i = 0; i <= classzone_idx; i++) {
+		struct zone *zone = pgdat->node_zones + i;
 
-	/* A special case here: if zone has no page, we think it's balanced */
-	return balanced_pages >= (present_pages >> 2);
+		if (!populated_zone(zone))
+			continue;
+
+		present_pages += zone->present_pages;
+
+		/*
+		 * A special case here:
+		 *
+		 * balance_pgdat() skips over all_unreclaimable after
+		 * DEF_PRIORITY. Effectively, it considers them balanced so
+		 * they must be considered balanced here as well!
+		 */
+		if (zone->all_unreclaimable) {
+			balanced_pages += zone->present_pages;
+			continue;
+		}
+
+		if (zone_balanced(zone, order, 0, i))
+			balanced_pages += zone->present_pages;
+		else if (!order)
+			return false;
+	}
+
+	if (order)
+		return balanced_pages >= (present_pages >> 2);
+	else
+		return true;
 }
 
 /* is kswapd sleeping prematurely? */
 static bool sleeping_prematurely(pg_data_t *pgdat, int order, long remaining,
 					int classzone_idx)
 {
-	int i;
-	unsigned long balanced = 0;
-	bool all_zones_ok = true;
-
 	/* If a direct reclaimer woke kswapd within HZ/10, it's premature */
 	if (remaining)
 		return true;
@@ -2573,7 +2599,6 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 							int *classzone_idx)
 {
 	struct zone *unbalanced_zone;
-	unsigned long balanced;
 	int i;
 	int end_zone = 0;	/* Inclusive.  0 = ZONE_DMA */
 	unsigned long total_scanned;
@@ -2598,7 +2623,6 @@ loop_again:
 		int has_under_min_watermark_zone = 0;
 
 		unbalanced_zone = NULL;
-		balanced = 0;
 
 		/*
 		 * Scan in the highmem->dma direction for the highest
@@ -2747,13 +2771,11 @@ loop_again:
 				 * spectulatively avoid congestion waits
 				 */
 				zone_clear_flag(zone, ZONE_CONGESTED);
-				if (i <= *classzone_idx)
-					balanced += zone->present_pages;
 			}
 
 		}
 
-		if (!unbalanced_zone || (order && pgdat_balanced(pgdat, balanced, *classzone_idx)))
+		if (pgdat_balanced(pgdat, order, *classzone_idx))
 			break;		/* kswapd: all done */
 		/*
 		 * OK, kswapd is getting into trouble.  Take a nap, then take
@@ -2777,12 +2799,7 @@ loop_again:
 	} while (--sc.priority >= 0);
 out:
 
-	/*
-	 * order-0: All zones must meet high watermark for a balanced node
-	 * high-order: Balanced zones must make up at least 25% of the node
-	 *             for the node to be balanced
-	 */
-	if (unbalanced_zone && (!order || !pgdat_balanced(pgdat, balanced, *classzone_idx))) {
+	if (!pgdat_balanced(pgdat, order, *classzone_idx)) {
 		cond_resched();
 
 		try_to_freeze();
