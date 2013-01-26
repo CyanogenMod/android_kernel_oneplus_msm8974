@@ -15,7 +15,6 @@
 
 #include "smpboot.h"
 
-#ifdef CONFIG_USE_GENERIC_SMP_HELPERS
 enum {
 	CSD_FLAG_LOCK		= 0x01,
 };
@@ -471,6 +470,7 @@ int smp_call_function(smp_call_func_t func, void *info, int wait)
 }
 EXPORT_SYMBOL(smp_call_function);
 
+#ifndef CONFIG_USE_GENERIC_SMP_HELPERS
 void ipi_call_lock(void)
 {
 	raw_spin_lock(&call_function.lock);
@@ -490,7 +490,7 @@ void ipi_call_unlock_irq(void)
 {
 	raw_spin_unlock_irq(&call_function.lock);
 }
-#endif /* USE_GENERIC_SMP_HELPERS */
+#endif
 
 /* Setup configured maximum number of CPUs to activate */
 unsigned int setup_max_cpus = NR_CPUS;
