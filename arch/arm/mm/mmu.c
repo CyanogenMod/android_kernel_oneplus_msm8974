@@ -857,25 +857,41 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
 {
 	struct map_desc *md;
 	struct vm_struct *vm;
-	int rc = 0;
+	struct static_vm *svm;
 
 	if (!nr)
 		return;
 
-	vm = early_alloc_aligned(sizeof(*vm) * nr, __alignof__(*vm));
+	svm = early_alloc_aligned(sizeof(*svm) * nr, __alignof__(*svm));
 
 	for (md = io_desc; nr; md++, nr--) {
 		create_mapping(md);
+
+		vm = &svm->vm;
 		vm->addr = (void *)(md->virtual & PAGE_MASK);
 		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 		vm->phys_addr = __pfn_to_phys(md->pfn);
 		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
 		vm->flags |= VM_ARM_MTYPE(md->type);
 		vm->caller = iotable_init;
-		rc = vm_area_check_early(vm);
-		if (!rc)
-			vm_area_add_early(vm++);
+		add_static_vm_early(svm++);
 	}
+}
+
+void __init vm_reserve_area_early(unsigned long addr, unsigned long size,
+				  void *caller)
+{
+	struct vm_struct *vm;
+	struct static_vm *svm;
+
+	svm = early_alloc_aligned(sizeof(*svm), __alignof__(*svm));
+
+	vm = &svm->vm;
+	vm->addr = (void *)addr;
+	vm->size = size;
+	vm->flags = VM_IOREMAP | VM_ARM_EMPTY_MAPPING;
+	vm->caller = caller;
+	add_static_vm_early(svm);
 }
 
 #ifndef CONFIG_ARM_LPAE
@@ -907,14 +923,13 @@ static void __init pmd_empty_section_gap(unsigned long addr)
 
 static void __init fill_pmd_gaps(void)
 {
+	struct static_vm *svm;
 	struct vm_struct *vm;
 	unsigned long addr, next = 0;
 	pmd_t *pmd;
 
-	/* we're still single threaded hence no lock needed here */
-	for (vm = vmlist; vm; vm = vm->next) {
-		if (!(vm->flags & (VM_ARM_STATIC_MAPPING | VM_ARM_EMPTY_MAPPING)))
-			continue;
+	list_for_each_entry(svm, &static_vmlist, list) {
+		vm = &svm->vm;
 		addr = (unsigned long)vm->addr;
 		if (addr < next)
 			continue;
