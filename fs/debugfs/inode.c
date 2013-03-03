@@ -301,6 +301,7 @@ static struct file_system_type debug_fs_type = {
 	.mount =	debug_mount,
 	.kill_sb =	kill_litter_super,
 };
+MODULE_ALIAS_FS("debugfs");
 
 static int debugfs_create_by_name(const char *name, umode_t mode,
 				  struct dentry *parent,
