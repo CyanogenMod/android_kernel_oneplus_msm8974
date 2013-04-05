@@ -124,6 +124,12 @@ found:
 	return sk;
 }
 
+bool l2cap_is_socket(struct socket *sock)
+{
+	return sock && sock->ops == &l2cap_sock_ops;
+}
+EXPORT_SYMBOL(l2cap_is_socket);
+
 static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int alen)
 {
 	struct sock *sk = sock->sk;

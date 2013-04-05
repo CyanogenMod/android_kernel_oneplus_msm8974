@@ -667,6 +667,7 @@ extern struct bt_sock_list l2cap_sk_list;
 
 int l2cap_init_sockets(void);
 void l2cap_cleanup_sockets(void);
+bool l2cap_is_socket(struct socket *sock);
 
 u8 l2cap_get_ident(struct l2cap_conn *conn);
 void l2cap_send_cmd(struct l2cap_conn *conn, u8 ident, u8 code, u16 len, void *data);
