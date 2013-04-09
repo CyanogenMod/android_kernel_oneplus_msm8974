@@ -16,7 +16,7 @@ DEFCONFIG="radioactive_defconfig"
 
 # Kernel Details
 BASE_RADIOACTIVE_VER="RADIOACTIVE_REBORN"
-VER="_V1.09"
+VER="_V1.10"
 RADIOACTIVE_VER="$BASE_RADIOACTIVE_VER$VER"
 
 # Vars
@@ -37,7 +37,6 @@ ZIMAGE_DIR="${HOME}/Android/AK-OnePone-AnyKernel2"
 
 # Functions
 function clean_all {
-                ccache -c -C
 		rm -rf $MODULES_DIR/*
 		cd $REPACK_DIR
 		rm -rf $KERNEL
