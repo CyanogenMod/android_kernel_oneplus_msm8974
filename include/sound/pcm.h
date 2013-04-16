@@ -186,6 +186,8 @@ struct snd_pcm_ops {
 #define SNDRV_PCM_FMTBIT_G723_24_1B	_SNDRV_PCM_FMTBIT(G723_24_1B)
 #define SNDRV_PCM_FMTBIT_G723_40	_SNDRV_PCM_FMTBIT(G723_40)
 #define SNDRV_PCM_FMTBIT_G723_40_1B	_SNDRV_PCM_FMTBIT(G723_40_1B)
+#define SNDRV_PCM_FMTBIT_DSD_U8		_SNDRV_PCM_FMTBIT(DSD_U8)
+#define SNDRV_PCM_FMTBIT_DSD_U16_LE	_SNDRV_PCM_FMTBIT(DSD_U16_LE)
 
 #ifdef SNDRV_LITTLE_ENDIAN
 #define SNDRV_PCM_FMTBIT_S16		SNDRV_PCM_FMTBIT_S16_LE
@@ -1156,5 +1158,11 @@ int snd_pcm_add_volume_ctls(struct snd_pcm *pcm, int stream,
 			   int max_length,
 			   unsigned long private_value,
 			   struct snd_pcm_volume **info_ret);
+
+/* Strong-typed conversion of pcm_format to bitwise */
+static inline u64 pcm_format_to_bits(snd_pcm_format_t pcm_format)
+{
+	return 1ULL << (__force int) pcm_format;
+}
 
 #endif /* __SOUND_PCM_H */
