@@ -37,9 +37,6 @@ void __ref platform_cpu_die(unsigned int cpu)
 {
 	unsigned int this_cpu;
 
-	flush_cache_all();
-	dsb();
-
 	/*
 	 * we're ready for shutdown now, so do it
 	 */
