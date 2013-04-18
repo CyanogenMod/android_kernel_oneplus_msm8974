@@ -26,7 +26,6 @@ int platform_cpu_kill(unsigned int cpu)
  */
 void platform_cpu_die(unsigned int cpu)
 {
-	flush_cache_all();
 	imx_enable_cpu(cpu, false);
 	cpu_do_idle();
 

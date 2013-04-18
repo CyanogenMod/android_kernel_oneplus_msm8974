@@ -18,7 +18,6 @@
 #include <linux/smp.h>
 
 #include <asm/smp_scu.h>
-#include <asm/cacheflush.h>
 
 #include "core.h"
 
@@ -35,8 +34,6 @@ int platform_cpu_kill(unsigned int cpu)
  */
 void platform_cpu_die(unsigned int cpu)
 {
-	flush_cache_all();
-
 	highbank_set_cpu_jump(cpu, secondary_startup);
 	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
 
