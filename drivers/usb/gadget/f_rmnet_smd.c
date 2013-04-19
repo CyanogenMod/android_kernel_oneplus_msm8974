@@ -1370,7 +1370,7 @@ int rmnet_smd_bind_config(struct usb_configuration *c)
 
 	dev->function.name = "rmnet";
 	dev->function.strings = rmnet_smd_strings;
-	dev->function.descriptors = rmnet_smd_fs_function;
+	dev->function.fs_descriptors = rmnet_smd_fs_function;
 	dev->function.hs_descriptors = rmnet_smd_hs_function;
 	dev->function.bind = rmnet_smd_bind;
 	dev->function.unbind = rmnet_smd_unbind;

@@ -1059,7 +1059,7 @@ f_audio_bind(struct usb_configuration *c, struct usb_function *f)
 	struct usb_composite_dev *cdev = c->cdev;
 	struct f_audio		*audio = func_to_audio(f);
 	int			status;
-	struct usb_ep		*ep;
+	struct usb_ep		*ep = NULL;
 	u8			epaddr;
 
 
@@ -1127,22 +1127,15 @@ f_audio_bind(struct usb_configuration *c, struct usb_function *f)
 	epaddr = speaker_as_ep_out_desc.bEndpointAddress & ~USB_DIR_IN;
 	speaker_as_iso_out.id = epaddr;
 
-	/* support all relevant hardware speeds. we expect that when
-	 * hardware is dual speed, all bulk-capable endpoints work at
-	 * both speeds
-	 */
-
 	/* copy descriptors, and track endpoint copies */
-	if (gadget_is_dualspeed(c->cdev->gadget)) {
-		c->highspeed = true;
-		f->hs_descriptors = usb_copy_descriptors(f_audio_desc);
-	} else {
-		f->descriptors = usb_copy_descriptors(f_audio_desc);
-	}
-
+	status = usb_assign_descriptors(f, f_audio_desc, f_audio_desc, NULL);
+	if (status)
+		goto fail;
 	return 0;
 
 fail:
+	if (ep)
+		ep->driver_data = NULL;
 	return status;
 }
 
@@ -1151,8 +1144,7 @@ f_audio_unbind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct f_audio *audio = func_to_audio(f);
 
-	usb_free_descriptors(f->descriptors);
-	usb_free_descriptors(f->hs_descriptors);
+	usb_free_all_descriptors(f);
 	kfree(audio);
 }
 

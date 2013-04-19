@@ -644,7 +644,7 @@ static int qdss_bind_config(struct usb_configuration *c, const char *name)
 	spin_unlock_irqrestore(&d_lock, flags);
 	qdss->cdev = c->cdev;
 	qdss->function.name = name;
-	qdss->function.descriptors = qdss_hs_desc;
+	qdss->function.fs_descriptors = qdss_hs_desc;
 	qdss->function.hs_descriptors = qdss_hs_desc;
 	qdss->function.strings = qdss_strings;
 	qdss->function.bind = qdss_bind;

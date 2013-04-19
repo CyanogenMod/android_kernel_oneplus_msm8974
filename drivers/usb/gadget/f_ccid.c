@@ -489,7 +489,7 @@ static void ccid_function_unbind(struct usb_configuration *c,
 {
 	if (gadget_is_dualspeed(c->cdev->gadget))
 		usb_free_descriptors(f->hs_descriptors);
-	usb_free_descriptors(f->descriptors);
+	usb_free_descriptors(f->fs_descriptors);
 
 }
 
@@ -535,8 +535,8 @@ static int ccid_function_bind(struct usb_configuration *c,
 	ccid_dev->out = ep;
 	ep->driver_data = cdev;
 
-	f->descriptors = usb_copy_descriptors(ccid_fs_descs);
-	if (!f->descriptors)
+	f->fs_descriptors = usb_copy_descriptors(ccid_fs_descs);
+	if (!f->fs_descriptors)
 		goto ep_auto_out_fail;
 
 	if (gadget_is_dualspeed(cdev->gadget)) {
@@ -944,7 +944,7 @@ static int ccid_bind_config(struct usb_configuration *c)
 	pr_debug("ccid_bind_config\n");
 	ccid_dev->cdev = c->cdev;
 	ccid_dev->function.name = FUNCTION_NAME;
-	ccid_dev->function.descriptors = ccid_fs_descs;
+	ccid_dev->function.fs_descriptors = ccid_fs_descs;
 	ccid_dev->function.hs_descriptors = ccid_hs_descs;
 	ccid_dev->function.bind = ccid_function_bind;
 	ccid_dev->function.unbind = ccid_function_unbind;

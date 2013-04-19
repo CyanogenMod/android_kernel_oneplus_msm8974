@@ -1550,7 +1550,7 @@ int rmnet_sdio_function_add(struct usb_configuration *c)
 
 	dev->function.name = "rmnet_sdio";
 	dev->function.strings = rmnet_sdio_strings;
-	dev->function.descriptors = rmnet_sdio_fs_function;
+	dev->function.fs_descriptors = rmnet_sdio_fs_function;
 	dev->function.hs_descriptors = rmnet_sdio_hs_function;
 	dev->function.bind = rmnet_sdio_bind;
 	dev->function.unbind = rmnet_sdio_unbind;
