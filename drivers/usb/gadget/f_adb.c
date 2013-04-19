@@ -666,7 +666,7 @@ static int adb_bind_config(struct usb_configuration *c)
 
 	dev->cdev = c->cdev;
 	dev->function.name = "adb";
-	dev->function.descriptors = fs_adb_descs;
+	dev->function.fs_descriptors = fs_adb_descs;
 	dev->function.hs_descriptors = hs_adb_descs;
 	if (gadget_is_superspeed(c->cdev->gadget))
 		dev->function.ss_descriptors = ss_adb_descs;

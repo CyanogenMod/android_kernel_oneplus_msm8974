@@ -356,6 +356,80 @@ static struct usb_descriptor_header *mbim_hs_function[] = {
 	NULL,
 };
 
+/* Super Speed Support */
+static struct usb_endpoint_descriptor ss_mbim_notify_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+	.bEndpointAddress =	USB_DIR_IN,
+	.bmAttributes =		USB_ENDPOINT_XFER_INT,
+	.wMaxPacketSize =	4*cpu_to_le16(NCM_STATUS_BYTECOUNT),
+	.bInterval =		LOG2_STATUS_INTERVAL_MSEC + 4,
+};
+
+static struct usb_ss_ep_comp_descriptor ss_mbim_notify_comp_desc = {
+	.bLength =		sizeof(ss_mbim_notify_comp_desc),
+	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
+
+	/* the following 3 values can be tweaked if necessary */
+	/* .bMaxBurst =         0, */
+	/* .bmAttributes =      0, */
+	.wBytesPerInterval =	4*cpu_to_le16(NCM_STATUS_BYTECOUNT),
+};
+
+static struct usb_endpoint_descriptor ss_mbim_in_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+	.bEndpointAddress =	USB_DIR_IN,
+	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+	.wMaxPacketSize =	__constant_cpu_to_le16(1024),
+};
+
+static struct usb_ss_ep_comp_descriptor ss_mbim_in_comp_desc = {
+	.bLength =              sizeof(ss_mbim_in_comp_desc),
+	.bDescriptorType =      USB_DT_SS_ENDPOINT_COMP,
+
+	/* the following 2 values can be tweaked if necessary */
+	/* .bMaxBurst =         0, */
+	/* .bmAttributes =      0, */
+};
+
+static struct usb_endpoint_descriptor ss_mbim_out_desc = {
+	.bLength =		USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType =	USB_DT_ENDPOINT,
+	.bEndpointAddress =	USB_DIR_OUT,
+	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
+	.wMaxPacketSize =	__constant_cpu_to_le16(1024),
+};
+
+static struct usb_ss_ep_comp_descriptor ss_mbim_out_comp_desc = {
+	.bLength =		sizeof(ss_mbim_out_comp_desc),
+	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
+
+	/* the following 2 values can be tweaked if necessary */
+	/* .bMaxBurst =         0, */
+	/* .bmAttributes =      0, */
+};
+
+static struct usb_descriptor_header *mbim_ss_function[] = {
+	(struct usb_descriptor_header *) &mbim_iad_desc,
+	/* MBIM control descriptors */
+	(struct usb_descriptor_header *) &mbim_control_intf,
+	(struct usb_descriptor_header *) &mbim_header_desc,
+	(struct usb_descriptor_header *) &mbim_union_desc,
+	(struct usb_descriptor_header *) &mbb_desc,
+	(struct usb_descriptor_header *) &ext_mbb_desc,
+	(struct usb_descriptor_header *) &ss_mbim_notify_desc,
+	(struct usb_descriptor_header *) &ss_mbim_notify_comp_desc,
+	/* data interface, altsettings 0 and 1 */
+	(struct usb_descriptor_header *) &mbim_data_nop_intf,
+	(struct usb_descriptor_header *) &mbim_data_intf,
+	(struct usb_descriptor_header *) &ss_mbim_in_desc,
+	(struct usb_descriptor_header *) &ss_mbim_in_comp_desc,
+	(struct usb_descriptor_header *) &ss_mbim_out_desc,
+	(struct usb_descriptor_header *) &ss_mbim_out_comp_desc,
+	NULL,
+};
+
 /* string descriptors: */
 
 #define STRING_CTRL_IDX	0
@@ -1494,8 +1568,8 @@ mbim_bind(struct usb_configuration *c, struct usb_function *f)
 		mbb_desc.wMaxSegmentSize = cpu_to_le16(0xfe0);
 
 	/* copy descriptors, and track endpoint copies */
-	f->descriptors = usb_copy_descriptors(mbim_fs_function);
-	if (!f->descriptors)
+	f->fs_descriptors = usb_copy_descriptors(mbim_fs_function);
+	if (!f->fs_descriptors)
 		goto fail;
 
 	/*
@@ -1514,6 +1588,20 @@ mbim_bind(struct usb_configuration *c, struct usb_function *f)
 		/* copy descriptors, and track endpoint copies */
 		f->hs_descriptors = usb_copy_descriptors(mbim_hs_function);
 		if (!f->hs_descriptors)
+			goto fail;
+	}
+
+	if (gadget_is_superspeed(c->cdev->gadget)) {
+		ss_mbim_in_desc.bEndpointAddress =
+				fs_mbim_in_desc.bEndpointAddress;
+		ss_mbim_out_desc.bEndpointAddress =
+				fs_mbim_out_desc.bEndpointAddress;
+		ss_mbim_notify_desc.bEndpointAddress =
+				fs_mbim_notify_desc.bEndpointAddress;
+
+		/* copy descriptors, and track endpoint copies */
+		f->ss_descriptors = usb_copy_descriptors(mbim_ss_function);
+		if (!f->ss_descriptors)
 			goto fail;
 	}
 
@@ -1539,8 +1627,12 @@ mbim_bind(struct usb_configuration *c, struct usb_function *f)
 fail:
 	pr_err("%s failed to bind, err %d\n", f->name, status);
 
-	if (f->descriptors)
-		usb_free_descriptors(f->descriptors);
+	if (f->ss_descriptors)
+		usb_free_descriptors(f->ss_descriptors);
+	if (f->hs_descriptors)
+		usb_free_descriptors(f->hs_descriptors);
+	if (f->fs_descriptors)
+		usb_free_descriptors(f->fs_descriptors);
 
 	if (mbim->not_port.notify_req) {
 		kfree(mbim->not_port.notify_req->buf);
@@ -1564,9 +1656,13 @@ static void mbim_unbind(struct usb_configuration *c, struct usb_function *f)
 	struct f_mbim	*mbim = func_to_mbim(f);
 
 	bam_data_destroy(mbim->port_num);
+
+	if (gadget_is_superspeed(c->cdev->gadget))
+		usb_free_descriptors(f->ss_descriptors);
+
 	if (gadget_is_dualspeed(c->cdev->gadget))
 		usb_free_descriptors(f->hs_descriptors);
-	usb_free_descriptors(f->descriptors);
+	usb_free_descriptors(f->fs_descriptors);
 
 	kfree(mbim->not_port.notify_req->buf);
 	usb_ep_free_request(mbim->not_port.notify, mbim->not_port.notify_req);

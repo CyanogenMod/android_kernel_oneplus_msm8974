@@ -994,9 +994,9 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 	hs_epin_desc.bEndpointAddress = fs_epin_desc.bEndpointAddress;
 	hs_epin_desc.wMaxPacketSize = fs_epin_desc.wMaxPacketSize;
 
-	fn->descriptors = usb_copy_descriptors(fs_audio_desc);
-	if (gadget_is_dualspeed(gadget))
-		fn->hs_descriptors = usb_copy_descriptors(hs_audio_desc);
+	ret = usb_assign_descriptors(fn, fs_audio_desc, hs_audio_desc, NULL);
+	if (ret)
+		goto err;
 
 	prm = &agdev->uac2.c_prm;
 	prm->max_psize = hs_epout_desc.wMaxPacketSize;
@@ -1016,15 +1016,25 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 			"%s:%d Error!\n", __func__, __LINE__);
 	}
 
-	return alsa_uac2_init(agdev);
+	ret = alsa_uac2_init(agdev);
+	if (ret)
+		goto err;
+	return 0;
+err:
+	kfree(agdev->uac2.p_prm.rbuf);
+	kfree(agdev->uac2.c_prm.rbuf);
+	usb_free_all_descriptors(fn);
+	if (agdev->in_ep)
+		agdev->in_ep->driver_data = NULL;
+	if (agdev->out_ep)
+		agdev->out_ep->driver_data = NULL;
+	return -EINVAL;
 }
 
 static void
 afunc_unbind(struct usb_configuration *cfg, struct usb_function *fn)
 {
 	struct audio_dev *agdev = func_to_agdev(fn);
-	struct usb_composite_dev *cdev = cfg->cdev;
-	struct usb_gadget *gadget = cdev->gadget;
 	struct uac2_rtd_params *prm;
 
 	alsa_uac2_exit(agdev);
@@ -1034,10 +1044,7 @@ afunc_unbind(struct usb_configuration *cfg, struct usb_function *fn)
 
 	prm = &agdev->uac2.c_prm;
 	kfree(prm->rbuf);
-
-	if (gadget_is_dualspeed(gadget))
-		usb_free_descriptors(fn->hs_descriptors);
-	usb_free_descriptors(fn->descriptors);
+	usb_free_all_descriptors(fn);
 
 	if (agdev->in_ep)
 		agdev->in_ep->driver_data = NULL;

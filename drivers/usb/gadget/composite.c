@@ -145,7 +145,7 @@ int config_ep_by_speed(struct usb_gadget *g,
 		}
 		/* else: fall through */
 	default:
-		speed_desc = f->descriptors;
+		speed_desc = f->fs_descriptors;
 	}
 	/* find descriptors */
 	for_each_ep_desc(speed_desc, d_spd) {
@@ -237,7 +237,7 @@ int usb_add_function(struct usb_configuration *config,
 	 * as full speed ... it's the function drivers that will need
 	 * to avoid bulk and ISO transfers.
 	 */
-	if (!config->fullspeed && function->descriptors)
+	if (!config->fullspeed && function->fs_descriptors)
 		config->fullspeed = true;
 	if (!config->highspeed && function->hs_descriptors)
 		config->highspeed = true;
@@ -395,7 +395,7 @@ static int config_buf(struct usb_configuration *config,
 			descriptors = f->hs_descriptors;
 			break;
 		default:
-			descriptors = f->descriptors;
+			descriptors = f->fs_descriptors;
 		}
 
 		if (!descriptors)
@@ -673,7 +673,7 @@ static int set_config(struct usb_composite_dev *cdev,
 			descriptors = f->hs_descriptors;
 			break;
 		default:
-			descriptors = f->descriptors;
+			descriptors = f->fs_descriptors;
 		}
 
 		for (; *descriptors; ++descriptors) {
@@ -1151,7 +1151,7 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 					DBG(cdev, "Config SS device in HS\n");
 				}
 			} else if (gadget->l1_supported) {
-				cdev->desc.bcdUSB = cpu_to_le16(0x0210);
+				cdev->desc.bcdUSB = cpu_to_le16(0x0201);
 				DBG(cdev, "Config HS device with LPM(L1)\n");
 			}
 

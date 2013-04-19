@@ -96,6 +96,7 @@
 #include "f_uac1.c"
 #endif
 #include "f_ncm.c"
+#include "f_charger.c"
 
 MODULE_AUTHOR("Mike Lockwood");
 MODULE_DESCRIPTION("Android Composite USB Driver");
@@ -467,7 +468,7 @@ static void ffs_function_cleanup(struct android_usb_function *f)
 
 static void ffs_function_enable(struct android_usb_function *f)
 {
-	struct android_dev *dev;
+	struct android_dev *dev = f->android_dev;
 	struct functionfs_config *config = f->config;
 
 	config->enabled = true;
@@ -479,7 +480,7 @@ static void ffs_function_enable(struct android_usb_function *f)
 
 static void ffs_function_disable(struct android_usb_function *f)
 {
-	struct android_dev *dev;
+	struct android_dev *dev = f->android_dev;
 	struct functionfs_config *config = f->config;
 
 	config->enabled = false;
@@ -502,6 +503,9 @@ ffs_aliases_show(struct device *pdev, struct device_attribute *attr, char *buf)
 	struct android_dev *dev;
 	int ret;
 
+	dev = list_first_entry(&android_dev_list, struct android_dev,
+			list_item);
+
 	mutex_lock(&dev->mutex);
 	ret = sprintf(buf, "%s\n", dev->ffs_aliases);
 	mutex_unlock(&dev->mutex);
@@ -515,6 +519,9 @@ ffs_aliases_store(struct device *pdev, struct device_attribute *attr,
 {
 	struct android_dev *dev;
 	char buff[256];
+
+	dev = list_first_entry(&android_dev_list, struct android_dev,
+			list_item);
 
 	mutex_lock(&dev->mutex);
 
@@ -550,7 +557,7 @@ static struct android_usb_function ffs_function = {
 
 static int functionfs_ready_callback(struct ffs_data *ffs)
 {
-	struct android_dev *dev;
+	struct android_dev *dev = ffs_function.android_dev;
 	struct functionfs_config *config = ffs_function.config;
 	int ret = 0;
 
@@ -573,7 +580,7 @@ err:
 
 static void functionfs_closed_callback(struct ffs_data *ffs)
 {
-	struct android_dev *dev;
+	struct android_dev *dev = ffs_function.android_dev;
 	struct functionfs_config *config = ffs_function.config;
 
 	mutex_lock(&dev->mutex);
@@ -1521,6 +1528,19 @@ static struct android_usb_function ccid_function = {
 	.bind_config	= ccid_function_bind_config,
 };
 
+/* Charger */
+static int charger_function_bind_config(struct android_usb_function *f,
+						struct usb_configuration *c)
+{
+	return charger_bind_config(c);
+}
+
+static struct android_usb_function charger_function = {
+	.name		= "charging",
+	.bind_config	= charger_function_bind_config,
+};
+
+
 static int
 mtp_function_init(struct android_usb_function *f,
 		struct usb_composite_dev *cdev)
@@ -2249,6 +2269,7 @@ static struct android_usb_function midi_function = {
 };
 #endif
 static struct android_usb_function *supported_functions[] = {
+	&ffs_function,
 	&mbim_function,
 	&ecm_qc_function,
 #ifdef CONFIG_SND_PCM
@@ -2280,6 +2301,7 @@ static struct android_usb_function *supported_functions[] = {
 #ifdef CONFIG_SND_RAWMIDI
 	&midi_function,
 #endif
+	&charger_function,
 	NULL
 };
 
@@ -2604,7 +2626,6 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 
 		while (conf_str) {
 			name = strsep(&conf_str, ",");
-			name = strsep(&b, ",");
 
 			is_ffs = 0;
 			strlcpy(aliases, dev->ffs_aliases, sizeof(aliases));
@@ -2629,12 +2650,11 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 					ffs_enabled = 1;
 				continue;
 			}
+			err = android_enable_function(dev, conf, name);
+			if (err)
+				pr_err("android_usb: Cannot enable '%s' (%d)",
+						name, err);
 		}
-
-		err = android_enable_function(dev, conf, name);
-		if (err)
-			pr_err("android_usb: Cannot enable '%s' (%d)",
-							   name, err);
 	}
 
 	/* Free uneeded configurations if exists */
