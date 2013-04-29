@@ -272,10 +272,12 @@
 /*
  * Configuration information
  */
-#define INPUT_POOL_WORDS 128
-#define OUTPUT_POOL_WORDS 32
-#define SEC_XFER_SIZE 512
-#define EXTRACT_SIZE 10
+#define INPUT_POOL_SHIFT	12
+#define INPUT_POOL_WORDS	(1 << (INPUT_POOL_SHIFT-5))
+#define OUTPUT_POOL_SHIFT	10
+#define OUTPUT_POOL_WORDS	(1 << (OUTPUT_POOL_SHIFT-5))
+#define SEC_XFER_SIZE		512
+#define EXTRACT_SIZE		10
 
 #define LONGS(x) (((x) + sizeof(unsigned long) - 1)/sizeof(unsigned long))
 
@@ -423,7 +425,7 @@ module_param(debug, bool, 0644);
 struct entropy_store;
 struct entropy_store {
 	/* read-only data: */
-	struct poolinfo *poolinfo;
+	const struct poolinfo *poolinfo;
 	__u32 *pool;
 	const char *name;
 	struct entropy_store *pull;
@@ -584,11 +586,13 @@ static void fast_mix(struct fast_pool *f, const void *in, int nbytes)
 }
 
 /*
- * Credit (or debit) the entropy store with n bits of entropy
+ * Credit (or debit) the entropy store with n bits of entropy.
+ * The nbits value is given in units of 2^-16 bits, i.e. 0x10000 == 1 bit.
  */
 static void credit_entropy_bits(struct entropy_store *r, int nbits)
 {
 	int entropy_count, orig;
+	const int pool_size = r->poolinfo->poolbits;
 
 	if (!nbits)
 		return;
@@ -597,12 +601,48 @@ static void credit_entropy_bits(struct entropy_store *r, int nbits)
 retry:
 	entropy_count = orig = ACCESS_ONCE(r->entropy_count);
 	entropy_count += nbits;
+	if (nbits < 0) {
+		/* Debit. */
+		entropy_count += nbits;
+	} else {
+		/*
+		 * Credit: we have to account for the possibility of
+		 * overwriting already present entropy.  Even in the
+		 * ideal case of pure Shannon entropy, new contributions
+		 * approach the full value asymptotically:
+		 *
+		 * entropy <- entropy + (pool_size - entropy) *
+		 *	(1 - exp(-add_entropy/pool_size))
+		 *
+		 * For add_entropy <= pool_size then
+		 * (1 - exp(-add_entropy/pool_size)) >=
+		 *    (add_entropy/pool_size)*0.632...
+		 * so we can approximate the exponential with
+		 * add_entropy/(pool_size*2) and still be on the
+		 * safe side by adding at most one pool_size at a time.
+		 *
+		 * The use of pool_size-1 in the while statement is to
+		 * prevent rounding artifacts from making the loop
+		 * arbitrarily long; this limits the loop to poolshift
+		 * turns no matter how large nbits is.
+		 */
+		int pnbits  = nbits;
+		const int s = r->poolinfo->poolbitshift + 1;
+
+		do {
+			int anbits = min(pnbits, pool_size);
+
+			entropy_count +=
+				((pool_size - entropy_count)*anbits) >> s;
+			pnbits -= anbits;
+		} while (unlikely(entropy_count < pool_size-1 && pnbits));
+	}
 
 	if (entropy_count < 0) {
 		DEBUG_ENT("negative entropy/overflow\n");
 		entropy_count = 0;
-	} else if (entropy_count > r->poolinfo->poolbits)
-		entropy_count = r->poolinfo->poolbits;
+	} else if (entropy_count > pool_size)
+		entropy_count = pool_size;
 	if (cmpxchg(&r->entropy_count, orig, entropy_count) != orig)
 		goto retry;
 
