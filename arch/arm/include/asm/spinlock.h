@@ -65,18 +65,9 @@ extern int msm_krait_need_wfe_fixup;
 
 static inline void dsb_sev(void)
 {
-#if __LINUX_ARM_ARCH__ >= 7
-	__asm__ __volatile__ (
-		"dsb\n"
-		SEV
-	);
-#else
-	__asm__ __volatile__ (
-		"mcr p15, 0, %0, c7, c10, 4\n"
-		SEV
-		: : "r" (0)
-	);
-#endif
+
+	dsb(ishst);
+	__asm__(SEV);
 }
 
 #ifndef CONFIG_ARM_TICKET_LOCKS
