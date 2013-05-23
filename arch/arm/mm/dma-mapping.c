@@ -563,7 +563,6 @@ static void __dma_remap(struct page *page, size_t size, pgprot_t prot,
 		func = __dma_update_pte;
 
 	apply_to_page_range(&init_mm, start, size, func, &prot);
-	dsb();
 	flush_tlb_kernel_range(start, end);
 }
 
