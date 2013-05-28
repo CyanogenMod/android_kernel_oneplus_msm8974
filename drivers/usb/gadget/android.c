@@ -448,6 +448,7 @@ struct functionfs_config {
 	bool opened;
 	bool enabled;
 	struct ffs_data *data;
+	struct android_dev *dev;
 };
 
 static int ffs_function_init(struct android_usb_function *f,
@@ -561,21 +562,32 @@ static int functionfs_ready_callback(struct ffs_data *ffs)
 	struct functionfs_config *config = ffs_function.config;
 	int ret = 0;
 
-	mutex_lock(&dev->mutex);
-
-	ret = functionfs_bind(ffs, dev->cdev);
-	if (ret)
-		goto err;
+	/* dev is null in case ADB is not in the composition */
+	if (dev) {
+		mutex_lock(&dev->mutex);
+		ret = functionfs_bind(ffs, dev->cdev);
+		if (ret) {
+			mutex_unlock(&dev->mutex);
+			return ret;
+		}
+	} else {
+		/* android ffs_func requires daemon to start only after enable*/
+		pr_debug("start adbd only in ADB composition\n");
+		return -ENODEV;
+	}
 
 	config->data = ffs;
 	config->opened = true;
+	/* Save dev in case the adb function will get disabled */
+	config->dev = dev;
 
 	if (config->enabled)
 		android_enable(dev);
 
-err:
 	mutex_unlock(&dev->mutex);
-	return ret;
+
+	return 0;
+
 }
 
 static void functionfs_closed_callback(struct ffs_data *ffs)
@@ -583,17 +595,32 @@ static void functionfs_closed_callback(struct ffs_data *ffs)
 	struct android_dev *dev = ffs_function.android_dev;
 	struct functionfs_config *config = ffs_function.config;
 
-	mutex_lock(&dev->mutex);
+	/*
+	 * In case new composition is without ADB or ADB got disabled by the
+	 * time ffs_daemon was stopped then use saved one
+	 */
+	if (!dev)
+		dev = config->dev;
 
-	if (config->enabled)
+	/* fatal-error: It should never happen */
+	if (!dev)
+		pr_err("adb_closed_callback: config->dev is NULL");
+
+	if (dev)
+		mutex_lock(&dev->mutex);
+
+	if (config->enabled && dev)
 		android_disable(dev);
+
+	config->dev = NULL;
 
 	config->opened = false;
 	config->data = NULL;
 
 	functionfs_unbind(ffs);
 
-	mutex_unlock(&dev->mutex);
+	if (dev)
+		mutex_unlock(&dev->mutex);
 }
 
 static int functionfs_check_dev_callback(const char *dev_name)
