@@ -458,7 +458,7 @@ static void bdi_writeout_fraction(struct backing_dev_info *bdi,
  * registered backing devices, which, for obvious reasons, can not
  * exceed 100%.
  */
-static unsigned int bdi_min_ratio;
+static unsigned int bdi_min_ratio = 5;
 
 int bdi_set_min_ratio(struct backing_dev_info *bdi, unsigned int min_ratio)
 {
