@@ -1075,7 +1075,7 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 	if (data->client.app_id > 0) {
 		spin_lock_irqsave(&qseecom.registered_app_list_lock, flags);
 		list_for_each_entry(ptr_app, &qseecom.registered_app_list_head,
-								list) {
+									list) {
 			if (ptr_app->app_id == data->client.app_id) {
 				found_app = true;
 				if (app_crash) {
@@ -1083,10 +1083,15 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 					unload = true;
 					break;
 				} else {
-					ptr_app->ref_cnt--;
-					pr_debug("Can't unload app(%d) inuse\n",
-							ptr_app->app_id);
-					break;
+					if (ptr_app->ref_cnt == 1) {
+						unload = true;
+						break;
+					} else {
+						ptr_app->ref_cnt--;
+						pr_debug("Can't unload app(%d) inuse\n",
+						ptr_app->app_id);
+						break;
+					}
 				}
 			}
 		}
@@ -1094,7 +1099,7 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 								flags);
 		if (found_app == false) {
 			pr_err("Cannot find app with id = %d\n",
-						data->client.app_id);
+					data->client.app_id);
 			return -EINVAL;
 		}
 	}
@@ -1118,7 +1123,7 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 				&resp, sizeof(resp));
 		if (ret) {
 			pr_err("scm_call to unload app (id = %d) failed\n",
-							req.app_id);
+								req.app_id);
 			return -EFAULT;
 		} else {
 			pr_warn("App id %d now unloaded\n", req.app_id);
@@ -1127,7 +1132,7 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data,
 			ret = __qseecom_process_incomplete_cmd(data, &resp);
 			if (ret) {
 				pr_err("process_incomplete_cmd fail err: %d\n",
-						ret);
+									ret);
 				return ret;
 			}
 		}
@@ -2187,7 +2192,7 @@ int qseecom_shutdown_app(struct qseecom_handle **handle)
 	if (!found_handle)
 		pr_err("Unable to find the handle, exiting\n");
 	else
-		ret = qseecom_unload_app(data);
+		ret = qseecom_unload_app(data, false);
 
 	if (qseecom.support_bus_scaling) {
 		mutex_lock(&qsee_bw_mutex);
@@ -4305,7 +4310,7 @@ static int __devinit qseecom_remove(struct platform_device *pdev)
 			goto exit_free_kc_handle;
 
 		list_del(&kclient->list);
-		ret = qseecom_unload_app(kclient->handle->dev);
+		ret = qseecom_unload_app(kclient->handle->dev, false);
 		if (!ret) {
 			kzfree(kclient->handle->dev);
 			kzfree(kclient->handle);
