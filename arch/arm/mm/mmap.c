@@ -11,10 +11,6 @@
 #include <linux/random.h>
 #include <asm/cachetype.h>
 
-int mmap_rnd_bits_min = CONFIG_ARCH_MMAP_RND_BITS_MIN;
-int mmap_rnd_bits_max = CONFIG_ARCH_MMAP_RND_BITS_MAX;
-int mmap_rnd_bits = CONFIG_ARCH_MMAP_RND_BITS;
-
 #define COLOUR_ALIGN(addr,pgoff)		\
 	((((addr)+SHMLBA-1)&~(SHMLBA-1)) +	\
 	 (((pgoff)<<PAGE_SHIFT) & (SHMLBA-1)))
@@ -184,11 +180,9 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
 	if (mmap_is_legacy()) {
 		mm->mmap_base = TASK_UNMAPPED_BASE + random_factor;
 		mm->get_unmapped_area = arch_get_unmapped_area;
-		mm->unmap_area = arch_unmap_area;
 	} else {
 		mm->mmap_base = mmap_base(random_factor);
 		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
-		mm->unmap_area = arch_unmap_area_topdown;
 	}
 }
 
