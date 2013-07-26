@@ -261,6 +261,10 @@ extern int sysctl_tcp_default_init_rwnd;
 extern int sysctl_tcp_delack_seg;
 extern int sysctl_tcp_use_userconfig;
 
+/* sysctl variables for controlling various tcp parameters */
+extern int sysctl_tcp_delack_seg;
+extern int sysctl_tcp_use_userconfig;
+
 extern atomic_long_t tcp_memory_allocated;
 extern struct percpu_counter tcp_sockets_allocated;
 extern int tcp_memory_pressure;
