@@ -271,6 +271,7 @@ static int mdss_mdp_writeback_prepare_rot(struct mdss_mdp_ctl *ctl, void *arg)
 	struct mdss_mdp_writeback_ctx *ctx;
 	struct mdss_mdp_writeback_arg *wb_args;
 	struct mdss_mdp_rotator_session *rot;
+	struct mdss_data_type *mdata;
 	struct mdss_mdp_format_params *fmt;
 	u32 format;
 
@@ -284,6 +285,11 @@ static int mdss_mdp_writeback_prepare_rot(struct mdss_mdp_ctl *ctl, void *arg)
 	rot = (struct mdss_mdp_rotator_session *) wb_args->priv_data;
 	if (!rot) {
 		pr_err("unable to retrieve rot session ctl=%d\n", ctl->num);
+		return -ENODEV;
+	}
+	mdata = ctl->mdata;
+	if (!mdata) {
+		pr_err("no mdata attached to ctl=%d", ctl->num);
 		return -ENODEV;
 	}
 	pr_debug("rot setup wb_num=%d\n", ctx->wb_num);
