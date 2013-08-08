@@ -1610,7 +1610,7 @@ int mdp3_put_img(struct mdp3_img_data *data, int client)
 	int dom;
 
 	 if (data->flags & MDP_MEMORY_ID_TYPE_FB) {
-		pr_info("mdp3_put_img fb mem buf=0x%x\n", data->addr);
+		pr_info("mdp3_put_img fb mem buf=0x%pa\n", &data->addr);
 		fput_light(data->srcp_file, data->p_need);
 		data->srcp_file = NULL;
 	} else if (!IS_ERR_OR_NULL(data->srcp_ihdl)) {
@@ -1635,11 +1635,12 @@ int mdp3_get_img(struct msmfb_data *img, struct mdp3_img_data *data,
 	struct file *file;
 	int ret = -EINVAL;
 	int fb_num;
-	unsigned long *start, *len;
+	unsigned long *len;
+	dma_addr_t *start;
 	struct ion_client *iclient = mdp3_res->ion_client;
 	int dom;
 
-	start = (unsigned long *) &data->addr;
+	start = &data->addr;
 	len = (unsigned long *) &data->len;
 	data->flags = img->flags;
 	data->p_need = 0;
@@ -1699,8 +1700,8 @@ done:
 		data->addr += img->offset;
 		data->len -= img->offset;
 
-		pr_debug("mem=%d ihdl=%p buf=0x%x len=0x%x\n", img->memory_id,
-			 data->srcp_ihdl, data->addr, data->len);
+		pr_debug("mem=%d ihdl=%p buf=0x%pa len=0x%x\n", img->memory_id,
+			 data->srcp_ihdl, &data->addr, data->len);
 	} else {
 		mdp3_put_img(data, client);
 		return -EINVAL;
