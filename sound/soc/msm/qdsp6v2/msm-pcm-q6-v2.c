@@ -191,7 +191,9 @@ static void event_handler(uint32_t opcode,
 			if (prtd->mmap_flag &&
 			    q6asm_is_cpu_buf_avail_nolock(OUT,
 				prtd->audio_client,
-				&size, &idx))
+				&size, &idx) &&
+				(substream->runtime->status->state ==
+				 SNDRV_PCM_STATE_RUNNING))
 				q6asm_read_nolock(prtd->audio_client);
 		} else {
 			pr_debug("%s: reclaim flushed buf in_count %x\n",
