@@ -32,6 +32,8 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/msm_mdp.h>
+#include <linux/of.h>
+#include <linux/of_address.h>
 #include <linux/proc_fs.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
@@ -42,7 +44,6 @@
 #include <linux/sync.h>
 #include <linux/sw_sync.h>
 #include <linux/file.h>
-#include <linux/memory_alloc.h>
 #include <linux/kthread.h>
 #include <linux/of_address.h>
 
