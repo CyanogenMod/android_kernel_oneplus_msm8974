@@ -229,6 +229,15 @@ int pm_qos_request_active(struct pm_qos_request *req)
 }
 EXPORT_SYMBOL_GPL(pm_qos_request_active);
 
+static void __pm_qos_update_request(struct pm_qos_request *req,
+			   s32 new_value)
+{
+	if (new_value != req->node.prio)
+		pm_qos_update_target(
+			pm_qos_array[req->pm_qos_class]->constraints,
+			&req->node, PM_QOS_UPDATE_REQ, new_value);
+}
+
 /**
  * pm_qos_work_fn - the timeout handler of pm_qos_update_request_timeout
  * @work: work struct for the delayed work (timeout)
@@ -237,7 +246,6 @@ EXPORT_SYMBOL_GPL(pm_qos_request_active);
  */
 static void pm_qos_work_fn(struct work_struct *work)
 {
-	s32 new_value = PM_QOS_DEFAULT_VALUE;
 	struct pm_qos_request *req = container_of(to_delayed_work(work),
 						  struct pm_qos_request,
 						  work);
@@ -245,10 +253,7 @@ static void pm_qos_work_fn(struct work_struct *work)
 	if (!req || !pm_qos_request_active(req))
 		return;
 
-	if (new_value != req->node.prio)
-		pm_qos_update_target(
-			pm_qos_array[req->pm_qos_class]->constraints,
-			&req->node, PM_QOS_UPDATE_REQ, new_value);
+	__pm_qos_update_request(req, PM_QOS_DEFAULT_VALUE);
 }
 
 /**
@@ -309,6 +314,8 @@ void pm_qos_update_request(struct pm_qos_request *req,
 		pm_qos_update_target(
 			pm_qos_array[req->pm_qos_class]->constraints,
 			&req->node, PM_QOS_UPDATE_REQ, new_value);
+
+	__pm_qos_update_request(req, new_value);
 }
 EXPORT_SYMBOL_GPL(pm_qos_update_request);
 
