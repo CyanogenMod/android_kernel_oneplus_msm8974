@@ -10,10 +10,9 @@
 notrace static unsigned int check_preemption_disabled(const char *what1,
 							const char *what2)
 {
-	unsigned long preempt_count = preempt_count();
 	int this_cpu = raw_smp_processor_id();
 
-	if (likely(preempt_count))
+	if (likely(preempt_count()))
 		goto out;
 
 	if (irqs_disabled())
