@@ -4401,7 +4401,7 @@ find_busiest_queue(struct sched_domain *sd, struct sched_group *group,
 	unsigned long busiest_load = 0, busiest_power = 1;
 	int i;
 
-	for_each_cpu(i, sched_group_cpus(group)) {
+	for_each_cpu_and(i, sched_group_cpus(group), cpus) {
 		unsigned long power = power_of(i);
 		unsigned long capacity = DIV_ROUND_CLOSEST(power,
 							   SCHED_POWER_SCALE);
@@ -4409,9 +4409,6 @@ find_busiest_queue(struct sched_domain *sd, struct sched_group *group,
 
 		if (!capacity)
 			capacity = fix_small_capacity(sd, group);
-
-		if (!cpumask_test_cpu(i, cpus))
-			continue;
 
 		rq = cpu_rq(i);
 		wl = weighted_cpuload(i);
