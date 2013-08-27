@@ -26,7 +26,9 @@
 #include <net/ping.h>
 #include <net/tcp_memcontrol.h>
 
+static int zero = 0;
 static int one = 1;
+static int gso_max_segs = GSO_MAX_SEGS;
 static int tcp_retr1_max = 255;
 static int ip_local_port_range_min[] = { 1, 1 };
 static int ip_local_port_range_max[] = { 65535, 65535 };
@@ -718,6 +720,15 @@ static struct ctl_table ipv4_table[] = {
 		.maxlen         = sizeof(int),
 		.mode           = 0644,
 		.proc_handler   = proc_tcp_default_init_rwnd
+	},
+	{
+		.procname	= "tcp_min_tso_segs",
+		.data		= &sysctl_tcp_min_tso_segs,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &gso_max_segs,
 	},
 	{
 		.procname	= "udp_mem",
