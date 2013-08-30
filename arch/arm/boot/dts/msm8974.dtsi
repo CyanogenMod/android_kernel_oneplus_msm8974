@@ -2478,6 +2478,13 @@
 			qcom,smdtty-dev-name = "LOOPBACK_TTY";
 		};
 	};
+
+	qcom,avtimer {
+		compatible = "qcom,avtimer";
+		reg = <0xfe053008 0x4>,
+			<0xfe05300c 0x4>;
+		reg-names = "avtimer_lsb_addr", "avtimer_msb_addr";
+	};
 };
 
 &gdsc_venus {
