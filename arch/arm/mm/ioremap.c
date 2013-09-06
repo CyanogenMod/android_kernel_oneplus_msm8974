@@ -38,7 +38,6 @@
 #include <asm/mach/map.h>
 #include "mm.h"
 
-
 LIST_HEAD(static_vmlist);
 
 static struct static_vm *find_static_vm_paddr(phys_addr_t paddr,
@@ -90,7 +89,8 @@ void __init add_static_vm_early(struct static_vm *svm)
 	void *vaddr;
 
 	vm = &svm->vm;
-	vm_area_add_early(vm);
+	if (!vm_area_check_early(vm))
+		vm_area_add_early(vm);
 	vaddr = vm->addr;
 
 	list_for_each_entry(curr_svm, &static_vmlist, list) {
