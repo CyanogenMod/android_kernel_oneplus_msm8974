@@ -43,7 +43,4 @@ struct xor_block_template const xor_block_neon_inner = {
 	.do_4	= xor_8regs_4,
 	.do_5	= xor_8regs_5,
 };
-<<<<<<< HEAD
 EXPORT_SYMBOL(xor_block_neon_inner);
-=======
->>>>>>> 0bf3a6f... ARM: crypto: add NEON accelerated XOR implementation
