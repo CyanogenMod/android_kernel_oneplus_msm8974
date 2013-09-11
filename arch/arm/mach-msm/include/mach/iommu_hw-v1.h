@@ -1605,6 +1605,7 @@ do { \
 #define CBFRSYNRA_SID_MASK      0x7FFF
 
 /* Implementation defined register space masks */
+#define MICRO_MMU_CTRL_RESERVED_MASK          0x03
 #define MICRO_MMU_CTRL_HALT_REQ_MASK          0x01
 #define MICRO_MMU_CTRL_IDLE_MASK              0x01
 
@@ -1976,6 +1977,7 @@ do { \
 #define CBFRSYNRA_SID_SHIFT        0
 
 /* Implementation defined register space shift */
+#define MICRO_MMU_CTRL_RESERVED_SHIFT         0x00
 #define MICRO_MMU_CTRL_HALT_REQ_SHIFT         0x02
 #define MICRO_MMU_CTRL_IDLE_SHIFT             0x03
 
