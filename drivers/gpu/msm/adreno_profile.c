@@ -419,7 +419,7 @@ static void transfer_results(struct kgsl_device *device,
 		} else {
 			struct adreno_context *adreno_ctxt =
 				ADRENO_CONTEXT(k_ctxt);
-			pid = k_ctxt->pid;  /* pid */
+			pid = k_ctxt->proc_priv->pid;  /* pid */
 			tid = k_ctxt->tid; /* tid creator */
 			client_type =  adreno_ctxt->type << 16;
 		}
