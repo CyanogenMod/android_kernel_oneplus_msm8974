@@ -80,4 +80,6 @@
 /* Instruct lower device to use last 4-bytes of skb data as FCS */
 #define SO_NOFCS		43
 
+#define SO_MAX_PACING_RATE	47
+
 #endif	/* _XTENSA_SOCKET_H */
