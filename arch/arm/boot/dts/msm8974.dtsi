@@ -151,11 +151,17 @@
 			label = "qseecom_mem";
 		};
 
+		fb_mem: fb_region {
+			linux,reserve-contiguous-region;
+			reg = <0 0x800000>;
+			label = "fb_mem";
+		};
+
 		audio_mem: audio_region {
 			linux,contiguous-region;
 			linux,reserve-region;
 			reg = <0 0x614000>;
-			lable = "audio_mem";
+			label = "audio_mem";
 	       };
 	};
 
