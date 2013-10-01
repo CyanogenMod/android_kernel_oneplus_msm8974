@@ -2628,6 +2628,11 @@ static int mdss_mdp_pp_ioctl(struct msm_fb_data_type *mfd,
 	if (!mdata)
 		return -EPERM;
 
+	if (mfd->panel_info->partial_update_enabled) {
+		pr_err("Partical update feature is enabled.");
+		return -EPERM;
+	}
+
 	ret = copy_from_user(&mdp_pp, argp, sizeof(mdp_pp));
 	if (ret)
 		return ret;
@@ -2772,6 +2777,11 @@ static int mdss_mdp_histo_ioctl(struct msm_fb_data_type *mfd, u32 cmd,
 	if (mfd->panel_info->partial_update_enabled && mdp5_data->dyn_pu_state
 			&& (cmd != MSMFB_HISTOGRAM_STOP)) {
 		pr_err("Partial update feature is enabled.\n");
+		return -EPERM;
+	}
+
+	if (mfd->panel_info->partial_update_enabled) {
+		pr_err("Partical update feature is enabled.");
 		return -EPERM;
 	}
 
