@@ -35,7 +35,7 @@
 #define VDD_SC1_ARRAY_CLAMP_GFS_CTL 0x15A0
 #define SCSS_CPU1CORE_RESET 0xD80
 #define SCSS_DBG_STATUS_CORE_PWRDUP 0xE64
-
+#define MSM8960_SAW2_BASE_ADDR 0x02089000
 /*
  * control for which core is the next to come out of the secondary
  * boot "holding pen".
@@ -118,7 +118,7 @@ static int __cpuinit msm8960_release_secondary(unsigned long base,
 	if (!base_ptr)
 		return -ENODEV;
 
-	msm_spm_turn_on_cpu_rail(cpu);
+	msm_spm_turn_on_cpu_rail(MSM8960_SAW2_BASE_ADDR, cpu);
 
 	writel_relaxed(0x109, base_ptr+0x04);
 	writel_relaxed(0x101, base_ptr+0x04);
