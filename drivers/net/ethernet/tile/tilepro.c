@@ -1093,6 +1093,8 @@ static void tile_net_register(void *dev_ptr)
 	info->egress_timer.data = (long)info;
 	info->egress_timer.function = tile_net_handle_egress_timer;
 
+	u64_stats_init(&info->stats.syncp);
+
 	priv->cpu[my_cpu] = info;
 
 	/*

@@ -728,6 +728,8 @@ static int igb_alloc_queues(struct igb_adapter *adapter)
 		/* For 82575, context index must be unique per ring. */
 		if (adapter->hw.mac.type == e1000_82575)
 			set_bit(IGB_RING_FLAG_TX_CTX_IDX, &ring->flags);
+		u64_stats_init(&ring->tx_syncp);
+		u64_stats_init(&ring->tx_syncp2);
 		adapter->tx_ring[i] = ring;
 	}
 	/* Restore the adapter's original node */
@@ -759,6 +761,7 @@ static int igb_alloc_queues(struct igb_adapter *adapter)
 		if (adapter->hw.mac.type == e1000_i350)
 			set_bit(IGB_RING_FLAG_RX_LB_VLAN_BSWAP, &ring->flags);
 
+		u64_stats_init(&ring->rx_syncp);
 		adapter->rx_ring[i] = ring;
 	}
 	/* Restore the adapter's original node */

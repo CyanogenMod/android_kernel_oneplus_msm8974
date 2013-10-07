@@ -828,6 +828,9 @@ retry:
 	/* enable PCI bus-mastering */
 	pci_set_master (pdev);
 
+	u64_stats_init(&tp->rx_stats.syncp);
+	u64_stats_init(&tp->tx_stats.syncp);
+
 	if (use_io) {
 		ioaddr = pci_iomap(pdev, 0, 0);
 		if (!ioaddr) {

@@ -842,7 +842,7 @@ ip_vs_new_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest,
 	       struct ip_vs_dest **dest_p)
 {
 	struct ip_vs_dest *dest;
-	unsigned atype;
+	unsigned int atype, i;
 
 	EnterFunction(2);
 
@@ -868,6 +868,12 @@ ip_vs_new_dest(struct ip_vs_service *svc, struct ip_vs_dest_user_kern *udest,
 	dest->stats.cpustats = alloc_percpu(struct ip_vs_cpu_stats);
 	if (!dest->stats.cpustats)
 		goto err_alloc;
+
+	for_each_possible_cpu(i) {
+		struct ip_vs_cpu_stats *ip_vs_dest_stats;
+		ip_vs_dest_stats = per_cpu_ptr(dest->stats.cpustats, i);
+		u64_stats_init(&ip_vs_dest_stats->syncp);
+	}
 
 	dest->af = svc->af;
 	dest->protocol = svc->protocol;
@@ -1130,7 +1136,7 @@ static int
 ip_vs_add_service(struct net *net, struct ip_vs_service_user_kern *u,
 		  struct ip_vs_service **svc_p)
 {
-	int ret = 0;
+	int ret = 0, i;
 	struct ip_vs_scheduler *sched = NULL;
 	struct ip_vs_pe *pe = NULL;
 	struct ip_vs_service *svc = NULL;
@@ -1173,6 +1179,12 @@ ip_vs_add_service(struct net *net, struct ip_vs_service_user_kern *u,
 	svc->stats.cpustats = alloc_percpu(struct ip_vs_cpu_stats);
 	if (!svc->stats.cpustats)
 		goto out_err;
+
+	for_each_possible_cpu(i) {
+		struct ip_vs_cpu_stats *ip_vs_stats;
+		ip_vs_stats = per_cpu_ptr(svc->stats.cpustats, i);
+		u64_stats_init(&ip_vs_stats->syncp);
+	}
 
 	/* I'm the first user of the service */
 	atomic_set(&svc->usecnt, 0);
@@ -3625,7 +3637,7 @@ static void ip_vs_genl_unregister(void)
 #ifdef CONFIG_SYSCTL
 int __net_init ip_vs_control_net_init_sysctl(struct net *net)
 {
-	int idx;
+	int i, idx;
 	struct netns_ipvs *ipvs = net_ipvs(net);
 	struct ctl_table *tbl;
 
@@ -3724,6 +3736,12 @@ int __net_init ip_vs_control_net_init(struct net *net)
 	ipvs->tot_stats.cpustats = alloc_percpu(struct ip_vs_cpu_stats);
 	if (!ipvs->tot_stats.cpustats)
 		return -ENOMEM;
+
+	for_each_possible_cpu(i) {
+		struct ip_vs_cpu_stats *ipvs_tot_stats;
+		ipvs_tot_stats = per_cpu_ptr(ipvs->tot_stats.cpustats, i);
+		u64_stats_init(&ipvs_tot_stats->syncp);
+	}
 
 	spin_lock_init(&ipvs->tot_stats.lock);
 

@@ -5544,6 +5544,8 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 	spin_lock_init(&np->lock);
 	spin_lock_init(&np->hwstats_lock);
 	SET_NETDEV_DEV(dev, &pci_dev->dev);
+	u64_stats_init(&np->swstats_rx_syncp);
+	u64_stats_init(&np->swstats_tx_syncp);
 
 	init_timer(&np->oom_kick);
 	np->oom_kick.data = (unsigned long) dev;
