@@ -1356,11 +1356,13 @@ static int mdss_fb_alloc_fbmem_iommu(struct msm_fb_data_type *mfd, int dom)
 		return -ENOMEM;
 	}
 
+    /*
 	if (MDSS_LPAE_CHECK(phys)) {
 		pr_warn("fb mem phys %pa > 4GB is not supported.\n", &phys);
 		dma_free_coherent(&pdev->dev, size, &virt, GFP_KERNEL);
 		return -ERANGE;
 	}
+    */
 
 	rc = msm_iommu_map_contig_buffer(phys, dom, 0, size, SZ_4K, 0,
 					    &mfd->iova);
@@ -1478,16 +1480,16 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 		fix->xpanstep = 1;
 		fix->ypanstep = 1;
 		var->vmode = FB_VMODE_NONINTERLACED;
-		var->blue.offset = 0;
-		var->green.offset = 8;
-		var->red.offset = 16;
+		var->blue.offset = 24;
+		var->green.offset = 16;
+		var->red.offset = 8;
 		var->blue.length = 8;
 		var->green.length = 8;
 		var->red.length = 8;
 		var->blue.msb_right = 0;
 		var->green.msb_right = 0;
 		var->red.msb_right = 0;
-		var->transp.offset = 24;
+		var->transp.offset = 0;
 		var->transp.length = 8;
 		bpp = 4;
 		break;
@@ -1497,16 +1499,16 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 		fix->xpanstep = 1;
 		fix->ypanstep = 1;
 		var->vmode = FB_VMODE_NONINTERLACED;
-		var->blue.offset = 8;
-		var->green.offset = 16;
-		var->red.offset = 24;
+		var->blue.offset = 16;
+		var->green.offset = 8;
+		var->red.offset = 0;
 		var->blue.length = 8;
 		var->green.length = 8;
 		var->red.length = 8;
 		var->blue.msb_right = 0;
 		var->green.msb_right = 0;
 		var->red.msb_right = 0;
-		var->transp.offset = 0;
+		var->transp.offset = 24;
 		var->transp.length = 8;
 		bpp = 4;
 		break;
@@ -2373,7 +2375,7 @@ static int mdss_fb_check_var(struct fb_var_screeninfo *var,
 		break;
 
 	case 32:
-		/* Figure out if the user meant RGBA or ARGB
+		/* Check user specified color format BGRA/ARGB/RGBA
 		   and verify the position of the RGB components */
 
 		if (!((var->transp.offset == 24) &&
@@ -2385,8 +2387,6 @@ static int mdss_fb_check_var(struct fb_var_screeninfo *var,
 			(var->green.offset == 8) &&
 			(var->red.offset == 0)))
 				return -EINVAL;
-		} else
-			return -EINVAL;
 
 		/* Check the common values for both RGBA and ARGB */
 
@@ -2473,10 +2473,23 @@ static int mdss_fb_set_par(struct fb_info *info)
 		break;
 
 	case 32:
-		if (var->transp.offset == 24)
+		if ((var->red.offset == 0) &&
+		    (var->green.offset == 8) &&
+		    (var->blue.offset == 16) &&
+		    (var->transp.offset == 24))
+			mfd->fb_imgType = MDP_RGBA_8888;
+		else if ((var->red.offset == 16) &&
+		    (var->green.offset == 8) &&
+		    (var->blue.offset == 0) &&
+		    (var->transp.offset == 24))
+			mfd->fb_imgType = MDP_BGRA_8888;
+		else if ((var->red.offset == 8) &&
+		    (var->green.offset == 16) &&
+		    (var->blue.offset == 24) &&
+		    (var->transp.offset == 0))
 			mfd->fb_imgType = MDP_ARGB_8888;
 		else
-			mfd->fb_imgType	= MDP_RGBA_8888;
+			mfd->fb_imgType = MDP_RGBA_8888;
 		break;
 
 	default:
