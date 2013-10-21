@@ -128,6 +128,7 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.read_fw_bin = false,
 	.calibration = NULL,
 	.micbias = MBHC_MICBIAS2,
+	.anc_micbias = MBHC_MICBIAS2,
 	.mclk_cb_fn = msm_snd_enable_codec_ext_clk,
 	.mclk_rate = TAIKO_EXT_CLK_RATE,
 	.gpio = 0,
@@ -152,12 +153,13 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.use_vddio_meas = true,
 /* OPPO 2013-10-22 liuyan Modify end */
 #ifdef CONFIG_MACH_OPPO  //liuyan add 2013-4-18
-       .hpmic_switch_gpio=0,
-       .enable_spk_gpio=0,
+	.hpmic_switch_gpio=0,
+	.enable_spk_gpio=0,
 	.yda145_ctr_gpio=0,
 	.yda145_boost_gpio=0,
-       .count_regulator=0,
+	.count_regulator=0,
 #endif
+	.enable_anc_mic_detect = false,
 };
 
 struct msm_auxpcm_gpio {
