@@ -70,6 +70,7 @@ extern u32 msm_vidc_firmware_unload_delay;
 	} while (0)
 
 
+struct dentry *msm_vidc_debugfs_init_drv(void);
 struct dentry *msm_vidc_debugfs_init_core(struct msm_vidc_core *core,
 		struct dentry *parent);
 struct dentry *msm_vidc_debugfs_init_inst(struct msm_vidc_inst *inst,
