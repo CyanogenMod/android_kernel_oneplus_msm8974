@@ -60,7 +60,6 @@ void __init msm_8974_reserve(void)
  */
 void __init msm8974_add_drivers(void)
 {
-	msm_smem_init();
 	msm_init_modem_notifier_list();
 	msm_smd_init();
 	msm_rpm_driver_init();
@@ -125,12 +124,21 @@ void __init msm8974_init(void)
 {
 	struct of_dev_auxdata *adata = msm8974_auxdata_lookup;
 
+	/*
+	 * populate devices from DT first so smem probe will get called as part
+	 * of msm_smem_init.  socinfo_init needs smem support so call
+	 * msm_smem_init before it.  msm_8974_init_gpiomux needs socinfo so
+	 * call socinfo_init before it.
+	 */
+	board_dt_populate(adata);
+
+	msm_smem_init();
+
 	if (socinfo_init() < 0)
 		pr_err("%s: socinfo_init() failed\n", __func__);
 
 	msm_8974_init_gpiomux();
 	regulator_has_full_constraints();
-	board_dt_populate(adata);
 	msm8974_add_drivers();
 }
 
