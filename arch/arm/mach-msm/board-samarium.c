@@ -81,7 +81,6 @@ void __init msmsamarium_reserve(void)
  */
 void __init msmsamarium_add_drivers(void)
 {
-	msm_smem_init();
 	msm_init_modem_notifier_list();
 	msm_smd_init();
 	msm_clock_init(&msm_dummy_clock_init_data);
@@ -97,11 +96,19 @@ void __init msmsamarium_init(void)
 {
 	struct of_dev_auxdata *adata = msmsamarium_auxdata_lookup;
 
+	/*
+	 * populate devices from DT first so smem probe will get called as part
+	 * of msm_smem_init.  socinfo_init needs smem support so call
+	 * msm_smem_init before it.
+	 */
+	board_dt_populate(adata);
+
+	msm_smem_init();
+
 	if (socinfo_init() < 0)
 		pr_err("%s: socinfo_init() failed\n", __func__);
 
 	msmsamarium_init_gpiomux();
-	board_dt_populate(adata);
 	msmsamarium_add_drivers();
 }
 
