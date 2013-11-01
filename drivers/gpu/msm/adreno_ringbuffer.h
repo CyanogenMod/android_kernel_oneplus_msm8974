@@ -20,10 +20,6 @@
 
 #define KGSL_RB_SIZE (32 * 1024)
 
-/* CP timestamp register */
-#define	REG_CP_TIMESTAMP		 REG_SCRATCH_REG0
-
-
 struct kgsl_device;
 struct kgsl_device_private;
 

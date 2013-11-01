@@ -343,7 +343,6 @@ enum adreno_regs {
 	ADRENO_REG_PA_SC_AA_CONFIG,
 	ADRENO_REG_SQ_GPR_MANAGEMENT,
 	ADRENO_REG_SQ_INST_STORE_MANAGMENT,
-	ADRENO_REG_TC_CNTL_STATUS,
 	ADRENO_REG_TP0_CHICKEN,
 	ADRENO_REG_RBBM_RBBM_CTL,
 	ADRENO_REG_REGISTER_MAX,
@@ -437,16 +436,7 @@ struct log_field {
 	{ BIT(KGSL_FT_DISABLE), "disable" }, \
 	{ BIT(KGSL_FT_TEMP_DISABLE), "temp" }
 
-extern struct adreno_gpudev adreno_a2xx_gpudev;
 extern struct adreno_gpudev adreno_a3xx_gpudev;
-
-/* A2XX register sets defined in adreno_a2xx.c */
-extern const unsigned int a200_registers[];
-extern const unsigned int a220_registers[];
-extern const unsigned int a225_registers[];
-extern const unsigned int a200_registers_count;
-extern const unsigned int a220_registers_count;
-extern const unsigned int a225_registers_count;
 
 /* A3XX register set defined in adreno_a3xx.c */
 extern const unsigned int a3xx_registers[];
@@ -526,47 +516,11 @@ int adreno_soft_reset(struct kgsl_device *device);
 
 int adreno_a3xx_pwron_fixup_init(struct adreno_device *adreno_dev);
 
-static inline int adreno_is_a200(struct adreno_device *adreno_dev)
-{
-	return (adreno_dev->gpurev == ADRENO_REV_A200);
-}
-
-static inline int adreno_is_a203(struct adreno_device *adreno_dev)
-{
-	return (adreno_dev->gpurev == ADRENO_REV_A203);
-}
-
-static inline int adreno_is_a205(struct adreno_device *adreno_dev)
-{
-	return (adreno_dev->gpurev == ADRENO_REV_A205);
-}
-
 bool adreno_hw_isidle(struct kgsl_device *device);
 
 static inline int adreno_is_a20x(struct adreno_device *adreno_dev)
 {
 	return (adreno_dev->gpurev <= 209);
-}
-
-static inline int adreno_is_a220(struct adreno_device *adreno_dev)
-{
-	return (adreno_dev->gpurev == ADRENO_REV_A220);
-}
-
-static inline int adreno_is_a225(struct adreno_device *adreno_dev)
-{
-	return (adreno_dev->gpurev == ADRENO_REV_A225);
-}
-
-static inline int adreno_is_a22x(struct adreno_device *adreno_dev)
-{
-	return (adreno_dev->gpurev  == ADRENO_REV_A220 ||
-		adreno_dev->gpurev == ADRENO_REV_A225);
-}
-
-static inline int adreno_is_a2xx(struct adreno_device *adreno_dev)
-{
-	return (adreno_dev->gpurev <= 299);
 }
 
 static inline int adreno_is_a3xx(struct adreno_device *adreno_dev)
@@ -629,30 +583,6 @@ static inline int adreno_context_timestamp(struct kgsl_context *k_ctxt,
 	return rb->global_ts;
 }
 
-/**
- * adreno_encode_istore_size - encode istore size in CP format
- * @adreno_dev - The 3D device.
- *
- * Encode the istore size into the format expected that the
- * CP_SET_SHADER_BASES and CP_ME_INIT commands:
- * bits 31:29 - istore size as encoded by this function
- * bits 27:16 - vertex shader start offset in instructions
- * bits 11:0 - pixel shader start offset in instructions.
- */
-static inline int adreno_encode_istore_size(struct adreno_device *adreno_dev)
-{
-	unsigned int size;
-	/* in a225 the CP microcode multiplies the encoded
-	 * value by 3 while decoding.
-	 */
-	if (adreno_is_a225(adreno_dev))
-		size = adreno_dev->istore_size/3;
-	else
-		size = adreno_dev->istore_size;
-
-	return (ilog2(size) - 5) << 29;
-}
-
 static inline int __adreno_add_idle_indirect_cmds(unsigned int *cmds,
 						unsigned int nop_gpuaddr)
 {
@@ -686,7 +616,7 @@ static inline int adreno_add_bank_change_cmds(unsigned int *cmds,
 {
 	unsigned int *start = cmds;
 
-	*cmds++ = cp_type0_packet(REG_CP_STATE_DEBUG_INDEX, 1);
+	*cmds++ = cp_type0_packet(A3XX_CP_STATE_DEBUG_INDEX, 1);
 	*cmds++ = (cur_ctx_bank ? 0 : 0x20);
 	cmds += __adreno_add_idle_indirect_cmds(cmds, nop_gpuaddr);
 	return cmds - start;
@@ -938,11 +868,7 @@ adreno_get_rptr(struct adreno_ringbuffer *rb)
 static inline void adreno_set_protected_registers(struct kgsl_device *device,
 	unsigned int *index, unsigned int reg, int mask_len)
 {
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	unsigned int val;
-
-	/* This function is only for adreno A3XX and beyond */
-	BUG_ON(adreno_is_a2xx(adreno_dev));
 
 	/* There are only 16 registers available */
 	BUG_ON(*index >= 16);
