@@ -984,6 +984,7 @@ int kgsl_pwrctrl_init(struct kgsl_device *device)
 	pwr->active_pwrlevel = pdata->init_level;
 	pwr->default_pwrlevel = pdata->init_level;
 	pwr->init_pwrlevel = pdata->init_level;
+	pwr->wakeup_maxpwrlevel = 0;
 	for (i = 0; i < pdata->num_levels; i++) {
 		pwr->pwrlevels[i].gpu_freq =
 		(pdata->pwrlevel[i].gpu_freq > 0) ?
@@ -1407,8 +1408,14 @@ EXPORT_SYMBOL(kgsl_pwrctrl_wake);
 void kgsl_pwrctrl_enable(struct kgsl_device *device)
 {
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
+	int level;
 	/* Order pwrrail/clk sequence based upon platform */
 	kgsl_pwrctrl_pwrrail(device, KGSL_PWRFLAGS_ON);
+	if (pwr->wakeup_maxpwrlevel) {
+		level = pwr->max_pwrlevel;
+		pwr->wakeup_maxpwrlevel = 0;
+	} else
+		level = pwr->default_pwrlevel;
 
 	pwr->bus_mod = 0;
 
