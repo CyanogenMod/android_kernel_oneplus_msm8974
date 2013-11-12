@@ -20,6 +20,7 @@
 #include "kgsl.h"
 #include "kgsl_sharedmem.h"
 #include "kgsl_cffdump.h"
+#include "kgsl_trace.h"
 
 #include "adreno.h"
 #include "adreno_pm4types.h"
@@ -211,7 +212,7 @@ err:
  *
  * Load the pm4 ucode from @start at @addr.
  */
-inline int adreno_ringbuffer_load_pm4_ucode(struct kgsl_device *device,
+static inline int adreno_ringbuffer_load_pm4_ucode(struct kgsl_device *device,
 			unsigned int start, unsigned int end, unsigned int addr)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
@@ -265,7 +266,7 @@ err:
  *
  * Load the pfp ucode from @start at @addr.
  */
-inline int adreno_ringbuffer_load_pfp_ucode(struct kgsl_device *device,
+static inline int adreno_ringbuffer_load_pfp_ucode(struct kgsl_device *device,
 			unsigned int start, unsigned int end, unsigned int addr)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
@@ -365,7 +366,7 @@ static int _ringbuffer_bootstrap_ucode(struct adreno_ringbuffer *rb,
  *
  * Setup ringbuffer for GPU.
  */
-void _ringbuffer_setup_common(struct adreno_ringbuffer *rb)
+static void _ringbuffer_setup_common(struct adreno_ringbuffer *rb)
 {
 	struct kgsl_device *device = rb->device;
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
@@ -412,7 +413,7 @@ void _ringbuffer_setup_common(struct adreno_ringbuffer *rb)
  *
  * Start ringbuffer for GPU.
  */
-int _ringbuffer_start_common(struct adreno_ringbuffer *rb)
+static int _ringbuffer_start_common(struct adreno_ringbuffer *rb)
 {
 	int status;
 	struct kgsl_device *device = rb->device;
@@ -1288,7 +1289,7 @@ int adreno_ringbuffer_submitcmd(struct adreno_device *adreno_dev,
 		adreno_getreg(adreno_dev, ADRENO_REG_RBBM_STATUS) << 2,
 		0x00000000, 0x80000000);
 done:
-	kgsl_trace_issueibcmds(device, context->id, cmdbatch,
+	trace_kgsl_issueibcmds(device, context->id, cmdbatch,
 		cmdbatch->timestamp, cmdbatch->flags, ret,
 		drawctxt->type);
 

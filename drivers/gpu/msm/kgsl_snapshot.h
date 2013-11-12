@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -171,6 +171,7 @@ struct kgsl_snapshot_debugbus {
 #define SNAPSHOT_GPU_OBJECT_SHADER  1
 #define SNAPSHOT_GPU_OBJECT_IB      2
 #define SNAPSHOT_GPU_OBJECT_GENERIC 3
+#define SNAPSHOT_GPU_OBJECT_DRAW    4
 
 struct kgsl_snapshot_gpu_object {
 	int type;      /* Type of GPU object */
@@ -325,6 +326,12 @@ int kgsl_snapshot_get_object(struct kgsl_device *device, phys_addr_t ptbase,
 
 int kgsl_snapshot_have_object(struct kgsl_device *device, phys_addr_t ptbase,
 	unsigned int gpuaddr, unsigned int size);
+
+struct adreno_ib_object_list;
+
+int kgsl_snapshot_add_ib_obj_list(struct kgsl_device *device,
+	phys_addr_t ptbase,
+	struct adreno_ib_object_list *ib_obj_list);
 
 #endif
 #endif

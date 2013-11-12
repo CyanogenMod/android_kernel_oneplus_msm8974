@@ -12,7 +12,6 @@
  */
 #include <linux/module.h>
 #include <linux/uaccess.h>
-#include <linux/vmalloc.h>
 #include <linux/ioctl.h>
 #include <linux/sched.h>
 #include <linux/of.h>
@@ -30,6 +29,7 @@
 #include "kgsl_cffdump.h"
 #include "kgsl_sharedmem.h"
 #include "kgsl_iommu.h"
+#include "kgsl_trace.h"
 
 #include "adreno.h"
 #include "adreno_pm4types.h"
@@ -42,38 +42,6 @@
 
 /* Number of times to try hard reset */
 #define NUM_TIMES_RESET_RETRY 5
-
-/* Adreno MH arbiter config*/
-#define ADRENO_CFG_MHARB \
-	(0x10 \
-		| (0 << MH_ARBITER_CONFIG__SAME_PAGE_GRANULARITY__SHIFT) \
-		| (1 << MH_ARBITER_CONFIG__L1_ARB_ENABLE__SHIFT) \
-		| (1 << MH_ARBITER_CONFIG__L1_ARB_HOLD_ENABLE__SHIFT) \
-		| (0 << MH_ARBITER_CONFIG__L2_ARB_CONTROL__SHIFT) \
-		| (1 << MH_ARBITER_CONFIG__PAGE_SIZE__SHIFT) \
-		| (1 << MH_ARBITER_CONFIG__TC_REORDER_ENABLE__SHIFT) \
-		| (1 << MH_ARBITER_CONFIG__TC_ARB_HOLD_ENABLE__SHIFT) \
-		| (0 << MH_ARBITER_CONFIG__IN_FLIGHT_LIMIT_ENABLE__SHIFT) \
-		| (0x8 << MH_ARBITER_CONFIG__IN_FLIGHT_LIMIT__SHIFT) \
-		| (1 << MH_ARBITER_CONFIG__CP_CLNT_ENABLE__SHIFT) \
-		| (1 << MH_ARBITER_CONFIG__VGT_CLNT_ENABLE__SHIFT) \
-		| (1 << MH_ARBITER_CONFIG__TC_CLNT_ENABLE__SHIFT) \
-		| (1 << MH_ARBITER_CONFIG__RB_CLNT_ENABLE__SHIFT) \
-		| (1 << MH_ARBITER_CONFIG__PA_CLNT_ENABLE__SHIFT))
-
-#define ADRENO_MMU_CONFIG						\
-	(0x01								\
-	 | (MMU_CONFIG << MH_MMU_CONFIG__RB_W_CLNT_BEHAVIOR__SHIFT)	\
-	 | (MMU_CONFIG << MH_MMU_CONFIG__CP_W_CLNT_BEHAVIOR__SHIFT)	\
-	 | (MMU_CONFIG << MH_MMU_CONFIG__CP_R0_CLNT_BEHAVIOR__SHIFT)	\
-	 | (MMU_CONFIG << MH_MMU_CONFIG__CP_R1_CLNT_BEHAVIOR__SHIFT)	\
-	 | (MMU_CONFIG << MH_MMU_CONFIG__CP_R2_CLNT_BEHAVIOR__SHIFT)	\
-	 | (MMU_CONFIG << MH_MMU_CONFIG__CP_R3_CLNT_BEHAVIOR__SHIFT)	\
-	 | (MMU_CONFIG << MH_MMU_CONFIG__CP_R4_CLNT_BEHAVIOR__SHIFT)	\
-	 | (MMU_CONFIG << MH_MMU_CONFIG__VGT_R0_CLNT_BEHAVIOR__SHIFT)	\
-	 | (MMU_CONFIG << MH_MMU_CONFIG__VGT_R1_CLNT_BEHAVIOR__SHIFT)	\
-	 | (MMU_CONFIG << MH_MMU_CONFIG__TC_R_CLNT_BEHAVIOR__SHIFT)	\
-	 | (MMU_CONFIG << MH_MMU_CONFIG__PA_W_CLNT_BEHAVIOR__SHIFT))
 
 #define KGSL_LOG_LEVEL_DEFAULT 3
 
@@ -111,9 +79,6 @@ static struct adreno_device device_3d0 = {
 					ARRAY_SIZE(adreno_governors)),
 		.name = DEVICE_3D0_NAME,
 		.id = KGSL_DEVICE_3D0,
-		.mmu = {
-			.config = ADRENO_MMU_CONFIG,
-		},
 		.pwrctrl = {
 			.irq_name = KGSL_3D0_IRQ,
 		},
@@ -329,6 +294,15 @@ static struct input_handler adreno_input_handler = {
 	.name = "kgsl",
 	.id_table = adreno_input_ids,
 };
+
+static int adreno_ft_init_sysfs(struct kgsl_device *device);
+static void adreno_ft_uninit_sysfs(struct kgsl_device *device);
+static int adreno_soft_reset(struct kgsl_device *device);
+
+static inline void adreno_irqctrl(struct adreno_device *adreno_dev, int state)
+{
+	adreno_dev->gpudev->irq_control(adreno_dev, state);
+}
 
 /**
  * adreno_perfcounter_init: Reserve kernel performance counters
@@ -840,14 +814,6 @@ static int adreno_setup_pt(struct kgsl_device *device,
 		return result;
 	}
 
-	/*
-	 * Set the mpu end to the last "normal" global memory we use.
-	 * For the IOMMU, this will be used to restrict access to the
-	 * mapped registers.
-	 */
-	device->mh.mpu_range = adreno_dev->profile.shared_buffer.gpuaddr +
-				adreno_dev->profile.shared_buffer.size;
-
 	return 0;
 }
 
@@ -861,15 +827,10 @@ static unsigned int _adreno_iommu_setstate_v0(struct kgsl_device *device,
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	int i;
 
-	if (cpu_is_msm8960())
-		cmds += adreno_add_change_mh_phys_limit_cmds(cmds, 0xFFFFF000,
-					device->mmu.setstate_memory.gpuaddr +
-					KGSL_IOMMU_SETSTATE_NOP_OFFSET);
-	else
-		cmds += adreno_add_bank_change_cmds(cmds,
-					KGSL_IOMMU_CONTEXT_USER,
-					device->mmu.setstate_memory.gpuaddr +
-					KGSL_IOMMU_SETSTATE_NOP_OFFSET);
+	cmds += adreno_add_bank_change_cmds(cmds,
+				KGSL_IOMMU_CONTEXT_USER,
+				device->mmu.setstate_memory.gpuaddr +
+				KGSL_IOMMU_SETSTATE_NOP_OFFSET);
 
 	cmds += adreno_add_idle_cmds(adreno_dev, cmds);
 
@@ -943,17 +904,10 @@ static unsigned int _adreno_iommu_setstate_v0(struct kgsl_device *device,
 	/* Release GPU-CPU sync Lock here */
 	cmds += kgsl_mmu_sync_unlock(&device->mmu, cmds);
 
-	if (cpu_is_msm8960())
-		cmds += adreno_add_change_mh_phys_limit_cmds(cmds,
-			kgsl_mmu_get_reg_gpuaddr(&device->mmu, 0,
-						0, KGSL_IOMMU_GLOBAL_BASE),
-			device->mmu.setstate_memory.gpuaddr +
-			KGSL_IOMMU_SETSTATE_NOP_OFFSET);
-	else
-		cmds += adreno_add_bank_change_cmds(cmds,
-			KGSL_IOMMU_CONTEXT_PRIV,
-			device->mmu.setstate_memory.gpuaddr +
-			KGSL_IOMMU_SETSTATE_NOP_OFFSET);
+	cmds += adreno_add_bank_change_cmds(cmds,
+		KGSL_IOMMU_CONTEXT_PRIV,
+		device->mmu.setstate_memory.gpuaddr +
+		KGSL_IOMMU_SETSTATE_NOP_OFFSET);
 
 	cmds += adreno_add_idle_cmds(adreno_dev, cmds);
 
@@ -1560,7 +1514,6 @@ static int __devinit
 adreno_probe(struct platform_device *pdev)
 {
 	struct kgsl_device *device;
-	struct kgsl_device_platform_data *pdata = NULL;
 	struct adreno_device *adreno_dev;
 	int status = -EINVAL;
 	bool is_dt;
@@ -1596,12 +1549,6 @@ adreno_probe(struct platform_device *pdev)
 
 	kgsl_pwrscale_init(&pdev->dev, CONFIG_MSM_ADRENO_DEFAULT_GOVERNOR);
 
-
-	device->flags &= ~KGSL_FLAGS_SOFT_RESET;
-	pdata = kgsl_device_get_drvdata(device);
-
-	adreno_coresight_init(pdev);
-
 	adreno_input_handler.private = device;
 
 	/*
@@ -1633,7 +1580,9 @@ static int __devexit adreno_remove(struct platform_device *pdev)
 
 	input_unregister_handler(&adreno_input_handler);
 
-	adreno_coresight_remove(pdev);
+	adreno_ft_uninit_sysfs(device);
+
+	adreno_coresight_remove(device);
 	adreno_profile_close(device);
 
 	kgsl_pwrscale_close(device);
@@ -1668,8 +1617,12 @@ static int adreno_init(struct kgsl_device *device)
 	/* Power up the device */
 	kgsl_pwrctrl_enable(device);
 
+
 	/* Identify the specific GPU */
 	adreno_identify_gpu(adreno_dev);
+
+	/* Initialize coresight for the target */
+	adreno_coresight_init(device);
 
 	if (adreno_ringbuffer_read_pm4_ucode(device)) {
 		KGSL_DRV_ERR(device, "Reading pm4 microcode failed %s\n",
@@ -1788,8 +1741,11 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 	/* Start the GPU */
 	adreno_dev->gpudev->start(adreno_dev);
 
+	/* Re-initialize the coresight registers if applicable */
+	adreno_coresight_start(adreno_dev);
+
 	kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_ON);
-	device->ftbl->irqctrl(device, 1);
+	adreno_irqctrl(adreno_dev, 1);
 
 	status = adreno_ringbuffer_cold_start(&adreno_dev->ringbuffer);
 	if (status)
@@ -1908,11 +1864,14 @@ static int adreno_stop(struct kgsl_device *device)
 
 	kgsl_mmu_stop(&device->mmu);
 
-	device->ftbl->irqctrl(device, 0);
+	adreno_irqctrl(adreno_dev, 0);
 	kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_OFF);
 	del_timer_sync(&device->idle_timer);
 
 	adreno_ocmem_gmem_free(adreno_dev);
+
+	/* Save active coresight registers if applicable */
+	adreno_coresight_stop(adreno_dev);
 
 	/* Save physical performance counter values before GPU power down*/
 	adreno_perfcounter_save(adreno_dev);
@@ -2013,7 +1972,7 @@ static int _ft_sysfs_store(const char *buf, size_t count, unsigned int *ptr)
  * @buf: value to write
  * @count: size of the value to write
  */
-struct adreno_device *_get_adreno_dev(struct device *dev)
+static struct adreno_device *_get_adreno_dev(struct device *dev)
 {
 	struct kgsl_device *device = kgsl_device_from_dev(dev);
 	return device ? ADRENO_DEVICE(device) : NULL;
@@ -2166,9 +2125,12 @@ static int _ft_fast_hang_detect_store(struct device *dev,
 
 	if (tmp != adreno_dev->fast_hang_detect) {
 		if (adreno_dev->fast_hang_detect) {
-			if (adreno_dev->gpudev->fault_detect_start)
+			if (adreno_dev->gpudev->fault_detect_start &&
+				!kgsl_active_count_get(&adreno_dev->dev)) {
 				adreno_dev->gpudev->fault_detect_start(
 					adreno_dev);
+				kgsl_active_count_put(&adreno_dev->dev);
+			}
 		} else {
 			if (adreno_dev->gpudev->fault_detect_stop)
 				adreno_dev->gpudev->fault_detect_stop(
@@ -2280,15 +2242,15 @@ static ssize_t _wake_timeout_show(struct device *dev,
 #define FT_DEVICE_ATTR(name) \
 	DEVICE_ATTR(name, 0644,	_ ## name ## _show, _ ## name ## _store);
 
-FT_DEVICE_ATTR(ft_policy);
-FT_DEVICE_ATTR(ft_pagefault_policy);
-FT_DEVICE_ATTR(ft_fast_hang_detect);
-FT_DEVICE_ATTR(ft_long_ib_detect);
+static FT_DEVICE_ATTR(ft_policy);
+static FT_DEVICE_ATTR(ft_pagefault_policy);
+static FT_DEVICE_ATTR(ft_fast_hang_detect);
+static FT_DEVICE_ATTR(ft_long_ib_detect);
 
 static DEVICE_INT_ATTR(wake_nice, 0644, _wake_nice);
 static FT_DEVICE_ATTR(wake_timeout);
 
-const struct device_attribute *ft_attr_list[] = {
+static const struct device_attribute *ft_attr_list[] = {
 	&dev_attr_ft_policy,
 	&dev_attr_ft_pagefault_policy,
 	&dev_attr_ft_fast_hang_detect,
@@ -2298,12 +2260,12 @@ const struct device_attribute *ft_attr_list[] = {
 	NULL,
 };
 
-int adreno_ft_init_sysfs(struct kgsl_device *device)
+static int adreno_ft_init_sysfs(struct kgsl_device *device)
 {
 	return kgsl_create_device_sysfs_files(device->dev, ft_attr_list);
 }
 
-void adreno_ft_uninit_sysfs(struct kgsl_device *device)
+static void adreno_ft_uninit_sysfs(struct kgsl_device *device)
 {
 	kgsl_remove_device_sysfs_files(device->dev, ft_attr_list);
 }
@@ -2555,7 +2517,7 @@ bool adreno_hw_isidle(struct kgsl_device *device)
  * The GPU hardware is reset but we never pull power so we can skip
  * a lot of the standard adreno_stop/adreno_start sequence
  */
-int adreno_soft_reset(struct kgsl_device *device)
+static int adreno_soft_reset(struct kgsl_device *device)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	int ret;
@@ -2574,7 +2536,7 @@ int adreno_soft_reset(struct kgsl_device *device)
 	adreno_ringbuffer_stop(&adreno_dev->ringbuffer);
 
 	if (kgsl_pwrctrl_isenabled(device))
-		device->ftbl->irqctrl(device, 0);
+		adreno_irqctrl(adreno_dev, 0);
 
 	kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_OFF);
 
@@ -2598,9 +2560,12 @@ int adreno_soft_reset(struct kgsl_device *device)
 	/* Reinitialize the GPU */
 	adreno_dev->gpudev->start(adreno_dev);
 
+	/* Re-initialize the coresight registers if applicable */
+	adreno_coresight_start(adreno_dev);
+
 	/* Enable IRQ */
 	kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_ON);
-	device->ftbl->irqctrl(device, 1);
+	adreno_irqctrl(adreno_dev, 1);
 
 	/*
 	 * If we have offsets for the jump tables we can try to do a warm start,
@@ -2739,43 +2704,21 @@ static int adreno_suspend_context(struct kgsl_device *device)
 	return status;
 }
 
-/* Find a memory structure attached to an adreno context */
-
-struct kgsl_memdesc *adreno_find_ctxtmem(struct kgsl_device *device,
-	phys_addr_t pt_base, unsigned int gpuaddr, unsigned int size)
-{
-	struct kgsl_context *context;
-	int next = 0;
-	struct kgsl_memdesc *desc = NULL;
-
-	read_lock(&device->context_lock);
-	while (1) {
-		context = idr_get_next(&device->context_idr, &next);
-		if (context == NULL)
-			break;
-
-		if (kgsl_mmu_pt_equal(&device->mmu,
-					context->proc_priv->pagetable,
-					pt_base)) {
-			struct adreno_context *adreno_context;
-
-			adreno_context = ADRENO_CONTEXT(context);
-			desc = &adreno_context->gpustate;
-			if (kgsl_gpuaddr_in_memdesc(desc, gpuaddr, size))
-				break;
-
-			desc = &adreno_context->context_gmem_shadow.gmemshadow;
-			if (kgsl_gpuaddr_in_memdesc(desc, gpuaddr, size))
-				break;
-		}
-		next = next + 1;
-		desc = NULL;
-	}
-	read_unlock(&device->context_lock);
-	return desc;
-}
-
-struct kgsl_memdesc *adreno_find_region(struct kgsl_device *device,
+/*
+ * adreno_find_region() - Find corresponding allocation for a given address
+ * @device: Device on which address operates
+ * @pt_base: The pagetable in which address is mapped
+ * @gpuaddr: The gpu address
+ * @size: Size in bytes of the address
+ * @entry: If the allocation is part of user space allocation then the mem
+ * entry is returned in this parameter. Caller is supposed to decrement
+ * refcount on this entry after its done using it.
+ *
+ * Finds an allocation descriptor for a given gpu address range
+ *
+ * Returns the descriptor on success else NULL
+ */
+static struct kgsl_memdesc *adreno_find_region(struct kgsl_device *device,
 						phys_addr_t pt_base,
 						unsigned int gpuaddr,
 						unsigned int size)
@@ -2802,7 +2745,7 @@ struct kgsl_memdesc *adreno_find_region(struct kgsl_device *device,
 	if (entry)
 		return &entry->memdesc;
 
-	return adreno_find_ctxtmem(device, pt_base, gpuaddr, size);
+	return NULL;
 }
 
 uint8_t *adreno_convertaddr(struct kgsl_device *device, phys_addr_t pt_base,
@@ -2879,7 +2822,7 @@ static void adreno_regwrite(struct kgsl_device *device,
 	if (!in_interrupt())
 		kgsl_pre_hwaccess(device);
 
-	kgsl_trace_regwrite(device, offsetwords, value);
+	trace_kgsl_regwrite(device, offsetwords, value);
 
 	kgsl_cffdump_regwrite(device, offsetwords << 2, value);
 	reg = (unsigned int *)(device->reg_virt + (offsetwords << 2));
@@ -2959,7 +2902,7 @@ static int adreno_readtimestamp(struct kgsl_device *device,
 					unsigned int *timestamp)
 {
 	int status = 0;
-	unsigned int id = context ? context->id : KGSL_MEMSTORE_GLOBAL;
+	unsigned int id = KGSL_CONTEXT_ID(context);
 
 	/*
 	 * If user passed in a NULL pointer for timestamp, return without
@@ -3079,12 +3022,6 @@ static void adreno_power_stats(struct kgsl_device *device,
 	stats->ram_wait = busy_data.vbif_starved_ram;
 }
 
-void adreno_irqctrl(struct kgsl_device *device, int state)
-{
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
-	adreno_dev->gpudev->irq_control(adreno_dev, state);
-}
-
 static unsigned int adreno_gpuid(struct kgsl_device *device,
 	unsigned int *chipid)
 {
@@ -3122,7 +3059,6 @@ static const struct kgsl_functable adreno_functable = {
 	.setup_pt = adreno_setup_pt,
 	.cleanup_pt = adreno_cleanup_pt,
 	.power_stats = adreno_power_stats,
-	.irqctrl = adreno_irqctrl,
 	.gpuid = adreno_gpuid,
 	.snapshot = adreno_snapshot,
 	.irq_handler = adreno_irq_handler,

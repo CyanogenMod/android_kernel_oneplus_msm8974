@@ -549,7 +549,7 @@ static int _adreno_dispatcher_issuecmds(struct adreno_device *adreno_dev)
  *
  * Lock the dispatcher and call _adreno_dispatcher_issueibcmds
  */
-int adreno_dispatcher_issuecmds(struct adreno_device *adreno_dev)
+static int adreno_dispatcher_issuecmds(struct adreno_device *adreno_dev)
 {
 	struct adreno_dispatcher *dispatcher = &adreno_dev->dispatcher;
 	int ret;
@@ -645,11 +645,20 @@ int adreno_dispatcher_queue_cmd(struct adreno_device *adreno_dev,
 	}
 
 	/*
-	 * After skipping to the end of the frame we need to force the preamble
-	 * to run (if it exists) regardless of the context state.
+	 * Force the preamble for this submission only - this is usually
+	 * requested by the dispatcher as part of fault recovery
 	 */
 
 	if (test_and_clear_bit(ADRENO_CONTEXT_FORCE_PREAMBLE, &drawctxt->priv))
+		set_bit(CMDBATCH_FLAG_FORCE_PREAMBLE, &cmdbatch->priv);
+
+	/*
+	 * Force the premable if set from userspace in the context or cmdbatch
+	 * flags
+	 */
+
+	if ((drawctxt->base.flags & KGSL_CONTEXT_CTX_SWITCH) ||
+		(cmdbatch->flags & KGSL_CONTEXT_CTX_SWITCH))
 		set_bit(CMDBATCH_FLAG_FORCE_PREAMBLE, &cmdbatch->priv);
 
 	/*
@@ -882,8 +891,8 @@ static void remove_invalidated_cmdbatches(struct kgsl_device *device,
 			replay[i] = NULL;
 
 			mutex_lock(&device->mutex);
-			kgsl_cancel_events_timestamp(device, cmd->context,
-				cmd->timestamp);
+			kgsl_cancel_events_timestamp(device,
+				&cmd->context->events, cmd->timestamp);
 			mutex_unlock(&device->mutex);
 
 			kgsl_cmdbatch_destroy(cmd);
@@ -1419,11 +1428,8 @@ static void adreno_dispatcher_work(struct work_struct *work)
 	 * If inflight went to 0, queue back up the event processor to catch
 	 * stragglers
 	 */
-	if (dispatcher->inflight == 0 && count) {
-		mutex_lock(&device->mutex);
-		queue_work(device->work_queue, &device->ts_expired_ws);
-		mutex_unlock(&device->mutex);
-	}
+	if (dispatcher->inflight == 0 && count)
+		queue_work(device->work_queue, &device->event_work);
 
 	/* Dispatch new commands if we have the room */
 	if (dispatcher->inflight < _dispatcher_inflight)
@@ -1440,7 +1446,7 @@ done:
 
 		/* There are still things in flight - update the idle counts */
 		mutex_lock(&device->mutex);
-		kgsl_pwrscale_idle(device);
+		kgsl_pwrscale_update(device);
 		mutex_unlock(&device->mutex);
 	} else {
 		/* There is nothing left in the pipeline.  Shut 'er down boys */
@@ -1463,7 +1469,7 @@ done:
 
 	/* Before leaving update the pwrscale information */
 	mutex_lock(&device->mutex);
-	kgsl_pwrscale_idle(device);
+	kgsl_pwrscale_update(device);
 	mutex_unlock(&device->mutex);
 
 	mutex_unlock(&dispatcher->mutex);
@@ -1502,7 +1508,7 @@ void adreno_dispatcher_queue_context(struct kgsl_device *device,
  * subsequent calls then the GPU may have faulted
  */
 
-void adreno_dispatcher_fault_timer(unsigned long data)
+static void adreno_dispatcher_fault_timer(unsigned long data)
 {
 	struct adreno_device *adreno_dev = (struct adreno_device *) data;
 	struct kgsl_device *device = &adreno_dev->dev;
@@ -1535,7 +1541,7 @@ void adreno_dispatcher_fault_timer(unsigned long data)
  * This is called when the timer expires - it either means the GPU is hung or
  * the IB is taking too long to execute
  */
-void adreno_dispatcher_timer(unsigned long data)
+static void adreno_dispatcher_timer(unsigned long data)
 {
 	struct adreno_device *adreno_dev = (struct adreno_device *) data;
 	struct kgsl_device *device = &adreno_dev->dev;

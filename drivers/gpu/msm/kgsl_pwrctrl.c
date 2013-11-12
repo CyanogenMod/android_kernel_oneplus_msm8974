@@ -25,7 +25,6 @@
 #include "kgsl_pwrscale.h"
 #include "kgsl_device.h"
 #include "kgsl_trace.h"
-#include "kgsl_sharedmem.h"
 
 #define KGSL_PWRFLAGS_POWER_ON 0
 #define KGSL_PWRFLAGS_CLK_ON   1
@@ -50,7 +49,7 @@ struct clk_pair {
 	uint map;
 };
 
-struct clk_pair clks[KGSL_MAX_CLKS] = {
+static struct clk_pair clks[KGSL_MAX_CLKS] = {
 	{
 		.name = "src_clk",
 		.map = KGSL_CLK_SRC,
@@ -765,43 +764,44 @@ static ssize_t kgsl_pwrctrl_bus_split_store(struct device *dev,
 	return count;
 }
 
-DEVICE_ATTR(gpuclk, 0644, kgsl_pwrctrl_gpuclk_show, kgsl_pwrctrl_gpuclk_store);
-DEVICE_ATTR(max_gpuclk, 0644, kgsl_pwrctrl_max_gpuclk_show,
+static DEVICE_ATTR(gpuclk, 0644, kgsl_pwrctrl_gpuclk_show,
+	kgsl_pwrctrl_gpuclk_store);
+static DEVICE_ATTR(max_gpuclk, 0644, kgsl_pwrctrl_max_gpuclk_show,
 	kgsl_pwrctrl_max_gpuclk_store);
-DEVICE_ATTR(idle_timer, 0644, kgsl_pwrctrl_idle_timer_show,
+static DEVICE_ATTR(idle_timer, 0644, kgsl_pwrctrl_idle_timer_show,
 	kgsl_pwrctrl_idle_timer_store);
-DEVICE_ATTR(gpubusy, 0444, kgsl_pwrctrl_gpubusy_show,
+static DEVICE_ATTR(gpubusy, 0444, kgsl_pwrctrl_gpubusy_show,
 	NULL);
-DEVICE_ATTR(gputop, 0444, kgsl_pwrctrl_gputop_show,
+static DEVICE_ATTR(gputop, 0444, kgsl_pwrctrl_gputop_show,
 	NULL);
-DEVICE_ATTR(gpu_available_frequencies, 0444,
+static DEVICE_ATTR(gpu_available_frequencies, 0444,
 	kgsl_pwrctrl_gpu_available_frequencies_show,
 	NULL);
-DEVICE_ATTR(max_pwrlevel, 0644,
+static DEVICE_ATTR(max_pwrlevel, 0644,
 	kgsl_pwrctrl_max_pwrlevel_show,
 	kgsl_pwrctrl_max_pwrlevel_store);
-DEVICE_ATTR(min_pwrlevel, 0644,
+static DEVICE_ATTR(min_pwrlevel, 0644,
 	kgsl_pwrctrl_min_pwrlevel_show,
 	kgsl_pwrctrl_min_pwrlevel_store);
-DEVICE_ATTR(thermal_pwrlevel, 0644,
+static DEVICE_ATTR(thermal_pwrlevel, 0644,
 	kgsl_pwrctrl_thermal_pwrlevel_show,
 	kgsl_pwrctrl_thermal_pwrlevel_store);
-DEVICE_ATTR(num_pwrlevels, 0444,
+static DEVICE_ATTR(num_pwrlevels, 0444,
 	kgsl_pwrctrl_num_pwrlevels_show,
 	NULL);
-DEVICE_ATTR(pmqos_latency, 0644,
+static DEVICE_ATTR(pmqos_latency, 0644,
 	kgsl_pwrctrl_pmqos_latency_show,
 	kgsl_pwrctrl_pmqos_latency_store);
-DEVICE_ATTR(reset_count, 0444,
+static DEVICE_ATTR(reset_count, 0444,
 	kgsl_pwrctrl_reset_count_show,
 	NULL);
-DEVICE_ATTR(force_clk_on, 0644,
+static DEVICE_ATTR(force_clk_on, 0644,
 	kgsl_pwrctrl_force_clk_on_show,
 	kgsl_pwrctrl_force_clk_on_store);
-DEVICE_ATTR(force_bus_on, 0644,
+static DEVICE_ATTR(force_bus_on, 0644,
 	kgsl_pwrctrl_force_bus_on_show,
 	kgsl_pwrctrl_force_bus_on_store);
-DEVICE_ATTR(force_rail_on, 0644,
+static DEVICE_ATTR(force_rail_on, 0644,
 	kgsl_pwrctrl_force_rail_on_show,
 	kgsl_pwrctrl_force_rail_on_store);
 DEVICE_ATTR(bus_split, 0644,
@@ -1043,10 +1043,6 @@ int kgsl_pwrctrl_init(struct kgsl_device *device)
 	/* Make sure we have a source clk for freq setting */
 	if (pwr->grp_clks[0] == NULL)
 		pwr->grp_clks[0] = pwr->grp_clks[1];
-
-	/* put the AXI bus into asynchronous mode with the graphics cores */
-	if (pdata->set_grp_async != NULL)
-		pdata->set_grp_async();
 
 	if (pdata->num_levels > KGSL_MAX_PWRLEVELS ||
 	    pdata->num_levels < 1) {
@@ -1307,8 +1303,6 @@ EXPORT_SYMBOL(kgsl_pre_hwaccess);
 static int
 _nap(struct kgsl_device *device)
 {
-	struct kgsl_power_stats stats;
-
 	switch (device->state) {
 	case KGSL_STATE_ACTIVE:
 		if (!device->ftbl->isidle(device)) {
@@ -1323,8 +1317,7 @@ _nap(struct kgsl_device *device)
 		 * the simple-on-demand governor will get the latest
 		 * busy_time data even if the gpu isn't active.
 		*/
-		device->ftbl->power_stats(device, &stats);
-		device->pwrscale.accum_stats.busy_time += stats.busy_time;
+		kgsl_pwrscale_update_stats(device);
 
 		kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_OFF);
 		kgsl_pwrctrl_clk(device, KGSL_PWRFLAGS_OFF, KGSL_STATE_NAP);
@@ -1453,10 +1446,6 @@ EXPORT_SYMBOL(kgsl_pwrctrl_sleep);
 int kgsl_pwrctrl_wake(struct kgsl_device *device, int priority)
 {
 	int status = 0;
-	unsigned int context_id;
-	unsigned int state = device->state;
-	unsigned int ts_processed = 0xdeaddead;
-	struct kgsl_context *context;
 
 	kgsl_pwrctrl_request_state(device, KGSL_STATE_ACTIVE);
 	switch (device->state) {
@@ -1472,19 +1461,6 @@ int kgsl_pwrctrl_wake(struct kgsl_device *device, int priority)
 	case KGSL_STATE_SLEEP:
 		kgsl_pwrctrl_axi(device, KGSL_PWRFLAGS_ON);
 		kgsl_pwrscale_wake(device);
-		kgsl_sharedmem_readl(&device->memstore,
-			(unsigned int *) &context_id,
-			KGSL_MEMSTORE_OFFSET(KGSL_MEMSTORE_GLOBAL,
-				current_context));
-		context = kgsl_context_get(device, context_id);
-		if (context)
-			kgsl_readtimestamp(device, context,
-				KGSL_TIMESTAMP_RETIRED,
-				&ts_processed);
-		KGSL_PWR_INFO(device, "Wake from %s state. CTXT: %d RTRD TS: %08X\n",
-			kgsl_pwrstate_to_str(state),
-			context ? context->id : -1, ts_processed);
-		kgsl_context_put(context);
 		/* fall through */
 	case KGSL_STATE_NAP:
 		/* Turn on the core clocks */
@@ -1614,28 +1590,6 @@ int kgsl_active_count_get(struct kgsl_device *device)
 	return ret;
 }
 EXPORT_SYMBOL(kgsl_active_count_get);
-
-/**
- * kgsl_active_count_get_light() - Increase the device active count
- * @device: Pointer to a KGSL device
- *
- * Increase the active count for the KGSL device WITHOUT
- * turning on the clocks based on the assumption that the clocks are already
- * on from a previous active_count_get(). Currently this is only used for
- * creating kgsl_events.
- */
-int kgsl_active_count_get_light(struct kgsl_device *device)
-{
-	if (atomic_inc_not_zero(&device->active_cnt) == 0) {
-		dev_WARN_ONCE(device->dev, 1, "active count is 0!\n");
-		return -EINVAL;
-	}
-
-	trace_kgsl_active_count(device,
-		(unsigned long) __builtin_return_address(0));
-	return 0;
-}
-EXPORT_SYMBOL(kgsl_active_count_get_light);
 
 /**
  * kgsl_active_count_put() - Decrease the device active count

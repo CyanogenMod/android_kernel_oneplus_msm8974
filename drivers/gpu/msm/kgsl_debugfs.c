@@ -120,18 +120,19 @@ void kgsl_device_debugfs_init(struct kgsl_device *device)
 				&memfree_hist_fops);
 }
 
-static const char * const memtype_strings[] = {
-	"gpumem",
-	"pmem",
-	"ashmem",
-	"usermap",
-	"ion",
+struct type_entry {
+	int type;
+	const char *str;
 };
+
+static const struct type_entry memtypes[] = { KGSL_MEM_TYPES };
 
 static const char *memtype_str(int memtype)
 {
-	if (memtype < ARRAY_SIZE(memtype_strings))
-		return memtype_strings[memtype];
+	int i;
+	for (i = 0; i < ARRAY_SIZE(memtypes); i++)
+		if (memtypes[i].type == memtype)
+			return memtypes[i].str;
 	return "unknown";
 }
 
@@ -171,9 +172,12 @@ static void print_mem_entry(struct seq_file *s, struct kgsl_mem_entry *entry)
 
 	kgsl_get_memory_usage(usage, sizeof(usage), m->flags);
 
-	seq_printf(s, "%08x %08lx %8d %5d %5s %10s %16s %5d\n",
-			m->gpuaddr, m->useraddr, m->size, entry->id, flags,
-			memtype_str(entry->memtype), usage, m->sglen);
+	seq_printf(s, "%X %lX %8zd %5d %5s %10s %16s %5d\n",
+			m->gpuaddr,
+			m->useraddr,
+			m->size, entry->id, flags,
+			memtype_str(kgsl_memdesc_usermem_type(m)),
+			usage, m->sglen);
 }
 
 static int process_mem_print(struct seq_file *s, void *unused)
@@ -212,14 +216,36 @@ static int process_mem_print(struct seq_file *s, void *unused)
 
 static int process_mem_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, process_mem_print, inode->i_private);
+	struct kgsl_process_private *private = inode->i_private;
+
+	/*
+	 * Hold a reference count on the process while open
+	 * in case the process tries to die in the meantime.
+	 * If the process is already dying we cannot get a
+	 * refcount, print nothing.
+	 */
+
+	if (!private || !kgsl_process_private_get(private))
+		return -ENODEV;
+
+	return single_open(file, process_mem_print, private);
+}
+
+static int process_mem_release(struct inode *inode, struct file *file)
+{
+	struct kgsl_process_private *private = inode->i_private;
+
+	if (private)
+		kgsl_process_private_put(private);
+
+	return single_release(inode, file);
 }
 
 static const struct file_operations process_mem_fops = {
 	.open = process_mem_open,
 	.read = seq_read,
 	.llseek = seq_lseek,
-	.release = single_release,
+	.release = process_mem_release,
 };
 
 
