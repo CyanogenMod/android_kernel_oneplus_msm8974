@@ -174,13 +174,10 @@ void kgsl_pwrctrl_pwrlevel_change(struct kgsl_device *device,
 	pwrlevel = &pwr->pwrlevels[pwr->active_pwrlevel];
 
 	kgsl_pwrctrl_buslevel_update(device, true);
-	if (test_bit(KGSL_PWRFLAGS_AXI_ON, &pwr->power_flags))
-		if (pwr->ebi1_clk)
-			clk_set_rate(pwr->ebi1_clk, pwrlevel->bus_freq);
 
 	if (test_bit(KGSL_PWRFLAGS_CLK_ON, &pwr->power_flags) ||
 		(device->state == KGSL_STATE_NAP))
-		clk_set_rate(pwr->grp_clks[0],
+			clk_set_rate(pwr->grp_clks[0],
 				pwr->pwrlevels[new_level].gpu_freq);
 
 
@@ -950,22 +947,12 @@ static void kgsl_pwrctrl_axi(struct kgsl_device *device, int state)
 		if (test_and_clear_bit(KGSL_PWRFLAGS_AXI_ON,
 			&pwr->power_flags)) {
 			trace_kgsl_bus(device, state);
-			if (pwr->ebi1_clk) {
-				clk_set_rate(pwr->ebi1_clk, 0);
-				clk_disable_unprepare(pwr->ebi1_clk);
-			}
 			kgsl_pwrctrl_buslevel_update(device, false);
 		}
 	} else if (state == KGSL_PWRFLAGS_ON) {
 		if (!test_and_set_bit(KGSL_PWRFLAGS_AXI_ON,
 			&pwr->power_flags)) {
 			trace_kgsl_bus(device, state);
-			if (pwr->ebi1_clk) {
-				clk_prepare_enable(pwr->ebi1_clk);
-				clk_set_rate(pwr->ebi1_clk,
-					pwr->pwrlevels[pwr->active_pwrlevel].
-					bus_freq);
-			}
 			kgsl_pwrctrl_buslevel_update(device, true);
 		}
 	}
@@ -1109,16 +1096,8 @@ int kgsl_pwrctrl_init(struct kgsl_device *device)
 
 	pwr->power_flags = 0;
 
-	pwr->idle_needed = pdata->idle_needed;
 	pwr->interval_timeout = pdata->idle_timeout;
 	pwr->strtstp_sleepwake = pdata->strtstp_sleepwake;
-	pwr->ebi1_clk = clk_get(&pdev->dev, "bus_clk");
-	if (IS_ERR(pwr->ebi1_clk))
-		pwr->ebi1_clk = NULL;
-	else
-		clk_set_rate(pwr->ebi1_clk,
-					 pwr->pwrlevels[pwr->active_pwrlevel].
-						bus_freq);
 
 	/* Set the CPU latency to 501usec to allow low latency PC modes */
 	pwr->pm_qos_latency = 501;
@@ -1211,8 +1190,6 @@ void kgsl_pwrctrl_close(struct kgsl_device *device)
 	KGSL_PWR_INFO(device, "close device %d\n", device->id);
 
 	pm_runtime_disable(device->parentdev);
-
-	clk_put(pwr->ebi1_clk);
 
 	if (pwr->pcl)
 		msm_bus_scale_unregister_client(pwr->pcl);
