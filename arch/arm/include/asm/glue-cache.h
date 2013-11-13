@@ -110,19 +110,19 @@
 #endif
 
 #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
-//# ifdef _CACHE
+# ifdef _CACHE
 #  define MULTI_CACHE 1
-//# else
-//#  define _CACHE v6
-//# endif
+# else
+#  define _CACHE v6
+# endif
 #endif
 
 #if defined(CONFIG_CPU_V7)
-//# ifdef _CACHE
+# ifdef _CACHE
 #  define MULTI_CACHE 1
-//# else
-//#  define _CACHE v7
-//# endif
+# else
+#  define _CACHE v7
+# endif
 #endif
 
 #if !defined(_CACHE) && !defined(MULTI_CACHE)
@@ -142,6 +142,8 @@
 #define dmac_map_area			__glue(_CACHE,_dma_map_area)
 #define dmac_unmap_area			__glue(_CACHE,_dma_unmap_area)
 #define dmac_flush_range		__glue(_CACHE,_dma_flush_range)
+#define dmac_inv_range			__glue(_CACHE,_dma_inv_range)
+#define dmac_clean_range		__glue(_CACHE,_dma_clean_range)
 #endif
 
 #endif
