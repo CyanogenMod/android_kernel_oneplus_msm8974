@@ -401,7 +401,6 @@ struct adreno_gpudev {
 	void (*coresight_config_debug_reg) (struct kgsl_device *device,
 			int debug_reg, unsigned int val);
 	void (*soft_reset)(struct adreno_device *device);
-	void (*postmortem_dump)(struct adreno_device *adreno_dev);
 };
 
 #define FT_DETECT_REGS_COUNT 14
@@ -473,10 +472,6 @@ void adreno_shadermem_regread(struct kgsl_device *device,
 						unsigned int offsetwords,
 						unsigned int *value);
 
-int adreno_dump(struct kgsl_device *device, int manual);
-void adreno_dump_fields(struct kgsl_device *device,
-			const char *start, const struct log_field *lines,
-			int num);
 unsigned int adreno_a3xx_rbbm_clock_ctl_default(struct adreno_device
 							*adreno_dev);
 
