@@ -61,8 +61,8 @@ static void fault_detect_read(struct kgsl_device *device)
 {
 	int i;
 
-	fault_detect_ts = kgsl_readtimestamp(device, NULL,
-		KGSL_TIMESTAMP_RETIRED);
+	kgsl_readtimestamp(device, NULL, KGSL_TIMESTAMP_RETIRED,
+		&fault_detect_ts);
 
 	for (i = 0; i < FT_DETECT_REGS_COUNT; i++) {
 		if (ft_detect_regs[i] == 0)
@@ -84,7 +84,7 @@ static inline bool _isidle(struct kgsl_device *device)
 	if (!kgsl_pwrctrl_isenabled(device))
 		goto ret;
 
-	ts = kgsl_readtimestamp(device, NULL, KGSL_TIMESTAMP_RETIRED);
+	kgsl_readtimestamp(device, NULL, KGSL_TIMESTAMP_RETIRED, &ts);
 
 	/* If GPU HW status is idle return true */
 	if (adreno_hw_isidle(device) ||
@@ -127,7 +127,7 @@ static int fault_detect_read_compare(struct kgsl_device *device)
 		fault_detect_regs[i] = val;
 	}
 
-	ts = kgsl_readtimestamp(device, NULL, KGSL_TIMESTAMP_RETIRED);
+	kgsl_readtimestamp(device, NULL, KGSL_TIMESTAMP_RETIRED, &ts);
 	if (ts != fault_detect_ts)
 		ret = 1;
 
@@ -1295,8 +1295,8 @@ static void adreno_dispatcher_work(struct work_struct *work)
 		 * pointers and continue processing the queue
 		 */
 
-		retired = kgsl_readtimestamp(device, cmdbatch->context,
-				KGSL_TIMESTAMP_RETIRED);
+		kgsl_readtimestamp(device, cmdbatch->context,
+			KGSL_TIMESTAMP_RETIRED, &retired);
 
 		if ((timestamp_cmp(cmdbatch->timestamp, retired) <= 0)) {
 
@@ -1354,8 +1354,8 @@ static void adreno_dispatcher_work(struct work_struct *work)
 		fault_handled = 1;
 
 		/* Get the last consumed timestamp */
-		consumed = kgsl_readtimestamp(device, cmdbatch->context,
-			KGSL_TIMESTAMP_CONSUMED);
+		kgsl_readtimestamp(device, cmdbatch->context,
+			KGSL_TIMESTAMP_CONSUMED, &consumed);
 
 		/*
 		 * Break here if fault detection is disabled for the context or
