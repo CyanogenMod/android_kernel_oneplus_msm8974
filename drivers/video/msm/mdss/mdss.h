@@ -128,6 +128,7 @@ struct mdss_data_type {
 	u8 has_wfd_blk;
 	u32 has_no_lut_read;
 	u8 has_wb_ad;
+	bool idle_pc_enabled;
 
 	u32 rotator_ot_limit;
 	u32 mdp_irq_mask;
@@ -207,7 +208,8 @@ struct mdss_data_type {
 
 	int handoff_pending;
 	struct mdss_prefill_data prefill_data;
-	bool ulps;
+	bool idle_pc;
+	atomic_t active_intf_cnt;
 	int iommu_ref_cnt;
 
 	u64 ab[MDSS_MAX_HW_BLK];
