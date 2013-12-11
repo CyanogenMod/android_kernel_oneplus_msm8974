@@ -46,6 +46,7 @@
 #include <mach/iommu.h>
 #include <mach/iommu_domains.h>
 #include <mach/msm_memtypes.h>
+#include <mach/rpm-regulator-smd.h>
 
 #include "mdp3.h"
 #include "mdss_fb.h"
@@ -1203,6 +1204,54 @@ static int mdp3_parse_dt(struct platform_device *pdev)
 	return 0;
 }
 
+void msm_mdp3_cx_ctrl(int enable)
+{
+	int rc;
+
+	if (!mdp3_res->vdd_cx) {
+		mdp3_res->vdd_cx = devm_regulator_get(&mdp3_res->pdev->dev,
+								"vdd-cx");
+		if (IS_ERR_OR_NULL(mdp3_res->vdd_cx)) {
+			pr_debug("unable to get CX reg. rc=%d\n",
+				PTR_RET(mdp3_res->vdd_cx));
+			mdp3_res->vdd_cx = NULL;
+			return;
+		}
+	}
+
+	if (enable) {
+		rc = regulator_set_voltage(
+				mdp3_res->vdd_cx,
+				RPM_REGULATOR_CORNER_SVS_SOC,
+				RPM_REGULATOR_CORNER_SUPER_TURBO);
+		if (rc < 0)
+			goto vreg_set_voltage_fail;
+
+		rc = regulator_enable(mdp3_res->vdd_cx);
+		if (rc) {
+			pr_err("Failed to enable regulator vdd_cx.\n");
+			return;
+		}
+	} else {
+		rc = regulator_disable(mdp3_res->vdd_cx);
+		if (rc) {
+			pr_err("Failed to disable regulator vdd_cx.\n");
+			return;
+		}
+		rc = regulator_set_voltage(
+				mdp3_res->vdd_cx,
+				RPM_REGULATOR_CORNER_NONE,
+				RPM_REGULATOR_CORNER_SUPER_TURBO);
+		if (rc < 0)
+			goto vreg_set_voltage_fail;
+	}
+
+	return;
+vreg_set_voltage_fail:
+	pr_err("Set vltg failed\n");
+	return;
+}
+
 void mdp3_batfet_ctrl(int enable)
 {
 	int rc;
@@ -1233,6 +1282,12 @@ void mdp3_batfet_ctrl(int enable)
 
 	if (rc < 0)
 		pr_err("%s: reg enable/disable failed", __func__);
+}
+
+void mdp3_enable_regulator(int enable)
+{
+	msm_mdp3_cx_ctrl(enable);
+	mdp3_batfet_ctrl(enable);
 }
 
 static void mdp3_iommu_heap_unmap_iommu(struct mdp3_iommu_meta *meta)
@@ -1962,7 +2017,7 @@ static int mdp3_continuous_splash_on(struct mdss_panel_data *pdata)
 	else
 		mdp3_res->intf[MDP3_DMA_OUTPUT_SEL_DSI_CMD].active = 1;
 
-	mdp3_batfet_ctrl(true);
+	mdp3_enable_regulator(true);
 	mdp3_res->cont_splash_en = 1;
 	return 0;
 
@@ -2319,13 +2374,13 @@ int mdp3_panel_get_boot_cfg(void)
 
 static  int mdp3_suspend_sub(struct mdp3_hw_resource *mdata)
 {
-	mdp3_batfet_ctrl(false);
+	mdp3_enable_regulator(false);
 	return 0;
 }
 
 static  int mdp3_resume_sub(struct mdp3_hw_resource *mdata)
 {
-	mdp3_batfet_ctrl(true);
+	mdp3_enable_regulator(true);
 	return 0;
 }
 
