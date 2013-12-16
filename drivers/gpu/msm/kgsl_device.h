@@ -173,10 +173,9 @@ struct kgsl_event {
  * @ibcount: Number of IBs in the command list
  * @ibdesc: Pointer to the list of IBs
  * @expires: Point in time when the cmdbatch is considered to be hung
- * @invalid:  non-zero if the dispatcher determines the command and the owning
- * context should be invalidated
  * @refcount: kref structure to maintain the reference count
  * @synclist: List of context/timestamp tuples to wait for before issuing
+ * @timer: a timer used to track possible sync timeouts for this cmdbatch
  *
  * This struture defines an atomic batch of command buffers issued from
  * userspace.
@@ -193,9 +192,9 @@ struct kgsl_cmdbatch {
 	uint32_t ibcount;
 	struct kgsl_ibdesc *ibdesc;
 	unsigned long expires;
-	int invalid;
 	struct kref refcount;
 	struct list_head synclist;
+	struct timer_list timer;
 };
 
 /**
@@ -723,4 +722,25 @@ static inline int kgsl_cmdbatch_sync_pending(struct kgsl_cmdbatch *cmdbatch)
 	return ret;
 }
 
+/**
+ * kgsl_sysfs_store() - parse a string from a sysfs store function
+ * @buf: Incoming string to parse
+ * @count: Size of the incoming string
+ * @ptr: Pointer to an unsigned int to store the value
+ */
+static inline ssize_t kgsl_sysfs_store(const char *buf, size_t count,
+		unsigned int *ptr)
+{
+	unsigned int val;
+	int rc;
+
+	rc = kstrtou32(buf, 0, &val);
+	if (rc)
+		return rc;
+
+	if (ptr)
+		*ptr = val;
+
+	return count;
+}
 #endif  /* __KGSL_DEVICE_H */
