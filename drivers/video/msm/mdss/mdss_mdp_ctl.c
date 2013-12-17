@@ -1208,12 +1208,18 @@ int mdss_mdp_ctl_splash_finish(struct mdss_mdp_ctl *ctl, bool handoff)
 static inline int mdss_mdp_set_split_ctl(struct mdss_mdp_ctl *ctl,
 		struct mdss_mdp_ctl *split_ctl)
 {
-	if (!ctl || !split_ctl)
+	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
+
+	if (!ctl || !split_ctl || !mdata)
 		return -ENODEV;
 
 	/* setup split ctl mixer as right mixer of original ctl so that
 	 * original ctl can work the same way as dual pipe solution */
 	ctl->mixer_right = split_ctl->mixer_left;
+
+	if ((mdata->mdp_rev >= MDSS_MDP_HW_REV_103) &&
+		(ctl->opmode == MDSS_MDP_CTL_OP_VIDEO_MODE))
+		ctl->split_flush_en = true;
 
 	return 0;
 }
@@ -1594,6 +1600,11 @@ static void mdss_mdp_ctl_split_display_enable(int enable,
 		MDSS_MDP_REG_SPLIT_DISPLAY_LOWER_PIPE_CTRL);
 	writel_relaxed(enable, main_ctl->mdata->mdp_base +
 		MDSS_MDP_REG_SPLIT_DISPLAY_EN);
+
+	if (main_ctl->split_flush_en)
+		writel_relaxed(enable ? 0x1 : 0x0,
+			main_ctl->mdata->mdp_base +
+			MMSS_MDP_MDP_SSPP_SPARE_0);
 }
 
 
@@ -2521,6 +2532,11 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 	if (ctl->mfd && ctl->mfd->dcm_state != DTM_ENTER)
 		/* postprocessing setup, including dspp */
 		mdss_mdp_pp_setup_locked(ctl);
+
+	if (sctl && ctl->split_flush_en) {
+		ctl->flush_bits |= sctl->flush_bits;
+		sctl->flush_bits = 0;
+	}
 
 	mdss_mdp_ctl_write(ctl, MDSS_MDP_REG_CTL_FLUSH, ctl->flush_bits);
 	if (sctl) {
