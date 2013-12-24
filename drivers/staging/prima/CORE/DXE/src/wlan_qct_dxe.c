@@ -1977,13 +1977,18 @@ void dxeRXPacketAvailableCB
    dxeCtxt->freeRXPacket = freePacket;
 
    /* Serialize RX Packet Available message upon RX thread */
-   HDXE_ASSERT(NULL != dxeCtxt->rxPktAvailMsg);
+   if (NULL == dxeCtxt->rxPktAvailMsg)
+   {
+       HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+               "DXE NULL pkt");
+       HDXE_ASSERT(0);
+       return;
+   }
 
    status = wpalPostRxMsg(WDI_GET_PAL_CTX(),
                           dxeCtxt->rxPktAvailMsg);
    if(eWLAN_PAL_STATUS_SUCCESS != status)
    {
-      HDXE_ASSERT(eWLAN_PAL_STATUS_SUCCESS == status);
       HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
                "dxeRXPacketAvailableCB serialize fail");
    }
@@ -2090,8 +2095,13 @@ static wpt_status dxeRXFrameSingleBufferAlloc
    status = wpalAllocateShadowRxFrame(currentPalPacketBuffer,
                                            &physicalAddressPCIe,
                                            &virtualAddressPCIe);
-   HDXE_ASSERT(0 != physicalAddressPCIe);
-   HDXE_ASSERT(0 != virtualAddressPCIe);
+   if((0 == physicalAddressPCIe) || (0 = virtualAddressPCIe))
+   {
+       HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_MED,
+               "RX NULL Shadow Memory");
+       HDXE_ASSERT(0);
+       return eWLAN_PAL_STATUS_E_FAULT;
+   }
    HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_MED,
             "RX Shadow Memory Va 0x%x, Pa 0x%x",
             virtualAddressPCIe, physicalAddressPCIe);
@@ -3049,12 +3059,18 @@ static void dxeRXISR
    }
 
    /* Serialize RX Ready interrupt upon RX thread */
-   HDXE_ASSERT(NULL != dxeCtxt->rxIsrMsg);
+   if(NULL == dxeCtxt->rxIsrMsg)
+   {
+      HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+               "dxeRXFrameReadyISR NULL message");
+      HDXE_ASSERT(0);
+      return;
+   }
+
    status = wpalPostRxMsg(WDI_GET_PAL_CTX(),
                           dxeCtxt->rxIsrMsg);
    if(eWLAN_PAL_STATUS_SUCCESS != status)
    {
-      HDXE_ASSERT(eWLAN_PAL_STATUS_SUCCESS == status);
       HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
                "dxeRXFrameReadyISR interrupt serialize fail");
    }
@@ -3163,8 +3179,21 @@ static wpt_status dxeTXPushFrame
       sourcePhysicalAddress          = (void *)frameVector.frg[fragCount].pa;
       xferSize                       = frameVector.frg[fragCount].size;
       fragCount++;
-      HDXE_ASSERT(0 != xferSize);
-      HDXE_ASSERT(NULL != sourcePhysicalAddress);
+      if(0 == xferSize)
+      {
+          HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+                  "dxeTXPushFrame invalid transfer size");
+
+          HDXE_ASSERT(0);
+          return eWLAN_PAL_STATUS_E_FAILURE;
+      }
+      if(NULL == sourcePhysicalAddress)
+      {
+          HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+              "dxeTXPushFrame invalid sourcePhysicalAddress");
+          HDXE_ASSERT(0);
+          return eWLAN_PAL_STATUS_E_FAILURE;
+      }
 #else
       status = wpalIteratorNext(&iterator,
                                 palPacket,
@@ -3529,7 +3558,13 @@ static wpt_status dxeTXCompFrame
          break;
       }
 
-      HDXE_ASSERT(currentCtrlBlk->xfrFrame != NULL);
+      if(currentCtrlBlk->xfrFrame == NULL)
+      {
+          HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+                  "Invalid transfer frame");
+          HDXE_ASSERT(0);
+          break;
+      }
       channelEntry->numFreeDesc++;
       channelEntry->numRsvdDesc--;
 
@@ -4217,7 +4252,13 @@ static void dxeTXISR
    dxeCtxt->ucTxMsgCnt = 1;
 
    /* Serialize TX complete interrupt upon TX thread */
-   HDXE_ASSERT(NULL != dxeCtxt->txIsrMsg);
+   if(NULL == dxeCtxt->txIsrMsg)
+   {
+       HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+               "Invalid message");
+       HDXE_ASSERT(0);
+       return;
+   }
    status = wpalPostTxMsg(WDI_GET_PAL_CTX(),
                           dxeCtxt->txIsrMsg);
    if(eWLAN_PAL_STATUS_SUCCESS != status)
