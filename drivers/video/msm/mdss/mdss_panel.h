@@ -16,6 +16,7 @@
 
 #include <linux/platform_device.h>
 #include <linux/types.h>
+#include <linux/of_device.h>
 
 /* panel id type */
 struct panel_id {
@@ -491,4 +492,9 @@ int mdss_panel_get_boot_cfg(void);
  * returns true if mdss is ready, else returns false.
  */
 bool mdss_is_ready(void);
+
+struct device_node *of_get_child_by_name(const struct device_node *node,
+				const char *name);
+
+
 #endif /* MDSS_PANEL_H */
