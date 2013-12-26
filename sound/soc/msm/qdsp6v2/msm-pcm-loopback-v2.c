@@ -431,7 +431,7 @@ static int msm_pcm_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id msm_pcm_loopback_dt_match[] = {
-	{.compatible = "qti,msm-pcm-loopback"},
+	{.compatible = "qcom,msm-pcm-loopback"},
 	{}
 };
 
