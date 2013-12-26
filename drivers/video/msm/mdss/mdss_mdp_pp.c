@@ -4657,6 +4657,12 @@ static int is_valid_calib_rgb_addr(char __iomem *ptr)
 		} else if (ptr == base + MDSS_MDP_REG_SSPP_SRC_OP_MODE) {
 			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
 			break;
+		/* IGC range */
+		} else if ((ptr >= base + MDSS_MDP_REG_IGC_RGB_BASE) &&
+				(ptr <= base + MDSS_MDP_REG_IGC_RGB_BASE +
+						MDSS_MDP_GC_SIZE)) {
+			ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
+			break;
 		}
 	}
 
