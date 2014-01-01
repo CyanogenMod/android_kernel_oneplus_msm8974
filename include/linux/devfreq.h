@@ -19,6 +19,9 @@
 
 #define DEVFREQ_NAME_LEN 16
 
+/* As defined in the kgsl device header */
+#define KGSL_STATE_SLUMBER 0x00000080
+
 struct devfreq;
 
 /**
@@ -164,6 +167,7 @@ struct devfreq {
 	char governor_name[DEVFREQ_NAME_LEN];
 	struct notifier_block nb;
 	struct delayed_work work;
+	uint32_t state;
 
 	unsigned long previous_freq;
 
