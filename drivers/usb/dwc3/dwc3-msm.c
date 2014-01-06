@@ -1979,16 +1979,12 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	if (!host_bus_suspend)
 		dwc3_msm_config_gdsc(mdwc, 0);
 
+	clk_disable_unprepare(mdwc->iface_clk);
+	clk_disable_unprepare(mdwc->utmi_clk);
+
 	if (!host_ss_suspend) {
 		clk_disable_unprepare(mdwc->core_clk);
 		mdwc->lpm_flags |= MDWC3_PHY_REF_AND_CORECLK_OFF;
-	}
-	clk_disable_unprepare(mdwc->iface_clk);
-
-	if (!host_bus_suspend)
-		clk_disable_unprepare(mdwc->utmi_clk);
-
-	if (!host_bus_suspend) {
 		/* USB PHY no more requires TCXO */
 		clk_disable_unprepare(mdwc->xo_clk);
 		mdwc->lpm_flags |= MDWC3_TCXO_SHUTDOWN;
@@ -2074,8 +2070,7 @@ static int dwc3_msm_resume(struct dwc3_msm *mdwc)
 	if (!host_bus_suspend)
 		dwc3_msm_config_gdsc(mdwc, 1);
 
-	if (!host_bus_suspend)
-		clk_prepare_enable(mdwc->utmi_clk);
+	clk_prepare_enable(mdwc->utmi_clk);
 
 	if (mdwc->otg_xceiv && mdwc->ext_xceiv.otg_capability && !dcp &&
 							!host_bus_suspend)
