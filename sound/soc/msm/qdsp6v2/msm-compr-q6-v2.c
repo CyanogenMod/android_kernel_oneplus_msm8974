@@ -976,7 +976,7 @@ static int msm_compr_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int msm_compr_ioctl(struct snd_pcm_substream *substream,
+static int msm_compr_ioctl_shared(struct snd_pcm_substream *substream,
 		unsigned int cmd, void *arg)
 {
 	int rc = 0;
@@ -988,10 +988,10 @@ static int msm_compr_ioctl(struct snd_pcm_substream *substream,
 
 	switch (cmd) {
 	case SNDRV_COMPRESS_TSTAMP: {
-		struct snd_compr_tstamp tstamp;
+		struct snd_compr_tstamp *tstamp;
 		pr_debug("SNDRV_COMPRESS_TSTAMP\n");
-
-		memset(&tstamp, 0x0, sizeof(struct snd_compr_tstamp));
+		tstamp = arg;
+		memset(tstamp, 0x0, sizeof(*tstamp));
 		rc = q6asm_get_session_time(prtd->audio_client, &timestamp);
 		if (rc < 0) {
 			pr_err("%s: Get Session Time return value =%lld\n",
@@ -1001,33 +1001,25 @@ static int msm_compr_ioctl(struct snd_pcm_substream *substream,
 		temp = (timestamp * 2 * runtime->channels);
 		temp = temp * (runtime->rate/1000);
 		temp = div_u64(temp, 1000);
-		tstamp.sampling_rate = runtime->rate;
-		tstamp.timestamp = timestamp;
+		tstamp->sampling_rate = runtime->rate;
+		tstamp->timestamp = timestamp;
 		pr_debug("%s: bytes_consumed:,timestamp = %lld,\n",
 						__func__,
-			tstamp.timestamp);
-		if (copy_to_user((void *) arg, &tstamp,
-			sizeof(struct snd_compr_tstamp)))
-				return -EFAULT;
+			tstamp->timestamp);
 		return 0;
 	}
-	case SNDRV_COMPRESS_GET_CAPS:
+	case SNDRV_COMPRESS_GET_CAPS: {
+		struct snd_compr_caps *caps;
+		caps = arg;
+		memset(caps, 0, sizeof(*caps));
 		pr_debug("SNDRV_COMPRESS_GET_CAPS\n");
-		if (copy_to_user((void *) arg, &compr->info.compr_cap,
-			sizeof(struct snd_compr_caps))) {
-			rc = -EFAULT;
-			pr_err("%s: ERROR: copy to user\n", __func__);
-			return rc;
-		}
+		memcpy(caps, &compr->info.compr_cap, sizeof(*caps));
 		return 0;
+	}
 	case SNDRV_COMPRESS_SET_PARAMS:
 		pr_debug("SNDRV_COMPRESS_SET_PARAMS:\n");
-		if (copy_from_user(&compr->info.codec_param, (void *) arg,
-			sizeof(struct snd_compr_params))) {
-			rc = -EFAULT;
-			pr_err("%s: ERROR: copy from user\n", __func__);
-			return rc;
-		}
+		memcpy(&compr->info.codec_param, (void *) arg,
+			sizeof(struct snd_compr_params));
 		switch (compr->info.codec_param.codec.id) {
 		case SND_AUDIOCODEC_MP3:
 			/* For MP3 we dont need any other parameter */
@@ -1190,6 +1182,342 @@ static int msm_compr_ioctl(struct snd_pcm_substream *substream,
 	}
 	return snd_pcm_lib_ioctl(substream, cmd, arg);
 }
+#ifdef CONFIG_COMPAT
+struct snd_enc_wma32 {
+	u32 super_block_align; /* WMA Type-specific data */
+	u32 encodeopt1;
+	u32 encodeopt2;
+};
+
+struct snd_enc_vorbis32 {
+	s32 quality;
+	u32 managed;
+	u32 max_bit_rate;
+	u32 min_bit_rate;
+	u32 downmix;
+};
+
+struct snd_enc_real32 {
+	u32 quant_bits;
+	u32 start_region;
+	u32 num_regions;
+};
+
+struct snd_enc_flac32 {
+	u32 num;
+	u32 gain;
+};
+
+struct snd_enc_generic32 {
+	u32 bw;	/* encoder bandwidth */
+	s32 reserved[15];
+};
+struct snd_dec_dts32 {
+	u32 modelIdLength;
+	compat_uptr_t modelId;
+};
+struct snd_dec_ddp32 {
+	u32 params_length;
+	compat_uptr_t params;
+	u32 params_id[18];
+	u32 params_value[18];
+};
+
+union snd_codec_options32 {
+	struct snd_enc_wma32 wma;
+	struct snd_enc_vorbis32 vorbis;
+	struct snd_enc_real32 real;
+	struct snd_enc_flac32 flac;
+	struct snd_enc_generic32 generic;
+	struct snd_dec_dts32 dts;
+	struct snd_dec_ddp32 ddp;
+};
+
+struct snd_codec32 {
+	u32 id;
+	u32 ch_in;
+	u32 ch_out;
+	u32 sample_rate;
+	u32 bit_rate;
+	u32 rate_control;
+	u32 profile;
+	u32 level;
+	u32 ch_mode;
+	u32 format;
+	u32 align;
+	u32 transcode_dts;
+	struct snd_dec_dts32 dts;
+	union snd_codec_options32 options;
+	u32 reserved[3];
+};
+
+struct snd_compressed_buffer32 {
+	u32 fragment_size;
+	u32 fragments;
+};
+
+struct snd_compr_params32 {
+	struct snd_compressed_buffer32 buffer;
+	struct snd_codec32 codec;
+	u8 no_wake_mode;
+};
+
+struct snd_compr_caps32 {
+	u32 num_codecs;
+	u32 direction;
+	u32 min_fragment_size;
+	u32 max_fragment_size;
+	u32 min_fragments;
+	u32 max_fragments;
+	u32 codecs[MAX_NUM_CODECS];
+	u32 reserved[11];
+};
+struct snd_compr_tstamp32 {
+	u32 byte_offset;
+	u32 copied_total;
+	compat_ulong_t pcm_frames;
+	compat_ulong_t pcm_io_frames;
+	u32 sampling_rate;
+	compat_u64 timestamp;
+};
+enum {
+	SNDRV_COMPRESS_TSTAMP32 = _IOR('C', 0x20, struct snd_compr_tstamp32),
+	SNDRV_COMPRESS_GET_CAPS32 = _IOWR('C', 0x10, struct snd_compr_caps32),
+	SNDRV_COMPRESS_SET_PARAMS32 =
+	_IOW('C', 0x12, struct snd_compr_params32),
+};
+static int msm_compr_compat_ioctl(struct snd_pcm_substream *substream,
+		unsigned int cmd, void *arg)
+{
+	int err = 0;
+	switch (cmd) {
+	case SNDRV_COMPRESS_TSTAMP32: {
+		struct snd_compr_tstamp tstamp;
+		struct snd_compr_tstamp32 tstamp32;
+		memset(&tstamp, 0, sizeof(tstamp));
+		memset(&tstamp32, 0, sizeof(tstamp32));
+		cmd = SNDRV_COMPRESS_TSTAMP;
+		err = msm_compr_ioctl_shared(substream, cmd, &tstamp);
+		if (err) {
+			pr_err("%s: COMPRESS_TSTAMP failed rc %d\n",
+			__func__, err);
+			goto bail_out;
+		}
+		tstamp32.byte_offset = tstamp.byte_offset;
+		tstamp32.copied_total = tstamp.copied_total;
+		tstamp32.pcm_frames = tstamp.pcm_frames;
+		tstamp32.pcm_io_frames = tstamp.pcm_io_frames;
+		tstamp32.sampling_rate = tstamp.sampling_rate;
+		tstamp32.timestamp = tstamp.timestamp;
+		if (copy_to_user(arg, &tstamp32, sizeof(tstamp32))) {
+			pr_err("%s: copytouser failed COMPRESS_TSTAMP32\n",
+			__func__);
+			err = -EFAULT;
+		}
+		break;
+	}
+	case SNDRV_COMPRESS_GET_CAPS32: {
+		struct snd_compr_caps caps;
+		struct snd_compr_caps32 caps32;
+		u32 i;
+		memset(&caps, 0, sizeof(caps));
+		memset(&caps32, 0, sizeof(caps32));
+		cmd = SNDRV_COMPRESS_GET_CAPS;
+		err = msm_compr_ioctl_shared(substream, cmd, &caps);
+		if (err) {
+			pr_err("%s: GET_CAPS failed rc %d\n",
+			__func__, err);
+			goto bail_out;
+		}
+		pr_debug("SNDRV_COMPRESS_GET_CAPS_32\n");
+		if (!err && caps.num_codecs >= MAX_NUM_CODECS) {
+			pr_err("%s: Invalid number of codecs\n", __func__);
+			err = -EINVAL;
+			goto bail_out;
+		}
+		caps32.direction = caps.direction;
+		caps32.max_fragment_size = caps.max_fragment_size;
+		caps32.max_fragments = caps.max_fragments;
+		caps32.min_fragment_size = caps.min_fragment_size;
+		caps32.num_codecs = caps.num_codecs;
+		for (i = 0; i < caps.num_codecs; i++)
+			caps32.codecs[i] = caps.codecs[i];
+		if (copy_to_user(arg, &caps32, sizeof(caps32))) {
+			pr_err("%s: copytouser failed COMPRESS_GETCAPS32\n",
+			__func__);
+			err = -EFAULT;
+		}
+		break;
+	}
+	case SNDRV_COMPRESS_SET_PARAMS32: {
+		struct snd_compr_params32 params32;
+		struct snd_compr_params params;
+		memset(&params32, 0 , sizeof(params32));
+		memset(&params, 0 , sizeof(params));
+		cmd = SNDRV_COMPRESS_SET_PARAMS;
+		if (copy_from_user(&params32, arg, sizeof(params32))) {
+			pr_err("%s: copyfromuser failed SET_PARAMS32\n",
+			__func__);
+			err = -EFAULT;
+			goto bail_out;
+		}
+		params.no_wake_mode = params32.no_wake_mode;
+		params.codec.id = params32.codec.id;
+		params.codec.ch_in = params32.codec.ch_in;
+		params.codec.ch_out = params32.codec.ch_out;
+		params.codec.sample_rate = params32.codec.sample_rate;
+		params.codec.bit_rate = params32.codec.bit_rate;
+		params.codec.rate_control = params32.codec.rate_control;
+		params.codec.profile = params32.codec.profile;
+		params.codec.level = params32.codec.level;
+		params.codec.ch_mode = params32.codec.ch_mode;
+		params.codec.format = params32.codec.format;
+		params.codec.align = params32.codec.align;
+		params.codec.transcode_dts = params32.codec.transcode_dts;
+
+		switch (params.codec.id) {
+		case SND_AUDIOCODEC_WMA:
+		case SND_AUDIOCODEC_WMA_PRO:
+			params.codec.options.wma.encodeopt1 =
+			params32.codec.options.wma.encodeopt1;
+			params.codec.options.wma.encodeopt2 =
+			params32.codec.options.wma.encodeopt2;
+			params.codec.options.wma.super_block_align =
+			params32.codec.options.wma.super_block_align;
+		break;
+		case SND_AUDIOCODEC_VORBIS:
+			params.codec.options.vorbis.downmix =
+			params32.codec.options.vorbis.downmix;
+			params.codec.options.vorbis.managed =
+			params32.codec.options.vorbis.managed;
+			params.codec.options.vorbis.max_bit_rate =
+			params32.codec.options.vorbis.max_bit_rate;
+			params.codec.options.vorbis.min_bit_rate =
+			params32.codec.options.vorbis.min_bit_rate;
+			params.codec.options.vorbis.quality =
+			params32.codec.options.vorbis.quality;
+		break;
+		case SND_AUDIOCODEC_REAL:
+			params.codec.options.real.num_regions =
+			params32.codec.options.real.num_regions;
+			params.codec.options.real.quant_bits =
+			params32.codec.options.real.quant_bits;
+			params.codec.options.real.start_region =
+			params32.codec.options.real.start_region;
+		break;
+		case SND_AUDIOCODEC_FLAC:
+			params.codec.options.flac.gain =
+			params32.codec.options.flac.gain;
+			params.codec.options.flac.num =
+			params32.codec.options.flac.num;
+		break;
+		case SND_AUDIOCODEC_DTS:
+		case SND_AUDIOCODEC_DTS_PASS_THROUGH:
+		case SND_AUDIOCODEC_DTS_LBR:
+		case SND_AUDIOCODEC_DTS_LBR_PASS_THROUGH:
+		case SND_AUDIOCODEC_DTS_TRANSCODE_LOOPBACK:
+			params.codec.options.dts.modelIdLength =
+			params32.codec.options.dts.modelIdLength;
+			params.codec.options.dts.modelId =
+			compat_ptr(params32.codec.options.dts.modelId);
+		break;
+		case SND_AUDIOCODEC_AC3:
+		case SND_AUDIOCODEC_EAC3:
+			params.codec.options.ddp.params_length =
+			params32.codec.options.ddp.params_length;
+			params.codec.options.ddp.params =
+			compat_ptr(params32.codec.options.ddp.params);
+			memcpy(params.codec.options.ddp.params_value,
+			params32.codec.options.ddp.params_value,
+			sizeof(params32.codec.options.ddp.params_value));
+			memcpy(params.codec.options.ddp.params_id,
+			params32.codec.options.ddp.params_id,
+			sizeof(params32.codec.options.ddp.params_id));
+		break;
+		default:
+			params.codec.options.generic.bw =
+			params32.codec.options.generic.bw;
+		break;
+		}
+		if (!err)
+			err = msm_compr_ioctl_shared(substream, cmd, &params);
+		break;
+	}
+	default:
+		err = msm_compr_ioctl_shared(substream, cmd, arg);
+	}
+bail_out:
+	return err;
+
+}
+#endif
+static int msm_compr_ioctl(struct snd_pcm_substream *substream,
+		unsigned int cmd, void *arg)
+{
+	int err = 0;
+	if (!substream) {
+		pr_err("%s: Invalid params\n", __func__);
+		return -EINVAL;
+	}
+	pr_debug("%s called with cmd = %d\n", __func__, cmd);
+	switch (cmd) {
+	case SNDRV_COMPRESS_TSTAMP: {
+		struct snd_compr_tstamp tstamp;
+		if (!arg) {
+			pr_err("%s: Invalid params Tstamp\n", __func__);
+			return -EINVAL;
+		}
+		err = msm_compr_ioctl_shared(substream, cmd, &tstamp);
+		if (err)
+			pr_err("%s: COMPRESS_TSTAMP failed rc %d\n",
+			__func__, err);
+		if (!err && copy_to_user(arg, &tstamp, sizeof(tstamp))) {
+			pr_err("%s: copytouser failed COMPRESS_TSTAMP\n",
+			__func__);
+			err = -EFAULT;
+		}
+		break;
+	}
+	case SNDRV_COMPRESS_GET_CAPS: {
+		struct snd_compr_caps cap;
+		if (!arg) {
+			pr_err("%s: Invalid params getcaps\n", __func__);
+			return -EINVAL;
+		}
+		pr_debug("SNDRV_COMPRESS_GET_CAPS\n");
+		err = msm_compr_ioctl_shared(substream, cmd, &cap);
+		if (err)
+			pr_err("%s: GET_CAPS failed rc %d\n",
+			__func__, err);
+		if (!err && copy_to_user(arg, &cap, sizeof(cap))) {
+			pr_err("%s: copytouser failed GET_CAPS\n",
+			__func__);
+			err = -EFAULT;
+		}
+		break;
+	}
+	case SNDRV_COMPRESS_SET_PARAMS: {
+		struct snd_compr_params params;
+		if (!arg) {
+			pr_err("%s: Invalid params setparam\n", __func__);
+			return -EINVAL;
+		}
+		if (copy_from_user(&params, arg,
+			sizeof(struct snd_compr_params))) {
+			pr_err("%s: SET_PARAMS\n", __func__);
+			return -EFAULT;
+		}
+		err = msm_compr_ioctl_shared(substream, cmd, &params);
+		if (err)
+			pr_err("%s: SET_PARAMS failed rc %d\n",
+			__func__, err);
+		break;
+	}
+	default:
+		err = msm_compr_ioctl_shared(substream, cmd, arg);
+	}
+	return err;
+}
 
 static int msm_compr_restart(struct snd_pcm_substream *substream)
 {
@@ -1324,6 +1652,9 @@ static struct snd_pcm_ops msm_compr_ops = {
 	.pointer	= msm_compr_pointer,
 	.mmap		= msm_compr_mmap,
 	.restart	= msm_compr_restart,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl   = msm_compr_compat_ioctl,
+#endif
 };
 
 static int msm_asoc_pcm_new(struct snd_soc_pcm_runtime *rtd)
