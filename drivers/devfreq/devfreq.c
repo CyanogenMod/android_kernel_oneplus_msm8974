@@ -101,7 +101,10 @@ int devfreq_get_freq_level(struct devfreq *devfreq, unsigned long freq)
 	int lev;
 	unsigned int *freq_table = devfreq->profile->freq_table;
 
-	for (lev = 0; lev < sizeof(freq_table); lev++)
+	if (devfreq->state == KGSL_STATE_SLUMBER)
+		return sizeof(freq_table);
+
+	for (lev = 0; lev < devfreq->profile->max_state; lev++)
 		if (freq == freq_table[lev])
 			return lev;
 
