@@ -240,19 +240,12 @@ err2:
 	return ERR_PTR(ret);
 }
 
-static void ion_delayed_unsecure(struct ion_buffer *buffer)
-{
-	if (buffer->heap->ops->unsecure_buffer)
-		buffer->heap->ops->unsecure_buffer(buffer, 1);
-}
-
 void ion_buffer_destroy(struct ion_buffer *buffer)
 {
 	if (WARN_ON(buffer->kmap_cnt > 0))
 		buffer->heap->ops->unmap_kernel(buffer->heap, buffer);
 	buffer->heap->ops->unmap_dma(buffer->heap, buffer);
 
-	ion_delayed_unsecure(buffer);
 	buffer->heap->ops->free(buffer);
 	if (buffer->flags & ION_FLAG_CACHED)
 		kfree(buffer->dirty);
@@ -474,7 +467,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	 */
 	flags |= ION_FLAG_CACHED_NEEDS_SYNC;
 
-	pr_debug("%s: len %d align %d heap_id_mask %u flags %x\n", __func__,
+	pr_debug("%s: len %zu align %zu heap_id_mask %u flags %x\n", __func__,
 		 len, align, heap_id_mask, flags);
 	/*
 	 * traverse the list of heaps available in this system in priority
@@ -535,8 +528,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		trace_ion_alloc_buffer_fail(client->name, dbg_str, len,
 					    heap_id_mask, flags,
 					    PTR_ERR(buffer));
-		pr_debug("ION is unable to allocate 0x%x bytes (alignment: "
-			 "0x%x) from heap(s) %sfor client %s\n",
+		pr_debug("ION is unable to allocate 0x%zx bytes (alignment: 0x%zx) from heap(s) %sfor client %s\n",
 			len, align, dbg_str, client->name);
 		return ERR_PTR(PTR_ERR(buffer));
 	}
@@ -715,7 +707,7 @@ static int ion_debug_client_show(struct seq_file *s, void *unused)
 		struct ion_handle *handle = rb_entry(n, struct ion_handle,
 						     node);
 
-		seq_printf(s, "%16.16s: %16x : %16d : %12p",
+		seq_printf(s, "%16.16s: %16zx : %16d : %12p",
 				handle->buffer->heap->name,
 				handle->buffer->size,
 				atomic_read(&handle->ref.refcount),
@@ -1613,10 +1605,10 @@ static int ion_debug_heap_show(struct seq_file *s, void *unused)
 			char task_comm[TASK_COMM_LEN];
 
 			get_task_comm(task_comm, client->task);
-			seq_printf(s, "%16.s %16u %16u\n", task_comm,
+			seq_printf(s, "%16.s %16u %16zu\n", task_comm,
 				   client->pid, size);
 		} else {
-			seq_printf(s, "%16.s %16u %16u\n", client->name,
+			seq_printf(s, "%16.s %16u %16zu\n", client->name,
 				   client->pid, size);
 		}
 	}
@@ -1632,17 +1624,18 @@ static int ion_debug_heap_show(struct seq_file *s, void *unused)
 			continue;
 		total_size += buffer->size;
 		if (!buffer->handle_count) {
-			seq_printf(s, "%16.s %16u %16u %d %d\n", buffer->task_comm,
-				   buffer->pid, buffer->size, buffer->kmap_cnt,
-				   atomic_read(&buffer->ref.refcount));
+			seq_printf(s, "%16.s %16u %16zu %d %d\n",
+				buffer->task_comm, buffer->pid, buffer->size,
+				buffer->kmap_cnt,
+				atomic_read(&buffer->ref.refcount));
 			total_orphaned_size += buffer->size;
 		}
 	}
 	mutex_unlock(&dev->buffer_lock);
 	seq_printf(s, "----------------------------------------------------\n");
-	seq_printf(s, "%16.s %16u\n", "total orphaned",
+	seq_printf(s, "%16.s %16zu\n", "total orphaned",
 		   total_orphaned_size);
-	seq_printf(s, "%16.s %16u\n", "total ", total_size);
+	seq_printf(s, "%16.s %16zu\n", "total ", total_size);
 	seq_printf(s, "----------------------------------------------------\n");
 
 	if (heap->debug_show)
@@ -1748,73 +1741,6 @@ void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 	}
 #endif
 	up_write(&dev->lock);
-}
-
-int ion_secure_handle(struct ion_client *client, struct ion_handle *handle,
-			int version, void *data, int flags)
-{
-	int ret = -EINVAL;
-	struct ion_heap *heap;
-	struct ion_buffer *buffer;
-
-	mutex_lock(&client->lock);
-	if (!ion_handle_validate(client, handle)) {
-		WARN(1, "%s: invalid handle passed to secure.\n", __func__);
-		goto out_unlock;
-	}
-
-	buffer = handle->buffer;
-	heap = buffer->heap;
-
-	if (!ion_heap_allow_handle_secure(heap->type)) {
-		pr_err("%s: cannot secure buffer from non secure heap\n",
-			__func__);
-		goto out_unlock;
-	}
-
-	BUG_ON(!buffer->heap->ops->secure_buffer);
-	/*
-	 * Protect the handle via the client lock to ensure we aren't
-	 * racing with free
-	 */
-	ret = buffer->heap->ops->secure_buffer(buffer, version, data, flags);
-
-out_unlock:
-	mutex_unlock(&client->lock);
-	return ret;
-}
-
-int ion_unsecure_handle(struct ion_client *client, struct ion_handle *handle)
-{
-	int ret = -EINVAL;
-	struct ion_heap *heap;
-	struct ion_buffer *buffer;
-
-	mutex_lock(&client->lock);
-	if (!ion_handle_validate(client, handle)) {
-		WARN(1, "%s: invalid handle passed to secure.\n", __func__);
-		goto out_unlock;
-	}
-
-	buffer = handle->buffer;
-	heap = buffer->heap;
-
-	if (!ion_heap_allow_handle_secure(heap->type)) {
-		pr_err("%s: cannot secure buffer from non secure heap\n",
-			__func__);
-		goto out_unlock;
-	}
-
-	BUG_ON(!buffer->heap->ops->unsecure_buffer);
-	/*
-	 * Protect the handle via the client lock to ensure we aren't
-	 * racing with free
-	 */
-	ret = buffer->heap->ops->unsecure_buffer(buffer, 0);
-
-out_unlock:
-	mutex_unlock(&client->lock);
-	return ret;
 }
 
 int ion_secure_heap(struct ion_device *dev, int heap_id, int version,
@@ -1973,11 +1899,11 @@ void __init ion_reserve(struct ion_platform_data *data)
 			int ret = memblock_reserve(data->heaps[i].base,
 					       data->heaps[i].size);
 			if (ret)
-				pr_err("memblock reserve of %x@%pa failed\n",
+				pr_err("memblock reserve of %zx@%pa failed\n",
 				       data->heaps[i].size,
 				       &data->heaps[i].base);
 		}
-		pr_info("%s: %s reserved base %pa size %d\n", __func__,
+		pr_info("%s: %s reserved base %pa size %zu\n", __func__,
 			data->heaps[i].name,
 			&data->heaps[i].base,
 			data->heaps[i].size);

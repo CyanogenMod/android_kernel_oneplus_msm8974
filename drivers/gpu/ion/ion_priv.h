@@ -123,9 +123,6 @@ struct ion_heap_ops {
 			   const struct list_head *mem_map);
 	int (*secure_heap)(struct ion_heap *heap, int version, void *data);
 	int (*unsecure_heap)(struct ion_heap *heap, int version, void *data);
-	int (*secure_buffer)(struct ion_buffer *buffer, int version,
-				void *data, int flags);
-	int (*unsecure_buffer)(struct ion_buffer *buffer, int force_unsecure);
 };
 
 /**
