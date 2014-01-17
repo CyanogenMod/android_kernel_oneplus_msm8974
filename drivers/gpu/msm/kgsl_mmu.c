@@ -382,7 +382,8 @@ int kgsl_mmu_init(struct kgsl_device *device)
 	struct kgsl_mmu *mmu = &device->mmu;
 
 	mmu->device = device;
-	status = kgsl_allocate_contiguous(&mmu->setstate_memory, PAGE_SIZE);
+	status = kgsl_allocate_contiguous(device, &mmu->setstate_memory,
+					PAGE_SIZE);
 	if (status)
 		return status;
 
@@ -392,19 +393,13 @@ int kgsl_mmu_init(struct kgsl_device *device)
 	kgsl_sharedmem_set(device, &mmu->setstate_memory, 0, 0,
 				mmu->setstate_memory.size);
 
-	if (KGSL_MMU_TYPE_NONE == kgsl_mmu_type) {
-		dev_info(device->dev, "|%s| MMU type set for device is "
-				"NOMMU\n", __func__);
-		status = dma_set_coherent_mask(device->dev->parent,
-					DMA_BIT_MASK(sizeof(dma_addr_t)*8));
-		goto done;
-	} else if (KGSL_MMU_TYPE_GPU == kgsl_mmu_type)
+	if (KGSL_MMU_TYPE_GPU == kgsl_mmu_type)
 		mmu->mmu_ops = &gpummu_ops;
-	else if (KGSL_MMU_TYPE_IOMMU == kgsl_mmu_type)
+	else if (KGSL_MMU_TYPE_IOMMU == kgsl_mmu_type) {
 		mmu->mmu_ops = &iommu_ops;
+		status =  mmu->mmu_ops->mmu_init(mmu);
+	}
 
-	status =  mmu->mmu_ops->mmu_init(mmu);
-done:
 	if (status)
 		kgsl_sharedmem_free(&mmu->setstate_memory);
 	return status;
@@ -594,10 +589,8 @@ int kgsl_setstate(struct kgsl_mmu *mmu, unsigned int context_id,
 			uint32_t flags)
 {
 	struct kgsl_device *device = mmu->device;
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 
-	if (!(flags & (KGSL_MMUFLAGS_TLBFLUSH | KGSL_MMUFLAGS_PTUPDATE))
-		&& !adreno_is_a2xx(adreno_dev))
+	if (!(flags & (KGSL_MMUFLAGS_TLBFLUSH | KGSL_MMUFLAGS_PTUPDATE)))
 		return 0;
 
 	if (KGSL_MMU_TYPE_NONE == kgsl_mmu_type)

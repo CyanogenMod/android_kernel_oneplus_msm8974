@@ -164,9 +164,9 @@ static int a3xx_snapshot_cp_pm4_ram(struct kgsl_device *device, void *snapshot,
 	 * maintain always changing hardcoded constants
 	 */
 
-	kgsl_regwrite(device, REG_CP_ME_RAM_RADDR, 0x0);
+	kgsl_regwrite(device, A3XX_CP_ME_RAM_RADDR, 0x0);
 	for (i = 0; i < size; i++)
-		kgsl_regread(device, REG_CP_ME_RAM_DATA, &data[i]);
+		kgsl_regread(device, A3XX_CP_ME_RAM_DATA, &data[i]);
 
 	return DEBUG_SECTION_SZ(size);
 }
@@ -463,23 +463,14 @@ void *a3xx_snapshot(struct adreno_device *adreno_dev, void *snapshot,
 	size = (adreno_is_a330(adreno_dev) ||
 		adreno_is_a305b(adreno_dev)) ? 0x2E : 0x14;
 
-	/* Skip indexed register dump for these chipsets 8974, 8x26, 8x10 */
-	if (adreno_is_a330(adreno_dev) ||
-		adreno_is_a330v2(adreno_dev) ||
-		adreno_is_a305b(adreno_dev) ||
-		adreno_is_a305c(adreno_dev)	) {
-		KGSL_DRV_ERR(device,
-		"Skipping indexed register dump\n");
-	} else {
-		snapshot = kgsl_snapshot_indexed_registers(device, snapshot,
-				remain, REG_CP_STATE_DEBUG_INDEX,
-				REG_CP_STATE_DEBUG_DATA, 0x0, size);
+	snapshot = kgsl_snapshot_indexed_registers(device, snapshot,
+			remain, A3XX_CP_STATE_DEBUG_INDEX,
+			A3XX_CP_STATE_DEBUG_DATA, 0x0, size);
 
-		/* CP_ME indexed registers */
-		snapshot = kgsl_snapshot_indexed_registers(device, snapshot,
-				remain, REG_CP_ME_CNTL, REG_CP_ME_STATUS,
-				64, 44);
-	}
+	/* CP_ME indexed registers */
+	snapshot = kgsl_snapshot_indexed_registers(device, snapshot,
+			remain, A3XX_CP_ME_CNTL, A3XX_CP_ME_STATUS,
+			64, 44);
 
 	/* VPC memory */
 	snapshot = kgsl_snapshot_add_section(device,

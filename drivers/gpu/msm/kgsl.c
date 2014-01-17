@@ -57,6 +57,12 @@ static int kgsl_pagetable_count = KGSL_PAGETABLE_COUNT;
  */
 static struct kmem_cache *memobjs_cache;
 
+#ifdef CONFIG_ARM_LPAE
+#define KGSL_DMA_BIT_MASK	DMA_BIT_MASK(64)
+#else
+#define KGSL_DMA_BIT_MASK	DMA_BIT_MASK(32)
+#endif
+
 static char *ksgl_mmu_type;
 module_param_named(ptcount, kgsl_pagetable_count, int, 0);
 MODULE_PARM_DESC(kgsl_pagetable_count,
@@ -4381,7 +4387,12 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 		goto error_dest_work_q;
 	}
 
-	status = kgsl_allocate_contiguous(&device->memstore,
+	/* Check to see if our device can perform DMA correctly */
+	status = dma_set_coherent_mask(&pdev->dev, KGSL_DMA_BIT_MASK);
+	if (status)
+		goto error_close_mmu;
+
+	status = kgsl_allocate_contiguous(device, &device->memstore,
 		KGSL_MEMSTORE_SIZE);
 
 	if (status != 0) {
@@ -4420,67 +4431,6 @@ error:
 	return status;
 }
 EXPORT_SYMBOL(kgsl_device_platform_probe);
-
-int kgsl_postmortem_dump(struct kgsl_device *device, int manual)
-{
-	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
-
-	BUG_ON(device == NULL);
-
-	kgsl_cffdump_hang(device);
-
-	/* For a manual dump, make sure that the system is idle */
-
-	if (manual) {
-		kgsl_active_count_wait(device, 0);
-
-		if (device->state == KGSL_STATE_ACTIVE)
-			kgsl_idle(device);
-	}
-
-	if (device->pm_dump_enable) {
-
-		KGSL_LOG_DUMP(device,
-			"POWER: START_STOP_SLEEP_WAKE = %d\n",
-			pwr->strtstp_sleepwake);
-
-		KGSL_LOG_DUMP(device,
-			"POWER: FLAGS = %08lX | ACTIVE POWERLEVEL = %08X",
-			pwr->power_flags, pwr->active_pwrlevel);
-
-		KGSL_LOG_DUMP(device, "POWER: INTERVAL TIMEOUT = %08X ",
-				pwr->interval_timeout);
-
-	}
-
-	/* Disable the idle timer so we don't get interrupted */
-	del_timer_sync(&device->idle_timer);
-
-	/* Force on the clocks */
-	kgsl_pwrctrl_wake(device, 0);
-
-	/* Disable the irq */
-	kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_OFF);
-
-	/*Call the device specific postmortem dump function*/
-	device->ftbl->postmortem_dump(device, manual);
-
-	/* On a manual trigger, turn on the interrupts and put
-	   the clocks to sleep.  They will recover themselves
-	   on the next event.  For a hang, leave things as they
-	   are until fault tolerance kicks in. */
-
-	if (manual) {
-		kgsl_pwrctrl_irq(device, KGSL_PWRFLAGS_ON);
-
-		/* try to go into a sleep mode until the next event */
-		kgsl_pwrctrl_request_state(device, KGSL_STATE_SLEEP);
-		kgsl_pwrctrl_sleep(device);
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL(kgsl_postmortem_dump);
 
 void kgsl_device_platform_remove(struct kgsl_device *device)
 {
