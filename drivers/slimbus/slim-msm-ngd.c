@@ -625,6 +625,11 @@ static int ngd_xferandwait_ack(struct slim_controller *ctrl,
 			ret = -ETIMEDOUT;
 		else
 			ret = txn->ec;
+	} else if (ret == -EREMOTEIO &&
+			(txn->mc == SLIM_USR_MC_CHAN_CTRL ||
+			 txn->mc == SLIM_USR_MC_DISCONNECT_PORT)) {
+		/* HW restarting, channel/port removal should succeed */
+		return 0;
 	}
 
 	if (ret) {
