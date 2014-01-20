@@ -86,6 +86,7 @@ struct kgsl_device_platform_data {
 	struct coresight_device *csdev;
 	struct coresight_platform_data *coresight_pdata;
 	unsigned int chipid;
+	unsigned int pm_qos_latency;
 };
 
 #endif
