@@ -14,8 +14,7 @@
  */
 #include <linux/clockchips.h>
 #include <linux/clksrc-dbx500-prcmu.h>
-
-#include <asm/sched_clock.h>
+#include <linux/sched_clock.h>
 
 #include <mach/setup.h>
 #include <mach/hardware.h>
