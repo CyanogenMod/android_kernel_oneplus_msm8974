@@ -495,4 +495,10 @@ config QPNP_BMS
 	  Say Y here to enable support for QPNP chip bms device.
 	  It registers a fuelgauge bms power supply to report
 	  State of Charge.
+
+config PIC1503_FASTCG
+	tristate "PIC1503 Fast-charge Driver"
+	help
+	  Say Y here to enable the PIC1503 fast charger
+
 endif # POWER_SUPPLY
