@@ -53,6 +53,7 @@ obj-$(CONFIG_PM8058_FIX_USB)    += pm8058_usb_fix.o
 obj-$(CONFIG_BATTERY_QCIBAT)    += qci_battery.o
 obj-$(CONFIG_BATTERY_BQ27520)	+= bq27520_fuelgauger.o
 obj-$(CONFIG_BATTERY_BQ27541)	+= bq27541_fuelgauger.o
+obj-$(CONFIG_HMAC_SHA1_BQ27541)	+= hmac_sha1_bq27541.o
 obj-$(CONFIG_BATTERY_BQ28400)	+= bq28400_battery.o
 obj-$(CONFIG_SMB137B_CHARGER)   += smb137b.o
 obj-$(CONFIG_SMB137C_CHARGER)	+= smb137c-charger.o
