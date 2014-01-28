@@ -450,6 +450,11 @@ config QPNP_CHARGER
 	  also offers relevant information to userspace via the power supply
 	  framework.
 
+config BQ24196_CHARGER
+	tristate "BQ24196 Charger driver"
+	help
+	  Say Y here to enable the BQ24196 battery charger device.
+
 config PM8XXX_CCADC
 	tristate "PM8XXX battery current adc driver"
 	depends on MFD_PM8921_CORE
