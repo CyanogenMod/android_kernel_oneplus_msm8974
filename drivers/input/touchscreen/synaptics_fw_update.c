@@ -352,8 +352,14 @@ static void parse_header(void)
 		(data->options_firmware_id == (1 << OPTION_BUILD_INFO));
 
 	if (img->is_contain_build_info) {
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_S3508_I2C_RMI
+		img->firmware_id = extract_uint(data->firmware_id);
+		img->package_id = (data->pkg_id_rev_msb << 8) |
+				data->pkg_id_lsb;
+#else
 		img->package_id = (data->pkg_id_msb << 8) |
 				data->pkg_id_lsb;
+#endif
 		img->package_revision_id = (data->pkg_id_rev_msb << 8) |
 				data->pkg_id_rev_lsb;
 		dev_info(&fwu->rmi4_data->i2c_client->dev,
