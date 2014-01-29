@@ -3,7 +3,16 @@ config MACH_OPPO
 	depends on ARCH_MSM
 
 menu "Oppo board selection"
-source "arch/arm/mach-msm/oppo
+
+config MACH_X9007
+	depends on ARCH_MSM8974
+	select MACH_OPPO
+	select SND_SOC_ES325
+	select SND_SOC_ES325_SLIM
+	bool "MSM8974 X9007"
+	help
+	  Support for the Oppo X9007 Find7.
+
 endmenu
 
 menu "Oppo specific options"
