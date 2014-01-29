@@ -1,0 +1,41 @@
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+	i2c@f9924000 {
+		sn3193_issi_rgb@68 {
+			compatible = "sn3193,issi-rgb";
+			reg = <0x68>;
+			sn3193,sdb-gpio = <&msmgpio 45 0x00>;
+		};
+		ti_lm3630_bl@36 {
+			compatible = "ti,lm3630";
+			reg = <0x36>;
+			ti,bank-a-ctrl = <0x05>;
+			ti,init-brt-ed1 = <200>;
+			ti,init-brt-led2 = <200>;
+			ti,max-brt-led1 = <255>;
+			ti,max-brt-led2 = <255>;
+			ti,pwm-active = <0>;
+			ti,pwm-ctrl = <0>;
+			ti,pwm-period = <255>;
+		};
+	};
+};
+
+&pm8941_lsid1 {
+	qcom,vibrator@c000 {
+		qcom,vib-timeout-ms = <15000>;
+		qcom,vib-vtg-level-mV = <3100>;
+		status = "okay";
+	};
+};

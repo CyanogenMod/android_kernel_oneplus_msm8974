@@ -1,0 +1,80 @@
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&mtp_batterydata {
+	qcom,mtp-3000mah {
+		qcom,max-voltage-uv = <4350000>;
+	};
+
+	qcom,palladium-batterydata {
+		qcom,max-voltage-uv = <4350000>;
+	};
+};
+
+&soc {
+	i2c@f9923000 {
+		bq27541-battery@55 {
+			status = "okay";
+			compatible = "ti,bq27541-battery";
+			reg = <0x55>;
+		};
+		pic16f_fastcg@25{
+			status = "okay";
+			compatible = "microchip,pic16f_fastcg";
+			reg = <0x25>;
+		};
+	};
+
+	i2c@f9928000 {
+		bq24196_charger@6b {
+			status = "okay";
+			compatible = "ti,bq24196_charger";
+			reg = <0x6b>;
+		};
+	};
+};
+
+&pm8941_lsid0 {
+	qcom,power-on@800 {
+		qcom,pon_2 {
+			linux,code = <0>;
+		};
+	};
+
+	qcom,coincell@2800 {
+		qcom,rset-ohms = <800>;
+		qcom,vset-millivolts = <3200>;
+		qcom,charge-enable = <1>;
+	};
+
+	qcom,bms {
+		qcom,low-voltage-threshold = <3520000>;
+	};
+
+	qcom,charger {
+		qcom,vddmax-mv = <4350>;
+		qcom,vddsafe-mv = <4350>;
+		qcom,vinmin-mv = <4400>;
+		qcom,ibatmax-ma = <2000>;
+		qcom,ibatterm-ma = <150>;
+		qcom,ibatsafe-ma = <2000>;
+		qcom,thermal-mitigation = <2000 900 900 200>;
+		qcom,cool-bat-mv = <4200>;
+		qcom,ibatmax-warm-ma = <900>;
+		qcom,warm-bat-mv = <4100>;
+		qcom,ibatmax-cool-ma = <900>;
+	};
+
+	qcom,pm8941_rtc {
+		qcom,qpnp-rtc-alarm-pwrup = <1>;
+	};
+};

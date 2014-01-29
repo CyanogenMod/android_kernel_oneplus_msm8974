@@ -1,0 +1,27 @@
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+	i2c@f9924000 {
+		synaptics-rmi-ts@20 {
+			compatible = "synaptics,rmi-ts";
+			reg = <0x20>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <61 0x8>;
+			synaptics,irq-gpio = <&msmgpio 61 0x00>;
+			synaptics,wakeup-gpio = <&msmgpio 57 0x00>;
+			synaptics,reset-gpio = <&msmgpio 60 0x00>;
+			synaptics,id-gpio = <&msmgpio 62 0x00>;
+			synaptics,id3-gpio = <&msmgpio 46 0x00>;
+		};
+	};
+};
