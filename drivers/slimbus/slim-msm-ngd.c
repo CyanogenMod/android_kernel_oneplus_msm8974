@@ -29,6 +29,11 @@
 #include "slim-msm.h"
 #include <mach/qdsp6v2/apr.h>
 
+#ifdef CONFIG_SND_SOC_ES325
+#include <linux/regulator/consumer.h>
+#include <linux/of_gpio.h>
+#endif
+
 #define NGD_SLIM_NAME	"ngd_msm_ctrl"
 #define SLIM_LA_MGR	0xFF
 #define SLIM_ROOT_FREQ	24576000
@@ -1085,6 +1090,30 @@ static int __devinit ngd_slim_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err_ioremap_bam_failed;
 	}
+
+#ifdef CONFIG_SND_SOC_ES325
+	dev->cdc_es325 = regulator_get(&pdev->dev, "cdc-es325");
+	if (IS_ERR(dev->cdc_es325)) {
+		dev_err(&pdev->dev, "Failed to get es325 regulator\n");
+		dev->cdc_es325= NULL;
+	} else {
+		if (regulator_enable(dev->cdc_es325)) {
+			dev_err(&pdev->dev, "enable es325 regulator failed\n");
+		}
+	}
+	dev->reset_gpio = of_get_named_gpio(pdev->dev.of_node,
+			"adnc,reset-gpio", 0);
+	if (dev->reset_gpio) {
+		if (gpio_request(dev->reset_gpio,"es325_reset")){
+			dev_err(&pdev->dev, "Request es325 reset gpio failed\n");
+		} else {
+			gpio_direction_output(dev->reset_gpio,0);
+			dev_info(&pdev->dev, "Set es325 reset gpio to %d\n",
+					dev->reset_gpio);
+		}
+	}
+#endif
+
 	if (pdev->dev.of_node) {
 
 		ret = of_property_read_u32(pdev->dev.of_node, "cell-index",
