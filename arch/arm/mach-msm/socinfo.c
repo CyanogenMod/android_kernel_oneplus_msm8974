@@ -31,6 +31,10 @@
 
 #include "boot_stats.h"
 
+#ifdef CONFIG_MACH_OPPO
+#include <linux/pcb_version.h>
+#endif
+
 #define BUILD_ID_LENGTH 32
 #define SMEM_IMAGE_VERSION_BLOCKS_COUNT 32
 #define SMEM_IMAGE_VERSION_SINGLE_BLOCK_SIZE 128
@@ -704,6 +708,92 @@ socinfo_show_platform_subtype(struct sys_device *dev,
 		hw_platform_subtype[hw_subtype]);
 }
 
+#ifdef CONFIG_MACH_OPPO
+static ssize_t
+socinfo_show_hw_pcb_version(struct sys_device *dev,
+			struct sysdev_attribute *attr,
+			char *buf)
+{
+	char *hw_version = "NULL";
+
+	if (!socinfo) {
+		pr_err("%s: No socinfo found!\n", __func__);
+		return 0;
+	}
+
+	switch (get_pcb_version()) {
+		case HW_VERSION__10:
+			hw_version = "10";
+			break;
+		case HW_VERSION__11:
+			hw_version = "11";
+			break;
+		case HW_VERSION__12:
+			hw_version = "12";
+			break;
+		case HW_VERSION__13:
+			hw_version = "13";
+			break;
+		default:
+			hw_version = "UNKNOWN";
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%-.32s\n",
+			hw_version);
+}
+
+static ssize_t
+socinfo_show_hw_rf_version(struct sys_device *dev,
+			struct sysdev_attribute *attr,
+			char *buf)
+{
+	char *rf_version = "NULL";
+
+	if (!socinfo) {
+		pr_err("%s: No socinfo found!\n", __func__);
+		return 0;
+	}
+
+	switch (get_rf_version()) {
+		case RF_VERSION__11:
+			rf_version = "11";
+			break;
+		case RF_VERSION__12:
+			rf_version = "12";
+			break;
+		case RF_VERSION__13:
+			rf_version = "13";
+			break;
+		case RF_VERSION__21:
+			rf_version = "21";
+			break;
+		case RF_VERSION__22:
+			rf_version = "22";
+			break;
+		case RF_VERSION__23:
+			rf_version = "23";
+			break;
+		case RF_VERSION__31:
+			rf_version = "31";
+			break;
+		case RF_VERSION__32:
+			rf_version = "32";
+			break;
+		case RF_VERSION__33:
+			rf_version = "33";
+			break;
+		case RF_VERSION__44:
+			rf_version = "44";
+			break;
+		default:
+			rf_version = "UNKNOWN";
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%-.32s\n",
+			rf_version);
+}
+#endif
+
 static ssize_t
 socinfo_show_pmic_model(struct sys_device *dev,
 			struct sysdev_attribute *attr,
@@ -980,6 +1070,15 @@ static struct sysdev_attribute socinfo_v7_files[] = {
 	_SYSDEV_ATTR(pmic_die_revision, 0444,
 			socinfo_show_pmic_die_revision, NULL),
 };
+
+#ifdef CONFIG_MACH_OPPO
+static struct sysdev_attribute socinfo_v9_files[] = {
+	_SYSDEV_ATTR(hw_pcb_version, 0444, socinfo_show_hw_pcb_version, NULL),
+};
+static struct sysdev_attribute socinfo_v10_files[] = {
+	_SYSDEV_ATTR(hw_rf_version, 0444, socinfo_show_hw_rf_version, NULL),
+};
+#endif
 
 static ssize_t
 msm_set_image_crm_version(struct device *dev,
@@ -1270,6 +1369,14 @@ static int __init socinfo_init_sysdev(void)
 
 	socinfo_create_files(&soc_sys_device, socinfo_v7_files,
 				ARRAY_SIZE(socinfo_v7_files));
+
+#ifdef CONFIG_MACH_OPPO
+	socinfo_create_files(&soc_sys_device, socinfo_v9_files,
+				ARRAY_SIZE(socinfo_v9_files));
+
+	socinfo_create_files(&soc_sys_device, socinfo_v10_files,
+				ARRAY_SIZE(socinfo_v10_files));
+#endif
 
 	return 0;
 
