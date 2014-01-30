@@ -175,6 +175,10 @@ struct wcd9xxx_pdata {
 	struct wcd9xxx_regulator regulator[WCD9XXX_MAX_REGULATOR];
 	u32 mclk_rate;
 	u32 dmic_sample_rate;
+#ifdef CONFIG_MACH_OPPO
+	struct regulator *cdc_hpmic_switch;
+	int hpmic_regulator_count;
+#endif
 };
 
 #endif
