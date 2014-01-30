@@ -22,7 +22,12 @@
 #include <linux/usb/otg.h>
 #include "power.h"
 
+#ifdef CONFIG_MACH_OPPO
+#define DWC3_IDEV_CHG_MAX 2000
+#define DWC3_IDEV_CHG_FLOATED 2000
+#else
 #define DWC3_IDEV_CHG_MAX 1500
+#endif
 
 struct dwc3_charger;
 
@@ -52,6 +57,10 @@ struct dwc3_otg {
 	int			host_bus_suspend;
 	int			charger_retry_count;
 	int			vbus_retry_count;
+#ifdef CONFIG_MACH_OPPO
+	struct delayed_work	detect_work;
+	struct delayed_work	non_standard_charger_work;
+#endif
 };
 
 /**

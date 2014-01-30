@@ -246,6 +246,10 @@ struct dwc3_msm {
 	bool ext_chg_opened;
 	bool ext_chg_active;
 	struct completion ext_chg_wait;
+
+#ifdef CONFIG_MACH_OPPO
+	unsigned int		power_now;
+#endif
 };
 
 #define USB_HSPHY_3P3_VOL_MIN		3050000 /* uV */
@@ -2283,6 +2287,11 @@ static int dwc3_msm_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TYPE:
 		val->intval = psy->type;
 		break;
+#ifdef CONFIG_MACH_OPPO
+	case POWER_SUPPLY_PROP_POWER_NOW:
+		val->intval = mdwc->power_now;
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -2331,6 +2340,11 @@ static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TYPE:
 		psy->type = val->intval;
 		break;
+#ifdef CONFIG_MACH_OPPO
+	case POWER_SUPPLY_PROP_POWER_NOW:
+		mdwc->power_now = val->intval;
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -2391,6 +2405,9 @@ static enum power_supply_property dwc3_msm_pm_power_props_usb[] = {
 	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_TYPE,
 	POWER_SUPPLY_PROP_SCOPE,
+#ifdef CONFIG_MACH_OPPO
+	POWER_SUPPLY_PROP_POWER_NOW,
+#endif
 };
 
 static void dwc3_init_adc_work(struct work_struct *w);
