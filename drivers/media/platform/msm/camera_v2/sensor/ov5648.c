@@ -24,6 +24,26 @@ static struct msm_sensor_power_setting ov5648_power_setting[] = {
 		.config_val = 0,
 		.delay = 0,
 	},
+#ifdef CONFIG_MACH_OPPO
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 5,
+	},
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = CAM_VDIG,
+		.config_val = 0,
+		.delay = 0,
+	},
+#else
 	{
 		.seq_type = SENSOR_GPIO,
 		.seq_val = SENSOR_GPIO_VDIG,
@@ -42,12 +62,27 @@ static struct msm_sensor_power_setting ov5648_power_setting[] = {
 		.config_val = 0,
 		.delay = 5,
 	},
+#endif
 	{
 		.seq_type = SENSOR_GPIO,
 		.seq_val = SENSOR_GPIO_STANDBY,
 		.config_val = GPIO_OUT_LOW,
 		.delay = 5,
 	},
+#ifdef CONFIG_MACH_OPPO
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_STANDBY,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 5,
+	},
+	{
+		.seq_type = SENSOR_CLK,
+		.seq_val = SENSOR_CAM_MCLK,
+		.config_val = 24000000,
+		.delay = 1,
+	},
+#else
 	{
 		.seq_type = SENSOR_GPIO,
 		.seq_val = SENSOR_GPIO_STANDBY,
@@ -72,6 +107,7 @@ static struct msm_sensor_power_setting ov5648_power_setting[] = {
 		.config_val = 24000000,
 		.delay = 10,
 	},
+#endif
 	{
 		.seq_type = SENSOR_I2C_MUX,
 		.seq_val = 0,
@@ -126,7 +162,11 @@ static struct msm_sensor_ctrl_t ov5648_s_ctrl = {
 
 static const struct of_device_id ov5648_dt_match[] = {
 	{
+#ifdef CONFIG_MACH_OPPO
+		.compatible = "qcom,ov5648",
+#else
 		.compatible = "ovti,ov5648",
+#endif
 		.data = &ov5648_s_ctrl
 	},
 	{}
@@ -136,7 +176,11 @@ MODULE_DEVICE_TABLE(of, ov5648_dt_match);
 
 static struct platform_driver ov5648_platform_driver = {
 	.driver = {
+#ifdef CONFIG_MACH_OPPO
+		.name = "qcom,ov5648",
+#else
 		.name = "ovti,ov5648",
+#endif
 		.owner = THIS_MODULE,
 		.of_match_table = ov5648_dt_match,
 	},
