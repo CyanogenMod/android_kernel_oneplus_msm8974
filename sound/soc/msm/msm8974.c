@@ -34,6 +34,11 @@
 #include "../codecs/wcd9xxx-common.h"
 #include "../codecs/wcd9320.h"
 
+//OPPO 2013-12-13 liuyan add version recognition 
+#ifdef CONFIG_MACH_OPPO 
+#include <linux/pcb_version.h>
+#endif
+//liuyan add end
 #define DRV_NAME "msm8974-asoc-taiko"
 
 #define MSM8974_SPK_ON 1
@@ -81,6 +86,12 @@ static void *adsp_state_notifier;
 
 #define ADSP_STATE_READY_TIMEOUT_MS 3000
 
+//OPPO 2013-12-13 liuyan add  for dvt
+#ifdef CONFIG_MACH_OPPO 
+int pcb_version;
+#endif
+
+//liuyan add end
 static inline int param_is_mask(int p)
 {
 	return ((p >= SNDRV_PCM_HW_PARAM_FIRST_MASK) &&
@@ -121,9 +132,17 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.mclk_rate = TAIKO_EXT_CLK_RATE,
 	.gpio = 0,
 	.gpio_irq = 0,
+#ifndef CONFIG_MACH_OPPO //luyan modify 2013-4-18
 	.gpio_level_insert = 1,
+#else
+	.gpio_level_insert = 0,
+#endif
 	.detect_extn_cable = true,
+#ifdef CONFIG_MACH_OPPO //luyan modify micbias to dc
+	.micbias_enable_flags = 1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET | 1<<MBHC_MICBIAS_ENABLE_REGULAR_HEADSET,
+#else
 	.micbias_enable_flags = 1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET,
+#endif
 	.insert_detect = true,
 	.swap_gnd_mic = NULL,
 	.cs_enable_flags = (1 << MBHC_CS_ENABLE_POLLING |
@@ -131,6 +150,14 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 			    1 << MBHC_CS_ENABLE_REMOVAL),
 	.do_recalibration = true,
 	.use_vddio_meas = true,
+/* OPPO 2013-10-22 liuyan Modify end */
+#ifdef CONFIG_MACH_OPPO  //liuyan add 2013-4-18
+       .hpmic_switch_gpio=0,
+       .enable_spk_gpio=0,
+	.yda145_ctr_gpio=0,
+	.yda145_boost_gpio=0,
+       .count_regulator=0,
+#endif
 };
 
 struct msm_auxpcm_gpio {
@@ -145,6 +172,15 @@ struct msm_auxpcm_ctrl {
 };
 
 struct msm8974_asoc_mach_data {
+//liuyan 2013-3-14 add,hp mic switch
+#ifdef CONFIG_MACH_OPPO
+       int hpmic_switch_gpio;
+	//struct regulator	*cdc_spk;
+	int enable_spk_gpio;
+	int yda145_ctr_gpio;
+	int yda145_boost_gpio;
+#endif
+//liuyan add end
 	int mclk_gpio;
 	u32 mclk_freq;
 	int us_euro_gpio;
@@ -694,8 +730,16 @@ static const struct snd_soc_dapm_widget msm8974_dapm_widgets[] = {
 
 	SND_SOC_DAPM_MIC("Handset Mic", NULL),
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+//liuyan 2013-4-18 modify
+#ifndef CONFIG_MACH_OPPO
 	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("ANCLeft Headset Mic", NULL),
+#else
+       SND_SOC_DAPM_MIC("Main Mic", NULL),
+	SND_SOC_DAPM_MIC("Second Mic", NULL),
+	SND_SOC_DAPM_MIC("ANC Mic", NULL),
+#endif
+//liuyan modify end
 	SND_SOC_DAPM_MIC("Analog Mic4", NULL),
 	SND_SOC_DAPM_MIC("Analog Mic6", NULL),
 	SND_SOC_DAPM_MIC("Analog Mic7", NULL),
@@ -1539,6 +1583,11 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+//liuyan 2013-3-14 add,hpmic switch
+#ifdef CONFIG_MACH_OPPO
+       struct msm8974_asoc_mach_data *mach_data;
+#endif
+//liuyan add end
 
 	/* Taiko SLIMBUS configuration
 	 * RX1, RX2, RX3, RX4, RX5, RX6, RX7, RX8, RX9, RX10, RX11, RX12, RX13
@@ -1626,6 +1675,67 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		}
 	}
 	/* start mbhc */
+//liuyan 2013-3-14 add, hpmi switch gpio
+#ifdef CONFIG_MACH_OPPO
+       mach_data=(struct msm8974_asoc_mach_data*)(rtd->card->drvdata);
+	mbhc_cfg.hpmic_switch_gpio=mach_data->hpmic_switch_gpio;
+	if (mbhc_cfg.hpmic_switch_gpio) {
+		err = gpio_request(mbhc_cfg.hpmic_switch_gpio, "HPMIC_SWITCH");
+		if (err) {
+			pr_err("%s: Failed to request gpio %d\n", __func__,
+				mbhc_cfg.hpmic_switch_gpio);
+			mbhc_cfg.hpmic_switch_gpio = 0;
+
+		}
+	       
+	}
+	gpio_direction_output(mbhc_cfg.hpmic_switch_gpio, 1);
+	mbhc_cfg.enable_spk_gpio=mach_data->enable_spk_gpio;
+	if (mbhc_cfg.enable_spk_gpio) {
+		err = gpio_request(mbhc_cfg.enable_spk_gpio, "ENABLE_SPK");
+		if (err) {
+			pr_err("%s: Failed to request gpio %d\n", __func__,
+				mbhc_cfg.enable_spk_gpio);
+			mbhc_cfg.enable_spk_gpio = 0;
+
+		}
+	       
+	}
+	gpio_direction_output(mbhc_cfg.enable_spk_gpio, 0);
+	printk("%s:enable_spk_gpio(%d)\n",__func__,mbhc_cfg.enable_spk_gpio);
+	//mbhc_cfg.cdc_spk=mach_data->cdc_spk;
+	//liuyan add for dvt
+	if(pcb_version==HW_VERSION__12){
+           mbhc_cfg.yda145_ctr_gpio=mach_data->yda145_ctr_gpio;
+	if (mbhc_cfg.yda145_ctr_gpio) {
+		err = gpio_request(mbhc_cfg.yda145_ctr_gpio, "YDA145_CTR");
+		if (err) {
+			pr_err("%s: Failed to request gpio %d\n", __func__,
+				mbhc_cfg.yda145_ctr_gpio);
+			mbhc_cfg.yda145_ctr_gpio = 0;
+
+		}
+	       
+	}
+	gpio_direction_output(mbhc_cfg.yda145_ctr_gpio, 0);
+	printk("%s:yda145_ctr_gpio(%d)\n",__func__,mbhc_cfg.yda145_ctr_gpio);
+
+	mbhc_cfg.yda145_boost_gpio=mach_data->yda145_boost_gpio;
+	if (mbhc_cfg.yda145_boost_gpio) {
+		err = gpio_request(mbhc_cfg.yda145_boost_gpio, "YDA145_BOOST");
+		if (err) {
+			pr_err("%s: Failed to request gpio %d\n", __func__,
+				mbhc_cfg.yda145_boost_gpio);
+			mbhc_cfg.yda145_boost_gpio = 0;
+
+		}
+	       
+	}
+	gpio_direction_output(mbhc_cfg.yda145_boost_gpio, 0);
+	printk("%s:yda145_boost_gpio(%d)\n",__func__,mbhc_cfg.yda145_boost_gpio);
+	}
+#endif
+//liuyan add end
 	mbhc_cfg.calibration = def_taiko_mbhc_cal();
 	if (mbhc_cfg.calibration) {
 		err = taiko_hs_detect(codec, &mbhc_cfg);
@@ -1660,6 +1770,8 @@ static int msm8974_snd_startup(struct snd_pcm_substream *substream)
 	return 0;
 }
 
+//liuyan 2013-3-13 change no_mic form 30 to 100,hs_max from 2400 to 2000
+//liuyan 2013-7-22 change button0 threshold form -50 to -70
 void *def_taiko_mbhc_cal(void)
 {
 	void *taiko_cal;
@@ -1709,9 +1821,15 @@ void *def_taiko_mbhc_cal(void)
 	btn_low = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_V_BTN_LOW);
 	btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg,
 					       MBHC_BTN_DET_V_BTN_HIGH);
+#ifndef CONFIG_MACH_OPPO //liuyan 2013-12-10 modify the switch reange
 	btn_low[0] = -50;
 	btn_high[0] = 20;
 	btn_low[1] = 21;
+#else
+	btn_low[0] = -70;
+	btn_high[0] = 40;
+	btn_low[1] = 41;
+#endif
 	btn_high[1] = 61;
 	btn_low[2] = 62;
 	btn_high[2] = 104;
@@ -2754,7 +2872,63 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err;
 	}
+//liuyan 2013-3-14 add,hp mic switch
+#ifdef CONFIG_MACH_OPPO
+       pcb_version=get_pcb_version();//liuyan add for dvt
+       printk("%s:pcb_version %d\n",__func__,pcb_version);
+       pdata->hpmic_switch_gpio= of_get_named_gpio(pdev->dev.of_node,
+				"qcom,hpmic-switch-gpio", 0);
+	if (pdata->hpmic_switch_gpio < 0) {
+		dev_err(&pdev->dev,
+			"Looking up %s property in node %s failed %d\n",
+			"qcom,hpmic-switch-gpio", pdev->dev.of_node->full_name,
+			pdata->hpmic_switch_gpio);
+		//ret = -ENODEV;
+		//goto err;
+	}
+	 pdata->enable_spk_gpio= of_get_named_gpio(pdev->dev.of_node,
+				"enable_spk-gpio", 0);
+	if (pdata->enable_spk_gpio < 0) {
+		dev_err(&pdev->dev,
+			"Looking up %s property in node %s failed %d\n",
+			"enable_spk-gpio", pdev->dev.of_node->full_name,
+			pdata->enable_spk_gpio);
+		//ret = -ENODEV;
+		//goto err;
+	}
 
+        //liuyan add for dvt
+        if(pcb_version==HW_VERSION__12){
+	     pdata->yda145_ctr_gpio= of_get_named_gpio(pdev->dev.of_node,
+				"qcom,yda145_ctr-gpio", 0);
+	     if (pdata->yda145_ctr_gpio < 0) {
+		  dev_err(&pdev->dev,
+			"Looking up %s property in node %s failed %d\n",
+			"qcom,yda145_ctr-gpio", pdev->dev.of_node->full_name,
+			pdata->yda145_ctr_gpio);
+		//ret = -ENODEV;
+		//goto err;
+	    }
+	    pdata->yda145_boost_gpio= of_get_named_gpio(pdev->dev.of_node,
+				"qcom,yda145_boots-gpio", 0);
+	     if (pdata->yda145_ctr_gpio < 0) {
+		  dev_err(&pdev->dev,
+			"Looking up %s property in node %s failed %d\n",
+			"qcom,yda145_boots-gpio", pdev->dev.of_node->full_name,
+			pdata->yda145_boost_gpio);
+		//ret = -ENODEV;
+		//goto err;
+	    }
+        }
+
+	/*pdata->cdc_spk= regulator_get(&pdev->dev, "cdc_spk");
+		if (IS_ERR(pdata->cdc_spk)) {
+			pr_err("%s:Failed to get hpmic switch regulator\n",__func__);
+			pdata->cdc_spk= NULL;
+			//ret = -EINVAL;
+		}*/
+#endif
+//liuyan add end
 	pdata->mclk_gpio = of_get_named_gpio(pdev->dev.of_node,
 				"qcom,cdc-mclk-gpios", 0);
 	if (pdata->mclk_gpio < 0) {
