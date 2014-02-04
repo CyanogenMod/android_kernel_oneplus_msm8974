@@ -28,6 +28,10 @@
 
 DEFINE_LED_TRIGGER(bl_led_trigger);
 
+#ifdef CONFIG_MACH_OPPO
+extern int lm3630_bank_a_update_status(u32 bl_level);
+#endif
+
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	ctrl->pwm_bl = pwm_request(ctrl->pwm_lpg_chan, "lcd-bklt");
@@ -303,6 +307,9 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 			__func__);
 		break;
 	}
+#ifdef CONFIG_MACH_OPPO
+	lm3630_bank_a_update_status(bl_level);
+#endif
 }
 
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
