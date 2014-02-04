@@ -49,6 +49,22 @@
 #include "modem_notifier.h"
 #include "platsmp.h"
 
+#include <linux/persistent_ram.h>
+
+
+static struct persistent_ram_descriptor msm_prd[] __initdata = {
+	{
+		.name = "ram_console",
+		.size = SZ_1M,
+	},
+};
+
+static struct persistent_ram msm_pr __initdata = {
+	.descs = msm_prd,
+	.num_descs = ARRAY_SIZE(msm_prd),
+	.start = PLAT_PHYS_OFFSET + SZ_1G + SZ_512M,
+	.size = SZ_1M,
+};
 
 static struct memtype_reserve msm8974_reserve_table[] __initdata = {
 	[MEMTYPE_SMI] = {
@@ -82,6 +98,7 @@ static void __init msm8974_early_memory(void)
 {
 	reserve_info = &msm8974_reserve_info;
 	of_scan_flat_dt(dt_scan_for_memory_hole, msm8974_reserve_table);
+	persistent_ram_early_init(&msm_pr);
 }
 
 /*
