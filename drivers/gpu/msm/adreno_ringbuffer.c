@@ -1316,23 +1316,18 @@ int adreno_ringbuffer_submitcmd(struct adreno_device *adreno_dev,
 	/* Set the constraints before adding to ringbuffer */
 	adreno_ringbuffer_set_constraint(device, cmdbatch);
 
+	/* CFF stuff executed only if CFF is enabled */
+	kgsl_cffdump_capture_ib_desc(device, context, ibdesc, numibs);
+
 	ret = adreno_ringbuffer_addcmds(&adreno_dev->ringbuffer,
 					drawctxt,
 					flags,
 					&link[0], (cmds - link),
 					cmdbatch->timestamp);
 
-#ifdef CONFIG_MSM_KGSL_CFF_DUMP
-	if (ret)
-		goto done;
-	/*
-	 * insert wait for idle after every IB1
-	 * this is conservative but works reliably and is ok
-	 * even for performance simulations
-	 */
-	ret = adreno_idle(device);
-#endif
-
+	kgsl_cffdump_regpoll(device,
+		adreno_getreg(adreno_dev, ADRENO_REG_RBBM_STATUS) << 2,
+		0x00000000, 0x80000000);
 done:
 	kgsl_trace_issueibcmds(device, context->id, cmdbatch,
 		cmdbatch->timestamp, cmdbatch->flags, ret,
