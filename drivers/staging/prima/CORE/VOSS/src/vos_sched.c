@@ -1184,7 +1184,7 @@ VOS_STATUS vos_sched_close ( v_PVOID_t pVosContext )
     set_bit(MC_POST_EVENT_MASK, &gpVosSchedContext->mcEventFlag);
     wake_up_interruptible(&gpVosSchedContext->mcWaitQueue);
     //Wait for MC to exit
-    wait_for_completion_interruptible(&gpVosSchedContext->McShutdown);
+    wait_for_completion(&gpVosSchedContext->McShutdown);
     gpVosSchedContext->McThread = 0;
 
     // shut down TX Thread
@@ -1192,7 +1192,7 @@ VOS_STATUS vos_sched_close ( v_PVOID_t pVosContext )
     set_bit(TX_POST_EVENT_MASK, &gpVosSchedContext->txEventFlag);
     wake_up_interruptible(&gpVosSchedContext->txWaitQueue);
     //Wait for TX to exit
-    wait_for_completion_interruptible(&gpVosSchedContext->TxShutdown);
+    wait_for_completion(&gpVosSchedContext->TxShutdown);
     gpVosSchedContext->TxThread = 0;
 
     // shut down RX Thread
@@ -1200,7 +1200,7 @@ VOS_STATUS vos_sched_close ( v_PVOID_t pVosContext )
     set_bit(RX_POST_EVENT_MASK, &gpVosSchedContext->rxEventFlag);
     wake_up_interruptible(&gpVosSchedContext->rxWaitQueue);
     //Wait for RX to exit
-    wait_for_completion_interruptible(&gpVosSchedContext->RxShutdown);
+    wait_for_completion(&gpVosSchedContext->RxShutdown);
     gpVosSchedContext->RxThread = 0;
 
     //Clean up message queues of TX and MC thread
@@ -1228,7 +1228,7 @@ VOS_STATUS vos_watchdog_close ( v_PVOID_t pVosContext )
     set_bit(WD_POST_EVENT_MASK, &gpVosWatchdogContext->wdEventFlag);
     wake_up_interruptible(&gpVosWatchdogContext->wdWaitQueue);
     //Wait for Watchdog thread to exit
-    wait_for_completion_interruptible(&gpVosWatchdogContext->WdShutdown);
+    wait_for_completion(&gpVosWatchdogContext->WdShutdown);
     return VOS_STATUS_SUCCESS;
 } /* vos_watchdog_close() */
 
@@ -1469,7 +1469,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->sysMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_INFO,
+               VOS_TRACE_LEVEL_ERROR,
                "%s: Freeing MC SYS message type %d ",__func__,
                pMsgWrapper->pVosMsg->type );
     sysMcFreeMsg(pSchedContext->pVContext, pMsgWrapper->pVosMsg);
@@ -1480,7 +1480,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   {
     if(pMsgWrapper->pVosMsg != NULL) 
     {
-        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                    "%s: Freeing MC WDA MSG message type %d",
                    __func__, pMsgWrapper->pVosMsg->type );
         if (pMsgWrapper->pVosMsg->bodyptr) {
@@ -1499,13 +1499,28 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   {
     if(pMsgWrapper->pVosMsg != NULL)
     {
-        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                    "%s: Freeing MC WDI MSG message type %d",
                    __func__, pMsgWrapper->pVosMsg->type );
-        if (pMsgWrapper->pVosMsg->bodyptr) {
+
+        /* MSG body pointer is not NULL
+         * and MSG type is 0
+         * This MSG is not posted by SMD NOTIFY
+         * We have to free MSG body */
+        if ((pMsgWrapper->pVosMsg->bodyptr) && (!pMsgWrapper->pVosMsg->type))
+        {
             vos_mem_free((v_VOID_t*)pMsgWrapper->pVosMsg->bodyptr);
         }
-
+        /* MSG body pointer is not NULL
+         * and MSG type is not 0
+         * This MSG is posted by SMD NOTIFY
+         * We should not free MSG body */
+        else if ((pMsgWrapper->pVosMsg->bodyptr) && pMsgWrapper->pVosMsg->type)
+        {
+            VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                       "%s: SMD NOTIFY MSG, do not free body",
+                       __func__);
+        }
         pMsgWrapper->pVosMsg->bodyptr = NULL;
         pMsgWrapper->pVosMsg->bodyval = 0;
         pMsgWrapper->pVosMsg->type = 0;
@@ -1517,7 +1532,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->peMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_INFO,
+               VOS_TRACE_LEVEL_ERROR,
                "%s: Freeing MC PE MSG message type %d",__func__,
                pMsgWrapper->pVosMsg->type );
     peFreeMsg(vosCtx->pMACContext, (tSirMsgQ*)pMsgWrapper->pVosMsg);
@@ -1527,7 +1542,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->smeMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_INFO,
+               VOS_TRACE_LEVEL_ERROR,
                "%s: Freeing MC SME MSG message type %d", __func__,
                pMsgWrapper->pVosMsg->type );
     sme_FreeMsg(vosCtx->pMACContext, pMsgWrapper->pVosMsg);
@@ -1537,7 +1552,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->tlMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_INFO,
+               VOS_TRACE_LEVEL_ERROR,
                "%s: Freeing MC TL message type %d",__func__,
                pMsgWrapper->pVosMsg->type );
     WLANTL_McFreeMsg(pSchedContext->pVContext, pMsgWrapper->pVosMsg);
@@ -1760,6 +1775,7 @@ VOS_STATUS vos_watchdog_wlan_shutdown(void)
 
     /* Set the flags so that all future CMD53 and Wext commands get blocked right away */
     vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
+    vos_set_reinit_in_progress(VOS_MODULE_ID_VOSS, FALSE);
     pHddCtx->isLogpInProgress = TRUE;
 
     /* Release the lock here */

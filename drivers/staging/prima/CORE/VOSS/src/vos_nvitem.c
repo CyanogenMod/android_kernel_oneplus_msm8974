@@ -63,13 +63,29 @@
 #include "vos_api.h"
 #include "wlan_hdd_misc.h"
 #include "vos_sched.h"
+#include "sme_Api.h"
 #include "wlan_nv_parser.h"
 #include "wlan_hdd_main.h"
 #include <net/cfg80211.h>
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,9,0))
+#define IEEE80211_CHAN_NO_80MHZ		1<<7
+#endif
+
+#ifdef CONFIG_ENABLE_LINUX_REG
+
+static v_REGDOMAIN_t cur_reg_domain = REGDOMAIN_COUNT;
+static char linux_reg_cc[2] = {0, 0};
+static v_REGDOMAIN_t temp_reg_domain = REGDOMAIN_COUNT;
+
+#endif
+
 static char crda_alpha2[2] = {0, 0}; /* country code from initial crda req */
 static char run_time_alpha2[2] = {0, 0}; /* country code from none-default country req */
 static v_BOOL_t crda_regulatory_entry_valid = VOS_FALSE;
 static v_BOOL_t crda_regulatory_run_time_entry_valid = VOS_FALSE;
+
+
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -108,6 +124,160 @@ typedef struct
 /*----------------------------------------------------------------------------
  * Static Variable Definitions
  * -------------------------------------------------------------------------*/
+// cache of country info table;
+// this is re-initialized from data on binary file
+// loaded on driver initialization if available
+
+#ifdef CONFIG_ENABLE_LINUX_REG
+
+static CountryInfoTable_t countryInfoTable =
+{
+    /* the first entry in the table is always the world domain */
+    138,
+    {
+      {REGDOMAIN_WORLD, {'0', '0'}}, // WORLD DOMAIN
+      {REGDOMAIN_FCC, {'A', 'D'}}, // ANDORRA
+      {REGDOMAIN_ETSI, {'A', 'E'}}, //UAE
+      {REGDOMAIN_ETSI, {'A', 'L'}}, //ALBANIA
+      {REGDOMAIN_ETSI, {'A', 'M'}}, //ARMENIA
+      {REGDOMAIN_ETSI, {'A', 'N'}}, //NETHERLANDS ANTILLES
+      {REGDOMAIN_FCC, {'A', 'R'}}, //ARGENTINA
+      {REGDOMAIN_FCC, {'A', 'S'}}, //AMERICAN SOMOA
+      {REGDOMAIN_ETSI, {'A', 'T'}}, //AUSTRIA
+      {REGDOMAIN_FCC, {'A', 'U'}}, //AUSTRALIA
+      {REGDOMAIN_ETSI , {'A', 'W'}}, //ARUBA
+      {REGDOMAIN_ETSI,  {'A', 'Z'}}, //AZERBAIJAN
+      {REGDOMAIN_ETSI, {'B', 'A'}}, //BOSNIA AND HERZEGOVINA
+      {REGDOMAIN_FCC, {'B', 'B'}}, //BARBADOS
+      {REGDOMAIN_ETSI, {'B', 'D'}}, //BANGLADESH
+      {REGDOMAIN_ETSI, { 'B', 'E'}}, //BELGIUM
+      {REGDOMAIN_ETSI, {'B', 'G'}}, //BULGARIA
+      {REGDOMAIN_ETSI, {'B', 'H'}}, //BAHRAIN
+      {REGDOMAIN_ETSI, {'B', 'L'}}, //
+      {REGDOMAIN_FCC, {'B', 'M'}}, //BERMUDA
+      {REGDOMAIN_ETSI, {'B', 'N'}}, //BRUNEI DARUSSALAM
+      {REGDOMAIN_ETSI, {'B', 'O'}}, //BOLIVIA
+      {REGDOMAIN_ETSI, {'B', 'R'}}, //BRAZIL
+      {REGDOMAIN_FCC, {'B', 'S'}}, //BAHAMAS
+      {REGDOMAIN_ETSI, {'B', 'Y'}}, //BELARUS
+      {REGDOMAIN_ETSI, {'B', 'Z'}}, //BELIZE
+      {REGDOMAIN_FCC, {'C', 'A'}}, //CANADA
+      {REGDOMAIN_ETSI, {'C', 'H'}}, //SWITZERLAND
+      {REGDOMAIN_ETSI, {'C', 'L'}}, //CHILE
+      {REGDOMAIN_FCC, {'C', 'N'}}, //CHINA
+      {REGDOMAIN_FCC, {'C', 'O'}}, //COLOMBIA
+      {REGDOMAIN_ETSI, {'C', 'R'}}, //COSTA RICA
+      {REGDOMAIN_ETSI, {'C', 'S'}},
+      {REGDOMAIN_ETSI, {'C', 'Y'}}, //CYPRUS
+      {REGDOMAIN_ETSI, {'C', 'Z'}}, //CZECH REPUBLIC
+      {REGDOMAIN_ETSI, {'D', 'E'}}, //GERMANY
+      {REGDOMAIN_ETSI, {'D', 'K'}}, //DENMARK
+      {REGDOMAIN_FCC, {'D', 'O'}}, //DOMINICAN REPUBLIC
+      {REGDOMAIN_ETSI, {'D', 'Z'}}, //ALGERIA
+      {REGDOMAIN_ETSI, {'E', 'C'}}, //ECUADOR
+      {REGDOMAIN_ETSI, {'E', 'E'}}, //ESTONIA
+      {REGDOMAIN_ETSI, {'E', 'G'}}, //EGYPT
+      {REGDOMAIN_ETSI, {'E', 'S'}}, //SPAIN
+      {REGDOMAIN_ETSI, {'F', 'I'}}, //FINLAND
+      {REGDOMAIN_ETSI, {'F', 'R'}}, //FRANCE
+      {REGDOMAIN_ETSI, {'G', 'B'}}, //UNITED KINGDOM
+      {REGDOMAIN_FCC, {'G', 'D'}},  //GRENADA
+      {REGDOMAIN_ETSI, {'G', 'E'}}, //GEORGIA
+      {REGDOMAIN_ETSI, {'G', 'F'}}, //FRENCH GUIANA
+      {REGDOMAIN_ETSI, {'G', 'L'}}, //GREENLAND
+      {REGDOMAIN_ETSI, {'G', 'P'}}, //GUADELOUPE
+      {REGDOMAIN_ETSI, {'G', 'R'}}, //GREECE
+      {REGDOMAIN_FCC, {'G', 'T'}},  //GUATEMALA
+      {REGDOMAIN_FCC, {'G', 'U'}},  //GUAM
+      {REGDOMAIN_ETSI, {'H', 'U'}}, //HUNGARY
+      {REGDOMAIN_FCC, {'I', 'D'}},  //INDONESIA
+      {REGDOMAIN_ETSI, {'I', 'E'}}, //IRELAND
+      {REGDOMAIN_ETSI, {'I', 'L'}}, //ISRAEL
+      {REGDOMAIN_ETSI, {'I', 'N'}}, //INDIA
+      {REGDOMAIN_ETSI, {'I', 'R'}}, //IRAN, ISLAMIC REPUBLIC OF
+      {REGDOMAIN_ETSI, {'I', 'S'}}, //ICELNAD
+      {REGDOMAIN_ETSI, {'I', 'T'}}, //ITALY
+      {REGDOMAIN_FCC, {'J', 'M'}},  //JAMAICA
+      {REGDOMAIN_JAPAN, {'J', 'P'}}, //JAPAN
+      {REGDOMAIN_ETSI, {'J', 'O'}}, //JORDAN
+      {REGDOMAIN_ETSI, {'K', 'E'}}, //KENYA
+      {REGDOMAIN_ETSI, {'K', 'H'}}, //CAMBODIA
+      {REGDOMAIN_ETSI, {'K', 'P'}}, //KOREA, DEMOCRATIC PEOPLE's REPUBLIC OF
+      {REGDOMAIN_ETSI, {'K', 'R'}}, //KOREA, REPUBLIC OF
+      {REGDOMAIN_ETSI, {'K', 'W'}}, //KUWAIT
+      {REGDOMAIN_ETSI, {'K', 'Z'}}, //KAZAKHSTAN
+      {REGDOMAIN_ETSI, {'L', 'B'}}, //LEBANON
+      {REGDOMAIN_ETSI, {'L', 'I'}}, //LIECHTENSTEIN
+      {REGDOMAIN_ETSI, {'L', 'K'}}, //SRI-LANKA
+      {REGDOMAIN_ETSI, {'L', 'T'}}, //LITHUANIA
+      {REGDOMAIN_ETSI, {'L', 'U'}}, //LUXEMBOURG
+      {REGDOMAIN_ETSI, {'L','V'}},  //LATVIA
+      {REGDOMAIN_ETSI, {'M', 'A'}}, //MOROCCO
+      {REGDOMAIN_ETSI, {'M', 'C'}}, //MONACO
+      {REGDOMAIN_ETSI, {'M', 'K'}}, //MACEDONIA, THE FORMER YUGOSLAV REPUBLIC OF
+      {REGDOMAIN_FCC, {'M','N'}}, //MONGOLIA
+      {REGDOMAIN_FCC, {'M', 'O'}}, //MACAO
+      {REGDOMAIN_FCC, {'M', 'P'}}, //NORTHERN MARIANA ISLANDS
+      {REGDOMAIN_ETSI, {'M', 'Q'}}, //MARTINIQUE
+      {REGDOMAIN_FCC, {'M', 'T'}}, //MALTA
+      {REGDOMAIN_ETSI, {'M', 'U'}}, //MAURITIUS
+      {REGDOMAIN_ETSI, {'M', 'W'}}, //MALAWI
+      {REGDOMAIN_FCC, {'M', 'X'}}, //MEXICO
+      {REGDOMAIN_ETSI, {'M', 'Y'}}, //MALAYSIA
+      {REGDOMAIN_ETSI, {'N', 'G'}}, //NIGERIA
+      {REGDOMAIN_FCC, {'N', 'I'}}, //NICARAGUA
+      {REGDOMAIN_ETSI, {'N', 'L'}}, //NETHERLANDS
+      {REGDOMAIN_ETSI, {'N', 'O'}}, //NORWAY
+      {REGDOMAIN_ETSI, {'N', 'P'}}, //NEPAL
+      {REGDOMAIN_FCC, {'N', 'Z'}}, //NEW-ZEALAND
+      {REGDOMAIN_FCC, {'O', 'M'}}, //OMAN
+      {REGDOMAIN_FCC, {'P', 'A'}}, //PANAMA
+      {REGDOMAIN_ETSI, {'P', 'E'}}, //PERU
+      {REGDOMAIN_ETSI, {'P', 'F'}}, //FRENCH POLYNESIA
+      {REGDOMAIN_ETSI, {'P', 'G'}}, //PAPUA NEW GUINEA
+      {REGDOMAIN_FCC, {'P', 'H'}}, //PHILIPPINES
+      {REGDOMAIN_ETSI, {'P', 'K'}}, //PAKISTAN
+      {REGDOMAIN_ETSI, {'P', 'L'}}, //POLAND
+      {REGDOMAIN_FCC, {'P', 'R'}}, //PUERTO RICO
+      {REGDOMAIN_FCC, {'P', 'S'}}, //PALESTINIAN TERRITORY, OCCUPIED
+      {REGDOMAIN_ETSI, {'P', 'T'}}, //PORTUGAL
+      {REGDOMAIN_FCC, {'P', 'Y'}}, //PARAGUAY
+      {REGDOMAIN_ETSI, {'Q', 'A'}}, //QATAR
+      {REGDOMAIN_ETSI, {'R', 'E'}}, //REUNION
+      {REGDOMAIN_ETSI, {'R', 'O'}}, //ROMAINIA
+      {REGDOMAIN_ETSI, {'R', 'S'}}, //SERBIA
+      {REGDOMAIN_ETSI, {'R', 'U'}}, //RUSSIA
+      {REGDOMAIN_FCC, {'R', 'W'}}, //RWANDA
+      {REGDOMAIN_ETSI, {'S', 'A'}}, //SAUDI ARABIA
+      {REGDOMAIN_ETSI, {'S', 'E'}}, //SWEDEN
+      {REGDOMAIN_ETSI, {'S', 'G'}}, //SINGAPORE
+      {REGDOMAIN_ETSI, {'S', 'I'}}, //SLOVENNIA
+      {REGDOMAIN_ETSI, {'S', 'K'}}, //SLOVAKIA
+      {REGDOMAIN_ETSI, {'S', 'V'}}, //EL SALVADOR
+      {REGDOMAIN_ETSI, {'S', 'Y'}}, //SYRIAN ARAB REPUBLIC
+      {REGDOMAIN_ETSI, {'T', 'H'}}, //THAILAND
+      {REGDOMAIN_ETSI, {'T', 'N'}}, //TUNISIA
+      {REGDOMAIN_ETSI, {'T', 'R'}}, //TURKEY
+      {REGDOMAIN_ETSI, {'T', 'T'}}, //TRINIDAD AND TOBAGO
+      {REGDOMAIN_FCC, {'T', 'W'}}, //TAIWAN, PRIVINCE OF CHINA
+      {REGDOMAIN_FCC, {'T', 'Z'}}, //TANZANIA, UNITED REPUBLIC OF
+      {REGDOMAIN_ETSI, {'U', 'A'}}, //UKRAINE
+      {REGDOMAIN_ETSI, {'U', 'G'}}, //UGANDA
+      {REGDOMAIN_FCC, {'U', 'S'}}, //USA
+      {REGDOMAIN_ETSI, {'U', 'Y'}}, //URUGUAY
+      {REGDOMAIN_FCC, {'U', 'Z'}}, //UZBEKISTAN
+      {REGDOMAIN_ETSI, {'V', 'E'}}, //VENEZUELA
+      {REGDOMAIN_FCC, {'V', 'I'}}, //VIRGIN ISLANDS, US
+      {REGDOMAIN_ETSI, {'V', 'N'}}, //VIETNAM
+      {REGDOMAIN_ETSI, {'Y', 'E'}}, //YEMEN
+      {REGDOMAIN_ETSI, {'Y', 'T'}}, //MAYOTTE
+      {REGDOMAIN_ETSI, {'Z', 'A'}}, //SOUTH AFRICA
+      {REGDOMAIN_ETSI, {'Z', 'W'}}, //ZIMBABWE
+    }
+};
+
+#else
+
 // cache of country info table;
 // this is re-initialized from data on binary file
 // loaded on driver initialization if available
@@ -371,13 +541,17 @@ static CountryInfoTable_t countryInfoTable =
         { REGDOMAIN_ETSI,    {'Z', 'W'}},  //ZIMBABWE
     }
 };
+
+#endif
+
+
 typedef struct nvEFSTable_s
 {
    v_U32_t    nvValidityBitmap;
    sHalNv     halnv;
 } nvEFSTable_t;
 nvEFSTable_t *gnvEFSTable;
-/* EFS Table  to send the NV structure to HAL*/ 
+/* EFS Table  to send the NV structure to HAL*/
 static nvEFSTable_t *pnvEFSTable;
 static v_U8_t *pnvEncodedBuf;
 static v_U8_t *pDictFile;
@@ -708,8 +882,8 @@ VOS_STATUS vos_nv_open(void)
        }
 
        pnvEFSTable->nvValidityBitmap = gnvEFSTable->nvValidityBitmap;
-        /* Copy the valid fields to the NV Global structure */ 
-        if (vos_nv_getValidity(VNV_FIELD_IMAGE, &itemIsValid) == 
+        /* Copy the valid fields to the NV Global structure */
+        if (vos_nv_getValidity(VNV_FIELD_IMAGE, &itemIsValid) ==
            VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE) {
@@ -720,22 +894,22 @@ VOS_STATUS vos_nv_open(void)
             }
         }
 
-        if (vos_nv_getValidity(VNV_RATE_TO_POWER_TABLE, &itemIsValid) == 
+        if (vos_nv_getValidity(VNV_RATE_TO_POWER_TABLE, &itemIsValid) ==
              VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_RATE_TO_POWER_TABLE, 
+                if(vos_nv_read( VNV_RATE_TO_POWER_TABLE,
                   (v_VOID_t *)&pnvEFSTable->halnv.tables.pwrOptimum[0],
                   NULL, sizeof(tRateGroupPwr) * NUM_RF_SUBBANDS ) != VOS_STATUS_SUCCESS)
                     goto error;
             }
         }
 
-        if (vos_nv_getValidity(VNV_REGULARTORY_DOMAIN_TABLE, &itemIsValid) == 
+        if (vos_nv_getValidity(VNV_REGULARTORY_DOMAIN_TABLE, &itemIsValid) ==
                VOS_STATUS_SUCCESS)
         {
-    
+
             if (itemIsValid == VOS_TRUE)
             {
                 if(vos_nv_read( VNV_REGULARTORY_DOMAIN_TABLE,
@@ -745,7 +919,7 @@ VOS_STATUS vos_nv_open(void)
             }
         }
 
-        if (vos_nv_getValidity(VNV_DEFAULT_LOCATION, &itemIsValid) == 
+        if (vos_nv_getValidity(VNV_DEFAULT_LOCATION, &itemIsValid) ==
             VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
@@ -756,20 +930,20 @@ VOS_STATUS vos_nv_open(void)
                     goto error;
             }
         }
-    
-        if (vos_nv_getValidity(VNV_TPC_POWER_TABLE, &itemIsValid) == 
+
+        if (vos_nv_getValidity(VNV_TPC_POWER_TABLE, &itemIsValid) ==
             VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_TPC_POWER_TABLE, 
+                if(vos_nv_read( VNV_TPC_POWER_TABLE,
                   (v_VOID_t *)&pnvEFSTable->halnv.tables.plutCharacterized[0],
                   NULL, sizeof(tTpcPowerTable) * NUM_RF_CHANNELS ) != VOS_STATUS_SUCCESS)
                     goto error;
             }
         }
-    
-        if (vos_nv_getValidity(VNV_TPC_PDADC_OFFSETS, &itemIsValid) == 
+
+        if (vos_nv_getValidity(VNV_TPC_PDADC_OFFSETS, &itemIsValid) ==
             VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
@@ -780,7 +954,7 @@ VOS_STATUS vos_nv_open(void)
                     goto error;
             }
         }
-        if (vos_nv_getValidity(VNV_RSSI_CHANNEL_OFFSETS, &itemIsValid) == 
+        if (vos_nv_getValidity(VNV_RSSI_CHANNEL_OFFSETS, &itemIsValid) ==
            VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
@@ -791,8 +965,8 @@ VOS_STATUS vos_nv_open(void)
                     goto error;
             }
         }
-    
-        if (vos_nv_getValidity(VNV_HW_CAL_VALUES, &itemIsValid) == 
+
+        if (vos_nv_getValidity(VNV_HW_CAL_VALUES, &itemIsValid) ==
          VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
@@ -803,7 +977,7 @@ VOS_STATUS vos_nv_open(void)
             }
         }
 
-        if (vos_nv_getValidity(VNV_FW_CONFIG, &itemIsValid) == 
+        if (vos_nv_getValidity(VNV_FW_CONFIG, &itemIsValid) ==
          VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
@@ -814,59 +988,59 @@ VOS_STATUS vos_nv_open(void)
             }
         }
 
-        if (vos_nv_getValidity(VNV_ANTENNA_PATH_LOSS, &itemIsValid) == 
+        if (vos_nv_getValidity(VNV_ANTENNA_PATH_LOSS, &itemIsValid) ==
          VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
             {
                 if(vos_nv_read( VNV_ANTENNA_PATH_LOSS,
-                  (v_VOID_t *)&pnvEFSTable->halnv.tables.antennaPathLoss[0], NULL, 
+                  (v_VOID_t *)&pnvEFSTable->halnv.tables.antennaPathLoss[0], NULL,
                 sizeof(tANI_S16)*NUM_RF_CHANNELS ) != VOS_STATUS_SUCCESS)
                     goto error;
             }
         }
-        if (vos_nv_getValidity(VNV_PACKET_TYPE_POWER_LIMITS, &itemIsValid) == 
+        if (vos_nv_getValidity(VNV_PACKET_TYPE_POWER_LIMITS, &itemIsValid) ==
          VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_PACKET_TYPE_POWER_LIMITS, 
-                  (v_VOID_t *)&pnvEFSTable->halnv.tables.pktTypePwrLimits[0], NULL, 
+                if(vos_nv_read( VNV_PACKET_TYPE_POWER_LIMITS,
+                  (v_VOID_t *)&pnvEFSTable->halnv.tables.pktTypePwrLimits[0], NULL,
                 sizeof(tANI_S16)*NUM_802_11_MODES*NUM_RF_CHANNELS ) != VOS_STATUS_SUCCESS)
                     goto error;
             }
         }
 
-        if (vos_nv_getValidity(VNV_OFDM_CMD_PWR_OFFSET, &itemIsValid) == 
+        if (vos_nv_getValidity(VNV_OFDM_CMD_PWR_OFFSET, &itemIsValid) ==
          VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_OFDM_CMD_PWR_OFFSET, 
-                  (v_VOID_t *)&pnvEFSTable->halnv.tables.ofdmCmdPwrOffset, NULL, 
+                if(vos_nv_read( VNV_OFDM_CMD_PWR_OFFSET,
+                  (v_VOID_t *)&pnvEFSTable->halnv.tables.ofdmCmdPwrOffset, NULL,
                                 sizeof(sOfdmCmdPwrOffset)) != VOS_STATUS_SUCCESS)
                     goto error;
             }
         }
 
-        if (vos_nv_getValidity(VNV_TX_BB_FILTER_MODE, &itemIsValid) == 
+        if (vos_nv_getValidity(VNV_TX_BB_FILTER_MODE, &itemIsValid) ==
          VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
             {
-               if(vos_nv_read(VNV_TX_BB_FILTER_MODE, 
-                  (v_VOID_t *)&pnvEFSTable->halnv.tables.txbbFilterMode, NULL, 
+               if(vos_nv_read(VNV_TX_BB_FILTER_MODE,
+                  (v_VOID_t *)&pnvEFSTable->halnv.tables.txbbFilterMode, NULL,
                 sizeof(sTxBbFilterMode)) != VOS_STATUS_SUCCESS)
                    goto error;
             }
         }
-        if (vos_nv_getValidity(VNV_TABLE_VIRTUAL_RATE, &itemIsValid) == 
+        if (vos_nv_getValidity(VNV_TABLE_VIRTUAL_RATE, &itemIsValid) ==
          VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
             {
-               if(vos_nv_read(VNV_TABLE_VIRTUAL_RATE, 
-                  (v_VOID_t *)&pnvEFSTable->halnv.tables.pwrOptimum_virtualRate, NULL, 
+               if(vos_nv_read(VNV_TABLE_VIRTUAL_RATE,
+                  (v_VOID_t *)&pnvEFSTable->halnv.tables.pwrOptimum_virtualRate, NULL,
                 sizeof(gnvEFSTable->halnv.tables.pwrOptimum_virtualRate)) != VOS_STATUS_SUCCESS)
                    goto error;
             }
@@ -900,138 +1074,7 @@ VOS_STATUS vos_nv_close(void)
     gnvEFSTable=NULL;
     return VOS_STATUS_SUCCESS;
 }
-/**------------------------------------------------------------------------
-  \brief vos_nv_getRegDomainFromCountryCode() - get the regulatory domain of
-  a country given its country code
-  The \a vos_nv_getRegDomainFromCountryCode() returns the regulatory domain of
-  a country given its country code.  This is done from reading a cached
-  copy of the binary file.
-  \param pRegDomain  - pointer to regulatory domain
-  \param countryCode - country code
-  \return VOS_STATUS_SUCCESS - regulatory domain is found for the given country
-          VOS_STATUS_E_FAULT - invalid pointer error
-          VOS_STATUS_E_EMPTY - country code table is empty
-          VOS_STATUS_E_EXISTS - given country code does not exist in table
-  \sa
-  -------------------------------------------------------------------------*/
-VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
-      const v_COUNTRYCODE_t countryCode )
-{
-   int i;
-   v_CONTEXT_t pVosContext = NULL;
-   hdd_context_t *pHddCtx = NULL;
-   struct wiphy *wiphy = NULL;
-   int status;
-   // sanity checks
-   if (NULL == pRegDomain)
-   {
-      VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-            ("Invalid reg domain pointer\r\n") );
-      return VOS_STATUS_E_FAULT;
-   }
-   *pRegDomain = REGDOMAIN_COUNT;
 
-   if (NULL == countryCode)
-   {
-      VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-            ("Country code array is NULL\r\n") );
-      return VOS_STATUS_E_FAULT;
-   }
-   if (0 == countryInfoTable.countryCount)
-   {
-      VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-            ("Reg domain table is empty\r\n") );
-      return VOS_STATUS_E_EMPTY;
-   }
-   /* If CRDA regulatory settings is valid, i.e. crda is enabled
-      and reg_notifier is called back.
-      Intercept here and redirect to the Reg domain table's CRDA
-      entry if country code is crda's country.
-      last one NUM_REG_DOMAINS-1 is reserved for crda */
-   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
-          "vos_nv_getRegDomainFromCountryCode %c%c\n",
-          countryCode[0], countryCode[1]);
-
-   if (crda_regulatory_entry_valid == VOS_TRUE)
-   {
-       if (crda_alpha2[0]==countryCode[0] && crda_alpha2[1]==countryCode[1])
-       {
-          *pRegDomain = NUM_REG_DOMAINS-1;
-              VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
-              "vos_nv_getRegDomainFromCountryCode return crda init entry\n");
-          return VOS_STATUS_SUCCESS;
-       }
-       if (run_time_alpha2[0]==countryCode[0] &&
-           run_time_alpha2[1]==countryCode[1] &&
-           crda_regulatory_run_time_entry_valid == VOS_TRUE)
-       {
-          *pRegDomain = NUM_REG_DOMAINS-2;
-              VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
-              "vos_nv_getRegDomainFromCountryCode return crda none-default country entry\n");
-           return VOS_STATUS_SUCCESS;
-       }
-       else
-       {
-           crda_regulatory_run_time_entry_valid = VOS_FALSE;
-           pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
-           if (NULL != pVosContext)
-               pHddCtx = vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
-           else
-               return VOS_STATUS_E_EXISTS;
-           if (NULL == pHddCtx)
-           {
-              VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                    ("Invalid pHddCtx pointer\r\n") );
-              return VOS_STATUS_E_FAULT;
-           }
-
-           wiphy = pHddCtx->wiphy;
-           INIT_COMPLETION(pHddCtx->driver_crda_req);
-           regulatory_hint(wiphy, countryCode);
-           status = wait_for_completion_interruptible_timeout(
-                   &pHddCtx->driver_crda_req,
-                   msecs_to_jiffies(CRDA_WAIT_TIME));
-           if (!status)
-           {
-               VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                       "%s: Timeout waiting for CRDA REQ", __func__);
-           }
-
-           if (crda_regulatory_run_time_entry_valid == VOS_TRUE)
-           {
-              VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
-                 "vos_nv_getRegDomainFromCountryCode return crda new none-default country entry\n");
-               return VOS_STATUS_SUCCESS;
-           }
-           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-              "vos_nv_getRegDomainFromCountryCode failed to get crda new none-default country entry\n");
-           return VOS_STATUS_E_EXISTS;
-       }
-   }
-
-   // iterate the country info table until end of table or the country code
-   // is found
-   for (i = 0; i < countryInfoTable.countryCount &&
-         REGDOMAIN_COUNT == *pRegDomain; i++)
-   {
-      if (memcmp(countryCode, countryInfoTable.countryInfo[i].countryCode,
-               VOS_COUNTRY_CODE_LEN) == 0)
-      {
-         // country code is found
-         *pRegDomain = countryInfoTable.countryInfo[i].regDomain;
-      }
-   }
-   if (REGDOMAIN_COUNT != *pRegDomain)
-   {
-      return VOS_STATUS_SUCCESS;
-   }
-   else
-   {
-      VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
-            ("country code is not found\r\n"));
-      return VOS_STATUS_E_EXISTS;
-   }
-}
 /**------------------------------------------------------------------------
   \brief vos_nv_getSupportedCountryCode() - get the list of supported
   country codes
@@ -1059,7 +1102,7 @@ VOS_STATUS vos_nv_getSupportedCountryCode( v_BYTE_t *pBuffer, v_SIZE_t *pBufferS
    if ( NULL == pBuffer || providedBufferSize < *pBufferSize )
    {
       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
-            ("Insufficient memory for country code list\r\n"));
+            ("Insufficient memory for country code list\n"));
       return VOS_STATUS_E_NOMEM;
    }
    for (i = 0; i < countryInfoTable.countryCount; i++)
@@ -1424,11 +1467,11 @@ VOS_STATUS vos_nv_read( VNV_TYPE type, v_VOID_t *outputVoidBuffer,
            }
            break;
        case VNV_FW_CONFIG:
-       
+
            itemSize = sizeof(gnvEFSTable->halnv.tables.fwConfig);
-       
+
            if(bufferSize != itemSize) {
-       
+
                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                 ("type = %d buffer size=%d is less than data size=%d\r\n"),type, bufferSize,
                  itemSize);
@@ -1651,11 +1694,11 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             break;
         case VNV_FW_CONFIG:
-        
+
            itemSize = sizeof(gnvEFSTable->halnv.tables.fwConfig);
-        
+
            if(bufferSize != itemSize) {
-        
+
                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                 ("type = %d buffer size=%d is less than data size=%d\r\n"),type, bufferSize,
                  itemSize);
@@ -1716,7 +1759,7 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
                 memcpy(&gnvEFSTable->halnv.tables.txbbFilterMode,inputVoidBuffer,bufferSize);
             }
             break;
-            
+
 
         case VNV_TABLE_VIRTUAL_RATE:
             itemSize = sizeof(gnvEFSTable->halnv.tables.pwrOptimum_virtualRate);
@@ -1771,7 +1814,7 @@ VOS_STATUS vos_nv_getChannelListWithPower(tChannelListWithPower *channels20MHz /
 {
     VOS_STATUS status = VOS_STATUS_SUCCESS;
     int i, count;
-    
+
     //TODO: Dont want to use pMac here...can we instead store the curRegDomain in NV
     // or pass it as a parameter to NV from SME?
 
@@ -1803,7 +1846,7 @@ VOS_STATUS vos_nv_getChannelListWithPower(tChannelListWithPower *channels20MHz /
         //center channels for 2.4 Ghz 40 MHz channels
         for( i = RF_CHAN_BOND_3; i <= RF_CHAN_BOND_11; i++ )
         {
-            
+
             if( regChannels[i].enabled )
             {
                 channels40MHz[count].chanId = rfChannels[i].channelNum;
@@ -1813,7 +1856,7 @@ VOS_STATUS vos_nv_getChannelListWithPower(tChannelListWithPower *channels20MHz /
         //center channels for 5 Ghz 40 MHz channels
         for( i = RF_CHAN_BOND_38; i <= RF_CHAN_BOND_163; i++ )
         {
-            
+
             if( regChannels[i].enabled )
             {
                 channels40MHz[count].chanId = rfChannels[i].channelNum;
@@ -1881,7 +1924,7 @@ VOS_STATUS vos_nv_getSupportedChannels( v_U8_t *p20MhzChannels, int *pNum20MhzCh
   -------------------------------------------------------------------------*/
 VOS_STATUS vos_nv_readDefaultCountryTable( uNvTables *tableData )
 {
-   
+
    VOS_STATUS status = VOS_STATUS_SUCCESS;
    memcpy(&tableData->defaultCountryTable, &pnvEFSTable->halnv.tables.defaultCountryTable, sizeof(sDefaultCountry));
    pr_info("DefaultCountry is %c%c\n",
@@ -1891,7 +1934,7 @@ VOS_STATUS vos_nv_readDefaultCountryTable( uNvTables *tableData )
 }
 
 /**------------------------------------------------------------------------
-  \brief vos_nv_getBuffer - 
+  \brief vos_nv_getBuffer -
   \param pBuffer  - to return the buffer address
               pSize     - buffer size.
   \return status of the NV read operation
@@ -1963,47 +2006,7 @@ VOS_STATUS vos_nv_setNVEncodedBuffer(v_U8_t *pNvBuffer, v_SIZE_t size)
 }
 
 /**------------------------------------------------------------------------
-  \brief vos_nv_setRegDomain - 
-  \param clientCtxt  - Client Context, Not used for PRIMA
-              regId  - Regulatory Domain ID
-  \return status set REG domain operation
-  \sa
-  -------------------------------------------------------------------------*/
-VOS_STATUS vos_nv_setRegDomain(void * clientCtxt, v_REGDOMAIN_t regId)
-{
-    v_CONTEXT_t pVosContext = NULL;
-    hdd_context_t *pHddCtx = NULL;
-    struct wiphy *wiphy = NULL;
-   /* Client Context Argumant not used for PRIMA */
-   if (regId >= REGDOMAIN_COUNT)
-   {
-      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                "VOS set reg domain, invalid REG domain ID %d", regId);
-      return VOS_STATUS_E_INVAL;
-   }
-
-   pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
-   if (NULL != pVosContext)
-      pHddCtx = vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
-   else
-      return VOS_STATUS_E_EXISTS;
-   /* Set correct channel information based on REG Domain */
-   regChannels = pnvEFSTable->halnv.tables.regDomains[regId].channels;
-
-   /* when CRDA is not running then we are world roaming.
-      In this case if 11d is enabled, then country code should
-      be update on basis of world roaming */
-   if ((NULL != pHddCtx) && (memcmp(pHddCtx->cfg_ini->crdaDefaultCountryCode,
-                    CFG_CRDA_DEFAULT_COUNTRY_CODE_DEFAULT , 2) == 0))
-   {
-      wiphy = pHddCtx->wiphy;
-      regulatory_hint(wiphy, "00");
-   }
-   return VOS_STATUS_SUCCESS;
-}
-
-/**------------------------------------------------------------------------
-  \brief vos_nv_getChannelEnabledState - 
+  \brief vos_nv_getChannelEnabledState -
   \param rfChannel  - input channel enum to know evabled state
   \return eNVChannelEnabledType enabled state for channel
              * enabled
@@ -2239,6 +2242,8 @@ static int create_crda_regulatory_entry(struct wiphy *wiphy,
    crda_regulatory_entry_post_processing(wiphy, request, nBandCapability, NUM_REG_DOMAINS-2);
 return 0;
 }
+
+
 v_BOOL_t is_crda_regulatory_entry_valid(void)
 {
 return crda_regulatory_entry_valid;
@@ -2314,7 +2319,7 @@ u32 center_freq = freq_khz + 20000;
   //RF_SUBBAND_2_4_GHZ
   for (i=RF_CHAN_BOND_3;i<=RF_CHAN_BOND_11;i++)
     if (center_freq <= (u32) (rfChannels[i].targetFreq) * 1000)
-      return i;
+        return i;
   //RF_SUBBAND_4_9_GHZ, Ch 242, 246, 250, 210, 214
   for (i=RF_CHAN_BOND_242;i<=RF_CHAN_BOND_214;i++)
     if (center_freq <= (u32) (rfChannels[i].targetFreq) * 1000)
@@ -2439,6 +2444,12 @@ static int create_crda_regulatory_entry_from_regd(struct wiphy *wiphy,
              wiphy_dbg(wiphy, "info: CH %d is DFS, max EIRP (mBm) is %d\n", rfChannels[j].channelNum,
                 wiphy->regd->reg_rules[i].power_rule.max_eirp);
          }
+         if (wiphy->regd->reg_rules[i].flags & NL80211_RRF_PASSIVE_SCAN)
+         {
+             pnvEFSTable->halnv.tables.regDomains[domain_id].channels[j].enabled = NV_CHANNEL_DFS;
+             wiphy_dbg(wiphy, "info: CH %d is Passive, max EIRP (mBm) is %d\n", rfChannels[j].channelNum,
+                wiphy->regd->reg_rules[i].power_rule.max_eirp);
+         }
          else
          {
              pnvEFSTable->halnv.tables.regDomains[domain_id].channels[j].enabled = NV_CHANNEL_ENABLE;
@@ -2508,6 +2519,808 @@ static int create_crda_regulatory_entry_from_regd(struct wiphy *wiphy,
   return 0;
 }
 
+#ifdef CONFIG_ENABLE_LINUX_REG
+
+/**------------------------------------------------------------------------
+  \brief vos_nv_setRegDomain -
+  \param clientCtxt  - Client Context, Not used for PRIMA
+              regId  - Regulatory Domain ID
+  \return status set REG domain operation
+  \sa
+  -------------------------------------------------------------------------*/
+VOS_STATUS vos_nv_setRegDomain(void * clientCtxt, v_REGDOMAIN_t regId)
+{
+
+    if (regId >= REGDOMAIN_COUNT)
+    {
+        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                  "VOS set reg domain, invalid REG domain ID %d", regId);
+        return VOS_STATUS_E_INVAL;
+    }
+
+    /* Set correct channel information based on REG Domain */
+    regChannels = pnvEFSTable->halnv.tables.regDomains[regId].channels;
+
+    return VOS_STATUS_SUCCESS;
+}
+
+/**------------------------------------------------------------------------
+  \brief vos_nv_getRegDomainFromCountryCode() - get the regulatory domain of
+  a country given its country code
+  The \a vos_nv_getRegDomainFromCountryCode() returns the regulatory domain of
+  a country given its country code.  This is done from reading a cached
+  copy of the binary file.
+  \param pRegDomain  - pointer to regulatory domain
+  \param countryCode - country code
+  \param source      - source of the country code
+  \return VOS_STATUS_SUCCESS - regulatory domain is found for the given country
+          VOS_STATUS_E_FAULT - invalid pointer error
+          VOS_STATUS_E_EMPTY - country code table is empty
+          VOS_STATUS_E_EXISTS - given country code does not exist in table
+  \sa
+  -------------------------------------------------------------------------*/
+VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
+      const v_COUNTRYCODE_t country_code, v_CountryInfoSource_t source)
+{
+
+    v_CONTEXT_t pVosContext = NULL;
+    hdd_context_t *pHddCtx = NULL;
+    struct wiphy *wiphy = NULL;
+    int i;
+    int wait_result;
+
+    /* sanity checks */
+    if (NULL == pRegDomain)
+    {
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("Invalid reg domain pointer") );
+        return VOS_STATUS_E_FAULT;
+    }
+
+    *pRegDomain = REGDOMAIN_COUNT;
+
+    if (NULL == country_code)
+    {
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("Country code array is NULL"));
+        return VOS_STATUS_E_FAULT;
+    }
+
+    if (0 == countryInfoTable.countryCount)
+    {
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("Reg domain table is empty") );
+        return VOS_STATUS_E_EMPTY;
+    }
+
+
+    pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+
+    if (NULL != pVosContext)
+        pHddCtx = vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
+    else
+        return VOS_STATUS_E_EXISTS;
+
+    if (NULL == pHddCtx)
+    {
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("Invalid pHddCtx pointer") );
+        return VOS_STATUS_E_FAULT;
+    }
+
+    temp_reg_domain = REGDOMAIN_COUNT;
+    /* lookup the country in the local database */
+    for (i = 0; i < countryInfoTable.countryCount &&
+             REGDOMAIN_COUNT == temp_reg_domain; i++)
+    {
+        if (memcmp(country_code, countryInfoTable.countryInfo[i].countryCode,
+                   VOS_COUNTRY_CODE_LEN) == 0)
+        {
+            /* country code is found */
+            /* record the temporary regulatory_domain as well */
+            temp_reg_domain = countryInfoTable.countryInfo[i].regDomain;
+            break;
+        }
+    }
+
+    if (REGDOMAIN_COUNT == temp_reg_domain) {
+
+        /* the country was not found in the driver database */
+        /* so we will return the REGDOMAIN_WORLD to SME/CSR */
+
+        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("Country does not map to any Regulatory domain"));
+
+        temp_reg_domain = REGDOMAIN_WORLD;
+    }
+
+    if (COUNTRY_QUERY == source)
+    {
+        *pRegDomain = temp_reg_domain;
+         return VOS_STATUS_SUCCESS;
+    }
+
+    wiphy = pHddCtx->wiphy;
+
+    if (false == wiphy->registered)
+    {
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("wiphy is not yet registered with the kernel") );
+        return VOS_STATUS_E_FAULT;
+    }
+
+    /* We need to query the kernel to get the regulatory information
+       for this country */
+
+
+    /* First compare the country code with the existing current country code
+       . If both are same there is no need to query any database */
+
+    VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                   ("regdomain request"));
+
+    if ((country_code[0] == linux_reg_cc[0]) &&
+        (country_code[1] == linux_reg_cc[1])) {
+
+        /* country code already exists */
+
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                   (" country code already exists"));
+
+        *pRegDomain = cur_reg_domain;
+
+        return VOS_STATUS_SUCCESS;
+    }
+    else {
+
+        /* get the regulatory information from the kernel
+           database */
+
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
+                   (" get country information from kernel db"));
+
+
+        if (COUNTRY_NV == source)
+        {
+            INIT_COMPLETION(pHddCtx->linux_reg_req);
+            regulatory_hint(wiphy, country_code);
+            wait_result = wait_for_completion_interruptible_timeout(
+                                                            &pHddCtx->linux_reg_req,
+                                                            LINUX_REG_WAIT_TIME);
+
+            /* if the country information does not exist with the kernel,
+               then the driver callback would not be called */
+
+            if (wait_result >= 0) {
+
+                /* the driver callback was called. this means the country
+                   regulatory information was found in the kernel database.
+                   The callback would have updated the internal database. Here
+                   update the country and the return value for the regulatory
+                   domain */
+
+                VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                           ("runtime country code is found in kernel db"));
+
+                *pRegDomain = temp_reg_domain;
+                cur_reg_domain = temp_reg_domain;
+                linux_reg_cc[0] = country_code[0];
+                linux_reg_cc[1] = country_code[1];
+
+                return VOS_STATUS_SUCCESS;
+            }
+            else {
+
+                /* the country information has not been found in the kernel
+                   database, return failure */
+
+                VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
+                           ("runtime country code is not found in kernel db"));
+
+                return VOS_STATUS_E_EXISTS;
+            }
+        }
+        else if (COUNTRY_IE == source || COUNTRY_USER == source)
+        {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+            regulatory_hint_user(country_code,NL80211_USER_REG_HINT_USER);
+#else
+            regulatory_hint_user(country_code);
+#endif
+            *pRegDomain = temp_reg_domain;
+        }
+
+   }
+
+   return VOS_STATUS_SUCCESS;
+}
+
+/* create_linux_regulatory_entry to populate internal structures from wiphy */
+static int create_linux_regulatory_entry(struct wiphy *wiphy,
+                struct regulatory_request *request,
+                v_U8_t nBandCapability)
+{
+    int i, j, m;
+    int k = 0, n = 0;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,9,0))
+    int err;
+#endif
+    const struct ieee80211_reg_rule *reg_rule;
+    v_CONTEXT_t pVosContext = NULL;
+    hdd_context_t *pHddCtx = NULL;
+
+    pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+
+    if (NULL != pVosContext)
+    {
+        pHddCtx = vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
+        if (NULL == pHddCtx)
+        {
+           VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                       ("Invalid pHddCtx pointer") );
+        }
+        else
+        {
+           pHddCtx->isVHT80Allowed = 0;
+        }
+    }
+    else
+    {
+       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                  ("Invalid pVosContext pointer") );
+    }
+
+    /* 20MHz channels */
+    if (nBandCapability == eCSR_BAND_24)
+        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                  "BandCapability is set to 2G only\n");
+
+    for (i = 0, m = 0; i<IEEE80211_NUM_BANDS; i++)
+    {
+        /* 5G only */
+        if (i == IEEE80211_BAND_2GHZ && nBandCapability == eCSR_BAND_5G)
+            continue;
+
+        /* 2G only */
+        else if (i == IEEE80211_BAND_5GHZ && nBandCapability == eCSR_BAND_24)
+            continue;
+
+        if (wiphy->bands[i] == NULL)
+        {
+
+            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                      "error: wiphy->bands is NULL, i = %d\n", i);
+            return -1;
+        }
+
+        /* internal channels[] is one continous array for both 2G and 5G bands
+           m is internal starting channel index for each band */
+
+        if (i == 0)
+            m = 0;
+        else
+            m = wiphy->bands[i-1]->n_channels + m;
+
+        for (j = 0; j < wiphy->bands[i]->n_channels; j++)
+        {
+            /* k = (m + j) is internal current channel index for 20MHz channel
+              n is internal channel index for corresponding 40MHz channel */
+
+            k = m + j;
+            n = bw20_ch_index_to_bw40_ch_index(k);
+
+            if (n == -1)
+                return -1;
+
+            /* If the regulatory rules for a country do not explicilty
+             * require a passive scan on a frequency, lift the passive
+             * scan restriction
+             */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+            reg_rule = freq_reg_info(wiphy,
+                                     MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq));
+#else
+            err = freq_reg_info(wiphy,
+                                MHZ_TO_KHZ(wiphy->bands[i]->channels[j].center_freq),
+                                0, &reg_rule);
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+            if (!IS_ERR(reg_rule))
+#else
+            if (0 == err)
+#endif
+            {
+                if (!(reg_rule->flags & NL80211_RRF_PASSIVE_SCAN))
+                {
+                    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                              "%s: Remove passive scan restriction for %u",
+                              __func__, wiphy->bands[i]->channels[j].center_freq);
+                    wiphy->bands[i]->channels[j].flags &= ~IEEE80211_CHAN_PASSIVE_SCAN;
+                }
+            }
+
+            if (wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_DISABLED)
+            {
+                if (pnvEFSTable == NULL)
+                {
+                    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                              "error: pnvEFSTable is NULL, probably not parsed nv.bin yet\n");
+                    return -1;
+                }
+                pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].enabled =
+                    NV_CHANNEL_DISABLE;
+                pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
+                    NV_CHANNEL_DISABLE;
+            }
+            /* nv cannot distinguish between DFS and passive channels */
+            else if (wiphy->bands[i]->channels[j].flags &
+                    (IEEE80211_CHAN_RADAR | IEEE80211_CHAN_PASSIVE_SCAN))
+            {
+                pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].enabled =
+                    NV_CHANNEL_DFS;
+
+                /* max_power is in mBm = 100 * dBm */
+                pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].pwrLimit =
+                    (tANI_S8) ((wiphy->bands[i]->channels[j].max_power));
+                if ((wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_HT40) == 0)
+                {
+                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
+                        NV_CHANNEL_DFS;
+
+                    /* 40MHz channel power is half of 20MHz (-3dB) ?? */
+                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit =
+                        (tANI_S8) (((wiphy->bands[i]->channels[j].max_power))-3);
+                }
+                if ((wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_80MHZ) == 0)
+                {
+                   if (NULL == pHddCtx)
+                   {
+                      VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                                  ("Invalid pHddCtx pointer") );
+                   }
+                   else
+                   {
+                      pHddCtx->isVHT80Allowed = 1;
+                   }
+                }
+            }
+            else /* Enable is only last flag we support */
+            {
+                pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].enabled =
+                    NV_CHANNEL_ENABLE;
+
+                /* max_power is in dBm */
+                pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].pwrLimit =
+                    (tANI_S8) ((wiphy->bands[i]->channels[j].max_power));
+                if ((wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_HT40) == 0)
+                {
+                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].enabled =
+                        NV_CHANNEL_ENABLE;
+                    /* 40MHz channel power is half of 20MHz (-3dB) */
+                    pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[n].pwrLimit =
+                        (tANI_S8) (((wiphy->bands[i]->channels[j].max_power))-3);
+                }
+                if ((wiphy->bands[i]->channels[j].flags & IEEE80211_CHAN_NO_80MHZ) == 0)
+                {
+                   if (NULL == pHddCtx)
+                   {
+                      VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                                  ("Invalid pHddCtx pointer") );
+                   }
+                   else
+                   {
+                      pHddCtx->isVHT80Allowed = 1;
+                   }
+                }
+
+            }
+
+
+
+        }
+    }
+
+    if (k == 0)
+       return -1;
+
+    return 0;
+}
+
+
+/*
+ * Function: wlan_hdd_linux_reg_notifier
+ * This function is called from cfg80211 core to provide regulatory settings
+ * after new country is requested or intersected (init, user input or 11d)
+ * This function is used to create a CRDA regulatory settings entry into internal
+ * regulatory setting table.
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+void wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
+                struct regulatory_request *request)
+#else
+int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
+                struct regulatory_request *request)
+#endif
+{
+    hdd_context_t *pHddCtx = wiphy_priv(wiphy);
+    tANI_U8 nBandCapability;
+    v_COUNTRYCODE_t country_code;
+    int i;
+    v_BOOL_t isVHT80Allowed;
+
+    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+               ("cfg80211 reg notifier callback for country"));
+
+    if (NULL == pHddCtx)
+    {
+       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("Invalid pHddCtx pointer") );
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+       return;
+#else
+       return 0;
+#endif
+    }
+
+    /* first check if this callback is in response to the driver callback */
+
+    if (request->initiator == NL80211_REGDOM_SET_BY_DRIVER)
+    {
+
+        nBandCapability = pHddCtx->cfg_ini->nBandCapability;
+        isVHT80Allowed = pHddCtx->isVHT80Allowed;
+        if (create_linux_regulatory_entry(wiphy, request, pHddCtx->cfg_ini->nBandCapability) == 0)
+        {
+
+            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                       (" regulatory entry created"));
+        }
+        if (pHddCtx->isVHT80Allowed != isVHT80Allowed)
+        {
+           hdd_checkandupdate_phymode( pHddCtx);
+        }
+
+        complete(&pHddCtx->linux_reg_req);
+    }
+
+    else if (request->initiator == NL80211_REGDOM_SET_BY_USER ||
+             request->initiator ==  NL80211_REGDOM_SET_BY_CORE)
+    {
+
+        /* first lookup the country in the local database */
+
+        country_code[0] = request->alpha2[0];
+        country_code[1] = request->alpha2[1];
+
+        temp_reg_domain = REGDOMAIN_COUNT;
+        for (i = 0; i < countryInfoTable.countryCount &&
+                 REGDOMAIN_COUNT == temp_reg_domain; i++)
+        {
+            if (memcmp(country_code, countryInfoTable.countryInfo[i].countryCode,
+                       VOS_COUNTRY_CODE_LEN) == 0)
+            {
+                /* country code is found */
+                /* record the temporary regulatory_domain as well */
+                temp_reg_domain = countryInfoTable.countryInfo[i].regDomain;
+                break;
+            }
+        }
+
+        if  (REGDOMAIN_COUNT == temp_reg_domain)
+            temp_reg_domain = REGDOMAIN_WORLD;
+
+        nBandCapability = pHddCtx->cfg_ini->nBandCapability;
+        isVHT80Allowed = pHddCtx->isVHT80Allowed;
+        if (create_linux_regulatory_entry(wiphy, request,
+                                          pHddCtx->cfg_ini->nBandCapability) == 0)
+        {
+            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                      (" regulatory entry created"));
+
+        }
+        if (pHddCtx->isVHT80Allowed != isVHT80Allowed)
+        {
+           hdd_checkandupdate_phymode( pHddCtx);
+        }
+
+        cur_reg_domain = temp_reg_domain;
+        linux_reg_cc[0] = country_code[0];
+        linux_reg_cc[1] = country_code[1];
+
+        /* now pass the new country information to sme */
+        if (request->alpha2[0] == '0' && request->alpha2[1] == '0')
+        {
+           sme_GenericChangeCountryCode(pHddCtx->hHal, country_code,
+                                        REGDOMAIN_COUNT);
+        }
+        else
+        {
+           sme_GenericChangeCountryCode(pHddCtx->hHal, country_code,
+                                        temp_reg_domain);
+        }
+
+    }
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+    return;
+#else
+    return 0;
+#endif
+}
+
+
+/* initialize wiphy from NV.bin */
+VOS_STATUS vos_init_wiphy_from_nv_bin(void)
+{
+    int i, j, m;
+    int k = 0;
+    v_REGDOMAIN_t reg_domain;
+    v_CONTEXT_t pVosContext = NULL;
+    hdd_context_t *pHddCtx = NULL;
+    struct wiphy *wiphy = NULL;
+
+    pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+
+    if (NULL != pVosContext)
+        pHddCtx = vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
+    else
+        return VOS_STATUS_E_EXISTS;
+
+    if (NULL == pHddCtx)
+    {
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                   ("Invalid pHddCtx pointer") );
+        return VOS_STATUS_E_FAULT;
+    }
+
+    wiphy = pHddCtx->wiphy;
+
+    if  (('0' == pnvEFSTable->halnv.tables.defaultCountryTable.countryCode[0])
+         &&
+         ('0' == pnvEFSTable->halnv.tables.defaultCountryTable.countryCode[1]))
+    {
+        /* default country is world roaming */
+
+        reg_domain = REGDOMAIN_WORLD;
+        wiphy->flags |= WIPHY_FLAG_CUSTOM_REGULATORY;
+    }
+    else if (REGDOMAIN_WORLD ==
+	     pnvEFSTable->halnv.tables.defaultCountryTable.regDomain) {
+
+        reg_domain = pnvEFSTable->halnv.tables.defaultCountryTable.regDomain;
+        wiphy->flags |= WIPHY_FLAG_CUSTOM_REGULATORY;
+    }
+    else {
+
+        reg_domain = pnvEFSTable->halnv.tables.defaultCountryTable.regDomain;
+        wiphy->flags |= WIPHY_FLAG_STRICT_REGULATORY;
+    }
+
+    m = 0;
+    for (i = 0; i < IEEE80211_NUM_BANDS; i++)
+    {
+
+        if (wiphy->bands[i] == NULL)
+        {
+            pr_info("error: wiphy->bands[i] is NULL, i = %d\n", i);
+            continue;
+        }
+
+        /* internal channels[] is one continous array for both 2G and 5G bands
+           m is internal starting channel index for each band */
+
+        for (j = 0; j < wiphy->bands[i]->n_channels; j++)
+        {
+            /* k = (m + j) is internal current channel index */
+            k = m + j;
+
+            if (pnvEFSTable->halnv.tables.regDomains[reg_domain].channels[k].enabled ==
+                NV_CHANNEL_DISABLE)
+                wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_DISABLED;
+
+            else if (pnvEFSTable->halnv.tables.regDomains[reg_domain].channels[k].enabled ==
+                     NV_CHANNEL_DFS) {
+
+                wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_PASSIVE_SCAN;
+
+                wiphy->bands[i]->channels[j].max_power =
+                    (pnvEFSTable->halnv.tables.regDomains[reg_domain].channels[k].pwrLimit)*100;
+            }
+
+            else if (pnvEFSTable->halnv.tables.regDomains[reg_domain].channels[k].enabled ==
+                     NV_CHANNEL_ENABLE) {
+
+                wiphy->bands[i]->channels[j].max_power =
+                    (pnvEFSTable->halnv.tables.regDomains[reg_domain].channels[k].pwrLimit)*100;
+            }
+        }
+
+	m += wiphy->bands[i]->n_channels;
+    }
+
+    return VOS_STATUS_SUCCESS;
+}
+
+
+#else
+
+/**------------------------------------------------------------------------
+  \brief vos_nv_setRegDomain -
+  \param clientCtxt  - Client Context, Not used for PRIMA
+              regId  - Regulatory Domain ID
+  \return status set REG domain operation
+  \sa
+  -------------------------------------------------------------------------*/
+VOS_STATUS vos_nv_setRegDomain(void * clientCtxt, v_REGDOMAIN_t regId)
+{
+    v_CONTEXT_t pVosContext = NULL;
+    hdd_context_t *pHddCtx = NULL;
+    struct wiphy *wiphy = NULL;
+   /* Client Context Argumant not used for PRIMA */
+   if (regId >= REGDOMAIN_COUNT)
+   {
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                "VOS set reg domain, invalid REG domain ID %d", regId);
+      return VOS_STATUS_E_INVAL;
+   }
+
+   pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+   if (NULL != pVosContext)
+      pHddCtx = vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
+   else
+      return VOS_STATUS_E_EXISTS;
+   /* Set correct channel information based on REG Domain */
+   regChannels = pnvEFSTable->halnv.tables.regDomains[regId].channels;
+
+   /* when CRDA is not running then we are world roaming.
+      In this case if 11d is enabled, then country code should
+      be update on basis of world roaming */
+   if (NULL != pHddCtx)
+   {
+      wiphy = pHddCtx->wiphy;
+      regulatory_hint(wiphy, "00");
+   }
+   return VOS_STATUS_SUCCESS;
+}
+
+
+/**------------------------------------------------------------------------
+  \brief vos_nv_getRegDomainFromCountryCode() - get the regulatory domain of
+  a country given its country code
+  The \a vos_nv_getRegDomainFromCountryCode() returns the regulatory domain of
+  a country given its country code.  This is done from reading a cached
+  copy of the binary file.
+  \param pRegDomain  - pointer to regulatory domain
+  \param countryCode - country code
+  \param source      - source of the country code
+  \return VOS_STATUS_SUCCESS - regulatory domain is found for the given country
+          VOS_STATUS_E_FAULT - invalid pointer error
+          VOS_STATUS_E_EMPTY - country code table is empty
+          VOS_STATUS_E_EXISTS - given country code does not exist in table
+  \sa
+  -------------------------------------------------------------------------*/
+VOS_STATUS vos_nv_getRegDomainFromCountryCode( v_REGDOMAIN_t *pRegDomain,
+      const v_COUNTRYCODE_t countryCode, v_CountryInfoSource_t source)
+{
+   int i;
+   v_CONTEXT_t pVosContext = NULL;
+   hdd_context_t *pHddCtx = NULL;
+   struct wiphy *wiphy = NULL;
+   int status;
+
+   // sanity checks
+   if (NULL == pRegDomain)
+   {
+      VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+            ("Invalid reg domain pointer\n") );
+      return VOS_STATUS_E_FAULT;
+   }
+   *pRegDomain = REGDOMAIN_COUNT;
+
+   if (NULL == countryCode)
+   {
+      VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+            ("Country code array is NULL\r\n") );
+      return VOS_STATUS_E_FAULT;
+   }
+   if (0 == countryInfoTable.countryCount)
+   {
+      VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+            ("Reg domain table is empty\r\n") );
+      return VOS_STATUS_E_EMPTY;
+   }
+   /* If CRDA regulatory settings is valid, i.e. crda is enabled
+      and reg_notifier is called back.
+      Intercept here and redirect to the Reg domain table's CRDA
+      entry if country code is crda's country.
+      last one NUM_REG_DOMAINS-1 is reserved for crda */
+   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
+          "vos_nv_getRegDomainFromCountryCode %c%c\n",
+          countryCode[0], countryCode[1]);
+
+   if (crda_regulatory_entry_valid == VOS_TRUE)
+   {
+       if (crda_alpha2[0]==countryCode[0] && crda_alpha2[1]==countryCode[1])
+       {
+          *pRegDomain = NUM_REG_DOMAINS-1;
+              VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
+              "vos_nv_getRegDomainFromCountryCode return crda init entry\n");
+          return VOS_STATUS_SUCCESS;
+       }
+       if (run_time_alpha2[0]==countryCode[0] &&
+           run_time_alpha2[1]==countryCode[1] &&
+           crda_regulatory_run_time_entry_valid == VOS_TRUE)
+       {
+          *pRegDomain = NUM_REG_DOMAINS-2;
+              VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
+              "vos_nv_getRegDomainFromCountryCode return crda none-default country entry\n");
+           return VOS_STATUS_SUCCESS;
+       }
+       else
+       {
+           crda_regulatory_run_time_entry_valid = VOS_FALSE;
+           pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+           if (NULL != pVosContext)
+               pHddCtx = vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
+           else
+               return VOS_STATUS_E_EXISTS;
+           if (NULL == pHddCtx)
+           {
+              VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                    ("Invalid pHddCtx pointer\r\n") );
+              return VOS_STATUS_E_FAULT;
+           }
+
+           wiphy = pHddCtx->wiphy;
+
+           INIT_COMPLETION(pHddCtx->driver_crda_req);
+           regulatory_hint(wiphy, countryCode);
+           status = wait_for_completion_interruptible_timeout(
+                   &pHddCtx->driver_crda_req,
+                   msecs_to_jiffies(CRDA_WAIT_TIME));
+           if (!status)
+           {
+               VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                       "%s: Timeout waiting for CRDA REQ", __func__);
+           }
+
+           if (crda_regulatory_run_time_entry_valid == VOS_TRUE)
+           {
+              VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
+                 "vos_nv_getRegDomainFromCountryCode return crda new none-default country entry\n");
+               return VOS_STATUS_SUCCESS;
+           }
+           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+              "vos_nv_getRegDomainFromCountryCode failed to get crda new none-default country entry\n");
+           return VOS_STATUS_E_EXISTS;
+       }
+   }
+
+   // iterate the country info table until end of table or the country code
+   // is found
+   for (i = 0; i < countryInfoTable.countryCount &&
+         REGDOMAIN_COUNT == *pRegDomain; i++)
+   {
+      if (memcmp(countryCode, countryInfoTable.countryInfo[i].countryCode,
+               VOS_COUNTRY_CODE_LEN) == 0)
+      {
+         // country code is found
+         *pRegDomain = countryInfoTable.countryInfo[i].regDomain;
+      }
+   }
+   if (REGDOMAIN_COUNT != *pRegDomain)
+   {
+      return VOS_STATUS_SUCCESS;
+   }
+   else
+   {
+      VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
+            ("country code is not found\r\n"));
+      return VOS_STATUS_E_EXISTS;
+   }
+}
+
+
 /*
  * Function: wlan_hdd_crda_reg_notifier
  * This function is called from cfg80211 core to provide regulatory settings
@@ -2529,18 +3342,9 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
     tANI_U8 uBufLen = WNI_CFG_COUNTRY_CODE_LEN;
     tANI_U8 nBandCapability;
     int i,j,k,m;
+
     wiphy_dbg(wiphy, "info: cfg80211 reg_notifier callback for country"
                      " %c%c\n", request->alpha2[0], request->alpha2[1]);
-    if (pHddCtx->isLoadUnloadInProgress)
-    {
-       wiphy_dbg(wiphy, "info: %s: Unloading/Loading in Progress. Ignore!!!",
-                 __func__);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
-       return;
-#else
-       return 0;
-#endif
-    }
     if (request->initiator == NL80211_REGDOM_SET_BY_USER)
     {
        wiphy_dbg(wiphy, "info: set by user\n");
@@ -2578,154 +3382,140 @@ int wlan_hdd_crda_reg_notifier(struct wiphy *wiphy,
     else if (request->initiator == NL80211_REGDOM_SET_BY_DRIVER ||
              (request->initiator == NL80211_REGDOM_SET_BY_CORE))
     {
-       if ( eHAL_STATUS_SUCCESS !=  sme_GetCountryCode(pHddCtx->hHal, ccode, &uBufLen))
-       {
-          wiphy_dbg(wiphy, "info: set by driver CCODE ERROR\n");
-          return 0;
-       }
-       if (eHAL_STATUS_SUCCESS != sme_GetRegulatoryDomainForCountry (pHddCtx->hHal,
-                                           ccode, (v_REGDOMAIN_t *) &domainIdCurrent))
-       {
-          wiphy_dbg(wiphy, "info: set by driver ERROR\n");
-          return 0;
-       }
-       wiphy_dbg(wiphy, "country: %c%c set by driver\n",ccode[0],ccode[1]);
-       /* if set by driver itself, it means driver can accept the crda
-          regulatory settings and wiphy->regd should be populated with crda
-          settings. iwiphy->bands doesn't seem to set ht40 flags in kernel
-          correctly, this may be fixed by later kernel */
-       if (memcmp(pHddCtx->cfg_ini->crdaDefaultCountryCode,
-                         CFG_CRDA_DEFAULT_COUNTRY_CODE_DEFAULT , 2) != 0)
-       {
-          if (create_crda_regulatory_entry_from_regd(wiphy, request, pHddCtx->cfg_ini->nBandCapability) == 0)
-          {
-             pr_info("crda entry created.\n");
-             if (crda_alpha2[0] == request->alpha2[0] && crda_alpha2[1] == request->alpha2[1])
-             {
-                /* first CRDA request should be from init time */
-                /* Change default country code to CRDA country code, assume indoor */
-                pnvEFSTable->halnv.tables.defaultCountryTable.countryCode[0] = request->alpha2[0];
-                pnvEFSTable->halnv.tables.defaultCountryTable.countryCode[1] = request->alpha2[1];
-                pnvEFSTable->halnv.tables.defaultCountryTable.countryCode[2] = 'I';
-                pnvEFSTable->halnv.tables.defaultCountryTable.regDomain = NUM_REG_DOMAINS-1;
-                wiphy_dbg(wiphy, "info: init time default country code is %c%c%c\n",
-                pnvEFSTable->halnv.tables.defaultCountryTable.countryCode[0],
-                    pnvEFSTable->halnv.tables.defaultCountryTable.countryCode[1],
-                       pnvEFSTable->halnv.tables.defaultCountryTable.countryCode[2]);
-             }
-             else /* second or later CRDA request after init time */
-             {
-                wiphy_dbg(wiphy, "info: crda none-default country code is %c%c\n",
-                    request->alpha2[0], request->alpha2[1]);
-             }
-             // hdd will read regd for this country after complete
-          }
-          complete(&pHddCtx->driver_crda_req);
-       }
-       else
-       {
-          nBandCapability = pHddCtx->cfg_ini->nBandCapability;
-          for (i=0, m=0; i<IEEE80211_NUM_BANDS; i++)
-          {
+         if ( eHAL_STATUS_SUCCESS !=  sme_GetCountryCode(pHddCtx->hHal, ccode, &uBufLen))
+         {
+            wiphy_dbg(wiphy, "info: set by driver CCODE ERROR\n");
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+            return;
+#else
+            return 0;
+#endif
+         }
+         if (eHAL_STATUS_SUCCESS != sme_GetRegulatoryDomainForCountry (pHddCtx->hHal,
+                                             ccode, (v_REGDOMAIN_t *) &domainIdCurrent))
+         {
+            wiphy_dbg(wiphy, "info: set by driver ERROR\n");
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
+            return;
+#else
+            return 0;
+#endif
+         }
+
+         wiphy_dbg(wiphy, "country: %c%c set by driver\n",ccode[0],ccode[1]);
+         /* if set by driver itself, it means driver can accept the crda
+            regulatory settings and wiphy->regd should be populated with crda
+            settings. iwiphy->bands doesn't seem to set ht40 flags in kernel
+            correctly, this may be fixed by later kernel */
+
+         nBandCapability = pHddCtx->cfg_ini->nBandCapability;
+         for (i = 0, m = 0; i < IEEE80211_NUM_BANDS; i++)
+         {
              if (NULL == wiphy->bands[i])
              {
-                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                     "error: wiphy->bands[i] is NULL, i = %d", i);
-                continue;
+                 VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                           "error: wiphy->bands[i] is NULL, i = %d", i);
+                 continue;
              }
 
              // internal channels[] is one continous array for both 2G and 5G bands
              // m is internal starting channel index for each band
              if (0 == i)
              {
-                m = 0;
+                 m = 0;
              }
              else
              {
-                m = wiphy->bands[i-1]?wiphy->bands[i-1]->n_channels + m:m;
+                 m = wiphy->bands[i-1]?wiphy->bands[i-1]->n_channels + m:m;
              }
 
              for (j=0; j<wiphy->bands[i]->n_channels; j++)
              {
-                // k = (m + j) is internal current channel index for 20MHz channel
-                // n is internal channel index for corresponding 40MHz channel
-                k = m + j;
-                if (IEEE80211_BAND_2GHZ == i && eCSR_BAND_5G == nBandCapability) // 5G only
-                {
-                   // Enable social channels for P2P
-                   if ((2412 == wiphy->bands[i]->channels[j].center_freq ||
-                       2437 == wiphy->bands[i]->channels[j].center_freq ||
-                       2462 == wiphy->bands[i]->channels[j].center_freq ) &&
-                       NV_CHANNEL_ENABLE == regChannels[k].enabled)
-                   {
-                       wiphy->bands[i]->channels[j].flags &= ~IEEE80211_CHAN_DISABLED;
-                   }
-                   else
-                   {
-                      wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_DISABLED;
-                   }
-                   continue;
-                }
-                else if (IEEE80211_BAND_5GHZ == i && eCSR_BAND_24 == nBandCapability) // 2G only
-                {
-                   wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_DISABLED;
-                   continue;
-                }
+                 // k = (m + j) is internal current channel index for 20MHz channel
+                 // n is internal channel index for corresponding 40MHz channel
+                 k = m + j;
+                 if (IEEE80211_BAND_2GHZ == i && eCSR_BAND_5G == nBandCapability) // 5G only
+                 {
+                     // Enable social channels for P2P
+                     if ((2412 == wiphy->bands[i]->channels[j].center_freq ||
+                          2437 == wiphy->bands[i]->channels[j].center_freq ||
+                          2462 == wiphy->bands[i]->channels[j].center_freq ) &&
+                         NV_CHANNEL_ENABLE == regChannels[k].enabled)
+                     {
+                         wiphy->bands[i]->channels[j].flags &= ~IEEE80211_CHAN_DISABLED;
+                     }
+                     else
+                     {
+                         wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_DISABLED;
+                     }
+                     continue;
+                 }
+                 else if (IEEE80211_BAND_5GHZ == i && eCSR_BAND_24 == nBandCapability) // 2G only
+                 {
+                     wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_DISABLED;
+                     continue;
+                 }
 
-                if (NV_CHANNEL_DISABLE == regChannels[k].enabled ||
-                    NV_CHANNEL_INVALID == regChannels[k].enabled)
-                {
-                   wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_DISABLED;
-                }
-                else if (NV_CHANNEL_DFS == regChannels[k].enabled)
-                {
-                   wiphy->bands[i]->channels[j].flags &= ~(IEEE80211_CHAN_DISABLED
-                                                          |IEEE80211_CHAN_RADAR);
-                   wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_PASSIVE_SCAN;
-                }
-                else
-                {
-                   wiphy->bands[i]->channels[j].flags &= ~(IEEE80211_CHAN_DISABLED
-                                                          |IEEE80211_CHAN_PASSIVE_SCAN
-                                                          |IEEE80211_CHAN_NO_IBSS
-                                                          |IEEE80211_CHAN_RADAR);
-                }
+                 if (NV_CHANNEL_DISABLE == regChannels[k].enabled ||
+                     NV_CHANNEL_INVALID == regChannels[k].enabled)
+                 {
+                     wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_DISABLED;
+                 }
+                 else if (NV_CHANNEL_DFS == regChannels[k].enabled)
+                 {
+                     wiphy->bands[i]->channels[j].flags &= ~(IEEE80211_CHAN_DISABLED
+                                                             |IEEE80211_CHAN_RADAR);
+                     wiphy->bands[i]->channels[j].flags |= IEEE80211_CHAN_PASSIVE_SCAN;
+                 }
+                 else
+                 {
+                     wiphy->bands[i]->channels[j].flags &= ~(IEEE80211_CHAN_DISABLED
+                                                             |IEEE80211_CHAN_PASSIVE_SCAN
+                                                             |IEEE80211_CHAN_NO_IBSS
+                                                             |IEEE80211_CHAN_RADAR);
+                 }
              }
-          }
-          /* Haven't seen any condition that will set by driver after init.
-           If we do, then we should also call sme_ChangeCountryCode */
-          if (wiphy->bands[IEEE80211_BAND_5GHZ])
-          {
+         }
+
+         /* Haven't seen any condition that will set by driver after init.
+            If we do, then we should also call sme_ChangeCountryCode */
+         if (wiphy->bands[IEEE80211_BAND_5GHZ])
+         {
              for (j=0; j<wiphy->bands[IEEE80211_BAND_5GHZ]->n_channels; j++)
              {
                  // p2p UNII-1 band channels are passive when domain is FCC.
-                if ((wiphy->bands[IEEE80211_BAND_5GHZ ]->channels[j].center_freq == 5180 ||
-                               wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5200 ||
-                               wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5220 ||
-                               wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5240) &&
-                               (ccode[0]== 'U'&& ccode[1]=='S'))
-                {
-                   wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].flags |= IEEE80211_CHAN_PASSIVE_SCAN;
-                }
-                else if ((wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5180 ||
-                                    wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5200 ||
-                                    wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5220 ||
-                                    wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5240) &&
-                                    (ccode[0]!= 'U'&& ccode[1]!='S'))
-                {
-                   wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].flags &= ~IEEE80211_CHAN_PASSIVE_SCAN;
-                }
+                 if ((wiphy->bands[IEEE80211_BAND_5GHZ ]->channels[j].center_freq == 5180 ||
+                      wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5200 ||
+                      wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5220 ||
+                      wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5240) &&
+                     ((ccode[0]== 'U'&& ccode[1]=='S') && pHddCtx->nEnableStrictRegulatoryForFCC))
+                 {
+                     wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].flags |= IEEE80211_CHAN_PASSIVE_SCAN;
+                 }
+                 else if ((wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5180 ||
+                           wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5200 ||
+                           wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5220 ||
+                           wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].center_freq == 5240) &&
+                          ((ccode[0]!= 'U'&& ccode[1]!='S') || !pHddCtx->nEnableStrictRegulatoryForFCC))
+                 {
+                     wiphy->bands[IEEE80211_BAND_5GHZ]->channels[j].flags &= ~IEEE80211_CHAN_PASSIVE_SCAN;
+                 }
              }
-          }
-          if (request->initiator == NL80211_REGDOM_SET_BY_CORE)
-          {
+         }
+
+         if (request->initiator == NL80211_REGDOM_SET_BY_CORE)
+         {
              request->processed = 1;
-          }
-       }
+         }
     }
+
+    complete(&pHddCtx->wiphy_channel_update_event);
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
     return;
 #else
     return 0;
 #endif
 }
+
+#endif

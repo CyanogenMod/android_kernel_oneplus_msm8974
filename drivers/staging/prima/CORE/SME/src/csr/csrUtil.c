@@ -6106,7 +6106,13 @@ v_REGDOMAIN_t csrGetCurrentRegulatoryDomain(tpAniSirGlobal pMac)
 }
 
 
-eHalStatus csrGetRegulatoryDomainForCountry(tpAniSirGlobal pMac, tANI_U8 *pCountry, v_REGDOMAIN_t *pDomainId)
+eHalStatus csrGetRegulatoryDomainForCountry
+(
+tpAniSirGlobal pMac,
+tANI_U8 *pCountry,
+v_REGDOMAIN_t *pDomainId,
+v_CountryInfoSource_t source
+)
 {
     eHalStatus status = eHAL_STATUS_INVALID_PARAMETER;
     VOS_STATUS vosStatus;
@@ -6117,7 +6123,10 @@ eHalStatus csrGetRegulatoryDomainForCountry(tpAniSirGlobal pMac, tANI_U8 *pCount
     {
         countryCode[0] = pCountry[0];
         countryCode[1] = pCountry[1];
-        vosStatus = vos_nv_getRegDomainFromCountryCode( &domainId, countryCode );
+        vosStatus = vos_nv_getRegDomainFromCountryCode(&domainId,
+                                                       countryCode,
+                                                       source);
+
         if( VOS_IS_STATUS_SUCCESS(vosStatus) )
         {
             if( pDomainId )
@@ -6165,10 +6174,15 @@ tANI_BOOLEAN csrMatchCountryCode( tpAniSirGlobal pMac, tANI_U8 *pCountry, tDot11
             //Make sure this country is recognizable
             if( pIes->Country.present )
             {
-                status = csrGetRegulatoryDomainForCountry( pMac, pIes->Country.country, &domainId );
+                status = csrGetRegulatoryDomainForCountry(pMac,
+                                           pIes->Country.country,
+                                           &domainId, COUNTRY_QUERY);
                 if( !HAL_STATUS_SUCCESS( status ) )
                 {
-                     status = csrGetRegulatoryDomainForCountry( pMac, pMac->scan.countryCode11d,(v_REGDOMAIN_t *) &domainId );
+                     status = csrGetRegulatoryDomainForCountry(pMac,
+                                                 pMac->scan.countryCode11d,
+                                                 (v_REGDOMAIN_t *) &domainId,
+                                                 COUNTRY_QUERY);
                      if( !HAL_STATUS_SUCCESS( status ) )
                      {
                            fRet = eANI_BOOLEAN_FALSE;

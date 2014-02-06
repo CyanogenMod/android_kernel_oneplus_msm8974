@@ -335,6 +335,10 @@ unsigned char *gCfgParamName[] = {
     (unsigned char *)"FLEX_CONNECT_POWER_FACTOR",
     (unsigned char *)"ANTENNA_DIVESITY",
     (unsigned char *)"ATH_DISABLE",
+    (unsigned char *)"BTC_ACTIVE_WLAN_LEN",
+    (unsigned char *)"BTC_ACTIVE_BT_LEN",
+    (unsigned char *)"BTC_SAP_ACTIVE_WLAN_LEN",
+    (unsigned char *)"BTC_SAP_ACTIVE_BT_LEN",
 };
 
 
