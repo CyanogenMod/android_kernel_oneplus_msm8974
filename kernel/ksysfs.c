@@ -218,7 +218,7 @@ static ssize_t gentle_fair_sleepers_show(struct kobject *kobj, struct kobj_attri
 static ssize_t gentle_fair_sleepers_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
 {
 	unsigned int input;
-	int ret, cpu;
+	int ret;
 	ret = sscanf(buf, "%u", &input);
 	if (input != 0 && input != 1)
 		input = 0;
