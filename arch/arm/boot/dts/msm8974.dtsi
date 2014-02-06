@@ -2245,11 +2245,16 @@
 		qcom,rx-ring-size = <64>;
 	};
 
-        memory_hole: qcom,msm-mem-hole {
-                compatible = "qcom,msm-mem-hole";
-                qcom,memblock-remove = <0x5d00000 0x7d00000
+	memory_hole: qcom,msm-mem-hole {
+		compatible = "qcom,msm-mem-hole";
+		qcom,memblock-remove = <0x5d00000 0x7d00000
 					0xfa00000 0x500000>; /* Address and Size of Hole */
-        };
+	};
+
+	ram_console {
+		compatible = "ram_console";
+		bootinfo = <0>;
+	};
 
 	uart7: uart@f995d000 { /*BLSP #2, UART #7 */
 		compatible = "qcom,msm-hsuart-v14";
