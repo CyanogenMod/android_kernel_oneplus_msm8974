@@ -333,7 +333,24 @@ limResumeLink(tpAniSirGlobal pMac, SUSPEND_RESUME_LINK_CALLBACK callback, tANI_U
 
    pMac->lim.gpLimResumeCallback = callback;
    pMac->lim.gpLimResumeData = data;
-   limSendHalFinishScanReq(pMac, eLIM_HAL_RESUME_LINK_WAIT_STATE );
+
+   /* eLIM_HAL_IDLE_SCAN_STATE state indicate limSendHalInitScanReq failed.
+    * In case limSendHalInitScanReq is success, Scanstate would be
+    * eLIM_HAL_SUSPEND_LINK_STATE
+    */
+   if( eLIM_HAL_IDLE_SCAN_STATE != pMac->lim.gLimHalScanState )
+   {
+      limSendHalFinishScanReq(pMac, eLIM_HAL_RESUME_LINK_WAIT_STATE );
+   }
+   else
+   {
+      limLog(pMac, LOGW, FL("Init Scan failed, we will not call finish scan."
+                   " calling the callback with failure status"));
+      pMac->lim.gpLimResumeCallback( pMac, eSIR_FAILURE, pMac->lim.gpLimResumeData);
+      pMac->lim.gpLimResumeCallback = NULL;
+      pMac->lim.gpLimResumeData = NULL;
+      pMac->lim.gLimSystemInScanLearnMode = 0;
+   }
 
    if(limIsInMCC(pMac))
    {
@@ -3723,8 +3740,10 @@ limProcessMinChannelTimeout(tpAniSirGlobal pMac)
     }
 #endif
 
-    
-    if (pMac->lim.gLimMlmState == eLIM_MLM_WT_PROBE_RESP_STATE)
+    /*do not process if we are in finish scan wait state i.e.
+    scan is aborted or finished*/
+    if (pMac->lim.gLimMlmState == eLIM_MLM_WT_PROBE_RESP_STATE &&
+        pMac->lim.gLimHalScanState != eLIM_HAL_FINISH_SCAN_WAIT_STATE)
     {
         PELOG1(limLog(pMac, LOG1, FL("Scanning : min channel timeout occurred"));)
 
@@ -3764,8 +3783,8 @@ limProcessMinChannelTimeout(tpAniSirGlobal pMac)
          * Log error.
          */
         limLog(pMac, LOGW,
-           FL("received unexpected MIN channel timeout in state %X"),
-           pMac->lim.gLimMlmState);
+           FL("received unexpected MIN channel timeout in mlme state %X and hal scan State %X"),
+           pMac->lim.gLimMlmState,pMac->lim.gLimHalScanState);
         limPrintMlmState(pMac, LOGE, pMac->lim.gLimMlmState);
     }
 } /*** limProcessMinChannelTimeout() ***/
@@ -3794,9 +3813,11 @@ limProcessMaxChannelTimeout(tpAniSirGlobal pMac)
 {
     tANI_U8 channelNum;
 
-    
-    if (pMac->lim.gLimMlmState == eLIM_MLM_WT_PROBE_RESP_STATE ||
-        pMac->lim.gLimMlmState == eLIM_MLM_PASSIVE_SCAN_STATE)
+    /*do not process if we are in finish scan wait state i.e.
+     scan is aborted or finished*/
+    if ((pMac->lim.gLimMlmState == eLIM_MLM_WT_PROBE_RESP_STATE ||
+        pMac->lim.gLimMlmState == eLIM_MLM_PASSIVE_SCAN_STATE) &&
+        pMac->lim.gLimHalScanState != eLIM_HAL_FINISH_SCAN_WAIT_STATE)
     {
         PELOG1(limLog(pMac, LOG1, FL("Scanning : Max channel timed out"));)
         /**
@@ -3835,8 +3856,8 @@ limProcessMaxChannelTimeout(tpAniSirGlobal pMac)
          * Log error.
          */
         limLog(pMac, LOGW,
-           FL("received unexpected MAX channel timeout in state %X"),
-           pMac->lim.gLimMlmState);
+           FL("received unexpected MAX channel timeout in mlme state %X and hal scan state %X"),
+           pMac->lim.gLimMlmState, pMac->lim.gLimHalScanState);
         limPrintMlmState(pMac, LOGW, pMac->lim.gLimMlmState);
     }
 } /*** limProcessMaxChannelTimeout() ***/

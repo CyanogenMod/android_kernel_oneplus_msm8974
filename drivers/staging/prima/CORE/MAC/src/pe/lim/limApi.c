@@ -1739,7 +1739,9 @@ limDetectChangeInApCapabilities(tpAniSirGlobal pMac,
             (SIR_MAC_GET_PRIVACY(apNewCaps.capabilityInfo) !=
              SIR_MAC_GET_PRIVACY(psessionEntry->limCurrentBssCaps))) ||
             (SIR_MAC_GET_SHORT_PREAMBLE(apNewCaps.capabilityInfo) !=
-             SIR_MAC_GET_SHORT_PREAMBLE(psessionEntry->limCurrentBssCaps))
+             SIR_MAC_GET_SHORT_PREAMBLE(psessionEntry->limCurrentBssCaps)) ||
+            (SIR_MAC_GET_QOS(apNewCaps.capabilityInfo) !=
+             SIR_MAC_GET_QOS(psessionEntry->limCurrentBssCaps))
        )
     {
         /* If Hidden SSID and privacy bit is not matching with the current capability,
@@ -1776,7 +1778,9 @@ limDetectChangeInApCapabilities(tpAniSirGlobal pMac,
                     (SIR_MAC_GET_PRIVACY(apNewCaps.capabilityInfo) ==
                      SIR_MAC_GET_PRIVACY(psessionEntry->limCurrentBssCaps))) &&
                     (SIR_MAC_GET_SHORT_PREAMBLE(apNewCaps.capabilityInfo) ==
-                     SIR_MAC_GET_SHORT_PREAMBLE(psessionEntry->limCurrentBssCaps))
+                     SIR_MAC_GET_SHORT_PREAMBLE(psessionEntry->limCurrentBssCaps)) &&
+                    (SIR_MAC_GET_QOS(apNewCaps.capabilityInfo) ==
+                     SIR_MAC_GET_QOS(psessionEntry->limCurrentBssCaps))
                )
             {
                 /* Only for probe response frames the control will come here */

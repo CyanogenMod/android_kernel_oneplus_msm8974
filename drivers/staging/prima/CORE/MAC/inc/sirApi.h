@@ -94,7 +94,12 @@
  *array of 166 is required.
  */
 #define SIR_MAX_24G_5G_CHANNEL_RANGE      166
+#define SIR_BCN_REPORT_MAX_BSS_DESC       4
 
+
+#ifdef FEATURE_WLAN_BATCH_SCAN
+#define SIR_MAX_SSID_SIZE (32)
+#endif
 
 
 #define SIR_NUM_11B_RATES 4   //1,2,5.5,11
@@ -208,6 +213,7 @@ typedef enum eSirScanType
 {
     eSIR_PASSIVE_SCAN,
     eSIR_ACTIVE_SCAN,
+    eSIR_BEACON_TABLE,
 } tSirScanType;
 
 /// Result codes Firmware return to Host SW
@@ -728,7 +734,7 @@ typedef struct sSirSmeStartBssRsp
 typedef struct sSirChannelList
 {
     tANI_U8          numChannels;
-    tANI_U8          channelNumber[1];
+    tANI_U8          channelNumber[SIR_CCX_MAX_MEAS_IE_REQS];
 } tSirChannelList, *tpSirChannelList;
 
 typedef struct sSirDFSChannelList
@@ -1054,7 +1060,8 @@ typedef struct sSirSmeJoinReq
     tANI_U8             txBFCsnValue;
 #endif
     tANI_U8             isAmsduSupportInAMPDU;
-
+    tAniBool            isWMEenabled;
+    tAniBool            isQosEnabled;
     tAniTitanCBNeighborInfo cbNeighbors;
     tAniBool            spectrumMgtIndicator;
     tSirMacPowerCapInfo powerCap;
@@ -2183,6 +2190,22 @@ typedef struct sAniGetTsmStatsRsp
     tAniTrafStrmMetrics tsmMetrics;
     void               *tsmStatsReq; //tsm stats request backup
 } tAniGetTsmStatsRsp, *tpAniGetTsmStatsRsp;
+
+typedef struct sSirCcxBcnReportBssInfo
+{
+    tBcnReportFields  bcnReportFields;
+    tANI_U8           ieLen;
+    tANI_U8           *pBuf;
+} tSirCcxBcnReportBssInfo, *tpSirCcxBcnReportBssInfo;
+
+typedef struct sSirCcxBcnReportRsp
+{
+    tANI_U16    measurementToken;
+    tANI_U8     flag;     /* Flag to report measurement done and more data */
+    tANI_U8     numBss;
+    tSirCcxBcnReportBssInfo bcnRepBssInfo[SIR_BCN_REPORT_MAX_BSS_DESC];
+} tSirCcxBcnReportRsp, *tpSirCcxBcnReportRsp;
+
 #endif /* FEATURE_WLAN_CCX || FEATURE_WLAN_CCX_UPLOAD */
 
 /* Change country code request MSG structure */
@@ -2196,8 +2219,18 @@ typedef struct sAniChangeCountryCodeReq
     void                    *changeCCCallback;
     void                    *pDevContext; //device context
     void                    *pVosContext; //voss context
-    
+
 } tAniChangeCountryCodeReq, *tpAniChangeCountryCodeReq;
+
+/* generic country code change request MSG structure */
+typedef struct sAniGenericChangeCountryCodeReq
+{
+    // Common for all types are requests
+    tANI_U16                msgType;    // message type is same as the request type
+    tANI_U16                msgLen;     // length of the entire request
+    tANI_U8                 countryCode[WNI_CFG_COUNTRY_CODE_LEN];   //3 char country code
+    tANI_U16                domain_index;
+} tAniGenericChangeCountryCodeReq, *tpAniGenericChangeCountryCodeReq;
 
 typedef struct sAniDHCPStopInd
 {
@@ -4473,5 +4506,76 @@ typedef struct sSirDelPeriodicTxPtrn
     /* Bitmap of pattern IDs that need to be deleted */
     tANI_U32 ucPatternIdBitmap;
 } tSirDelPeriodicTxPtrn, *tpSirDelPeriodicTxPtrn;
+
+#ifdef FEATURE_WLAN_BATCH_SCAN
+// Set batch scan resposne from FW
+typedef struct
+{
+  /*maximum number of scans which FW can cache*/
+  tANI_U32 nScansToBatch;
+} tSirSetBatchScanRsp, *tpSirSetBatchScanRsp;
+
+// Set batch scan request to FW
+typedef struct
+{
+    tANI_U32 scanFrequency;        /* how frequent to do scan - default 30Sec*/
+    tANI_U32 numberOfScansToBatch; /* number of scans to batch */
+    tANI_U32 bestNetwork;          /* best networks in terms of rssi */
+    tANI_U8  rfBand;               /* band to scan :
+                                      0 ->both Band, 1->2.4Ghz Only
+                                      and 2-> 5GHz Only */
+    tANI_U32 rtt;                  /* set if required to do RTT it is not
+                                      supported in current version */
+} tSirSetBatchScanReq, *tpSirSetBatchScanReq;
+
+
+// Stop batch scan request to FW
+typedef struct
+{
+    tANI_U32 param;
+} tSirStopBatchScanInd, *tpSirStopBatchScanInd;
+
+// Trigger batch scan result indication to FW
+typedef struct
+{
+    tANI_U32 param;
+} tSirTriggerBatchScanResultInd, *tpSirTriggerBatchScanResultInd;
+
+// Batch scan result indication from FW
+typedef PACKED_PRE struct PACKED_POST
+{
+    tANI_U8   bssid[6];     /* BSSID */
+    tANI_U8   ssid[32];     /* SSID */
+    tANI_U8   ch;           /* Channel */
+    tANI_U8   rssi;         /* RSSI or Level */
+    /*Timestamp when Network was found. Used to calculate age based on timestamp
+      in GET_RSP msg header */
+    tANI_U32  timestamp;
+} tSirBatchScanNetworkInfo, *tpSirBatchScanNetworkInfo;
+
+typedef PACKED_PRE struct PACKED_POST
+{
+    tANI_U32   scanId; /* Scan List ID. */
+    /*No of AP in a Scan Result. Should be same as bestNetwork in SET_REQ msg*/
+    tANI_U32   numNetworksInScanList;
+    /*Variable data ptr: Number of AP in Scan List*/
+    /*Following numNetworkInScanList is data of type tSirBatchScanNetworkInfo
+     *of sizeof(tSirBatchScanNetworkInfo) * numNetworkInScanList */
+    tANI_U8    scanList[1];
+} tSirBatchScanList, *tpSirBatchScanList;
+
+typedef PACKED_PRE struct PACKED_POST
+{
+    tANI_U32      timestamp;
+    tANI_U32      numScanLists;
+    boolean       isLastResult;
+    /* Variable Data ptr: Number of Scan Lists*/
+    /* following isLastResult is data of type tSirBatchScanList
+     * of sizeof(tSirBatchScanList) * numScanLists*/
+    tANI_U8       scanResults[1];
+}  tSirBatchScanResultIndParam, *tpSirBatchScanResultIndParam;
+
+#endif // FEATURE_WLAN_BATCH_SCAN
+
 
 #endif /* __SIR_API_H */

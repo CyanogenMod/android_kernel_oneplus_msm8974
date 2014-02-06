@@ -226,14 +226,8 @@ int iw_set_oem_data_req(
 
         vos_mem_zero(&oemDataReqConfig, sizeof(tOemDataReqConfig));
 
-        if (copy_from_user((&oemDataReqConfig)->oemDataReq,
-                           pOemDataReq->oemDataReq, OEM_DATA_REQ_SIZE))
-        {
-            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-                      "%s: copy_from_user() failed!", __func__);
-            return -EFAULT;
-        }
-
+        vos_mem_copy((&oemDataReqConfig)->oemDataReq, pOemDataReq->oemDataReq, OEM_DATA_REQ_SIZE);
+    
         status = sme_OemDataReq(WLAN_HDD_GET_HAL_CTX(pAdapter), 
                                                 pAdapter->sessionId,
                                                 &oemDataReqConfig, 

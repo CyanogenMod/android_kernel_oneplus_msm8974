@@ -368,7 +368,7 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
       goto err_packet_close;
    }
 
-
+#ifndef CONFIG_ENABLE_LINUX_REG
    /* initialize the NV module */
    vStatus = vos_nv_open();
    if (!VOS_IS_STATUS_SUCCESS(vStatus))
@@ -378,6 +378,7 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
                 "%s: Failed to initialize the NV module", __func__);
      goto err_sys_close;
    }
+#endif
 
    /* If we arrive here, both threads dispacthing messages correctly */
    
@@ -397,10 +398,6 @@ VOS_STATUS vos_open( v_CONTEXT_t *pVosContext, v_SIZE_t hddContextSize )
      VOS_ASSERT(0);
      goto err_nv_close;
    }
-/* call crda before sme_Open which will read NV and store the default country code */
-   wlan_hdd_get_crda_regd_entry(
-      ((hdd_context_t*)(gpVosContext->pHDDContext))->wiphy,
-      ((hdd_context_t*)(gpVosContext->pHDDContext))->cfg_ini);
 
    /* Now proceed to open the SME */
    vStatus = sme_Open(gpVosContext->pMACContext);
@@ -442,9 +439,13 @@ err_mac_close:
    macClose(gpVosContext->pMACContext);
 
 err_nv_close:
+
+#ifndef CONFIG_ENABLE_LINUX_REG
    vos_nv_close();
-   
-err_sys_close:   
+
+err_sys_close:
+#endif
+
    sysClose(gpVosContext);
 
 err_packet_close:
@@ -453,7 +454,7 @@ err_packet_close:
 err_wda_close:
    WDA_close(gpVosContext);
 
-err_sched_close:   
+err_sched_close:
    vos_sched_close(gpVosContext);
 
 
@@ -731,7 +732,7 @@ VOS_STATUS vos_start( v_CONTEXT_t vosContext )
 
 
 err_sme_stop:
-  sme_Stop(pVosContext->pMACContext, TRUE);
+  sme_Stop(pVosContext->pMACContext, HAL_STOP_TYPE_SYS_RESET);
     
 err_mac_stop:
   macStop( pVosContext->pMACContext, HAL_STOP_TYPE_SYS_RESET );
@@ -879,6 +880,7 @@ VOS_STATUS vos_close( v_CONTEXT_t vosContext )
 
   ((pVosContextType)vosContext)->pMACContext = NULL;
 
+#ifndef CONFIG_ENABLE_LINUX_REG
   vosStatus = vos_nv_close();
   if (!VOS_IS_STATUS_SUCCESS(vosStatus))
   {
@@ -886,7 +888,7 @@ VOS_STATUS vos_close( v_CONTEXT_t vosContext )
          "%s: Failed to close NV", __func__);
      VOS_ASSERT( VOS_IS_STATUS_SUCCESS( vosStatus ) );
   }
-
+#endif
 
   vosStatus = sysClose( vosContext );
   if (!VOS_IS_STATUS_SUCCESS(vosStatus))
@@ -1027,6 +1029,7 @@ v_VOID_t* vos_get_context( VOS_MODULE_ID moduleId,
 
     case VOS_MODULE_ID_SME:
     case VOS_MODULE_ID_PE:
+    case VOS_MODULE_ID_PMC:
     {
       /* 
       ** In all these cases, we just return the MAC Context
@@ -1148,6 +1151,31 @@ void vos_set_load_unload_in_progress(VOS_MODULE_ID moduleId, v_U8_t value)
    gpVosContext->isLoadUnloadInProgress = value;
 }
 
+v_U8_t vos_is_reinit_in_progress(VOS_MODULE_ID moduleId, v_VOID_t *moduleContext)
+{
+  if (gpVosContext == NULL)
+  {
+    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+        "%s: global voss context is NULL", __func__);
+    return 1;
+  }
+
+   return gpVosContext->isReInitInProgress;
+}
+
+void vos_set_reinit_in_progress(VOS_MODULE_ID moduleId, v_U8_t value)
+{
+  if (gpVosContext == NULL)
+  {
+    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+        "%s: global voss context is NULL", __func__);
+    return;
+  }
+
+   gpVosContext->isReInitInProgress = value;
+}
+
+
 /**---------------------------------------------------------------------------
   
   \brief vos_alloc_context() - allocate a context within the VOSS global Context
@@ -1232,6 +1260,7 @@ VOS_STATUS vos_alloc_context( v_VOID_t *pVosContext, VOS_MODULE_ID moduleID,
     }
     case VOS_MODULE_ID_SME:
     case VOS_MODULE_ID_PE:
+    case VOS_MODULE_ID_PMC:
     case VOS_MODULE_ID_HDD:
     case VOS_MODULE_ID_HDD_SOFTAP:
     default:
@@ -1357,6 +1386,7 @@ VOS_STATUS vos_free_context( v_VOID_t *pVosContext, VOS_MODULE_ID moduleID,
     case VOS_MODULE_ID_HDD:
     case VOS_MODULE_ID_SME:
     case VOS_MODULE_ID_PE:
+    case VOS_MODULE_ID_PMC:
     case VOS_MODULE_ID_HDD_SOFTAP:
     default:
     {     

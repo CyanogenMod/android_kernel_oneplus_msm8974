@@ -72,7 +72,7 @@ eHalStatus p2pProcessRemainOnChannelCmd(tpAniSirGlobal pMac, tSmeCmd *p2pRemaino
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
     tSirRemainOnChnReq* pMsg;
-    tANI_U16 len;
+    tANI_U32 len;
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, p2pRemainonChn->sessionId );
 
     if(!pSession)
@@ -111,14 +111,20 @@ eHalStatus p2pProcessRemainOnChannelCmd(tpAniSirGlobal pMac, tSmeCmd *p2pRemaino
 #else
     len = sizeof(tSirRemainOnChnReq) + pMac->p2pContext.probeRspIeLength;
 #endif
-
+    if( len > 0xFFFF )
+    {
+       /*In coming len for Msg is more then 16bit value*/
+       smsLog(pMac, LOGE, FL("  Message length is very large, %d"),
+            len);
+       return eHAL_STATUS_FAILURE;
+    }
     status = palAllocateMemory(pMac->hHdd, (void**)&pMsg, len );
     if(HAL_STATUS_SUCCESS(status))
     {
         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO, "%s call", __func__);
         palZeroMemory(pMac->hHdd, pMsg, sizeof(tSirRemainOnChnReq));
         pMsg->messageType = eWNI_SME_REMAIN_ON_CHANNEL_REQ;
-        pMsg->length = len;
+        pMsg->length = (tANI_U16)len;
         palCopyMemory( pMac, pMsg->selfMacAddr, pSession->selfMacAddr, sizeof(tSirMacAddr) ); 
         pMsg->chnNum = p2pRemainonChn->u.remainChlCmd.chn;
         pMsg->phyMode = p2pRemainonChn->u.remainChlCmd.phyMode;
