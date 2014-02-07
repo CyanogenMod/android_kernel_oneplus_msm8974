@@ -52,6 +52,7 @@
 #include <linux/persistent_ram.h>
 #include <linux/gpio.h>
 
+static struct platform_device *ram_console_dev;
 
 static struct persistent_ram_descriptor msm_prd[] __initdata = {
 	{
@@ -162,6 +163,24 @@ cfg_disp_err:
 	gpio_free(DISP_ESD_GPIO);
 }
 
+static void __init oppo_config_ramconsole(void)
+{
+	int ret;
+
+	ram_console_dev = platform_device_alloc("ram_console", -1);
+	if (!ram_console_dev) {
+		pr_err("%s: Unable to allocate memory for RAM console device",
+				__func__);
+		return;
+	}
+
+	ret = platform_device_add(ram_console_dev);
+	if (ret) {
+		pr_err("%s: Unable to add RAM console device", __func__);
+		return;
+	}
+}
+
 static struct of_dev_auxdata msm_hsic_host_adata[] = {
 	OF_DEV_AUXDATA("qcom,hsic-host", 0xF9A00000, "msm_hsic_host", NULL),
 	{}
@@ -229,6 +248,7 @@ void __init msm8974_init(void)
 	board_dt_populate(adata);
 	msm8974_add_drivers();
 	oppo_config_display();
+	oppo_config_ramconsole();
 }
 
 void __init msm8974_init_very_early(void)
