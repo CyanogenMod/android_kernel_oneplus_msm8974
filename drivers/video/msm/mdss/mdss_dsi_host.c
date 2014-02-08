@@ -90,6 +90,8 @@ void mdss_dsi_ctrl_init(struct mdss_dsi_ctrl_pdata *ctrl)
 		ctrl->ndx = DSI_CTRL_1;
 	}
 
+	ctrl->panel_mode = ctrl->panel_data.panel_info.mipi.mode;
+
 	ctrl_list[ctrl->ndx] = ctrl;	/* keep it */
 
 	if (mdss_register_irq(ctrl->dsi_hw))
@@ -246,8 +248,6 @@ void mdss_dsi_host_init(struct mipi_panel_info *pinfo,
 				panel_data);
 
 	pinfo->rgb_swap = DSI_RGB_SWAP_RGB;
-
-	ctrl_pdata->panel_mode = pinfo->mode;
 
 	if (pinfo->mode == DSI_VIDEO_MODE) {
 		data = 0;
