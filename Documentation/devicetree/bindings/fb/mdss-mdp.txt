@@ -305,6 +305,8 @@ Fudge Factors:			Fudge factors are used to boost demand for
 - qcom,mdss-highest-bank-bit: Property to indicate tile format as opposed to usual
 				linear format. The value tells the GPU highest memory
 				 bank bit used.
+- qcom,max-bandwidth-per-pipe-kbps: This value indicates the max bandwidth in KB
+				that a single pipe can support without underflow.
 
 Optional subnodes:
 Child nodes representing the frame buffer virtual devices.
