@@ -13,7 +13,6 @@
 &soc {
 	slim@fe12f000 {
 		cdc-es325-supply = <&pm8941_lvs2>;
-		adnc,reset-gpio = <&msmgpio 67 0>;
 
 		taiko_codec {
 			cdc-hpmic_switch-1-supply = <&pm8941_l24>;
@@ -78,8 +77,8 @@
 			"MIC BIAS4 External", "Digital Mic6";
 
 		qcom,hpmic-switch-gpio = <&msmgpio 87 0>;
-		qcom,yda145_ctr-gpio = <&msmgpio 67 0>;
-		qcom,yda145_boots-gpio = <&msmgpio 77 0>;
+		qcom,yda145_ctr-gpio = <&msmgpio 77 0>;
+		qcom,yda145_boots-gpio = <&msmgpio 67 0>;
 		enable_spk-gpio = <&msmgpio 73 0>;
 	};
 };
