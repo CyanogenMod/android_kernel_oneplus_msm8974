@@ -193,6 +193,8 @@ static int bq27541_battery_temperature(struct bq27541_device_info *di)
 			dev_err(di->dev, "error reading temperature\n");
 			if (count > 1) {
 				count = 0;
+				di->temp_pre = -400 -
+					ZERO_DEGREE_CELSIUS_IN_TENTH_KELVIN;
 				return -400;
 			} else {
 				return di->temp_pre +
@@ -981,11 +983,13 @@ static void fastcg_work_func(struct work_struct *work)
 			  jiffies + msecs_to_jiffies(10000));
 		ret_info = 0x2;
 	} else if(data == 0x5a){
-		//fastchg full,vbatt > 4320
+		//fastchg full,vbatt > 4350
+#if 0	//lfc modify for it(set fast_switch_to_normal ture) is earlier than usb_plugged_out irq(set it false)
 		bq27541_di->fast_switch_to_normal = true;
 		bq27541_di->alow_reading = true;
 		bq27541_di->fast_chg_started = false;
 		bq27541_di->fast_chg_allow = false;
+#endif
 		//switch off fast chg
 		pr_info("%s fastchg full,switch off fastchg,set GPIO96 0\n", __func__);
 		gpio_set_value(96, 0);
@@ -1052,19 +1056,32 @@ static void fastcg_work_func(struct work_struct *work)
 	}
 
 out:
+	gpio_tlmm_config(GPIO_CFG(1,0,GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
+	gpio_direction_input(1);
+	
+	//lfc add for it is faster than usb_plugged_out irq to send 0x5a(fast_chg full) to AP
+	if(data == 0x5a){
+		usleep_range(120000,120000);
+		bq27541_di->fast_switch_to_normal = true;
+		bq27541_di->alow_reading = true;
+		bq27541_di->fast_chg_started = false;
+		bq27541_di->fast_chg_allow = false;
+	}
+	
 	if(pic_need_to_up_fw){
 		msleep(500);
 		pic16f_fw_update();
 		pic_need_to_up_fw = 0;
 	}
-	gpio_tlmm_config(GPIO_CFG(1,0,GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
-	gpio_direction_input(1);
 	
 	retval = request_irq(bq27541_di->irq, irq_rx_handler, IRQF_TRIGGER_RISING, "mcu_data", bq27541_di);	//0X01:rising edge,0x02:falling edge
 	if(retval < 0) {
 	pr_err("%s request ap rx irq failed.\n", __func__);
 	}
-	
+	if((data == 0x52) || (data == 0x58)){
+		power_supply_changed(bq27541_di->batt_psy);
+	}
+
 	if((data == 0x54) || (data == 0x5a) || (data == 0x59)){
 		power_supply_changed(bq27541_di->batt_psy);
 		wake_unlock(&bq27541_di->fastchg_wake_lock);

@@ -952,7 +952,8 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 
 //以下寄存器总是修改，因此抽出来定义在这里
 #define SYNA_ADDR_REPORT_FLAG        0x1b  //report mode register
-#define SYNA_ADDR_GESTURE_FLAG       0x1f  //gesture enable register
+#define SYNA_ADDR_GESTURE_FLAG       0x20  //gesture enable register
+#define SYNA_ADDR_GLOVE_FLAG       	 0x1f  //glove enable register
 #define SYNA_ADDR_GESTURE_OFFSET     0x08  //gesture register addr=0x08
 #define SYNA_ADDR_GESTURE_EXT        0x402  //gesture ext data
 
@@ -1253,15 +1254,15 @@ static int synaptics_rmi4_proc_read(char *page, char **start, off_t off,
 static int synaptics_rmi4_proc_write( struct file *filp, const char __user *buff,
 	unsigned long len, void *data ) {
 	int retval;
-	unsigned char val[5];
-	unsigned int bak;
+	unsigned char val[9];
+	unsigned char bak;
 	unsigned int enable ;
 	if(len > 2)
 		return 0 ;
 	
 	enable =(buff[0]==0x30)?0:1 ;
 	bak = syna_rmi4_data->gesture_enable ;
-	syna_rmi4_data->gesture_enable &= 0xff00 ;
+	syna_rmi4_data->gesture_enable &= 0x00 ;
 	if(enable)
 		syna_rmi4_data->gesture_enable |= 0x6b ;
 	if(bak == syna_rmi4_data->gesture_enable)
@@ -1274,19 +1275,69 @@ static int synaptics_rmi4_proc_write( struct file *filp, const char __user *buff
 	retval = synaptics_rmi4_i2c_read(syna_rmi4_data,SYNA_ADDR_GESTURE_FLAG,val,sizeof(val));
 
 
-	val[0] = (syna_rmi4_data->gesture_enable >> 8)&0xff ;
-	val[1] = syna_rmi4_data->gesture_enable & 0xff ;
+	val[0] = syna_rmi4_data->gesture_enable & 0xff ;
 	retval = synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_GESTURE_FLAG,val,sizeof(val));
 
 	return (retval==sizeof(val))?len:0;
 }
 
+//glove proc read function
+static int synaptics_rmi4_proc_glove_read(char *page, char **start, off_t off,
+	int count, int *eof, void *data) {
+	int len = 0 ;
+	unsigned int enable ;
+	
+	enable = (syna_rmi4_data->glove_enable)?1:0;
+
+	len = sprintf(page, "%d\n", enable);
+	
+	return len ;
+}
+
+//glove proc write function
+static int synaptics_rmi4_proc_glove_write( struct file *filp, const char __user *buff,
+	unsigned long len, void *data ) {
+	int retval;
+	unsigned char val[1];
+	unsigned char bak;
+	unsigned int enable ;
+	if(len > 2)
+		return 0 ;
+	
+	enable =(buff[0]==0x30)?0:1 ;
+	bak = syna_rmi4_data->glove_enable ;
+	syna_rmi4_data->glove_enable &= 0x00 ;
+	if(enable)
+		syna_rmi4_data->glove_enable |= 0x01 ;
+	if(bak == syna_rmi4_data->glove_enable)
+		return len ;
+
+	print_ts(TS_DEBUG, KERN_ERR "glove enable=0x%x\n", syna_rmi4_data->glove_enable);
+
+	
+	retval = synaptics_rmi4_i2c_read(syna_rmi4_data,SYNA_ADDR_GLOVE_FLAG,val,sizeof(val));
+
+
+	val[0] = syna_rmi4_data->glove_enable & 0xff ;
+	retval = synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_GLOVE_FLAG,val,sizeof(val));
+
+	return (retval==sizeof(val))?len:0;
+}
+
+
 static int synaptics_rmi4_init_touchpanel_proc(void)
 {
-	struct proc_dir_entry *proc_entry;
+	struct proc_dir_entry *proc_entry=0;
 
 	struct proc_dir_entry *procdir = proc_mkdir( "touchpanel", NULL );
-
+	
+    //glove mode inteface	
+	proc_entry = create_proc_entry("glove_mode_enable", 0666, procdir);
+	if (proc_entry) {
+		proc_entry->write_proc = synaptics_rmi4_proc_glove_write;
+		proc_entry->read_proc = synaptics_rmi4_proc_glove_read;
+	}
+	
 	proc_entry = create_proc_entry("double_tap_enable", 0666, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_write;
@@ -1858,7 +1909,7 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,unsig
 	}
 
 
-    if(syna_rmi4_data->gesturemode != gesturemode && gesturemode != UnkownGestrue) {
+    if(gesturemode != UnkownGestrue) {
 		syna_rmi4_data->gesturemode = gesturemode ;
 		memcpy(syna_rmi4_data->points,points,sizeof(syna_rmi4_data->points));
     } else {
@@ -3483,6 +3534,7 @@ static int synaptics_rmi4_reset_device(struct synaptics_rmi4_data *rmi4_data,
     //reinit device
 	msleep(10);
 	synaptics_rmi4_irq_enable(rmi4_data, true) ;
+	synaptics_rmi4_i2c_read(rmi4_data,rmi4_data->f01_data_base_addr + 1,(unsigned char*)&temp,1);
 
 	return retval;
 }
@@ -4139,7 +4191,7 @@ static void synaptics_rmi4_late_resume(struct early_suspend *h)
 static int synaptics_rmi4_suspend(struct device *dev)
 {
 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
-	unsigned char val;
+	unsigned char val=0;
 	const struct synaptics_dsx_platform_data *platform_data =
 			rmi4_data->board;
 
@@ -4147,6 +4199,10 @@ static int synaptics_rmi4_suspend(struct device *dev)
 		return 0 ;
 
     rmi4_data->pwrrunning = true ;
+	
+	if(rmi4_data->glove_enable)
+		synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_GLOVE_FLAG,&val,sizeof(val));
+
     synaptics_enable_gesture(rmi4_data,true);
 
 	if(rmi4_data->gesture) {
@@ -4161,10 +4217,7 @@ static int synaptics_rmi4_suspend(struct device *dev)
 
 	if (!rmi4_data->sensor_sleep) {
 		rmi4_data->touch_stopped = true;
-		if(syna_rmi4_data->gesture_enable & (1<<8)) {
-			val = 0 ;
-			synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_GESTURE_FLAG,&val,1);
-		}
+
 		synaptics_rmi4_irq_enable(rmi4_data, false);
 		synaptics_rmi4_sensor_sleep(rmi4_data);
 		synaptics_rmi4_free_fingers(rmi4_data);
@@ -4206,7 +4259,7 @@ void synaptics_rmi4_sync_lcd_resume(void) {
 static int synaptics_rmi4_resume(struct device *dev)
 {
 	int retval;
-	unsigned char val;
+	unsigned char val=1;
 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
 	const struct synaptics_dsx_platform_data *platform_data =
 			rmi4_data->board;
@@ -4217,6 +4270,10 @@ static int synaptics_rmi4_resume(struct device *dev)
     print_ts(TS_INFO, KERN_ERR "gesture status[0x%x,0x%x]\n", syna_use_gesture,rmi4_data->gesture_enable);
 
     rmi4_data->pwrrunning = true ;
+	
+	if(rmi4_data->glove_enable)
+		synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_GLOVE_FLAG,&val,sizeof(val));
+
 	if(rmi4_data->gesture) {
 	    synaptics_enable_gesture(rmi4_data,false);
 		rmi4_data->pwrrunning = false ;
@@ -4250,10 +4307,6 @@ static int synaptics_rmi4_resume(struct device *dev)
 				__func__);
 			rmi4_data->pwrrunning = false ;
 			return retval;
-	}
-	if(syna_rmi4_data->gesture_enable & (1<<8)) {
-	    val = 1 ;
-		synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_GESTURE_FLAG,&val,1);
 	}
 
 	rmi4_data->pwrrunning = false ;

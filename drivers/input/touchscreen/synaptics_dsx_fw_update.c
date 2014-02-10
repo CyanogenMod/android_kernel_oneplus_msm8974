@@ -28,7 +28,11 @@
 #include "synaptics_dsx_i2c.h"
 #include "synaptics_firmware_youngfast.h"
 #include "synaptics_firmware_tpk.h"
+#ifdef CONFIG_OPPO_DEVICE_FIND7OP
+#include "synaptics_firmware_wintek_14001.h"
+#else
 #include "synaptics_firmware_wintek.h"
+#endif
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 #include <linux/gpio.h>

@@ -108,7 +108,7 @@ config register 04h
 #define GREEN_SLED 1
 #define BLUE_SLED 2
 #define SN3193_POWER_ON 1
-#define shine_debug 1
+#define shine_debug 0
 /*OPPO yuyi 20133-01-07 add begin for abandon red and green light*/
 int brightness_time = 0;
 /*OPPO yuyi 20133-01-07 add end  for abandon red and green light*/
@@ -177,8 +177,8 @@ or rgb=1
 */
 static int SN3193_workmod_sled( int rgb)
 {
-   	 int ret=0;
-  	 if(rgb){
+	int ret=0;
+	if(rgb){
      		  ret=SN3193_write_reg(0x02,0x20);
 	}else{
 		ret=SN3193_write_reg(0x02,0x00);
@@ -189,13 +189,13 @@ static int SN3193_workmod_sled( int rgb)
 //set max output current
 static int SN3193_setCurrent_sled( u8 cs)
 {
-   	 int ret=0;
+	int ret=0;
 	ret=SN3193_write_reg(0x03,0x10);
 	return ret;
 }
 /*static int SN3193_setColor_sled(u8 r,u8 g,u8 b) //r,g,b 0~255
 {
-       int ret=0;
+	int ret=0;
 	ret=SN3193_write_reg(0x04,r);
 	ret=SN3193_write_reg(0x05,g);
 	ret=SN3193_write_reg(0x06,b);
@@ -203,7 +203,7 @@ static int SN3193_setCurrent_sled( u8 cs)
 }*/
 static int SN3193_upData_sled(void)   //update 04~06
 {
-       int ret=0;
+	int ret=0;
 	ret=SN3193_write_reg(0x07,0x00);
 	return ret;
 }
@@ -236,31 +236,31 @@ static int SN3193_SetBreathTime_sled(u8 Ch, u8 T0,u8 T1,u8 T2,u8 T3,u8 T4)
 		case 3:
 			SN3193_write_reg(0x0c,T0<<4);	  
 		  	SN3193_write_reg(0x12,(T1<<5)|(T2<<1));	
-     		       SN3193_write_reg(0x18,(T3<<5)|(T4<<1));	
+     		SN3193_write_reg(0x18,(T3<<5)|(T4<<1));	
 			break;
 	
 		}
 #else /* VENDOR_EDIT */
-         SN3193_write_reg(0x0c,T0<<4);	  
-	 SN3193_write_reg(0x12,(T1<<5)|(T2<<1));	
-     	 SN3193_write_reg(0x18,(T3<<5)|(T4<<1));
+	SN3193_write_reg(0x0c,T0<<4);	  
+	SN3193_write_reg(0x12,(T1<<5)|(T2<<1));	
+	SN3193_write_reg(0x18,(T3<<5)|(T4<<1));
 #endif /* VENDOR_EDIT */
 /*OPPO yuyi 2014-01-07 modify end  for abandon red and green light*/
-         return ret;
+	return ret;
 }
 
 static int  SN3193_TimeUpdate_sled(void)
 {
-       int ret=0;
+	int ret=0;
  	ret=SN3193_write_reg(0x1c,0x00);	
 	return ret;
 }
 
 static int SN3193_TurnOnRGB_sled(void)
 {
-     int ret=0;
-     SN3193_write_reg(0x1D, 0x07);	
-    return ret;
+	int ret=0;
+	SN3193_write_reg(0x1D, 0x07);	
+	return ret;
 }
 
 /*********************************************/
@@ -324,7 +324,7 @@ int ret =0;
 
 static int SN3193_open(struct inode *inode, struct file *file)
 {
-       int ret=0;
+	int ret=0;
 	struct SN3193_sled *info = container_of(file->private_data,
 					       struct SN3193_sled, SN3193_miscdev);
 	file->private_data = info;
@@ -350,23 +350,23 @@ static long SN3193_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case SLED_ENABLE:
-	         SN3193_enable_sled(1);
-		  SN3193_setCurrent_sled(0x01);
-		  pr_info("%s:enable sled\n",__func__);
-		 break;
+		SN3193_enable_sled(1);
+		SN3193_setCurrent_sled(0x01);
+		pr_info("%s:enable sled\n",__func__);
+		break;
 	case SLED_DISABLE:		
 		RGBctl = 0x00;
 		SN3193_TurnOffOut_sled();
 		SN3193_enable_sled(0);
              // mod_timer(&SN3193_sled_dev_sate->gsled_last_timer,0xffffffffL);
-	       pr_info("%s:disable sled\n",__func__);
-		 break;
+		pr_info("%s:disable sled\n",__func__);
+		break;
 	case SLED_SET_WORKMOD:
 		if (copy_from_user(&val,(void __user *)arg, sizeof(unsigned int))) {
 			r = -EFAULT;
 		}
 		pr_info("%s;set sled work mod ,val:%d\n",__func__,val);
-	       SN3193_workmod_sled(val);  //now we should set to val to 0
+		SN3193_workmod_sled(val);  //now we should set to val to 0
 		break;
 	case SLED_CONFIG_FEATURE:
 		if (copy_from_user(&val,(void __user *)arg, sizeof(unsigned int))) {
@@ -379,9 +379,9 @@ static long SN3193_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (copy_from_user(t,(void __user *)arg, sizeof(unsigned int))) {
 			r = -EFAULT;
 		}
-		 pr_info("%s;set stagnate modl:%d,%d,%d,%d,%d\n",__func__,t[1],t[2],t[3],t[4],t[5]);
-	        SN3193_SetBreathTime_sled(t[0],t[1],t[2],t[3],t[4],t[5]);
-	        SN3193_TimeUpdate_sled();
+		pr_info("%s;set stagnate modl:%d,%d,%d,%d,%d\n",__func__,t[1],t[2],t[3],t[4],t[5]);
+		SN3193_SetBreathTime_sled(t[0],t[1],t[2],t[3],t[4],t[5]);
+		SN3193_TimeUpdate_sled();
 		break;
 	case SLED_SET_RED :
 		if (copy_from_user(&val,(void __user *)arg, sizeof(unsigned int))) {
@@ -390,15 +390,15 @@ static long SN3193_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 /*OPPO yuyi 2014-01-07 modify begin for abandon red and green light*/
 #ifndef VENDOR_EDIT
 //ZhangPan@Mobile Phone Software Dept.Driver, 2013/12/19, Modify for blue_led
-			RGBctl = RGBctl |0x01;
+		RGBctl = RGBctl |0x01;
 #else /* VENDOR_EDIT */
-			RGBctl = RGBctl |0x04;
+		RGBctl = RGBctl |0x04;
 #endif /* VENDOR_EDIT */
 /*OPPO yuyi 2014-01-07 modify end for abandon red and green light*/
 		SN3193_TurnOnOut_sled(RGBctl);
-              SN3193_SetBrightness(RED_SLED,val);
-	       SN3193_upData_sled();
-	       pr_info("%s:set sled red,val:%d\n",__func__,val);
+		SN3193_SetBrightness(RED_SLED,val);
+		SN3193_upData_sled();
+		pr_info("%s:set sled red,val:%d\n",__func__,val);
 		break;
 	case SLED_SET_GREEEN:
 		if (copy_from_user(&val,(void __user *)arg, sizeof(unsigned int))) {
@@ -407,24 +407,24 @@ static long SN3193_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 /*OPPO yuyi 2014-01-07 modify begin for abandon red and green light*/
 #ifndef VENDOR_EDIT
 //ZhangPan@Mobile Phone Software Dept.Driver, 2013/12/19, Modify for blue_led
-			 RGBctl = RGBctl |0x02;
+		RGBctl = RGBctl |0x02;
 #else /* VENDOR_EDIT */
-			 RGBctl = RGBctl |0x04;
+		RGBctl = RGBctl |0x04;
 #endif /* VENDOR_EDIT */
 /*OPPO yuyi 2014-01-07 modify end for abandon red and green light*/
-		 SN3193_TurnOnOut_sled(RGBctl);
-	        SN3193_SetBrightness(GREEN_SLED,val);
-	        SN3193_upData_sled();
-	        pr_info("%s:set sled green,val:%d\n",__func__,val);
+		SN3193_TurnOnOut_sled(RGBctl);
+		SN3193_SetBrightness(GREEN_SLED,val);
+		SN3193_upData_sled();
+		pr_info("%s:set sled green,val:%d\n",__func__,val);
 		break;
       case SLED_SET_BLUE:
 	  	if (copy_from_user(&val,(void __user *)arg, sizeof(unsigned int))) {
 			r = -EFAULT;
 		}
 		RGBctl = RGBctl |0x04;
-	        SN3193_TurnOnOut_sled(RGBctl);
-	  	 SN3193_SetBrightness(BLUE_SLED,val);
-	        SN3193_upData_sled();
+		SN3193_TurnOnOut_sled(RGBctl);
+		SN3193_SetBrightness(BLUE_SLED,val);
+		SN3193_upData_sled();
 		pr_info("%s:set sled blue,val:%d\n",__func__,val);
 		break;
 	/*case SLED_SET_LASTTIME:
@@ -446,21 +446,21 @@ static long SN3193_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 /*OPPO yuyi 2014-01-07 modify begin for abandon red and green light*/
 #ifndef VENDOR_EDIT
 //ZhangPan@Mobile Phone Software Dept.Driver, 2013/12/19, Modify for blue_led
-			SN3193_TurnOnOut_sled((1<<RED_SLED));
+		SN3193_TurnOnOut_sled((1<<RED_SLED));
 #else /* VENDOR_EDIT */
-			SN3193_TurnOnOut_sled((1<<BLUE_SLED));
+		SN3193_TurnOnOut_sled((1<<BLUE_SLED));
 #endif /* VENDOR_EDIT */
 /*OPPO yuyi 2014-01-07 modify end for abandon red and green light*/
-              SN3193_SetBrightness(RED_SLED,val);
+		SN3193_SetBrightness(RED_SLED,val);
 
 		SN3193_enable_sled(1);
 		SN3193_config_feature_sled(0);
 		SN3193_workmod_sled(1); 
 		SN3193_setCurrent_sled(0x01);
 		  
-	       SN3193_SetBreathTime_sled(1,0,1,2,1,4);
+		SN3193_SetBreathTime_sled(1,0,1,2,1,4);
 			
-	       SN3193_TimeUpdate_sled();
+		SN3193_TimeUpdate_sled();
 		SN3193_upData_sled();
 		break;
 	case SET_GREEN_BREATHE:
@@ -470,28 +470,28 @@ static long SN3193_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 /*OPPO yuyi 2014-01-07 modify begin for abandon red and green light*/
 #ifndef VENDOR_EDIT
 //ZhangPan@Mobile Phone Software Dept.Driver, 2013/12/19, Modify for blue_led
-			 SN3193_TurnOnOut_sled((1<<GREEN_SLED));
+		SN3193_TurnOnOut_sled((1<<GREEN_SLED));
 #else /* VENDOR_EDIT */
-			 SN3193_TurnOnOut_sled((1<<BLUE_SLED));
+		SN3193_TurnOnOut_sled((1<<BLUE_SLED));
 #endif /* VENDOR_EDIT */
 /*OPPO yuyi 2014-01-07 modify end for abandon red and green light*/
-	        SN3193_SetBrightness(GREEN_SLED,val);
+		SN3193_SetBrightness(GREEN_SLED,val);
 
 		SN3193_enable_sled(1);
 		SN3193_config_feature_sled(0);
 		SN3193_workmod_sled(1); 
 		SN3193_setCurrent_sled(0x01);
 		
-	        SN3193_SetBreathTime_sled(2,0,1,2,1,4);
-	        SN3193_TimeUpdate_sled();
+		SN3193_SetBreathTime_sled(2,0,1,2,1,4);
+		SN3193_TimeUpdate_sled();
 		SN3193_upData_sled();
 		break;
 	case SET_BLUE_BREATHE:
 	  	if (copy_from_user(&val,(void __user *)arg, sizeof(unsigned int))) {
 			r = -EFAULT;
 		}
-	        SN3193_TurnOnOut_sled((1<<BLUE_SLED));
-	  	 SN3193_SetBrightness(BLUE_SLED,val);
+		SN3193_TurnOnOut_sled((1<<BLUE_SLED));
+		SN3193_SetBrightness(BLUE_SLED,val);
 		 
 		SN3193_enable_sled(1);
 		SN3193_config_feature_sled(0);
@@ -501,41 +501,41 @@ static long SN3193_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	#ifndef  VENDOR_EDIT
 		SN3193_SetBreathTime_sled(3,0,1,2,1,4);
 	#else
-	        SN3193_SetBreathTime_sled(3,0,4,3,4,5);
+		SN3193_SetBreathTime_sled(3,0,4,3,4,5);
 	#endif
-/*OPPO yuyi 2014-01-09 modify end for different effect*/	
-	        SN3193_TimeUpdate_sled();
+/*OPPO yuyi 2014-01-09 modify end for different effect*/
+		SN3193_TimeUpdate_sled();
 		SN3193_upData_sled();
 		break;	
 	case SET_RED_OFF:
 /*OPPO yuyi 2014-01-07 modify begin for abandon red and green light*/
 #ifndef VENDOR_EDIT
 //ZhangPan@Mobile Phone Software Dept.Driver, 2013/12/19, Modify for blue_led
-			RGBctl = RGBctl & 0xFE;
+		RGBctl = RGBctl & 0xFE;
 #else /* VENDOR_EDIT */
-			RGBctl = RGBctl & 0xFB;
+		RGBctl = RGBctl & 0xFB;
 #endif /* VENDOR_EDIT */
 /*OPPO yuyi 2014-01-07 modify end for abandon red and green light*/
 		SN3193_TurnOnOut_sled(RGBctl);
-	       SN3193_upData_sled();
-		  break;
+		SN3193_upData_sled();
+		break;
 	case SET_GREEN_OFF:
 /*OPPO yuyi 2014-01-07 modify begin for abandon red and green light*/
 #ifndef VENDOR_EDIT
 //ZhangPan@Mobile Phone Software Dept.Driver, 2013/12/19, Modify for blue_led
-			RGBctl = RGBctl & 0xFD;
+		RGBctl = RGBctl & 0xFD;
 #else /* VENDOR_EDIT */
 		RGBctl = RGBctl & 0xFB;
 #endif /* VENDOR_EDIT */
 /*OPPO yuyi 2014-01-07 modify end for abandon red and green light*/
 		SN3193_TurnOnOut_sled(RGBctl);
-	       SN3193_upData_sled();
-		   break;
+		SN3193_upData_sled();
+		break;
 	case SET_BLUE_OFF:
 		RGBctl = RGBctl & 0xFB;
 		SN3193_TurnOnOut_sled(RGBctl);
-	       SN3193_upData_sled();
-		   break;
+		SN3193_upData_sled();
+		break;
 	default:
 		dev_err(&info->i2c_dev->dev, "Unknown ioctl 0x%x\n", cmd);
 		r = -ENOIOCTLCMD;
@@ -612,15 +612,15 @@ lvs5_get_failed:
 	 int ret = 0  ;
  
 	 //irq
-	 ret = gpio_tlmm_config(SN3193_SDB, GPIO_CFG_ENABLE);
-	 if (ret) {
-		 printk(KERN_ERR "%s:yuyi,gpio_tlmm_config(%#x)=%d\n",
+	ret = gpio_tlmm_config(SN3193_SDB, GPIO_CFG_ENABLE);
+	if (ret) {
+		printk(KERN_ERR "%s:yuyi,gpio_tlmm_config(%#x)=%d\n",
 				 __func__, SN3193_SDB, ret);
-	 }
-	  gpio_set_value(APQ_SLED_SDB_GPIO, 1);
+	}
+	gpio_set_value(APQ_SLED_SDB_GPIO, 1);
 
-	  printk("yuyi,sn3193  power end\n");
-	  printk(KERN_ERR "%s:yuyi for SN3193_SDB gpio---\n",__func__);
+	printk("yuyi,sn3193  power end\n");
+	printk(KERN_ERR "%s:yuyi for SN3193_SDB gpio---\n",__func__);
 	 
 }
 
@@ -683,7 +683,7 @@ static ssize_t sled_blink_store(struct device *dev, struct device_attribute *att
 			 const char *buf, size_t count)
 {
 	unsigned long value = simple_strtoul(buf, NULL, 10);
-	u8 t123,t4;
+	u8 t13,t2,t4;
 	if(shine_debug) {
 		printk("shineled----%s:   buf = %s: count = %d\n", __func__, buf, count);
 		printk("shineled----%s:   totalMS = %d: onMS = %d\n", __func__, totalMS, onMS);
@@ -701,15 +701,16 @@ static ssize_t sled_blink_store(struct device *dev, struct device_attribute *att
 
 		SN3193_setCurrent_sled(0x01);
 
-		t123 = get_register_t(onMS / 3);
+		t13 = get_register_t((onMS * 4) / 9);
+		t2 = get_register_t(onMS  / 9);
 		t4 = get_register_t(totalMS - onMS) + 1;
 
 		if(shine_debug) {
-			printk("shineled----%s:   t123 = %d: t4 = %d\n", __func__, t123, t4);
+			printk("shineled----%s:   t13 = %d: t2 = %d t4 = %d\n", __func__, t13, t2,t4);
 		}
-		SN3193_SetBreathTime_sled(1,0,t123,t123 + 1,t123, t4);
-		SN3193_SetBreathTime_sled(2,0,t123,t123 + 1,t123, t4);
-		SN3193_SetBreathTime_sled(3,0,t123,t123 + 1,t123, t4);
+		SN3193_SetBreathTime_sled(1,0,t13,t2,t13, t4);
+		SN3193_SetBreathTime_sled(2,0,t13,t2,t13, t4);
+		SN3193_SetBreathTime_sled(3,0,t13,t2,t13, t4);
 
 		SN3193_TimeUpdate_sled();	//start breath	
 
