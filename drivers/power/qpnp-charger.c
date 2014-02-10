@@ -2351,10 +2351,6 @@ qpnp_power_get_property_mains(struct power_supply *psy,
 #ifdef CONFIG_PIC1503_FASTCG
 	case POWER_SUPPLY_PROP_FASTCHARGER:
 		val->intval = get_prop_fast_chg_started(chip);
-		if (val->intval == 0) {
-			if (get_prop_fast_switch_to_normal(chip) == true)
-				val->intval = 1;
-		}
 		break;
 #endif
 	default:
@@ -2607,6 +2603,10 @@ get_prop_batt_status(struct qpnp_chg_chip *chip)
 	if (qpnp_chg_is_usb_chg_plugged_in(chip) &&
 			chip->chg_display_full) {
 		return POWER_SUPPLY_STATUS_FULL;
+	}
+
+	if (get_prop_batt_temp(chip) <= AUTO_CHARGING_BATT_REMOVE_TEMP) {
+		return POWER_SUPPLY_STATUS_DISCHARGING;
 	}
 
 	if (qpnp_ext_charger && qpnp_ext_charger->chg_get_system_status) {
@@ -2919,6 +2919,7 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 				qpnp_battery_status_get(chip) != BATTERY_STATUS_BAD) {
 				qpnp_chg_usb_suspend_enable(chip, 0);
 				qpnp_chg_charge_en(chip, !chip->charging_disabled);
+				power_supply_changed(&chip->batt_psy);
 				if (((ret.intval / 1000) > USB_WALL_THRESHOLD_MA)
 						&& (charger_monitor ||
 						!chip->charger_monitor_checked)) {
@@ -5476,7 +5477,7 @@ static int set_prop_batt_health(struct qpnp_chg_chip *chip, int batt_health)
 #define MAX_COUNT	50
 #ifdef CONFIG_MACH_OPPO
 /* jingchun.wang@Onlinerd.Driver, 2014/01/02  Add for set soft aicl voltage to 4.4v */
-#define SOFT_AICL_VOL	4400
+#define SOFT_AICL_VOL	4500
 #endif /*CONFIG_MACH_OPPO*/
 /* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
 static int soft_aicl(struct qpnp_chg_chip *chip)
@@ -6042,7 +6043,6 @@ static void qpnp_check_charge_timeout(struct qpnp_chg_chip *chip)
 /* OPPO 2013-11-01 wangjc Modify end */
 		if (!rc)
 			count= 0;
-		qpnp_chg_iusbmax_set(chip, QPNP_CHG_I_MAX_MIN_100);
 		/* jingchun.wang@Onlinerd.Driver, 2013/12/16  Add for charge timeout */
 		chip->time_out = true;
 	}
@@ -6333,8 +6333,6 @@ static void update_heartbeat(struct work_struct *work)
 	
 	qpnp_check_recharging(chip);
 
-	power_supply_changed(&chip->batt_psy);
-	
 	/*update time 6s*/
 	schedule_delayed_work(&chip->update_heartbeat_work,
 			      round_jiffies_relative(msecs_to_jiffies

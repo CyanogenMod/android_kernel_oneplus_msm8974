@@ -824,6 +824,9 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 						non_standard = true;
 						schedule_delayed_work(&dotg->non_standard_charger_work,
 							round_jiffies_relative(msecs_to_jiffies(5000)));
+					} else {
+						power_supply_set_online(dotg->psy, true);
+						power_supply_changed(dotg->psy);
 					}
 #endif
 					break;

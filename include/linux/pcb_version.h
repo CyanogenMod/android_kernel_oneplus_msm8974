@@ -17,6 +17,10 @@ enum {
 	HW_VERSION__11,		//900 mV	
 	HW_VERSION__12,		//1200 mV	
 	HW_VERSION__13,		//1484 mV
+	HW_VERSION__20 = 20,
+	HW_VERSION__21 = 21,
+	HW_VERSION__22 = 22,
+	HW_VERSION__23 = 23,
 };
 enum {
 	RF_VERSION_UNKNOWN,
@@ -29,7 +33,8 @@ enum {
 	RF_VERSION__31,		//TD_GSM	
 	RF_VERSION__32,		//TD_GSM_LTE	
 	RF_VERSION__33,		//
-	RF_VERSION__44,		//
+	RF_VERSION__44 = 19,	//
+	RF_VERSION__66 = 30,
 };
 
 int get_pcb_version(void);

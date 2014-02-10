@@ -9,6 +9,11 @@
 ** Author: yuyi@Dep.Group.Module
 ** 
 ****************************************************************/
+
+#ifndef CONFIG_VENDOR_EDIT
+#define CONFIG_VENDOR_EDIT
+#endif
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -315,7 +320,9 @@ static int pn544_dev_open(struct inode *inode, struct file *filp)
 static long pn544_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct pn544_dev *pn544_dev = filp->private_data;
-	
+/*OPPO yuyi 2013-10-04 add begin for NFC_SMX when standby*/
+	int ret = 0;
+/*OPPO yuyi 2013-10-04 add end for NFC_SMX when standby*/
 	switch (cmd) 
 	{
 	case PN544_SET_PWR:
@@ -324,6 +331,13 @@ static long pn544_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 			/* power on with firmware download (requires hw reset)
 			 */
 			printk("%s power on with firmware\n", __func__);
+/*OPPO yuyi 2013-10-04 add begin for NFC_SMX when standby*/
+			ret = disable_irq_wake(pn544_dev->client->irq);
+			if(ret < 0)
+				{
+					printk("%s,power on with firmware disable_irq_wake %d\n",__func__,ret);
+				}	
+/*OPPO yuyi 2013-10-04 add end for NFC_SMX when standby*/
 			gpio_set_value(pn544_dev->ven_gpio, 1);
 			gpio_set_value(pn544_dev->firm_gpio, 1);
 			msleep(10);
@@ -335,6 +349,13 @@ static long pn544_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 		else if (arg == 1) 
 		{
 			/* power on */
+/*OPPO yuyi 2013-10-04 add begin for NFC_SMX when standby*/
+			ret = enable_irq_wake(pn544_dev->client->irq);
+			if(ret < 0)
+				{
+					printk("%s,power on enable_irq_wake  %d\n",__func__,ret);
+				}
+/*OPPO yuyi 2013-10-04 add end for NFC_SMX when standby*/
 			printk("%s power on\n", __func__);
 			gpio_set_value(pn544_dev->firm_gpio, 0);
 			gpio_set_value(pn544_dev->ven_gpio, 1);
@@ -343,6 +364,13 @@ static long pn544_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 		else  if (arg == 0) 
 		{
 			/* power off */
+/*OPPO yuyi 2013-10-04 add begin for NFC_SMX when standby*/
+			ret = disable_irq_wake(pn544_dev->client->irq);
+			if(ret < 0)
+				{
+					printk("%s,power off disable_irq_wake %d\n",__func__,ret);
+				}
+/*OPPO yuyi 2013-10-04 add end for NFC_SMX when standby*/
 			printk("%s power off\n", __func__);
 			gpio_set_value(pn544_dev->firm_gpio, 0);
 			gpio_set_value(pn544_dev->ven_gpio, 0);
@@ -498,10 +526,12 @@ static int pn544_probe(struct i2c_client *client, const struct i2c_device_id *id
 	pn544_disable_irq(pn544_dev);
 	i2c_set_clientdata(client, pn544_dev);
 
+	#ifdef CONFIG_VENDOR_EDIT
 	/*liuhd add for sleep current because of nfc  2013-12-17*/
 	gpio_set_value(pn544_dev->ven_gpio, 1);
 	msleep(10);
       gpio_set_value(pn544_dev->ven_gpio, 0);
+	#endif
 	/*add end by liuhd 2013-12-17*/
 	return 0;
 

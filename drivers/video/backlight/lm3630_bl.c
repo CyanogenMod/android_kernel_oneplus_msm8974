@@ -96,11 +96,14 @@ static int lm3630_chip_init(struct lm3630_chip_data *pchip)
     	if (ret < 0)
     		goto out;
     }
-	//config max A and B current to 20mA
-	regmap_write(pchip->regmap,
-				   REG_MAXCU_A, 0x14);
-	regmap_write(pchip->regmap,
-				   REG_MAXCU_B, 0x14);
+
+#ifdef CONGIF_OPPO_CMCC_OPTR
+    reg_val = 0x12; /* For 13077 CMCC */
+#else
+    reg_val = 0x16; /* For 13077 pvt panel */
+#endif
+	regmap_write(pchip->regmap, REG_MAXCU_A, reg_val);
+	regmap_write(pchip->regmap, REG_MAXCU_B, reg_val);
 	/* bank control */
 	reg_val = ((pdata->bank_b_ctrl & 0x01) << 1) |
 			(pdata->bank_a_ctrl & 0x07)|0x18;//linear

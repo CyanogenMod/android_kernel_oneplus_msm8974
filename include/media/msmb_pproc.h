@@ -229,11 +229,6 @@ struct msm_pproc_queue_buf_info {
 #define VIDIOC_MSM_CPP_QUEUE_BUF \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 14, struct msm_camera_v4l2_ioctl_t)
 
-#ifdef CONFIG_MACH_OPPO
-#define VIDIOC_MSM_CPP_INIT_HW \
-	_IOWR('V', BASE_VIDIOC_PRIVATE + 15, struct msm_camera_v4l2_ioctl_t)
-#endif
-
 #define V4L2_EVENT_CPP_FRAME_DONE  (V4L2_EVENT_PRIVATE_START + 0)
 #define V4L2_EVENT_VPE_FRAME_DONE  (V4L2_EVENT_PRIVATE_START + 1)
 

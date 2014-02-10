@@ -734,6 +734,18 @@ socinfo_show_hw_pcb_version(struct sys_device *dev,
 		case HW_VERSION__13:
 			hw_version = "13";
 			break;
+		case HW_VERSION__20:
+			hw_version = "20";
+			break;
+		case HW_VERSION__21:
+			hw_version = "21";
+			break;
+		case HW_VERSION__22:
+			hw_version = "22";
+			break;
+		case HW_VERSION__23:
+			hw_version = "23";
+			break;
 		default:
 			hw_version = "UNKNOWN";
 	}
@@ -784,6 +796,9 @@ socinfo_show_hw_rf_version(struct sys_device *dev,
 			break;
 		case RF_VERSION__44:
 			rf_version = "44";
+			break;
+		case RF_VERSION__66:
+			rf_version = "66";
 			break;
 		default:
 			rf_version = "UNKNOWN";

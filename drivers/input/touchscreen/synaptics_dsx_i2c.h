@@ -284,7 +284,8 @@ struct synaptics_rmi4_data {
 	unsigned short points[2*7];
 	struct mutex ops_lock;
 	struct notifier_block fb_notif;
-	unsigned int gesture_enable;
+	unsigned char gesture_enable;
+	unsigned char glove_enable;  //glove mode
 	struct workqueue_struct *reportqueue;  //for work queue
 	struct work_struct reportwork;
 };
