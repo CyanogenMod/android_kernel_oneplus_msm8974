@@ -32,6 +32,7 @@
 #ifdef CONFIG_SND_SOC_ES325
 #include <linux/regulator/consumer.h>
 #include <linux/of_gpio.h>
+#include <linux/pcb_version.h>
 #endif
 
 #define NGD_SLIM_NAME	"ngd_msm_ctrl"
@@ -1101,6 +1102,7 @@ static int __devinit ngd_slim_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "enable es325 regulator failed\n");
 		}
 	}
+	if (get_pcb_version() < HW_VERSION__12) {
 	dev->reset_gpio = of_get_named_gpio(pdev->dev.of_node,
 			"adnc,reset-gpio", 0);
 	if (dev->reset_gpio) {
@@ -1111,6 +1113,7 @@ static int __devinit ngd_slim_probe(struct platform_device *pdev)
 			dev_info(&pdev->dev, "Set es325 reset gpio to %d\n",
 					dev->reset_gpio);
 		}
+	}
 	}
 #endif
 
