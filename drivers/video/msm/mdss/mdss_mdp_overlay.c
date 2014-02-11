@@ -3004,6 +3004,16 @@ int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 		goto init_fail;
 	}
 
+	rc = sysfs_create_link_nowarn(&dev->kobj,
+			&mdp5_data->mdata->pdev->dev.kobj, "mdp");
+	if (rc)
+		pr_warn("problem creating link to mdp sysfs\n");
+
+	rc = sysfs_create_link_nowarn(&dev->kobj,
+			&mfd->pdev->dev.kobj, "mdss_fb");
+	if (rc)
+		pr_warn("problem creating link to mdss_fb sysfs\n");
+
 	if (mfd->panel_info->type == MIPI_VIDEO_PANEL) {
 		rc = sysfs_create_group(&dev->kobj,
 			&dynamic_fps_fs_attrs_group);
