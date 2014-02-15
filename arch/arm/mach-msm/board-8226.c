@@ -81,11 +81,6 @@ static struct of_dev_auxdata msm8226_auxdata_lookup[] __initdata = {
 	{}
 };
 
-static void __init msm8226_early_memory(void)
-{
-	of_scan_flat_dt(dt_scan_for_memory_hole, NULL);
-}
-
 static void __init msm8226_reserve(void)
 {
 	of_scan_flat_dt(dt_scan_for_memory_reserve, NULL);
@@ -148,7 +143,6 @@ DT_MACHINE_START(MSM8226_DT, "Qualcomm MSM 8x26 / MSM 8x28 (Flattened Device Tre
 	.timer = &msm_dt_timer,
 	.dt_compat = msm8226_dt_match,
 	.reserve = msm8226_reserve,
-	.init_very_early = msm8226_early_memory,
 	.restart = msm_restart,
 	.smp = &arm_smp_ops,
 MACHINE_END

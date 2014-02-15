@@ -35,10 +35,6 @@ void __init fsm9900_reserve(void)
 {
 }
 
-static void __init fsm9900_early_memory(void)
-{
-}
-
 static struct clk_lookup msm_clocks_dummy[] = {
 	CLK_DUMMY("core_clk",   BLSP2_UART_CLK, "f9960000.serial", OFF),
 	CLK_DUMMY("iface_clk",  BLSP2_UART_CLK, "f9960000.serial", OFF),
@@ -94,11 +90,6 @@ void __init fsm9900_init(void)
 	fsm9900_add_drivers();
 }
 
-void __init fsm9900_init_very_early(void)
-{
-	fsm9900_early_memory();
-}
-
 static const char *fsm9900_dt_match[] __initconst = {
 	"qcom,fsm9900",
 	NULL
@@ -112,7 +103,6 @@ DT_MACHINE_START(FSM9900_DT, "Qualcomm FSM 9900 (Flattened Device Tree)")
 	.timer = &msm_dt_timer,
 	.dt_compat = fsm9900_dt_match,
 	.reserve = fsm9900_reserve,
-	.init_very_early = fsm9900_init_very_early,
 	.restart = msm_restart,
 	.smp = &msm8974_smp_ops,
 MACHINE_END
