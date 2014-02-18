@@ -1576,7 +1576,10 @@ void kgsl_pwrctrl_enable(struct kgsl_device *device)
 		pwr->wakeup_maxpwrlevel = 0;
 	} else
 		level = pwr->default_pwrlevel;
-	kgsl_pwrctrl_pwrlevel_change(device, level);
+
+	if (pwr->constraint.type == KGSL_CONSTRAINT_NONE)
+		kgsl_pwrctrl_pwrlevel_change(device, pwr->active_pwrlevel);
+
 	kgsl_pwrctrl_clk(device, KGSL_PWRFLAGS_ON, KGSL_STATE_ACTIVE);
 	kgsl_pwrctrl_axi(device, KGSL_PWRFLAGS_ON);
 }
