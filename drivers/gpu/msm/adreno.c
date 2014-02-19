@@ -2326,8 +2326,8 @@ static ssize_t _ft_hang_intr_status_store(struct device *dev,
 	adreno_dev = ADRENO_DEVICE(device);
 
 	mutex_lock(&device->mutex);
-	ret = _ft_sysfs_store(buf, count, &new_setting);
-	if (ret != count)
+	ret = kgsl_sysfs_store(buf, &new_setting);
+	if (ret)
 		goto done;
 	if (new_setting)
 		new_setting = 1;
@@ -2367,7 +2367,7 @@ static ssize_t _ft_hang_intr_status_store(struct device *dev,
 	}
 done:
 	mutex_unlock(&device->mutex);
-	return ret;
+	return ret < 0 ? ret : count;
 }
 
 /**
