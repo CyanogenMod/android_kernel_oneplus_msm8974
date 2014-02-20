@@ -13,10 +13,11 @@
 &soc {
 	led_flash0: qcom,camera-led-flash {
 		cell-index = <0>;
-		compatible = "qcom,camera-led-cci";
+		compatible = "qcom,camera-led-flash";
+		qcom,flash-source = <&pm8941_flash0 &pm8941_flash1>;
+		qcom,torch-source = <&pm8941_torch>;
+		qcom,flash-cci-source = <&adp1660>;
 		qcom,flash-type = <1>;
-		qcom,flash-source = <&adp1660>;
-		qcom,torch-source;
 	};
 
 	adp1660: qcom,camera-led-flash-src1 {

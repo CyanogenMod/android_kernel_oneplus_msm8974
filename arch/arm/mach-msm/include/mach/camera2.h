@@ -11,6 +11,10 @@
  *
  */
 
+#ifdef CONFIG_MACH_OPPO
+#include <mach/camera2-oppo.h>
+#else
+
 #ifndef __CAMERA2_H__
 #define __CAMERA2_H__
 
@@ -152,4 +156,5 @@ struct msm_eeprom_board_info {
 	struct msm_eeprom_mm_t mm_data;
 };
 
+#endif
 #endif

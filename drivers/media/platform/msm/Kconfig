@@ -35,7 +35,12 @@ config MSMB_CAMERA_DEBUG
 	  Enable printk() debug for msm camera 2.0
 
 if MSMB_CAMERA
+if MACH_OPPO
+source "drivers/media/platform/msm/camera_oppo_v2/Kconfig"
+endif
+if !MACH_OPPO
 source "drivers/media/platform/msm/camera_v2/Kconfig"
+endif
 endif # MSMB_CAMERA
 
 source "drivers/media/platform/msm/vidc/Kconfig"
