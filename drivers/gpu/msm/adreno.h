@@ -546,6 +546,8 @@ static inline int adreno_is_a205(struct adreno_device *adreno_dev)
 	return (adreno_dev->gpurev == ADRENO_REV_A205);
 }
 
+bool adreno_hw_isidle(struct kgsl_device *device);
+
 static inline int adreno_is_a20x(struct adreno_device *adreno_dev)
 {
 	return (adreno_dev->gpurev <= 209);
