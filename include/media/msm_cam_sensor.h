@@ -49,6 +49,13 @@
 #define MAX_AF_ITERATIONS 3
 #define MAX_NUMBER_OF_STEPS 47
 
+#ifdef CONFIG_MACH_OPPO
+typedef enum sensor_stats_type {
+	YRGB,
+	YYYY,
+} sensor_stats_type_t;
+#endif
+
 enum flash_type {
 	LED_FLASH = 1,
 	STROBE_FLASH,
@@ -443,6 +450,9 @@ enum msm_actuator_cfg_type_t {
 	CFG_SET_DEFAULT_FOCUS,
 	CFG_SET_POSITION,
 	CFG_MOVE_FOCUS,
+#ifdef CONFIG_MACH_OPPO
+	CFG_ACTUATOR_POWERDOWN,
+#endif
 };
 
 enum actuator_type {
@@ -582,8 +592,12 @@ enum msm_camera_led_config_t {
 
 struct msm_camera_led_cfg_t {
 	enum msm_camera_led_config_t cfgtype;
+#ifdef CONFIG_MACH_OPPO
+	uint32_t led_current;
+#else
 	uint32_t torch_current;
 	uint32_t flash_current[2];
+#endif
 };
 
 #define VIDIOC_MSM_SENSOR_CFG \
