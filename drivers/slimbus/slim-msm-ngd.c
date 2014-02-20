@@ -1093,27 +1093,26 @@ static int __devinit ngd_slim_probe(struct platform_device *pdev)
 	}
 
 #ifdef CONFIG_SND_SOC_ES325
-	dev->cdc_es325 = regulator_get(&pdev->dev, "cdc-es325");
-	if (IS_ERR(dev->cdc_es325)) {
-		dev_err(&pdev->dev, "Failed to get es325 regulator\n");
-		dev->cdc_es325= NULL;
-	} else {
-		if (regulator_enable(dev->cdc_es325)) {
-			dev_err(&pdev->dev, "enable es325 regulator failed\n");
-		}
-	}
-	if (get_pcb_version() < HW_VERSION__12) {
-	dev->reset_gpio = of_get_named_gpio(pdev->dev.of_node,
-			"adnc,reset-gpio", 0);
-	if (dev->reset_gpio) {
-		if (gpio_request(dev->reset_gpio,"es325_reset")){
-			dev_err(&pdev->dev, "Request es325 reset gpio failed\n");
+	if (get_pcb_version() == HW_VERSION__10) {
+		dev->cdc_es325 = regulator_get(&pdev->dev, "cdc-es325");
+		if (IS_ERR(dev->cdc_es325)) {
+			dev_err(&pdev->dev, "Failed to get es325 regulator\n");
+			dev->cdc_es325 = NULL;
 		} else {
-			gpio_direction_output(dev->reset_gpio,0);
-			dev_info(&pdev->dev, "Set es325 reset gpio to %d\n",
-					dev->reset_gpio);
+			if (regulator_enable(dev->cdc_es325))
+				dev_err(&pdev->dev, "enable es325 regulator failed\n");
 		}
-	}
+		dev->reset_gpio = of_get_named_gpio(pdev->dev.of_node,
+				"adnc,reset-gpio", 0);
+		if (dev->reset_gpio) {
+			if (gpio_request(dev->reset_gpio,"es325_reset")) {
+				dev_err(&pdev->dev, "Request es325 reset gpio failed\n");
+			} else {
+				gpio_direction_output(dev->reset_gpio, 0);
+				dev_info(&pdev->dev, "Set es325 reset gpio to %d\n",
+						dev->reset_gpio);
+			}
+		}
 	}
 #endif
 
