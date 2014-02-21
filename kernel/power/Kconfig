@@ -290,3 +290,10 @@ config DEDUCE_WAKEUP_REASONS
 	bool
 	default n
 
+config QUICK_WAKEUP
+	bool "Quick wakeup"
+	depends on SUSPEND
+	default y
+	---help---
+	  Allow kernel driver to do periodic jobs without resuming the full system
+	  This option can increase battery life on android powered smartphone.
