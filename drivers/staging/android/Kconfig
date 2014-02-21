@@ -13,8 +13,9 @@ config ANDROID_BINDER_IPC
 	default n
 
 config ANDROID_BINDER_IPC_32BIT
-	bool "Use old 32-bit binder api"
-	depends on !64BIT
+	bool "Use old (Android 4.4 and earlier) 32-bit binder API"
+	depends on !64BIT && ANDROID_BINDER_IPC
+	default y
 	---help---
 	  Enable to support an old 32-bit Android user-space. Breaks the new
 	  Android user-space.
