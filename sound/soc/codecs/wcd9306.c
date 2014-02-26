@@ -5754,6 +5754,9 @@ static int tapan_post_reset_cb(struct wcd9xxx *wcd9xxx)
 	for (count = 0; count < NUM_CODEC_DAIS; count++)
 		tapan->dai[count].bus_down_in_recovery = true;
 
+	for (count = 0; count < NUM_CODEC_DAIS; count++)
+		tapan->dai[count].bus_down_in_recovery = true;
+
 	mutex_unlock(&codec->mutex);
 	return ret;
 }
