@@ -18,13 +18,6 @@
 	interrupt-parent = <&intc>;
 	soc: soc { };
 
-	memory {
-		fb_mem: fb_region {
-			linux,reserve-contiguous-region;
-			reg = <0 0x1400000>;
-			label = "fb_mem";
-		};
-	};
 };
 
 /include/ "msmsamarium-ion.dtsi"
