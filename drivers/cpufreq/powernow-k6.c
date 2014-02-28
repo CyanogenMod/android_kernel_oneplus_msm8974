@@ -135,7 +135,8 @@ static void powernow_k6_set_cpu_multiplier(unsigned int best_i)
  *
  *   Tries to change the PowerNow! multiplier
  */
-static void powernow_k6_set_state(unsigned int best_i)
+static void powernow_k6_set_state(struct cpufreq_policy *policy,
+		unsigned int best_i)
 {
 	struct cpufreq_freqs freqs;
 
@@ -146,13 +147,12 @@ static void powernow_k6_set_state(unsigned int best_i)
 
 	freqs.old = busfreq * powernow_k6_get_cpu_multiplier();
 	freqs.new = busfreq * clock_ratio[best_i].index;
-	freqs.cpu = 0; /* powernow-k6.c is UP only driver */
 
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 
 	powernow_k6_set_cpu_multiplier(best_i);
 
-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 
 	return;
 }
@@ -190,7 +190,7 @@ static int powernow_k6_target(struct cpufreq_policy *policy,
 				target_freq, relation, &newstate))
 		return -EINVAL;
 
-	powernow_k6_set_state(newstate);
+	powernow_k6_set_state(policy, newstate);
 
 	return 0;
 }
@@ -275,7 +275,7 @@ static int powernow_k6_cpu_exit(struct cpufreq_policy *policy)
 	unsigned int i;
 	for (i = 0; i < 8; i++) {
 		if (i == max_multiplier)
-			powernow_k6_set_state(i);
+			powernow_k6_set_state(policy, i);
 	}
 	cpufreq_frequency_table_put_attr(policy->cpu);
 	return 0;

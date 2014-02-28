@@ -248,7 +248,7 @@ static void change_VID(int vid)
 }
 
 
-static void change_speed(unsigned int index)
+static void change_speed(struct cpufreq_policy *policy, unsigned int index)
 {
 	u8 fid, vid;
 	struct cpufreq_freqs freqs;
@@ -263,15 +263,13 @@ static void change_speed(unsigned int index)
 	fid = powernow_table[index].index & 0xFF;
 	vid = (powernow_table[index].index & 0xFF00) >> 8;
 
-	freqs.cpu = 0;
-
 	rdmsrl(MSR_K7_FID_VID_STATUS, fidvidstatus.val);
 	cfid = fidvidstatus.bits.CFID;
 	freqs.old = fsb * fid_codes[cfid] / 10;
 
 	freqs.new = powernow_table[index].frequency;
 
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 
 	/* Now do the magic poking into the MSRs.  */
 
@@ -292,7 +290,7 @@ static void change_speed(unsigned int index)
 	if (have_a0 == 1)
 		local_irq_enable();
 
-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 }
 
 
@@ -546,7 +544,7 @@ static int powernow_target(struct cpufreq_policy *policy,
 				relation, &newstate))
 		return -EINVAL;
 
-	change_speed(newstate);
+	change_speed(policy, newstate);
 
 	return 0;
 }
@@ -565,7 +563,7 @@ static int powernow_verify(struct cpufreq_policy *policy)
  * We will then get the same kind of behaviour already tested under
  * the "well-known" other OS.
  */
-static int __cpuinit fixup_sgtc(void)
+static int fixup_sgtc(void)
 {
 	unsigned int sgtc;
 	unsigned int m;
@@ -599,7 +597,7 @@ static unsigned int powernow_get(unsigned int cpu)
 }
 
 
-static int __cpuinit acer_cpufreq_pst(const struct dmi_system_id *d)
+static int acer_cpufreq_pst(const struct dmi_system_id *d)
 {
 	printk(KERN_WARNING PFX
 		"%s laptop with broken PST tables in BIOS detected.\n",
@@ -617,7 +615,7 @@ static int __cpuinit acer_cpufreq_pst(const struct dmi_system_id *d)
  * A BIOS update is all that can save them.
  * Mention this, and disable cpufreq.
  */
-static struct dmi_system_id __cpuinitdata powernow_dmi_table[] = {
+static struct dmi_system_id powernow_dmi_table[] = {
 	{
 		.callback = acer_cpufreq_pst,
 		.ident = "Acer Aspire",
@@ -629,7 +627,7 @@ static struct dmi_system_id __cpuinitdata powernow_dmi_table[] = {
 	{ }
 };
 
-static int __cpuinit powernow_cpu_init(struct cpufreq_policy *policy)
+static int powernow_cpu_init(struct cpufreq_policy *policy)
 {
 	union msr_fidvidstatus fidvidstatus;
 	int result;

@@ -18,6 +18,7 @@
 #include <linux/io.h>
 #include <linux/err.h>
 #include <linux/clk.h>
+#include <linux/cpu.h>
 #include <linux/mutex.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
@@ -154,6 +155,9 @@ static struct mux_div_clk a7ssmux = {
 static struct clk_lookup clock_tbl_a7[] = {
 	CLK_LOOKUP("cpu0_clk",	a7ssmux.c, "0.qcom,msm-cpufreq"),
 	CLK_LOOKUP("cpu0_clk",	a7ssmux.c, "fe805664.qcom,pm-8x60"),
+	CLK_LOOKUP("cpu1_clk",	a7ssmux.c, "0.qcom,msm-cpufreq"),
+	CLK_LOOKUP("cpu2_clk",	a7ssmux.c, "0.qcom,msm-cpufreq"),
+	CLK_LOOKUP("cpu3_clk",	a7ssmux.c, "0.qcom,msm-cpufreq"),
 };
 
 static int of_get_fmax_vdd_class(struct platform_device *pdev, struct clk *c,
@@ -292,7 +296,7 @@ static int of_get_clk_src(struct platform_device *pdev, struct clk_src *parents)
 static int clock_a7_probe(struct platform_device *pdev)
 {
 	struct resource *res;
-	int speed_bin = 0, version = 0, rc;
+	int speed_bin = 0, version = 0, rc, cpu;
 	unsigned long rate, aux_rate;
 	struct clk *aux_clk, *main_pll;
 	char prop_name[] = "qcom,speedX-bin-vX";
@@ -361,8 +365,11 @@ static int clock_a7_probe(struct platform_device *pdev)
 	 * that the clocks have already been prepared and enabled by the time
 	 * they take over.
 	 */
-	WARN(clk_prepare_enable(&a7ssmux.c),
-		"Unable to turn on CPU clock");
+	get_online_cpus();
+	for_each_online_cpu(cpu)
+		WARN(clk_prepare_enable(&a7ssmux.c),
+			"Unable to turn on CPU clock");
+	put_online_cpus();
 	return 0;
 }
 
@@ -383,4 +390,4 @@ static int __init clock_a7_init(void)
 {
 	return platform_driver_probe(&clock_a7_driver, clock_a7_probe);
 }
-device_initcall(clock_a7_init);
+arch_initcall(clock_a7_init);

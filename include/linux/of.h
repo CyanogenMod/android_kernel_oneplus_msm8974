@@ -308,6 +308,7 @@ static inline int of_property_read_u32_index(const struct device_node *np,
 	return -ENOSYS;
 }
 
+<<<<<<< HEAD
 static inline int of_property_read_u8_array(const struct device_node *np,
 			const char *propname, u8 *out_values, size_t sz)
 {
@@ -320,6 +321,8 @@ static inline int of_property_read_u16_array(const struct device_node *np,
 	return -ENOSYS;
 }
 
+=======
+>>>>>>> 0ed0fba... devfreq: Backport MSM devfreq features from 3.10
 static inline int of_property_read_u32_array(const struct device_node *np,
 					     const char *propname,
 					     u32 *out_values, size_t sz)

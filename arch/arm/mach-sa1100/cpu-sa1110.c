@@ -257,7 +257,6 @@ static int sa1110_target(struct cpufreq_policy *policy,
 
 	freqs.old = sa11x0_getspeed(0);
 	freqs.new = sa11x0_ppcr_to_freq(ppcr);
-	freqs.cpu = 0;
 
 	sdram_calculate_timing(&sd, freqs.new, sdram);
 
@@ -278,7 +277,7 @@ static int sa1110_target(struct cpufreq_policy *policy,
 	sd.mdcas[2] = 0xaaaaaaaa;
 #endif
 
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 
 	/*
 	 * The clock could be going away for some time.  Set the SDRAMs
@@ -326,7 +325,7 @@ static int sa1110_target(struct cpufreq_policy *policy,
 	 */
 	sdram_update_refresh(freqs.new, sdram);
 
-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 
 	return 0;
 }

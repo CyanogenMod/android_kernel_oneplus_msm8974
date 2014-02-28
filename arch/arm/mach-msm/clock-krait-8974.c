@@ -394,6 +394,7 @@ static struct clk_lookup kpss_clocks_8974[] = {
 	CLK_LOOKUP("",	krait2_pri_mux_clk.c,		""),
 	CLK_LOOKUP("",	krait3_pri_mux_clk.c,		""),
 	CLK_LOOKUP("",	l2_pri_mux_clk.c,		""),
+	CLK_LOOKUP("l2_clk",	l2_clk.c,	  "0.qcom,cache"),
 	CLK_LOOKUP("l2_clk",	l2_clk.c,     "0.qcom,msm-cpufreq"),
 	CLK_LOOKUP("cpu0_clk",	krait0_clk.c, "0.qcom,msm-cpufreq"),
 	CLK_LOOKUP("cpu1_clk",	krait1_clk.c, "0.qcom,msm-cpufreq"),
@@ -894,7 +895,7 @@ static int __init clock_krait_8974_init(void)
 {
 	return platform_driver_register(&clock_krait_8974_driver);
 }
-module_init(clock_krait_8974_init);
+arch_initcall(clock_krait_8974_init);
 
 static void __exit clock_krait_8974_exit(void)
 {
