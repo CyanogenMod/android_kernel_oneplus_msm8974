@@ -56,6 +56,7 @@ static int exynos_target(struct cpufreq_policy *policy,
 	mutex_lock(&cpufreq_lock);
 
 	freqs.old = policy->cur;
+	freqs.new = target_freq;
 
 	if (frequency_locked && target_freq != locking_frequency) {
 		ret = -EAGAIN;
@@ -90,7 +91,7 @@ static int exynos_target(struct cpufreq_policy *policy,
 	}
 	arm_volt = volt_table[index];
 
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 
 	/* When the new frequency is higher than current frequency */
 	if ((freqs.new > freqs.old) && !safe_arm_volt) {
@@ -105,7 +106,7 @@ static int exynos_target(struct cpufreq_policy *policy,
 	if (freqs.new != freqs.old)
 		exynos_info->set_freq(old_index, index);
 
-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 
 	/* When the new frequency is lower than current frequency */
 	if ((freqs.new < freqs.old) ||

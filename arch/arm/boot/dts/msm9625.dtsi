@@ -463,6 +463,17 @@
 		qcom,bus-speed-mode = "SDR12", "SDR25", "SDR50", "DDR50";
 	};
 
+	cpubw: qcom,cpubw {
+		compatible = "qcom,devbw";
+		governor = "cpufreq";
+		qcom,src-dst-ports = <1 512>;
+		qcom,active-only;
+		qcom,bw-tbl =
+			< 1266 /* 166 MHz */ >,
+			< 2540 /* 333 MHz */ >,
+			< 3051 /* 400 MHz */ >;
+	};
+
 	ipa_hw: qcom,ipa@fd4c0000 {
 		compatible = "qcom,ipa";
 		reg = <0xfd4c0000 0x26000>,
@@ -501,30 +512,15 @@
 		};
 	};
 
-	qcom,acpuclk@f9010000 {
-		compatible = "qcom,acpuclk-9625";
-		reg = <0xf9010008 0x10>,
-		      <0xf9008004 0x4>;
-		reg-names = "rcg_base", "pwr_base";
-		a5_cpu-supply = <&pm8019_l10_corner_ao>;
-		a5_mem-supply = <&pm8019_l12_ao>;
-	};
-
-	gdsc_usb_hsic: qcom,gdsc@fc400404 {
-		compatible = "qcom,gdsc";
-		reg = <0xfc400404 0x4>;
-		regulator-name = "gdsc_usb_hsic";
-	};
-
-	tsens@fc4a8000 {
-		compatible = "qcom,msm-tsens";
-		reg = <0xfc4a8000 0x2000>,
-		      <0xfc4bc000 0x1000>;
-		reg-names = "tsens_physical", "tsens_eeprom_physical";
-		interrupts = <0 184 0>;
-		qcom,sensors = <5>;
-		qcom,slope = <3200 3200 3200 3200 3200>;
-		qcom,calib-mode = "fuse_map1";
+	qcom,msm-cpufreq@0 {
+		reg = <0 4>;
+		compatible = "qcom,msm-cpufreq";
+		qcom,cpufreq-table =
+			<  300000 >,
+			<  600000 >,
+			<  787200 >,
+			<  998400 >,
+			< 1152000 >;
 	};
 
 	qcom,msm-thermal {
