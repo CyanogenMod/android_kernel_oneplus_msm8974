@@ -75,6 +75,8 @@ struct ion_device {
  * @idr:		an idr space for allocating handle ids
  * @lock:		lock protecting the tree of handles
  * @name:		used for debugging
+ * @display_name:	used for debugging (unique version of @name)
+ * @display_serial:	used for debugging (to make display_name unique)
  * @task:		used for debugging
  *
  * A client represents a list of buffers this client may access.
@@ -88,6 +90,8 @@ struct ion_client {
 	struct idr idr;
 	struct mutex lock;
 	char *name;
+	char *display_name;
+	int display_serial;
 	struct task_struct *task;
 	pid_t pid;
 	struct dentry *debug_root;
@@ -768,31 +772,17 @@ static const struct file_operations debug_client_fops = {
 	.release = single_release,
 };
 
-static bool startswith(const char *string, const char *prefix)
-{
-	size_t l1 = strlen(string);
-	size_t l2 = strlen(prefix);
-	return strncmp(string, prefix, min(l1, l2)) == 0;
-}
-
 static int ion_get_client_serial(const struct rb_root *root,
 					const unsigned char *name)
 {
 	int serial = -1;
 	struct rb_node *node;
 	for (node = rb_first(root); node; node = rb_next(node)) {
-		int n;
-		char *serial_string;
 		struct ion_client *client = rb_entry(node, struct ion_client,
 						node);
-		if (!startswith(client->name, name))
+		if (strcmp(client->name, name))
 			continue;
-		serial_string = strrchr(client->name, '-');
-		if (!serial_string)
-			continue;
-		serial_string++;
-		sscanf(serial_string, "%d", &n);
-		serial = max(serial, n);
+		serial = max(serial, client->display_serial);
 	}
 	return serial + 1;
 }
@@ -806,16 +796,11 @@ struct ion_client *ion_client_create(struct ion_device *dev,
 	struct rb_node *parent = NULL;
 	struct ion_client *entry;
 	pid_t pid;
-	int name_len;
-	int client_serial;
 
 	if (!name) {
 		pr_err("%s: Name cannot be null\n", __func__);
 		return ERR_PTR(-EINVAL);
 	}
-	name_len = strnlen(name, 64);
-	/* add some space to accommodate the serial number suffix */
-	name_len = min(64, name_len + 11);
 
 	get_task_struct(current->group_leader);
 	task_lock(current->group_leader);
@@ -831,30 +816,28 @@ struct ion_client *ion_client_create(struct ion_device *dev,
 	task_unlock(current->group_leader);
 
 	client = kzalloc(sizeof(struct ion_client), GFP_KERNEL);
-	if (!client) {
-		if (task)
-			put_task_struct(current->group_leader);
-		return ERR_PTR(-ENOMEM);
-	}
+	if (!client)
+		goto err_put_task_struct;
 
 	client->dev = dev;
 	client->handles = RB_ROOT;
 	idr_init(&client->idr);
 	mutex_init(&client->lock);
 
-	client->name = kzalloc(name_len+1, GFP_KERNEL);
-	if (!client->name) {
-		put_task_struct(current->group_leader);
-		kfree(client);
-		return ERR_PTR(-ENOMEM);
-	}
-
 	client->task = task;
 	client->pid = pid;
+	client->name = kstrdup(name, GFP_KERNEL);
+	if (!client->name)
+		goto err_free_client;
 
 	down_write(&dev->lock);
-	client_serial = ion_get_client_serial(&dev->clients, name);
-	snprintf(client->name, name_len, "%s-%d", name, client_serial);
+	client->display_serial = ion_get_client_serial(&dev->clients, name);
+	client->display_name = kasprintf(
+		GFP_KERNEL, "%s-%d", name, client->display_serial);
+	if (!client->display_name) {
+		up_write(&dev->lock);
+		goto err_free_client_name;
+	}
 	p = &dev->clients.rb_node;
 	while (*p) {
 		parent = *p;
@@ -868,20 +851,28 @@ struct ion_client *ion_client_create(struct ion_device *dev,
 	rb_link_node(&client->node, parent, p);
 	rb_insert_color(&client->node, &dev->clients);
 
-
-	client->debug_root = debugfs_create_file(client->name, 0664,
+	client->debug_root = debugfs_create_file(client->display_name, 0664,
 						dev->clients_debug_root,
 						client, &debug_client_fops);
 	if (!client->debug_root) {
 		char buf[256], *path;
 		path = dentry_path(dev->clients_debug_root, buf, 256);
-		pr_err("Failed to created client debugfs at %s/%s\n",
-			path, client->name);
+		pr_err("Failed to create client debugfs at %s/%s\n",
+			path, client->display_name);
 	}
 
 	up_write(&dev->lock);
 
 	return client;
+
+err_free_client_name:
+	kfree(client->name);
+err_free_client:
+	kfree(client);
+err_put_task_struct:
+	if (task)
+		put_task_struct(current->group_leader);
+	return ERR_PTR(-ENOMEM);
 }
 EXPORT_SYMBOL(ion_client_create);
 
@@ -908,6 +899,7 @@ void ion_client_destroy(struct ion_client *client)
 
 	up_write(&dev->lock);
 
+	kfree(client->display_name);
 	kfree(client->name);
 	kfree(client);
 }
@@ -1360,41 +1352,65 @@ static int ion_sync_for_device(struct ion_client *client, int fd)
 	return 0;
 }
 
+/* fix up the cases where the ioctl direction bits are incorrect */
+static unsigned int ion_ioctl_dir(unsigned int cmd)
+{
+	switch (cmd) {
+	case ION_IOC_SYNC:
+	case ION_IOC_FREE:
+	case ION_IOC_CUSTOM:
+		return _IOC_WRITE;
+	default:
+		return _IOC_DIR(cmd);
+	}
+}
+
 static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct ion_client *client = filp->private_data;
+	struct ion_device *dev = client->dev;
+	struct ion_handle *cleanup_handle = NULL;
+	int ret = 0;
+	unsigned int dir;
+
+	union {
+		struct ion_fd_data fd;
+		struct ion_allocation_data allocation;
+		struct ion_handle_data handle;
+		struct ion_custom_data custom;
+	} data;
+
+	dir = ion_ioctl_dir(cmd);
+
+	if (_IOC_SIZE(cmd) > sizeof(data))
+		return -EINVAL;
+
+	if (dir & _IOC_WRITE)
+		if (copy_from_user(&data, (void __user *)arg, _IOC_SIZE(cmd)))
+			return -EFAULT;
 
 	switch (cmd) {
 	case ION_IOC_ALLOC:
 	{
-		struct ion_allocation_data data;
 		struct ion_handle *handle;
 
-		if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
-			return -EFAULT;
-		handle = ion_alloc(client, data.len, data.align,
-					     data.heap_mask, data.flags);
-
+		handle = ion_alloc(client, data.allocation.len,
+						data.allocation.align,
+						data.allocation.heap_mask,
+						data.allocation.flags);
 		if (IS_ERR(handle))
 			return PTR_ERR(handle);
 
-		data.handle = handle->id;
+		data.allocation.handle = handle->id;
 
-		if (copy_to_user((void __user *)arg, &data, sizeof(data))) {
-			ion_free(client, handle);
-			return -EFAULT;
-		}
+		cleanup_handle = handle;
 		break;
 	}
 	case ION_IOC_FREE:
 	{
-		struct ion_handle_data data;
 		struct ion_handle *handle;
 
-		if (copy_from_user(&data, (void __user *)arg,
-				   sizeof(struct ion_handle_data)))
-			return -EFAULT;
-		handle = ion_handle_get_by_id(client, data.handle);
+		handle = ion_handle_get_by_id(client, data.handle.handle);
 		if (IS_ERR(handle))
 			return PTR_ERR(handle);
 		ion_free(client, handle);
@@ -1404,63 +1420,39 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case ION_IOC_SHARE:
 	case ION_IOC_MAP:
 	{
-		struct ion_fd_data data;
 		struct ion_handle *handle;
-		if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
-			return -EFAULT;
 
-		handle = ion_handle_get_by_id(client, data.handle);
+		handle = ion_handle_get_by_id(client, data.handle.handle);
 		if (IS_ERR(handle))
 			return PTR_ERR(handle);
-		data.fd = ion_share_dma_buf_fd(client, handle);
+		data.fd.fd = ion_share_dma_buf_fd(client, handle);
 		ion_handle_put(handle);
-		if (copy_to_user((void __user *)arg, &data, sizeof(data)))
-			return -EFAULT;
-		if (data.fd < 0)
-			return data.fd;
+		if (data.fd.fd < 0)
+			ret = data.fd.fd;
 		break;
 	}
 	case ION_IOC_IMPORT:
 	{
-		struct ion_fd_data data;
 		struct ion_handle *handle;
-		int ret = 0;
-		if (copy_from_user(&data, (void __user *)arg,
-				   sizeof(struct ion_fd_data)))
-			return -EFAULT;
-		handle = ion_import_dma_buf(client, data.fd);
+		handle = ion_import_dma_buf(client, data.fd.fd);
 		if (IS_ERR(handle))
 			ret = PTR_ERR(handle);
 		else
-			data.handle = handle->id;
-
-		if (copy_to_user((void __user *)arg, &data,
-				 sizeof(struct ion_fd_data)))
-			return -EFAULT;
-		if (ret < 0)
-			return ret;
+			data.handle.handle = handle->id;
 		break;
 	}
 	case ION_IOC_SYNC:
 	{
-		struct ion_fd_data data;
-		if (copy_from_user(&data, (void __user *)arg,
-				   sizeof(struct ion_fd_data)))
-			return -EFAULT;
-		ion_sync_for_device(client, data.fd);
+		ret = ion_sync_for_device(client, data.fd.fd);
 		break;
 	}
 	case ION_IOC_CUSTOM:
 	{
-		struct ion_device *dev = client->dev;
-		struct ion_custom_data data;
-
 		if (!dev->custom_ioctl)
 			return -ENOTTY;
-		if (copy_from_user(&data, (void __user *)arg,
-				sizeof(struct ion_custom_data)))
-			return -EFAULT;
-		return dev->custom_ioctl(client, data.cmd, data.arg);
+		ret = dev->custom_ioctl(client, data.custom.cmd,
+						data.custom.arg);
+		break;
 	}
 	case ION_IOC_CLEAN_CACHES:
 		return client->dev->custom_ioctl(client,
@@ -1474,7 +1466,15 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	default:
 		return -ENOTTY;
 	}
-	return 0;
+
+	if (dir & _IOC_READ) {
+		if (copy_to_user((void __user *)arg, &data, _IOC_SIZE(cmd))) {
+			if (cleanup_handle)
+				ion_free(client, cleanup_handle);
+			return -EFAULT;
+		}
+	}
+	return ret;
 }
 
 static int ion_release(struct inode *inode, struct file *file)
@@ -1754,6 +1754,9 @@ void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 
 	if (heap->flags & ION_HEAP_FLAG_DEFER_FREE)
 		ion_heap_init_deferred_free(heap);
+
+	if ((heap->flags & ION_HEAP_FLAG_DEFER_FREE) || heap->ops->shrink)
+		ion_heap_init_shrinker(heap);
 
 	heap->dev = dev;
 	down_write(&dev->lock);

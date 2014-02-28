@@ -153,10 +153,10 @@ end:
 
 void ion_heap_freelist_add(struct ion_heap *heap, struct ion_buffer *buffer)
 {
-	rt_mutex_lock(&heap->lock);
+	spin_lock(&heap->free_lock);
 	list_add(&buffer->list, &heap->free_list);
 	heap->free_list_size += buffer->size;
-	rt_mutex_unlock(&heap->lock);
+	spin_unlock(&heap->free_lock);
 	wake_up(&heap->waitqueue);
 }
 
@@ -164,9 +164,9 @@ size_t ion_heap_freelist_size(struct ion_heap *heap)
 {
 	size_t size;
 
-	rt_mutex_lock(&heap->lock);
+	spin_lock(&heap->free_lock);
 	size = heap->free_list_size;
-	rt_mutex_unlock(&heap->lock);
+	spin_unlock(&heap->free_lock);
 
 	return size;
 }
@@ -174,27 +174,31 @@ size_t ion_heap_freelist_size(struct ion_heap *heap)
 static size_t _ion_heap_freelist_drain(struct ion_heap *heap, size_t size,
 				bool skip_pools)
 {
-	struct ion_buffer *buffer, *tmp;
+	struct ion_buffer *buffer;
 	size_t total_drained = 0;
 
 	if (ion_heap_freelist_size(heap) == 0)
 		return 0;
 
-	rt_mutex_lock(&heap->lock);
+	spin_lock(&heap->free_lock);
 	if (size == 0)
 		size = heap->free_list_size;
 
-	list_for_each_entry_safe(buffer, tmp, &heap->free_list, list) {
+	while (!list_empty(&heap->free_list)) {
 		if (total_drained >= size)
 			break;
+		buffer = list_first_entry(&heap->free_list, struct ion_buffer,
+					  list);
 		list_del(&buffer->list);
 		heap->free_list_size -= buffer->size;
 		if (skip_pools)
-			buffer->flags |= ION_FLAG_FREED_FROM_SHRINKER;
+			buffer->private_flags |= ION_PRIV_FLAG_SHRINKER_FREE;
 		total_drained += buffer->size;
+		spin_unlock(&heap->free_lock);
 		ion_buffer_destroy(buffer);
+		spin_lock(&heap->free_lock);
 	}
-	rt_mutex_unlock(&heap->lock);
+	spin_unlock(&heap->free_lock);
 
 	return total_drained;
 }
@@ -219,16 +223,16 @@ static int ion_heap_deferred_free(void *data)
 		wait_event_freezable(heap->waitqueue,
 				     ion_heap_freelist_size(heap) > 0);
 
-		rt_mutex_lock(&heap->lock);
+		spin_lock(&heap->free_lock);
 		if (list_empty(&heap->free_list)) {
-			rt_mutex_unlock(&heap->lock);
+			spin_unlock(&heap->free_lock);
 			continue;
 		}
 		buffer = list_first_entry(&heap->free_list, struct ion_buffer,
 					  list);
 		list_del(&buffer->list);
 		heap->free_list_size -= buffer->size;
-		rt_mutex_unlock(&heap->lock);
+		spin_unlock(&heap->free_lock);
 		ion_buffer_destroy(buffer);
 	}
 
@@ -241,7 +245,7 @@ int ion_heap_init_deferred_free(struct ion_heap *heap)
 
 	INIT_LIST_HEAD(&heap->free_list);
 	heap->free_list_size = 0;
-	rt_mutex_init(&heap->lock);
+	spin_lock_init(&heap->free_lock);
 	init_waitqueue_head(&heap->waitqueue);
 	heap->task = kthread_run(ion_heap_deferred_free, heap,
 				 "%s", heap->name);
@@ -252,6 +256,44 @@ int ion_heap_init_deferred_free(struct ion_heap *heap)
 		return PTR_RET(heap->task);
 	}
 	return 0;
+}
+
+static int ion_heap_shrink(struct shrinker *shrinker, struct shrink_control *sc)
+{
+	struct ion_heap *heap = container_of(shrinker, struct ion_heap,
+					     shrinker);
+	int total = 0;
+	int freed = 0;
+	int to_scan = sc->nr_to_scan;
+
+	if (to_scan == 0)
+		goto out;
+
+	/*
+	 * shrink the free list first, no point in zeroing the memory if we're
+	 * just going to reclaim it
+	 */
+	if (heap->flags & ION_HEAP_FLAG_DEFER_FREE)
+		freed = ion_heap_freelist_drain(heap, to_scan * PAGE_SIZE) /
+				PAGE_SIZE;
+
+	to_scan -= freed;
+	if (to_scan < 0)
+		to_scan = 0;
+
+out:
+	total = ion_heap_freelist_size(heap) / PAGE_SIZE;
+	if (heap->ops->shrink)
+		total += heap->ops->shrink(heap, sc->gfp_mask, to_scan);
+	return total;
+}
+
+void ion_heap_init_shrinker(struct ion_heap *heap)
+{
+	heap->shrinker.shrink = ion_heap_shrink;
+	heap->shrinker.seeks = DEFAULT_SEEKS;
+	heap->shrinker.batch = 0;
+	register_shrinker(&heap->shrinker);
 }
 
 struct ion_heap *ion_heap_create(struct ion_platform_heap *heap_data)
@@ -270,6 +312,9 @@ struct ion_heap *ion_heap_create(struct ion_platform_heap *heap_data)
 		break;
 	case ION_HEAP_TYPE_CHUNK:
 		heap = ion_chunk_heap_create(heap_data);
+		break;
+	case ION_HEAP_TYPE_DMA:
+		heap = ion_cma_heap_create(heap_data);
 		break;
 	default:
 		pr_err("%s: Invalid heap type %d\n", __func__,
@@ -307,6 +352,9 @@ void ion_heap_destroy(struct ion_heap *heap)
 		break;
 	case ION_HEAP_TYPE_CHUNK:
 		ion_chunk_heap_destroy(heap);
+		break;
+	case ION_HEAP_TYPE_DMA:
+		ion_cma_heap_destroy(heap);
 		break;
 	default:
 		pr_err("%s: Invalid heap type %d\n", __func__,
