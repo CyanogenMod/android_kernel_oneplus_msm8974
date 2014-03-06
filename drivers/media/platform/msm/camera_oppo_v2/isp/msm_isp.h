@@ -71,12 +71,6 @@ enum msm_isp_camif_update_state {
 	DISABLE_CAMIF_IMMEDIATELY
 };
 
-enum msm_isp_reset_type {
-	ISP_RST_HARD,
-	ISP_RST_SOFT,
-	ISP_RST_MAX
-};
-
 struct msm_isp_timestamp {
 	/*Monotonic clock for v4l2 buffer*/
 	struct timeval buf_time;
@@ -153,8 +147,7 @@ struct msm_vfe_axi_ops {
 
 struct msm_vfe_core_ops {
 	void (*reg_update) (struct vfe_device *vfe_dev);
-	long (*reset_hw) (struct vfe_device *vfe_dev,
-		enum msm_isp_reset_type reset_type);
+	long (*reset_hw) (struct vfe_device *vfe_dev);
 	int (*init_hw) (struct vfe_device *vfe_dev);
 	void (*init_hw_reg) (struct vfe_device *vfe_dev);
 	void (*release_hw) (struct vfe_device *vfe_dev);
@@ -453,6 +446,7 @@ struct vfe_device {
 	uint8_t vt_enable;
 	void __iomem *p_avtimer_msw;
 	void __iomem *p_avtimer_lsw;
+	uint8_t ignore_error;
 };
 
 #endif

@@ -394,49 +394,43 @@ static int32_t msm_actuator_set_default_focus(
 static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
 {
 	int32_t rc = 0;
-/*deleted by Jinshui.Liu@Camera 20140114 start for*/
-#ifndef CONFIG_VENDOR_EDIT
     uint16_t code = 0;
     uint8_t buf[2];
-#endif
-/*deleted by Jinshui.Liu@Camera 20140114 end*/
+
 	CDBG("Enter\n");
+
 	if (a_ctrl->actuator_state != ACTUATOR_POWER_DOWN) {
 	if (a_ctrl->vcm_enable) {
 		rc = gpio_direction_output(a_ctrl->vcm_pwd, 0);
 		if (!rc)
 			gpio_free(a_ctrl->vcm_pwd);
 	}
-	pr_err("%s %d\n",__func__, __LINE__);
-/*deleted by Jinshui.Liu@Camera 20140114 start for*/
-#ifndef CONFIG_VENDOR_EDIT
-	code = a_ctrl->current_lens_pos;
-	pr_err("%s %d\n",__func__, __LINE__);
-	CDBG("%s: a_ctrl->curr_lens_pos = %d\n",__func__,a_ctrl->current_lens_pos);
-	while(code) {
 
-	pr_err("%s %d\n",__func__, __LINE__);
-	CDBG("%s: code is = %d\n",__func__,code);
-	code = (code > 30)?(code - 30) : 0;
-	buf[0] = (code >> 4);
-	buf[1] = ((code << 4) | 0x7) & 0xFF;
-	pr_err("%s %d\n",__func__, __LINE__);
-	rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write_seq(&a_ctrl->i2c_client,
-	buf[0],
-	&buf[1], 1);
-	pr_err("%s %d\n",__func__, __LINE__);
-	usleep_range(15000, 16000);
+	code = a_ctrl->current_lens_pos;
+    CDBG("%s %d\n",__func__, __LINE__);
+	CDBG("%s: a_ctrl->curr_lens_pos = %d\n",__func__,a_ctrl->current_lens_pos);
+
+	while(code) {
+    CDBG("%s %d\n",__func__, __LINE__);
+    	CDBG("%s: code is = %d\n",__func__,code);
+    	code = (code > 50)?(code - 50) : 0;
+    	buf[0] = (code >> 4);
+    	buf[1] = ((code << 4) | 0x7) & 0xFF;
+    CDBG("%s %d\n",__func__, __LINE__);
+    	rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write_seq(&a_ctrl->i2c_client,
+    	buf[0],
+    	&buf[1], 1);
+    CDBG("%s %d\n",__func__, __LINE__);
+    	usleep_range(15000, 16000);
 	}
 	buf[0] = buf[1] =  0;
-	pr_err("%s %d\n",__func__, __LINE__);
+    CDBG("%s %d\n",__func__, __LINE__);
 	rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write_seq(&a_ctrl->i2c_client,
 		buf[0],
 		&buf[1], 1);
 
-	pr_err("%s %d\n",__func__, __LINE__);
+    CDBG("%s %d\n",__func__, __LINE__);
 	usleep_range(8000, 9000);
-#endif
-/*deleted by Jinshui.Liu@Camera 20140114 end*/
 	kfree(a_ctrl->step_position_table);
 	a_ctrl->step_position_table = NULL;
 	kfree(a_ctrl->i2c_reg_tbl);
@@ -444,6 +438,7 @@ static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
 	a_ctrl->i2c_tbl_index = 0;
 		a_ctrl->actuator_state = ACTUATOR_POWER_DOWN;
 	}
+
 	CDBG("Exit\n");
 	return rc;
 }

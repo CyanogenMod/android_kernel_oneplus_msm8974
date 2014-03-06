@@ -494,7 +494,7 @@ static int32_t msm_led_cci_query_ic(struct msm_led_cci_ctrl_t *fctrl, struct dev
     
 	CDBG("called\n");
 
-    if (!of_get_property(of_node, "qcom,flash-source", &count)) {
+    if (!of_get_property(of_node, "qcom,flash-cci-source", &count)) {
         pr_err("can not get qcom,flash-source\n");
         return -EINVAL;
     }
@@ -505,7 +505,7 @@ static int32_t msm_led_cci_query_ic(struct msm_led_cci_ctrl_t *fctrl, struct dev
         fctrl->led_info = NULL;
         /*get led info form dt*/
         flash_src_node = of_parse_phandle(of_node,
-            "qcom,flash-source", i);
+            "qcom,flash-cci-source", i);
         if (!flash_src_node) {
             continue;
         }
@@ -605,7 +605,7 @@ FAILED:
 }
 
 static const struct of_device_id msm_led_cci_dt_match[] = {
-	{.compatible = "qcom,camera-led-cci"},
+	{.compatible = "qcom,camera-led-flash"},
 	{}
 };
 
@@ -968,8 +968,14 @@ static int32_t msm_led_cci_probe(struct platform_device *pdev)
 static int __init msm_led_cci_add_driver(void)
 {
 	CDBG("called\n");
-	return platform_driver_probe(&msm_led_cci_driver,
-		msm_led_cci_probe);
+	if (get_pcb_version() >= HW_VERSION__20) {
+	    pr_err("It Find7S");
+	    return -ENODEV;
+	} else {
+	    pr_err("It Find7");
+	    return platform_driver_probe(&msm_led_cci_driver,
+		    msm_led_cci_probe);
+	}
 }
 
 static struct msm_led_cci_fn_t msm_led_cci_func_tbl = {

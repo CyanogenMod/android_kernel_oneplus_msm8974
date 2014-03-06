@@ -28,7 +28,7 @@
 #endif
 
 /* OPPO 2013-12-18 yingpiao.lin modify begin for bug gpio-standby is none */
-#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
 #define UNDEFINE_GPIO 0XFFFF
 #endif
 /* OPPO 2013-12-18 yingpiao.lin Add modify end */
@@ -575,7 +575,7 @@ int32_t msm_sensor_init_gpio_pin_tbl(struct device_node *of_node,
 		CDBG("%s qcom,gpio-reset %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_STANDBY]);
 /* OPPO 2013-12-18 yingpiao.lin modify begin for bug gpio-standby is none */
-#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
     } else {
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_STANDBY] =
 				UNDEFINE_GPIO;
@@ -1036,7 +1036,7 @@ int32_t msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 				goto power_up_failed;
 			}
 /* OPPO 2013-12-18 yingpiao.lin modify begin for bug gpio-standby is none */
-#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
 			if (data->gpio_conf->gpio_num_info->gpio_num
 				[power_setting->seq_val] == UNDEFINE_GPIO)
 				continue;
@@ -1094,13 +1094,7 @@ int32_t msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 		rc = msm_sensor_match_id(s_ctrl);
 	if (rc < 0) {
 		pr_err("%s:%d match id failed rc %d\n", __func__, __LINE__, rc);
-/*modified by Jinshui.Liu@Prd.Camera 20140107 start for i2c error handing*/
-#ifndef CONFIG_VENDOR_EDIT
 		goto power_up_failed;
-#else
-		return -0x1ff;
-#endif
-/*modified by Jinshui.Liu@Camera 20140107 end*/
 	}
 
 	CDBG("%s exit\n", __func__);
@@ -1126,7 +1120,7 @@ power_up_failed:
 			break;
 		case SENSOR_GPIO:
 /* OPPO 2013-12-18 yingpiao.lin modify begin for bug gpio-standby is none */
-#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
 			if (data->gpio_conf->gpio_num_info->gpio_num
 				[power_setting->seq_val] == UNDEFINE_GPIO)
 				continue;
@@ -1201,7 +1195,7 @@ int32_t msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 				continue;
 			}
 /* OPPO 2013-12-18 yingpiao.lin modify begin for bug gpio-standby is none */
-#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
 			if (data->gpio_conf->gpio_num_info->gpio_num
 				[power_setting->seq_val] == UNDEFINE_GPIO)
 				continue;
@@ -1289,7 +1283,7 @@ static void msm_sensor_stop_stream(struct msm_sensor_ctrl_t *s_ctrl)
 }
 
 /* OPPO 2013-12-26 zhuosj Add begin for at test */
-#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
 static void at_msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	pr_err("%s cmd is 0 \n", __func__);
@@ -1322,12 +1316,6 @@ static int msm_sensor_get_af_status(struct msm_sensor_ctrl_t *s_ctrl,
 static long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg)
 {
-/*Added by Jinshui.Liu@Camera 20140107 start for i2c error handing*/
-#ifdef CONFIG_VENDOR_EDIT
-	uint32_t rc;
-	struct sensorb_cfg_data *cdata = (struct sensorb_cfg_data *)arg;
-#endif
-/*Added by Jinshui.Liu@Camera 20140107 end*/
 	struct msm_sensor_ctrl_t *s_ctrl = get_sctrl(sd);
 	void __user *argp = (void __user *)arg;
 	if (!s_ctrl) {
@@ -1335,7 +1323,7 @@ static long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 		return -EBADF;
 	}
 /* OPPO 2013-12-26 zhuosj Add begin for at test */
-#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
 	if (cmd == 0 && arg == NULL) {
 		at_msm_sensor_power_down(s_ctrl);
 		return 0;
@@ -1347,28 +1335,7 @@ static long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 /* OPPO 2013-12-26 zhuosj Add end */
 	switch (cmd) {
 	case VIDIOC_MSM_SENSOR_CFG:
-/*modified by Jinshui.Liu@Prd.Camera 20140107 start for i2c error handing*/
-#ifndef CONFIG_VENDOR_EDIT
 		return s_ctrl->func_tbl->sensor_config(s_ctrl, argp);
-#else
-		rc = s_ctrl->func_tbl->sensor_config(s_ctrl, argp);
-		if (cdata->cfgtype == CFG_POWER_UP) {
-			if (rc == -0x1ff) {
-				pr_err("%s:%d power down and powerup again\n", __func__, __LINE__);
-				cdata->cfgtype = CFG_POWER_DOWN;
-				rc = s_ctrl->func_tbl->sensor_config(s_ctrl, argp);
-
-				cdata->cfgtype = CFG_POWER_UP;
-				rc = s_ctrl->func_tbl->sensor_config(s_ctrl, argp);
-				return rc;
-			} else {
-				return rc;
-			}
-		} else {
-			return rc;
-		}
-#endif
-/*modified by Jinshui.Liu@Camera 20140107 end*/
 	case VIDIOC_MSM_SENSOR_GET_AF_STATUS:
 		return msm_sensor_get_af_status(s_ctrl, argp);
 	case VIDIOC_MSM_SENSOR_RELEASE:
@@ -1730,18 +1697,7 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 			if (rc < 0) {
 				pr_err("%s:%d failed rc %ld\n", __func__,
 					__LINE__, rc);
-/*modified by Jinshui.Liu@Prd.Camera 20140107 start for i2c error handing*/
-#ifndef CONFIG_VENDOR_EDIT
 				break;
-#else
-				if (rc == -0x1ff) {
-					pr_err("%s:%d i2c read error, will power up again latter\n", __func__, __LINE__);
-					s_ctrl->sensor_state = MSM_SENSOR_POWER_UP;
-				} else {
-					break;
-				}
-#endif
-/*modified by Jinshui.Liu@Camera 20140107 end*/
 			}
 			s_ctrl->sensor_state = MSM_SENSOR_POWER_UP;
 			pr_err("%s:%d sensor state %d\n", __func__, __LINE__,
@@ -1953,16 +1909,6 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 	memcpy(s_ctrl->clk_info, cam_8974_clk_info, sizeof(cam_8974_clk_info));
 	s_ctrl->clk_info_size = ARRAY_SIZE(cam_8974_clk_info);
 	rc = s_ctrl->func_tbl->sensor_power_up(s_ctrl);
-/*Added by Jinshui.Liu@Camera 20140107 start for i2c error handing*/
-#ifdef CONFIG_VENDOR_EDIT
-	if (rc == -0x1ff) {
-		pr_err("%s:%d i2c read failed, will try again", __func__, __LINE__);
-		rc = s_ctrl->func_tbl->sensor_power_down(s_ctrl);
-		pr_err("%s:%d rc %d", __func__, __LINE__, rc);
-		rc = s_ctrl->func_tbl->sensor_power_up(s_ctrl);
-	}
-#endif
-/*Added by Jinshui.Liu@Camera 20140107 end*/
 	if (rc < 0) {
 		pr_err("%s %s power up failed\n", __func__,
 			s_ctrl->sensordata->sensor_name);

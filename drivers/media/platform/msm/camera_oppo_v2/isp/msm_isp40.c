@@ -364,8 +364,7 @@ static void msm_vfe40_process_reset_irq(struct vfe_device *vfe_dev,
 static void msm_vfe40_process_halt_irq(struct vfe_device *vfe_dev,
 	uint32_t irq_status0, uint32_t irq_status1)
 {
-	uint32_t halt_ack = msm_camera_io_r(vfe_dev->vfe_base + 0x2e4);
-	if (halt_ack & 1)
+	if (irq_status1 & (1 << 8))
 		complete(&vfe_dev->halt_complete);
 }
 
@@ -576,24 +575,10 @@ static void msm_vfe40_reg_update(struct vfe_device *vfe_dev)
 	msm_camera_io_w_mb(0xF, vfe_dev->vfe_base + 0x378);
 }
 
-static uint32_t msm_vfe40_reset_values[ISP_RST_MAX] =
+static long msm_vfe40_reset_hardware(struct vfe_device *vfe_dev)
 {
-	0x1FF, /* ISP_RST_HARD reset everything */
-	0x1EF /* ISP_RST_SOFT all modules without registers */
-};
-
-
-static long msm_vfe40_reset_hardware(struct vfe_device *vfe_dev ,
-			enum msm_isp_reset_type reset_type)
-{
-	uint32_t rst_val;
-	if (reset_type >= ISP_RST_MAX) {
-		pr_err("%s: Error Invalid parameter\n", __func__);
-		reset_type = ISP_RST_HARD;
-	}
-	rst_val = msm_vfe40_reset_values[reset_type];
 	init_completion(&vfe_dev->reset_complete);
-	msm_camera_io_w_mb(rst_val, vfe_dev->vfe_base + 0xC);
+	msm_camera_io_w_mb(0x1FF, vfe_dev->vfe_base + 0xC);
 	return wait_for_completion_interruptible_timeout(
 		&vfe_dev->reset_complete, msecs_to_jiffies(50));
 }
@@ -894,7 +879,13 @@ static void msm_vfe40_update_camif_state(struct vfe_device *vfe_dev,
 		msm_camera_io_w_mb(0x0, vfe_dev->vfe_base + 0x2F4);
 		vfe_dev->axi_data.src_info[VFE_PIX_0].active = 0;
 	} else if (update_state == DISABLE_CAMIF_IMMEDIATELY) {
+		vfe_dev->ignore_error = 1;
+		msm_camera_io_w_mb(0x6, vfe_dev->vfe_base + 0x2F4);
+		vfe_dev->hw_info->vfe_ops.axi_ops.halt(vfe_dev);
+		vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev);
+		vfe_dev->hw_info->vfe_ops.core_ops.init_hw_reg(vfe_dev);
 		vfe_dev->axi_data.src_info[VFE_PIX_0].active = 0;
+		vfe_dev->ignore_error = 0;
 	}
 }
 

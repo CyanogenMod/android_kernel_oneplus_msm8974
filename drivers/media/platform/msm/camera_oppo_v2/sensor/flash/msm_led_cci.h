@@ -26,6 +26,7 @@
 #include "msm_camera_i2c.h"
 #include "msm_cci.h"
 #include "msm_sd.h"
+#include <linux/pcb_version.h>
 
 #define MAX_LED_TRIGGERS 3
 
