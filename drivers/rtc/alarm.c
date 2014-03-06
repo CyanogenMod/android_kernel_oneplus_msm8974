@@ -309,6 +309,24 @@ err:
 	return ret;
 }
 
+#ifdef CONFIG_MACH_OPPO
+int msmrtc_alarm_read_time(struct rtc_time *tm)
+{
+	int ret=0;
+
+	ret = rtc_read_time(alarm_rtc_dev, tm);
+	if (ret < 0) {
+		pr_alarm(ERROR, "%s: Failed to read RTC time\n", __func__);
+		goto err;
+	}
+
+	return 0;
+err:
+	pr_alarm(ERROR, "%s: rtc alarm will lost!", __func__);
+	return -1;
+}
+EXPORT_SYMBOL(msmrtc_alarm_read_time);
+#endif
 
 void
 alarm_update_timedelta(struct timespec tmp_time, struct timespec new_time)

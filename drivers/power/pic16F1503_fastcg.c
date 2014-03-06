@@ -15,6 +15,12 @@ static struct task_struct *pic16f_fw_update_task = NULL;
 #define BYTE_OFFSET 2
 #define BYTES_TO_WRITE 16
 
+#if defined CONFIG_MACH_FIND7 || defined CONFIG_MACH_FIND7WX	//FIND7/FIND7WX:pic1503
+#define ERASE_COUNT   96	//0x200-0x7FF
+#else	//FIND7OP or other pic1508 
+#define ERASE_COUNT   224	//0x200-0xFFF
+#endif
+
 static struct i2c_client *pic16F_client;
 
 int pic_fw_ver_count = sizeof(Pic16F_firmware_data);
@@ -37,7 +43,7 @@ int pic16f_fw_update(void)
 	//buf = firmware_data;
     buf = Pic16F_firmware_data;
 	//erase address 0x200-0x7FF 
-	for(i = 0;i < 96;i++){
+	for(i = 0;i < ERASE_COUNT;i++){
 		//first:set address
 		rc = i2c_smbus_write_i2c_block_data(pic16F_client,0x01,2,&addr_buf[0]);
 		if(rc < 0){
