@@ -175,7 +175,10 @@ struct msm8974_asoc_mach_data {
 //liuyan 2013-3-14 add,hp mic switch
 #ifdef CONFIG_MACH_OPPO
        int hpmic_switch_gpio;
-	//struct regulator	*cdc_spk;
+#ifdef CONFIG_MACH_FIND7OP
+/* xiaojun.lv@Prd.AudioDrv,2014/2/10,add for 14001 regulator*/       
+	struct regulator	*cdc_spk;
+#endif
 	int enable_spk_gpio;
 	int yda145_ctr_gpio;
 	int yda145_boost_gpio;
@@ -1707,7 +1710,7 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	printk("%s:enable_spk_gpio(%d)\n",__func__,mbhc_cfg.enable_spk_gpio);
 	//mbhc_cfg.cdc_spk=mach_data->cdc_spk;
 	//liuyan add for dvt
-	if(pcb_version==HW_VERSION__12){
+	if(pcb_version>=HW_VERSION__12){
            mbhc_cfg.yda145_ctr_gpio=mach_data->yda145_ctr_gpio;
 	if (mbhc_cfg.yda145_ctr_gpio) {
 		err = gpio_request(mbhc_cfg.yda145_ctr_gpio, "YDA145_CTR");
@@ -2900,7 +2903,7 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 	}
 
         //liuyan add for dvt
-        if(pcb_version==HW_VERSION__12){
+        if(pcb_version>=HW_VERSION__12){
 	     pdata->yda145_ctr_gpio= of_get_named_gpio(pdev->dev.of_node,
 				"qcom,yda145_ctr-gpio", 0);
 	     if (pdata->yda145_ctr_gpio < 0) {
@@ -2979,6 +2982,18 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 			ret);
 		goto err;
 	}
+
+#ifdef CONFIG_MACH_FIND7OP
+/* xiaojun.lv@Prd.AudioDrv,2014/2/10,add for 14001 regulator*/
+        pdata->cdc_spk= regulator_get(&pdev->dev, "cdc_spk");
+		if (IS_ERR(pdata->cdc_spk)) {
+			pr_err("%s:Failed to get cdc_spk regulator\n",__func__);
+			pdata->cdc_spk= NULL;
+			//ret = -EINVAL;
+		}
+		printk("%s regulator_enable(pdata->cdc_spk);\n",__func__);
+		regulator_enable(pdata->cdc_spk);
+#endif
 
 	/* Parse Primary AUXPCM info from DT */
 	ret = msm8974_dtparse_auxpcm(pdev, &pdata->pri_auxpcm_ctrl,

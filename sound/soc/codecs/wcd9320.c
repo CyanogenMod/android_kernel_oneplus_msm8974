@@ -1552,7 +1552,7 @@ static int spkr_put_control(struct snd_kcontrol *kcontrol,
 	printk("%s:val %d\n",__func__,value);
 	if(value){
 		//liuyan add for dvt
-		if(pcb_version==HW_VERSION__12){
+		if(pcb_version>=HW_VERSION__12){
 		gpio_set_value(taiko->mbhc.mbhc_cfg->yda145_boost_gpio,1);
 		pr_debug("%s:gpio:%d %d\n",__func__,taiko->mbhc.mbhc_cfg->yda145_boost_gpio,
 			    gpio_get_value(taiko->mbhc.mbhc_cfg->yda145_boost_gpio));
@@ -1569,7 +1569,7 @@ static int spkr_put_control(struct snd_kcontrol *kcontrol,
 		pr_debug("%s:gpio:%d %d\n",__func__,taiko->mbhc.mbhc_cfg->enable_spk_gpio,
 			     gpio_get_value(taiko->mbhc.mbhc_cfg->enable_spk_gpio));
 		//liuyan add for dvt
-		if(pcb_version==HW_VERSION__12){
+		if(pcb_version>=HW_VERSION__12){
 		gpio_set_value(taiko->mbhc.mbhc_cfg->yda145_ctr_gpio,0);
 		pr_debug("%s:gpio:%d %d\n",__func__,taiko->mbhc.mbhc_cfg->yda145_ctr_gpio,
 			    gpio_get_value(taiko->mbhc.mbhc_cfg->yda145_ctr_gpio));
