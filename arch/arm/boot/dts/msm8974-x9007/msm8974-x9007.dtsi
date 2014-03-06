@@ -19,6 +19,7 @@
 /include/ "msm8974-x9007-nfc.dtsi"
 /include/ "msm8974-x9007-regulator.dtsi"
 /include/ "msm8974-x9007-sound.dtsi"
+/include/ "msm8974-x9007-leds.dtsi"
 
 &soc {
 

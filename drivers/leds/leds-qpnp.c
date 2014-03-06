@@ -485,6 +485,11 @@ struct qpnp_led_data {
 
 static int num_kpbl_leds_on;
 
+#ifdef CONFIG_MACH_OPPO
+bool flash_blink_state;
+int led_flash_state;
+#endif
+
 static int
 qpnp_led_masked_write(struct qpnp_led_data *led, u16 addr, u8 mask, u8 val)
 {
@@ -1253,7 +1258,11 @@ static int qpnp_kpdbl_set(struct qpnp_led_data *led)
 			return rc;
 		}
 
+#ifdef CONFIG_MACH_OPPO
+		num_kpbl_leds_on = 1;
+#else
 		num_kpbl_leds_on++;
+#endif
 
 	} else {
 		led->kpdbl_cfg->pwm_cfg->mode =
@@ -2176,6 +2185,87 @@ static ssize_t blink_store(struct device *dev,
 	return count;
 }
 
+#ifdef CONFIG_MACH_OPPO
+static void led_flash_blink_work(struct work_struct *work)
+{
+	//int brightness;
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct qpnp_led_data *led = container_of(dwork,
+			struct qpnp_led_data, dwork);
+
+	if (flash_blink_state) {
+		if (led->flash_cfg->torch_enable)
+			led->cdev.brightness = 51;
+		else
+			led->cdev.brightness = 500;
+	} else {
+		led->cdev.brightness = 0;
+	}
+
+	__qpnp_led_work(led, 0);
+
+	flash_blink_state = !flash_blink_state;
+
+	schedule_delayed_work(dwork, msecs_to_jiffies(1200));
+	return;
+}
+
+static void led_flash_blink_stop(struct qpnp_led_data *led)
+{
+	if (led_flash_state == 2) {
+		flash_blink_state = false;
+		cancel_delayed_work_sync(&led->dwork);
+		led->cdev.brightness = 0;
+		__qpnp_led_work(led, 0);
+	} else if(led_flash_state == 1) {
+		led->cdev.brightness = 0;
+		__qpnp_led_work(led, 0);
+	} else {
+		return;
+	}
+
+	led_flash_state = 0;
+}
+
+static ssize_t led_flash_blink_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	ssize_t ret = -EINVAL;
+	struct qpnp_led_data *led;
+	unsigned long state;
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	led = container_of(led_cdev, struct qpnp_led_data, cdev);
+
+	ret = kstrtoul(buf, 10, &state);
+	if (ret)
+		return ret;
+
+	if (state == 2) {
+		/*blink*/
+		led_flash_blink_stop(led);
+		led_flash_state = 2;
+		flash_blink_state = true;
+		INIT_DELAYED_WORK(&led->dwork, led_flash_blink_work);
+		schedule_delayed_work(&led->dwork, msecs_to_jiffies(500));
+	} else if (state == 1) {
+		/*lamp*/
+		led_flash_blink_stop(led);
+		led_flash_state = 1;
+		if (led->flash_cfg->torch_enable)
+			led->cdev.brightness = 51;
+		else
+			led->cdev.brightness = 500;
+		__qpnp_led_work(led, 0);
+	} else {
+		/*off*/
+		led_flash_blink_stop(led);
+	}
+
+	return count;
+}
+#endif
+
 static DEVICE_ATTR(led_mode, 0664, NULL, led_mode_store);
 static DEVICE_ATTR(strobe, 0664, NULL, led_strobe_type_store);
 static DEVICE_ATTR(pwm_us, 0664, NULL, pwm_us_store);
@@ -2186,8 +2276,14 @@ static DEVICE_ATTR(ramp_step_ms, 0664, NULL, ramp_step_ms_store);
 static DEVICE_ATTR(lut_flags, 0664, NULL, lut_flags_store);
 static DEVICE_ATTR(duty_pcts, 0664, NULL, duty_pcts_store);
 static DEVICE_ATTR(blink, 0664, NULL, blink_store);
+#ifdef CONFIG_MACH_OPPO
+static DEVICE_ATTR(flash_blink, 0666, NULL, led_flash_blink_store);
+#endif
 
 static struct attribute *led_attrs[] = {
+#ifdef CONFIG_MACH_OPPO
+	&dev_attr_flash_blink.attr,
+#endif
 	&dev_attr_led_mode.attr,
 	&dev_attr_strobe.attr,
 	NULL
