@@ -6482,6 +6482,8 @@ static void update_heartbeat(struct work_struct *work)
 	
 	qpnp_check_recharging(chip);
 
+	power_supply_changed(&chip->batt_psy);
+
 	/*update time 6s*/
 	schedule_delayed_work(&chip->update_heartbeat_work,
 			      round_jiffies_relative(msecs_to_jiffies
