@@ -159,6 +159,14 @@
 		qcom,mdss-dsi-mdp-trigger = "trigger_sw";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 20>, <0 200>, <1 20>;
+		qcom,mdss-dsi-cabc-off-command = [15 01 00 00 10 00 02 55 00
+			05 01 00 00 10 00 02 29 00];
+		qcom,mdss-dsi-cabc-ui-command = [15 01 00 00 10 00 02 55 01
+			05 01 00 00 10 00 02 29 00];
+		qcom,mdss-dsi-cabc-still-image-command = [15 01 00 00 10 00 02 55 02
+			05 01 00 00 10 00 02 29 00];
+		qcom,mdss-dsi-cabc-video-command = [15 01 00 00 10 00 02 55 03
+			05 01 00 00 10 00 02 29 00];
 		qcom,partial-update-enabled;
 	};
 
