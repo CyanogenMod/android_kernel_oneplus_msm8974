@@ -907,9 +907,7 @@ static int mdp3_overlay_set(struct msm_fb_data_type *mfd,
 			dma->source_config.stride = stride;
 			dma->output_config.pack_pattern =
 				mdp3_ctrl_get_pack_pattern(req->src.format);
-			mdp3_clk_enable(1, 0);
-			mdp3_session->dma->dma_config_source(dma);
-			mdp3_clk_enable(0, 0);
+			dma->update_src_cfg = true;
 		}
 		mdp3_session->overlay.id = 1;
 		req->id = 1;
@@ -934,16 +932,6 @@ static int mdp3_overlay_unset(struct msm_fb_data_type *mfd, int ndx)
 	mutex_lock(&mdp3_session->lock);
 
 	if (mdp3_session->overlay.id == ndx && ndx == 1) {
-		struct mdp3_dma *dma = mdp3_session->dma;
-		dma->source_config.width = panel_info->xres,
-		dma->source_config.height = panel_info->yres,
-		dma->source_config.format = format;
-		dma->source_config.stride = fix->line_length;
-		dma->output_config.pack_pattern =
-			mdp3_ctrl_get_pack_pattern(mfd->fb_imgType);
-		mdp3_clk_enable(1, 0);
-		mdp3_session->dma->dma_config_source(dma);
-		mdp3_clk_enable(0, 0);
 		mdp3_session->overlay.id = MSMFB_NEW_REQUEST;
 		mdp3_bufq_deinit(&mdp3_session->bufq_in);
 	} else {
