@@ -27,10 +27,11 @@
 #include "synaptics_dsx.h"
 #include "synaptics_dsx_i2c.h"
 #include "synaptics_firmware_youngfast.h"
-#include "synaptics_firmware_tpk.h"
-#ifdef CONFIG_OPPO_DEVICE_FIND7OP
+#ifdef CONFIG_MACH_FIND7OP  //for 14001's wintek tp
+#include "synaptics_firmware_tpk_14001.h"
 #include "synaptics_firmware_wintek_14001.h"
 #else
+#include "synaptics_firmware_tpk.h"
 #include "synaptics_firmware_wintek.h"
 #endif
 #include <linux/proc_fs.h>
@@ -1325,7 +1326,7 @@ static int fwu_start_reflash(void)
 
 	fwu->rmi4_data->stay_awake = true;
 
-	pr_notice("%s: Start of reflash process\n", __func__);
+	//pr_notice("%s: Start of reflash process\n", __func__);
 
 	if (fwu->ext_data_source) {
 		fw_image = fwu->ext_data_source;
@@ -1424,7 +1425,7 @@ exit:
 	if (fw_entry)
 		release_firmware(fw_entry);
 
-	pr_notice("%s: End of reflash process\n", __func__);
+	//pr_notice("%s: End of reflash process\n", __func__);
 
 	fwu->rmi4_data->stay_awake = false;
 
@@ -1465,21 +1466,6 @@ int synaptics_fw_updater(unsigned char *fw_data)
 	fwu->config_area = UI_CONFIG_AREA;
 
 	retval = fwu_start_reflash();
-
-	if(retval < 0) {
-        //if fail, retry it
-    	regulator_disable(fwu->rmi4_data->regulator);    
-		msleep(30);
-		regulator_enable(fwu->rmi4_data->regulator);
-		fwu->rmi4_data->current_page = MASK_8BIT;
-		msleep(150);
-
-		synaptics_rmi4_fwu_init_func(fwu->rmi4_data);
-		queue_delayed_work(fwu->fwu_workqueue,
-			&fwu->fwu_work,
-			msecs_to_jiffies(50));
-	} 
-
 
 	return retval;
 }
@@ -1570,12 +1556,16 @@ static void fwu_startup_fw_update_work(struct work_struct *work)
 	firmwaredata = fwu_rmi4_get_firmware_data() ;
 	if(!firmwaredata) {
 		printk("[syna]can't find firmware data\n");
+		if(fwu && (fwu->rmi4_data))
+			fwu->rmi4_data->bcontinue = 1 ;
         return ;
 	}
 		
 	synaptics_fw_updater(firmwaredata);
 
 	fwu->image_name[0] = 0;
+
+	fwu->rmi4_data->bcontinue = 1 ;
 
 	return;
 }
@@ -2059,6 +2049,14 @@ static int init_synaptics_proc(void)
 	return ret;
 }
 
+//init fw module
+int rmi4_fw_module_init(bool insert) {
+	synaptics_rmi4_new_function(RMI_FW_UPDATER, insert,
+			synaptics_rmi4_fwu_init,
+			synaptics_rmi4_fwu_remove,
+			synaptics_rmi4_fwu_attn);
+	return 0;
+}
 
 static int __init rmi4_fw_update_module_init(void)
 {
