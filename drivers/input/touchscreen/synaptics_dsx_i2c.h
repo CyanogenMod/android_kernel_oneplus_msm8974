@@ -286,6 +286,9 @@ struct synaptics_rmi4_data {
 	struct notifier_block fb_notif;
 	unsigned char gesture_enable;
 	unsigned char glove_enable;  //glove mode
+	unsigned char pdoze_enable;  //pdoze mode
+	unsigned char pdoze_status;
+	unsigned char bcontinue;
 	struct workqueue_struct *reportqueue;  //for work queue
 	struct work_struct reportwork;
 };
