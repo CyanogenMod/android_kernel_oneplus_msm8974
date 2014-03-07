@@ -253,10 +253,6 @@ struct msm_slim_ctrl {
 	struct work_struct	slave_notify;
 	struct msm_slim_qmi	qmi;
 	struct msm_slim_pdata	pdata;
-#ifdef CONFIG_SND_SOC_ES325
-	struct regulator	*cdc_es325;
-	unsigned int		reset_gpio;
-#endif
 };
 
 struct msm_sat_chan {
