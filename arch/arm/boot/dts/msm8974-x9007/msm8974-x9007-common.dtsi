@@ -652,3 +652,15 @@
 		qcom,channel-type = <0x1540>;
 	};
 };
+
+&dsi_jdi_1080_vid {
+       qcom,cont-splash-enabled;
+};
+
+&dsi_jdi_1080_cmd {
+       qcom,cont-splash-enabled;
+};
+
+&dsi_truly_1080_vid {
+       qcom,cont-splash-enabled;
+};
