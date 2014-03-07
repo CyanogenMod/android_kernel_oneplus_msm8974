@@ -42,12 +42,9 @@
 #ifdef CONFIG_MACH_OPPO
 //liuyan add for dvt
 #include <linux/pcb_version.h>
-//liuyan add for es325
-#ifdef CONFIG_SND_SOC_ES325
-#include "es325-export.h"
-#endif
 //liuyan add end
 #endif
+
 #define TAIKO_MAD_SLIMBUS_TX_PORT 12
 #define TAIKO_MAD_AUDIO_FIRMWARE_PATH "wcd9320/wcd9320_mad_audio.bin"
 #define TAIKO_VALIDATE_RX_SBPORT_RANGE(port) ((port >= 16) && (port <= 22))
@@ -4792,100 +4789,6 @@ static int taiko_hw_params(struct snd_pcm_substream *substream,
 
 	return 0;
 }
-//liuyan modify for es325
-#ifdef CONFIG_MACH_OPPO
-static int taiko_es325_hw_params(struct snd_pcm_substream *substream,
-		struct snd_pcm_hw_params *params,
-		struct snd_soc_dai *dai)
-{
-	int rc = 0;
-	dev_err(dai->dev,"%s: dai_name = %s DAI-ID %x rate %d num_ch %d\n", __func__,
-			dai->name, dai->id, params_rate(params),
-			params_channels(params));
-
-	rc = taiko_hw_params(substream, params, dai);
-
-#ifdef CONFIG_SND_SOC_ES325
-	if (es325_remote_route_enable(dai))
-		rc = es325_slim_hw_params(substream, params, dai);
-#endif
-
-	return rc;
-}
-
-#define SLIM_BUGFIX
-static int taiko_es325_set_channel_map(struct snd_soc_dai *dai,
-				unsigned int tx_num, unsigned int *tx_slot,
-				unsigned int rx_num, unsigned int *rx_slot)
-
-{
-#ifdef CONFIG_SND_SOC_ES325
-#if !defined(SLIM_BUGFIX)
-	unsigned int taiko_tx_num = 0;
-#endif
-	unsigned int taiko_tx_slot[6];
-#if !defined(SLIM_BUGFIX)
-	unsigned int taiko_rx_num = 0;
-#endif
-	unsigned int taiko_rx_slot[6];
-#if defined(SLIM_BUGFIX)
-	unsigned int temp_tx_num = 0;
-	unsigned int temp_rx_num = 0;
-#endif
-#endif
-	int rc = 0;
-
-#ifdef CONFIG_SND_SOC_ES325
-	if (es325_remote_route_enable(dai)) {
-#if defined(SLIM_BUGFIX)
-		rc = taiko_get_channel_map(dai, &temp_tx_num, taiko_tx_slot,
-					&temp_rx_num, taiko_rx_slot);
-#else
-		rc = taiko_get_channel_map(dai, &taiko_tx_num, taiko_tx_slot,
-					&taiko_rx_num, taiko_rx_slot);
-#endif
-
-		rc = taiko_set_channel_map(dai, tx_num, taiko_tx_slot, rx_num, taiko_rx_slot);
-
-		rc = es325_slim_set_channel_map(dai, tx_num, tx_slot, rx_num, rx_slot);
-	} else
-#endif
-		rc = taiko_set_channel_map(dai, tx_num, tx_slot, rx_num, rx_slot);
-
-	return rc;
-}
-
-static int taiko_es325_get_channel_map(struct snd_soc_dai *dai,
-				unsigned int *tx_num, unsigned int *tx_slot,
-				unsigned int *rx_num, unsigned int *rx_slot)
-
-{
-	int rc = 0;
-
-#ifdef CONFIG_SND_SOC_ES325
-	if (es325_remote_route_enable(dai))
-		rc = es325_slim_get_channel_map(dai, tx_num, tx_slot, rx_num, rx_slot);
-	else
-#endif
-		rc = taiko_get_channel_map(dai, tx_num, tx_slot, rx_num, rx_slot);
-
-	return rc;
-}
-#endif
-
-//liuyan 2013-12-19 modify for evt1 and evt2
-#ifdef CONFIG_MACH_OPPO
-static struct snd_soc_dai_ops taiko_dai_ops_es325 = {
-	.startup = taiko_startup,
-	.shutdown = taiko_shutdown,
-	.hw_params = taiko_es325_hw_params, /* tabla_hw_params, */
-	.set_sysclk = taiko_set_dai_sysclk,
-	.set_fmt = taiko_set_dai_fmt,
-	.set_channel_map = taiko_es325_set_channel_map, /* tabla_set_channel_map, */
-	.get_channel_map = taiko_es325_get_channel_map, /* tabla_get_channel_map, */
-};
-#endif
-//liuyan modify end
 
 static struct snd_soc_dai_ops taiko_dai_ops = {
 	.startup = taiko_startup,
@@ -4896,181 +4799,6 @@ static struct snd_soc_dai_ops taiko_dai_ops = {
 	.set_channel_map = taiko_set_channel_map,
 	.get_channel_map = taiko_get_channel_map,
 };
-
-//liuyan 2013-12-19 modify for evt1 and evt2
-#ifdef CONFIG_MACH_OPPO
-#ifdef CONFIG_SND_SOC_ES325
-static struct snd_soc_dai_ops taiko_es325_dai_ops = {
-	.startup = taiko_startup,
-	.hw_params = taiko_es325_hw_params,
-	.set_channel_map = taiko_es325_set_channel_map,
-	.get_channel_map = taiko_es325_get_channel_map,
-};
-#endif
-
-static struct snd_soc_dai_driver taiko_dai_es325[] = {
-	{
-		.name = "taiko_rx1",
-		.id = AIF1_PB,
-		.playback = {
-			.stream_name = "AIF1 Playback",
-			.rates = WCD9320_RATES,
-			.formats = TAIKO_FORMATS_S16_S24_LE,
-			.rate_max = 192000,
-			.rate_min = 8000,
-			.channels_min = 1,
-			.channels_max = 2,
-		},
-		.ops = &taiko_dai_ops_es325,
-	},
-	{
-		.name = "taiko_tx1",
-		.id = AIF1_CAP,
-		.capture = {
-			.stream_name = "AIF1 Capture",
-			.rates = WCD9320_RATES,
-			.formats = TAIKO_FORMATS,
-			.rate_max = 192000,
-			.rate_min = 8000,
-			.channels_min = 1,
-			.channels_max = 4,
-		},
-		.ops = &taiko_dai_ops_es325,
-	},
-	{
-		.name = "taiko_rx2",
-		.id = AIF2_PB,
-		.playback = {
-			.stream_name = "AIF2 Playback",
-			.rates = WCD9320_RATES,
-			.formats = TAIKO_FORMATS_S16_S24_LE,
-			.rate_min = 8000,
-			.rate_max = 192000,
-			.channels_min = 1,
-			.channels_max = 2,
-		},
-		.ops = &taiko_dai_ops_es325,
-	},
-	{
-		.name = "taiko_tx2",
-		.id = AIF2_CAP,
-		.capture = {
-			.stream_name = "AIF2 Capture",
-			.rates = WCD9320_RATES,
-			.formats = TAIKO_FORMATS,
-			.rate_max = 192000,
-			.rate_min = 8000,
-			.channels_min = 1,
-			.channels_max = 8,
-		},
-		.ops = &taiko_dai_ops_es325,
-	},
-	{
-		.name = "taiko_tx3",
-		.id = AIF3_CAP,
-		.capture = {
-			.stream_name = "AIF3 Capture",
-			.rates = WCD9320_RATES,
-			.formats = TAIKO_FORMATS,
-			.rate_max = 48000,
-			.rate_min = 8000,
-			.channels_min = 1,
-			.channels_max = 2,
-		},
-		.ops = &taiko_dai_ops_es325,
-	},
-	{
-		.name = "taiko_rx3",
-		.id = AIF3_PB,
-		.playback = {
-			.stream_name = "AIF3 Playback",
-			.rates = WCD9320_RATES,
-			.formats = TAIKO_FORMATS_S16_S24_LE,
-			.rate_min = 8000,
-			.rate_max = 192000,
-			.channels_min = 1,
-			.channels_max = 2,
-		},
-		.ops = &taiko_dai_ops_es325,
-	},
-	{
-		.name = "taiko_vifeedback",
-		.id = AIF4_VIFEED,
-		.capture = {
-			.stream_name = "VIfeed",
-			.rates = SNDRV_PCM_RATE_48000,
-			.formats = TAIKO_FORMATS,
-			.rate_max = 48000,
-			.rate_min = 48000,
-			.channels_min = 2,
-			.channels_max = 2,
-	 },
-		.ops = &taiko_dai_ops_es325,
-	},
-	{
-		.name = "taiko_mad1",
-		.id = AIF4_MAD_TX,
-		.capture = {
-			.stream_name = "AIF4 MAD TX",
-			.rates = SNDRV_PCM_RATE_16000,
-			.formats = TAIKO_FORMATS,
-			.rate_min = 16000,
-			.rate_max = 16000,
-			.channels_min = 1,
-			.channels_max = 1,
-		},
-		.ops = &taiko_dai_ops_es325,
-	},
-//liuyan add for es325
-#ifdef CONFIG_SND_SOC_ES325
-	{
-		.name = "taiko_es325_rx1",
-		.id = AIF1_PB + ES325_DAI_ID_OFFSET,
-		.playback = {
-			.stream_name = "AIF1 Playback",
-			.rates = WCD9320_RATES,
-			.formats = TAIKO_FORMATS,
-			.rate_max = 192000,
-			.rate_min = 8000,
-			.channels_min = 1,
-			.channels_max = 2,
-		},
-		.ops = &taiko_es325_dai_ops,
-	},
-	{
-		.name = "taiko_es325_tx1",
-		.id = AIF1_CAP + ES325_DAI_ID_OFFSET,
-		.capture = {
-			.stream_name = "AIF1 Capture",
-			.rates = WCD9320_RATES,
-			.formats = TAIKO_FORMATS,
-			.rate_max = 192000,
-			.rate_min = 8000,
-			.channels_min = 1,
-			.channels_max = 2,
-		},
-		.ops = &taiko_es325_dai_ops,
-	},
-	{
-		.name = "taiko_es325_rx2",
-		.id = AIF2_PB + ES325_DAI_ID_OFFSET,
-		.playback = {
-			.stream_name = "AIF2 Playback",
-			.rates = WCD9320_RATES,
-			.formats = TAIKO_FORMATS,
-			.rate_max = 192000,
-			.rate_min = 8000,
-			.channels_min = 1,
-			.channels_max = 2,
-		},
-		.ops = &taiko_es325_dai_ops,
-	},
-#endif
-//liuyan add end
-
-};
-#endif
-//liuyan modify end
 
 static struct snd_soc_dai_driver taiko_dai[] = {
 	{
@@ -5348,20 +5076,8 @@ static int taiko_codec_enable_slimrx(struct snd_soc_dapm_widget *w,
 		ret = wcd9xxx_cfg_slim_sch_rx(core, &dai->wcd9xxx_ch_list,
 					      dai->rate, dai->bit_width,
 					      &dai->grph);
-//liuyan add for es325, evt1 and evt2
-#ifdef CONFIG_SND_SOC_ES325
-       if(pcb_version==HW_VERSION__10)
-		    ret = es325_remote_cfg_slim_rx(w->shift);
-#endif
-//liuyan add end
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-//liuyan add for es325, evt1 and evt2
-#ifdef CONFIG_SND_SOC_ES325
-       if(pcb_version==HW_VERSION__10)
-		    ret = es325_remote_close_slim_rx(w->shift);
-#endif
-//liuyan add end
 		ret = wcd9xxx_close_slim_sch_rx(core, &dai->wcd9xxx_ch_list,
 						dai->grph);
 		ret = taiko_codec_enable_slim_chmask(dai, false);
@@ -5473,20 +5189,8 @@ static int taiko_codec_enable_slimtx(struct snd_soc_dapm_widget *w,
 		ret = wcd9xxx_cfg_slim_sch_tx(core, &dai->wcd9xxx_ch_list,
 					      dai->rate, dai->bit_width,
 					      &dai->grph);
-//liuyan add for es325, evt1 and evt2
-#ifdef CONFIG_SND_SOC_ES325
-        if(pcb_version==HW_VERSION__10)
-		    ret = es325_remote_cfg_slim_tx(w->shift);
-#endif
-//liuyan add end
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-//liuyan add for es325, evt1 and evt2
-#ifdef CONFIG_SND_SOC_ES325
-        if(pcb_version==HW_VERSION__10)
-		    ret = es325_remote_close_slim_tx(w->shift);
-#endif
-//liuyan add end
 		ret = wcd9xxx_close_slim_sch_tx(core, &dai->wcd9xxx_ch_list,
 						dai->grph);
 		ret = taiko_codec_enable_slim_chmask(dai, false);
@@ -7298,15 +7002,6 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 		WCD9XXX_BG_CLK_UNLOCK(&taiko->resmgr);
 	}
 
-//liuyan add for es325, evt1 and evt2
-#ifdef CONFIG_SND_SOC_ES325
-      if(pcb_version==HW_VERSION__10){
-           printk("register es325....");
-	    es325_remote_add_codec_controls(codec);
-      	}
-#endif
-//liuyan add end
-
 	ptr = kmalloc((sizeof(taiko_rx_chs) +
 		       sizeof(taiko_tx_chs)), GFP_KERNEL);
 	if (!ptr) {
@@ -7482,23 +7177,9 @@ static const struct dev_pm_ops taiko_pm_ops = {
 static int __devinit taiko_probe(struct platform_device *pdev)
 {
 	int ret = 0;
-#ifdef CONFIG_MACH_OPPO
-	if (wcd9xxx_get_intf_type() == WCD9XXX_INTERFACE_TYPE_SLIMBUS) {
-		pcb_version = get_pcb_version(); //add for dvt
-		printk("%s:pcb_version %d\n",__func__,pcb_version);
-		if (pcb_version == HW_VERSION__10) {
-		ret = snd_soc_register_codec(&pdev->dev, &soc_codec_dev_taiko,
-			taiko_dai_es325, ARRAY_SIZE(taiko_dai_es325));
-		} else {
-			ret = snd_soc_register_codec(&pdev->dev, &soc_codec_dev_taiko,
-					taiko_dai, ARRAY_SIZE(taiko_dai));
-		}
-	}
-#else
 	if (wcd9xxx_get_intf_type() == WCD9XXX_INTERFACE_TYPE_SLIMBUS)
 		ret = snd_soc_register_codec(&pdev->dev, &soc_codec_dev_taiko,
 			taiko_dai, ARRAY_SIZE(taiko_dai));
-#endif
 	else if (wcd9xxx_get_intf_type() == WCD9XXX_INTERFACE_TYPE_I2C)
 		ret = snd_soc_register_codec(&pdev->dev, &soc_codec_dev_taiko,
 			taiko_i2s_dai, ARRAY_SIZE(taiko_i2s_dai));
