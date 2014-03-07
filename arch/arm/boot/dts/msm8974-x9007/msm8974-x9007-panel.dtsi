@@ -78,6 +78,7 @@
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 20>, <0 200>, <1 20>;
+		qcom,cont-splash-enabled;
 	};
 
 	dsi_jdi_1080_cmd: qcom,mdss_dsi_jdi_1080p_cmd {
@@ -168,6 +169,7 @@
 		qcom,mdss-dsi-cabc-video-command = [15 01 00 00 10 00 02 55 03
 			05 01 00 00 10 00 02 29 00];
 		qcom,partial-update-enabled;
+		qcom,cont-splash-enabled;
 	};
 
 	dsi_truly_1080_vid: qcom,mdss_dsi_truly_1080p_video {
@@ -252,5 +254,6 @@
 		qcom,mdss-dsi-mdp-trigger = <0x0>;
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 20>, <0 200>, <1 20>;
+		qcom,cont-splash-enabled;
 	};
 };
