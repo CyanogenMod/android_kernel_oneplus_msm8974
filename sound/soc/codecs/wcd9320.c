@@ -4793,7 +4793,7 @@ static int taiko_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 //liuyan modify for es325
-#ifdef CONFIG_SND_SOC_ES325
+#ifdef CONFIG_MACH_OPPO
 static int taiko_es325_hw_params(struct snd_pcm_substream *substream,
 		struct snd_pcm_hw_params *params,
 		struct snd_soc_dai *dai)
@@ -4805,8 +4805,10 @@ static int taiko_es325_hw_params(struct snd_pcm_substream *substream,
 
 	rc = taiko_hw_params(substream, params, dai);
 
+#ifdef CONFIG_SND_SOC_ES325
 	if (es325_remote_route_enable(dai))
 		rc = es325_slim_hw_params(substream, params, dai);
+#endif
 
 	return rc;
 }
@@ -4817,6 +4819,7 @@ static int taiko_es325_set_channel_map(struct snd_soc_dai *dai,
 				unsigned int rx_num, unsigned int *rx_slot)
 
 {
+#ifdef CONFIG_SND_SOC_ES325
 #if !defined(SLIM_BUGFIX)
 	unsigned int taiko_tx_num = 0;
 #endif
@@ -4829,8 +4832,10 @@ static int taiko_es325_set_channel_map(struct snd_soc_dai *dai,
 	unsigned int temp_tx_num = 0;
 	unsigned int temp_rx_num = 0;
 #endif
+#endif
 	int rc = 0;
 
+#ifdef CONFIG_SND_SOC_ES325
 	if (es325_remote_route_enable(dai)) {
 #if defined(SLIM_BUGFIX)
 		rc = taiko_get_channel_map(dai, &temp_tx_num, taiko_tx_slot,
@@ -4844,6 +4849,7 @@ static int taiko_es325_set_channel_map(struct snd_soc_dai *dai,
 
 		rc = es325_slim_set_channel_map(dai, tx_num, tx_slot, rx_num, rx_slot);
 	} else
+#endif
 		rc = taiko_set_channel_map(dai, tx_num, tx_slot, rx_num, rx_slot);
 
 	return rc;
@@ -4856,9 +4862,11 @@ static int taiko_es325_get_channel_map(struct snd_soc_dai *dai,
 {
 	int rc = 0;
 
+#ifdef CONFIG_SND_SOC_ES325
 	if (es325_remote_route_enable(dai))
 		rc = es325_slim_get_channel_map(dai, tx_num, tx_slot, rx_num, rx_slot);
 	else
+#endif
 		rc = taiko_get_channel_map(dai, tx_num, tx_slot, rx_num, rx_slot);
 
 	return rc;
@@ -4866,7 +4874,7 @@ static int taiko_es325_get_channel_map(struct snd_soc_dai *dai,
 #endif
 
 //liuyan 2013-12-19 modify for evt1 and evt2
-#ifdef CONFIG_SND_SOC_ES325
+#ifdef CONFIG_MACH_OPPO
 static struct snd_soc_dai_ops taiko_dai_ops_es325 = {
 	.startup = taiko_startup,
 	.shutdown = taiko_shutdown,
@@ -4890,6 +4898,7 @@ static struct snd_soc_dai_ops taiko_dai_ops = {
 };
 
 //liuyan 2013-12-19 modify for evt1 and evt2
+#ifdef CONFIG_MACH_OPPO
 #ifdef CONFIG_SND_SOC_ES325
 static struct snd_soc_dai_ops taiko_es325_dai_ops = {
 	.startup = taiko_startup,
@@ -4897,6 +4906,7 @@ static struct snd_soc_dai_ops taiko_es325_dai_ops = {
 	.set_channel_map = taiko_es325_set_channel_map,
 	.get_channel_map = taiko_es325_get_channel_map,
 };
+#endif
 
 static struct snd_soc_dai_driver taiko_dai_es325[] = {
 	{
