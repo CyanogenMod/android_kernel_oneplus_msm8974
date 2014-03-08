@@ -1,0 +1,56 @@
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/include/ "msm8974-x9007-common.dtsi"
+/include/ "msm8974-x9007-camera.dtsi"
+/include/ "msm8974-x9007-input.dtsi"
+/include/ "msm8974-x9007-usb.dtsi"
+/include/ "msm8974-x9007-misc.dtsi"
+/include/ "msm8974-x9007-pm.dtsi"
+/include/ "msm8974-x9007-nfc.dtsi"
+/include/ "msm8974-x9007-regulator.dtsi"
+/include/ "msm8974-x9007-sound.dtsi"
+/include/ "msm8974-x9007-leds.dtsi"
+
+&soc {
+
+};
+
+&cci {
+	qcom,camera@20 {
+		qcom,cam-vreg-min-voltage = <1050000 0 2800000 2800000>;
+		qcom,cam-vreg-max-voltage = <1050000 0 2800000 2800000>;
+	};
+};
+
+&i2c_1 {
+	status = "ok";
+};
+
+&spi_0 {
+	compatible;
+	reg-names;
+	reg = <>;
+	interrupt-names;
+	interrupts;
+	spi-max-frequency;
+	qcom,gpio-mosi;
+	qcom,gpio-miso;
+	qcom,gpio-clk;
+	qcom,gpio-cs0;
+	qcom,infinite-mode;
+	qcom,use-bam;
+	qcom,ver-reg-exists;
+	qcom,bam-consumer-pipe-index;
+	qcom,bam-producer-pipe-index;
+	qcom,master-id;
+};
