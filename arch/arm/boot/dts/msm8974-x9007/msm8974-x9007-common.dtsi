@@ -589,8 +589,8 @@
 	};
 
 	mpp@a100 { /* MPP 2 */
-		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
-		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,mode = <0>;          /* QPNP_PIN_MODE_DIG_IN */
+		qcom,out-strength = <4>;  /* QPNP_PIN_PULL_DN */
 		qcom,master-en = <1>;
 	};
 
@@ -598,19 +598,21 @@
 	};
 
 	mpp@a300 { /* MPP 4 */
+		qcom,mode = <0>;          /* QPNP_PIN_MODE_DIG_IN */
+		qcom,out-strength = <4>;  /* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
 	};
 
 	mpp@a400 { /* MPP 5 */
+		qcom,mode = <0>;          /* QPNP_PIN_MODE_DIG_IN */
+		qcom,out-strength = <4>;  /* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
 	};
 
 	mpp@a500 { /* MPP 6 */
-		/* SPI_ETH_RST config */
-		qcom,mode = <1>; /* DIG_OUT */
-		qcom,output-type = <0>; /* CMOS */
-		qcom,vin-sel = <2>; /* PM8941_S3 1.8V > 1.6V */
-		qcom,src-sel = <0>; /* CONSTANT */
-		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
-		qcom,master-en = <1>; /* ENABLE MPP */
+		qcom,mode = <0>;          /* QPNP_PIN_MODE_DIG_IN */
+		qcom,out-strength = <4>;  /* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
 	};
 
 	mpp@a600 { /* MPP 7 */
