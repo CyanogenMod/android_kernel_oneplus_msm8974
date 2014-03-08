@@ -36,7 +36,11 @@
 
 #include "synaptics_dsx.h"
 #include "synaptics_dsx_i2c.h"
+#ifdef CONFIG_MACH_FIND7OP  //for 14001's  tp
+#include "synaptics_test_rawdata_14001.h"
+#else
 #include "synaptics_test_rawdata.h"
+#endif
 #ifdef KERNEL_ABOVE_2_6_38
 #include <linux/input/mt.h>
 #endif
@@ -958,6 +962,7 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define SYNA_ADDR_GESTURE_OFFSET     0x08  //gesture register addr=0x08
 #define SYNA_ADDR_GESTURE_EXT        0x402  //gesture ext data
 #define SYNA_ADDR_PDOZE_FLAG         0x07  //pdoze status register
+#define SYNA_ADDR_TOUCH_FEATURE      0x1E  //ThreeD Touch Features
 
 extern int rmi4_fw_module_init(bool insert);
 extern int get_boot_mode(void);
@@ -1133,6 +1138,7 @@ static int get_virtual_key_button(int x, int y)
 /***** For virtual key definition end *********************/
 static int synaptics_set_f12ctrl_data(struct synaptics_rmi4_data *rmi4_data, bool enable, unsigned char suppression) {
     int retval;
+	unsigned char val[4];
 	unsigned char reportbuf[3];
     unsigned short reportaddr = SYNA_ADDR_REPORT_FLAG;  //F12_2D_CTRL register changed in new firmware
 	
@@ -1154,10 +1160,16 @@ static int synaptics_set_f12ctrl_data(struct synaptics_rmi4_data *rmi4_data, boo
 		reportbuf[1] = suppression ;
 		
     } else {
+    	retval = synaptics_rmi4_i2c_read(syna_rmi4_data,SYNA_ADDR_GESTURE_FLAG,val,sizeof(val));
+		val[0] = syna_rmi4_data->gesture_enable & 0xff ;
+		retval = synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_GESTURE_FLAG,val,sizeof(val));
+
 		if(enable)
 			reportbuf[2] |= 0x02 ;
-		else
+		else {
 			reportbuf[2] &= 0xfd ;
+			syna_use_gesture = (rmi4_data->gesture_enable&0xff)?1:0 ;
+		}
     }
 
 	retval = synaptics_rmi4_i2c_write(rmi4_data,
@@ -1208,8 +1220,16 @@ static int synaptics_enable_pdoze(struct synaptics_rmi4_data *rmi4_data, bool en
 		val[2] |= 0x80 ;
 	
 	retval = synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_REPORT_FLAG,val,sizeof(val));
+	
+	retval = synaptics_rmi4_i2c_read(syna_rmi4_data,SYNA_ADDR_TOUCH_FEATURE,val,1);
 
-	return (retval==sizeof(val))?0:-1;
+    val[0] |= 0x10 ;
+	if(enable)
+		val[0] &= 0xEF ;
+	
+	retval = synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_TOUCH_FEATURE,val,1);
+
+	return 0;
 }
 
 //enable irq wakeup
@@ -1302,8 +1322,6 @@ static int synaptics_rmi4_proc_read(char *page, char **start, off_t off,
 
 static int synaptics_rmi4_proc_write( struct file *filp, const char __user *buff,
 	unsigned long len, void *data ) {
-	int retval;
-	unsigned char val[4];
 	unsigned char bak;
 	unsigned int enable ;
 	if(len > 2)
@@ -1317,17 +1335,11 @@ static int synaptics_rmi4_proc_write( struct file *filp, const char __user *buff
 	if(bak == syna_rmi4_data->gesture_enable)
 		return len ;
 
+    if(!(syna_use_gesture && syna_rmi4_data->gesture))
 	syna_use_gesture = (syna_rmi4_data->gesture_enable&0xff)?1:0 ;
 	print_ts(TS_DEBUG, KERN_ERR "enable=0x%x\n", syna_rmi4_data->gesture_enable);
 
-	
-	retval = synaptics_rmi4_i2c_read(syna_rmi4_data,SYNA_ADDR_GESTURE_FLAG,val,sizeof(val));
-
-
-	val[0] = syna_rmi4_data->gesture_enable & 0xff ;
-	retval = synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_GESTURE_FLAG,val,sizeof(val));
-
-	return (retval==sizeof(val))?len:0;
+	return len;
 }
 
 //glove proc read function
@@ -2166,7 +2178,6 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 			print_ts(TS_DEBUG, KERN_ERR "[syna]gestureext: %2x %2x %2x %2x %2x %2x %2x %2x %2x\n",
 				gestureext[0],gestureext[1],gestureext[2],gestureext[3],gestureext[4],gestureext[5],gestureext[6],gestureext[7],gestureext[24]);
 		}
-        return 0 ;
     }
 
     //check pdoze status
@@ -2176,10 +2187,8 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				&keyvalue,
 				1);
 		keyvalue = (keyvalue & 0x60)?1:0 ;
-		if(rmi4_data->pdoze_status != keyvalue) {
-			rmi4_data->pdoze_status = keyvalue ;
-			print_ts(TS_DEBUG, KERN_ERR "[syna]pdoze status: %d\n",rmi4_data->pdoze_status);
-		}
+		rmi4_data->pdoze_status = keyvalue ;
+		print_ts(TS_DEBUG, KERN_ERR "[syna]pdoze status: %d\n",rmi4_data->pdoze_status);
     }
 
 	retval = synaptics_rmi4_i2c_read(rmi4_data,
