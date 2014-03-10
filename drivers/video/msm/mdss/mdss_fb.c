@@ -1478,6 +1478,8 @@ static int mdss_fb_fbmem_ion_mmap(struct fb_info *info,
 			return rc;
 		}
 	}
+	/* Notify listeners */
+	sysfs_notify(&mfd->fbi->dev->kobj, NULL, "show_blank_event");
 
 	table = ion_sg_table(mfd->fb_ion_client, mfd->fb_ion_handle);
 	if (IS_ERR(table)) {
