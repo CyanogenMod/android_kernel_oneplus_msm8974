@@ -1854,7 +1854,7 @@ exit_free_mem:
 
 static int synaptics_rmi4_fwu_init(struct synaptics_rmi4_data *rmi4_data)
 {
-	int retval;
+	int retval = 0;
 	unsigned char attr_count;
 
 	fwu = kzalloc(sizeof(*fwu), GFP_KERNEL);
