@@ -3534,7 +3534,7 @@ static int bif_add_known_slaves_from_dt(struct bif_ctrl_dev *bdev,
 					struct device_node *of_node)
 {
 	int len = 0;
-	int rc, i;
+	int rc = 0, i = 0;
 	u32 addr;
 	const __be32 *val;
 
@@ -3725,7 +3725,7 @@ struct bif_ctrl_dev *bif_ctrl_register(struct bif_ctrl_desc *bif_desc,
 	struct bif_slave_dev *sdev;
 	bool battery_present = false;
 	bool slaves_present = false;
-	int rc, rid_ohm;
+	int rc = 0, rid_ohm = 0;
 
 	if (!bif_desc) {
 		pr_err("Invalid bif_desc specified\n");

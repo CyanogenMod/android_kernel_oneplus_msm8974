@@ -401,7 +401,7 @@ static int pn544_probe(struct i2c_client *client, const struct i2c_device_id *id
 {
 	int ret;
 	struct pn544_i2c_platform_data *platform_data;
-	struct pn544_dev *pn544_dev;
+	struct pn544_dev *pn544_dev = NULL;
 /*OPPO yuyi 2014-02-24 add begin for nfc pn65T*/
 	struct clk*p65T_clk = NULL;
 /*OPPO yuyi 2014-02-24 add begin for nfc pn65T*/
