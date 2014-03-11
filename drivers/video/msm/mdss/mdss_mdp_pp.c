@@ -3008,7 +3008,6 @@ static int pp_hist_disable(struct pp_hist_col_info *hist_info)
 		ret = -EINVAL;
 		goto exit;
 	}
-	complete_all(&hist_info->comp);
 	spin_lock_irqsave(&hist_info->hist_lock, flag);
 	hist_info->col_en = false;
 	hist_info->col_state = HIST_UNKNOWN;
@@ -3016,6 +3015,7 @@ static int pp_hist_disable(struct pp_hist_col_info *hist_info)
 	mdss_mdp_hist_intr_req(&mdata->hist_intr,
 				intr_mask << hist_info->intr_shift, false);
 	writel_relaxed(BIT(1), hist_info->base);/* cancel */
+	complete_all(&hist_info->comp);
 	ret = 0;
 exit:
 	mutex_unlock(&hist_info->hist_mutex);
