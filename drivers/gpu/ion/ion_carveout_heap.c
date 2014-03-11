@@ -2,7 +2,7 @@
  * drivers/gpu/ion/ion_carveout_heap.c
  *
  * Copyright (C) 2011 Google, Inc.
- * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -103,8 +103,8 @@ static void ion_carveout_heap_free(struct ion_buffer *buffer)
 	buffer->priv_phys = ION_CARVEOUT_ALLOCATE_FAIL;
 }
 
-struct sg_table *ion_carveout_heap_map_dma(struct ion_heap *heap,
-					      struct ion_buffer *buffer)
+static struct sg_table *ion_carveout_heap_map_dma(struct ion_heap *heap,
+						  struct ion_buffer *buffer)
 {
 	size_t chunk_size = buffer->size;
 
@@ -115,8 +115,8 @@ struct sg_table *ion_carveout_heap_map_dma(struct ion_heap *heap,
 					buffer->size);
 }
 
-void ion_carveout_heap_unmap_dma(struct ion_heap *heap,
-				 struct ion_buffer *buffer)
+static void ion_carveout_heap_unmap_dma(struct ion_heap *heap,
+					struct ion_buffer *buffer)
 {
 	if (buffer->sg_table)
 		sg_free_table(buffer->sg_table);
@@ -133,6 +133,9 @@ void *ion_carveout_heap_map_kernel(struct ion_heap *heap,
 		ret_value = ioremap_cached(buffer->priv_phys, buffer->size);
 	else
 		ret_value = ioremap(buffer->priv_phys, buffer->size);
+
+	if (ret_value == NULL)
+		return ERR_PTR(-ENOMEM);
 
 	return ret_value;
 }
@@ -155,7 +158,7 @@ int ion_carveout_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
 		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 
 	ret_value =  remap_pfn_range(vma, vma->vm_start,
-			__phys_to_pfn(buffer->priv_phys) + vma->vm_pgoff,
+			PFN_DOWN(buffer->priv_phys) + vma->vm_pgoff,
 			vma->vm_end - vma->vm_start,
 			vma->vm_page_prot);
 

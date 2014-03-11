@@ -2,7 +2,7 @@
  * include/linux/ion.h
  *
  * Copyright (C) 2011 Google, Inc.
- * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -21,8 +21,7 @@
 #include <linux/ioctl.h>
 #include <linux/types.h>
 
-struct ion_handle;
-typedef struct ion_handle *ion_user_handle_t;
+typedef int ion_user_handle_t;
 
 /**
  * enum ion_heap_types - list of all possible types of heaps
@@ -72,6 +71,7 @@ enum ion_heap_type {
 #ifdef __KERNEL__
 #include <linux/err.h>
 
+struct ion_handle;
 struct ion_device;
 struct ion_heap;
 struct ion_mapper;
@@ -88,7 +88,7 @@ struct ion_buffer;
  * struct ion_platform_heap - defines a heap in the given platform
  * @type:	type of the heap from ion_heap_type enum
  * @id:		unique identifier for heap.  When allocating higher numbers
- * 		will be allocated from first.  At allocation these are passed
+ *		will be allocated from first.  At allocation these are passed
  *		as a bit mask and therefore can not exceed ION_NUM_HEAP_IDS.
  * @name:	used for debug purposes
  * @base:	base address of heap in physical memory if applicable
