@@ -1269,7 +1269,6 @@ static ssize_t synaptics_rmi4_gesture_store(struct device *dev,
 	return count;
 }
 
-
 //support tp2.0 interface, app read it to get points
 static int synaptics_rmi4_crood_read(char *page, char **start, off_t off,
 		int count, int *eof, void *data)
@@ -1314,10 +1313,17 @@ static int synaptics_rmi4_proc_double_tap_write(struct file *filp, const char __
 {
 	unsigned char bak;
 	unsigned int enable;
+	char buf[2];
+
 	if (len > 2)
 		return 0;
 
-	enable = (buff[0] == 0x30) ? 0 : 1;
+	if (copy_from_user(buf, buff, len)) {
+		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
+		return -EFAULT;
+	}
+
+	enable = (buf[0] == '0') ? 0 : 1;
 	bak = syna_rmi4_data->gesture_enable;
 	syna_rmi4_data->gesture_enable &= 0x00;
 	if (enable)
@@ -1354,10 +1360,17 @@ static int synaptics_rmi4_proc_glove_write(struct file *filp, const char __user 
 	unsigned char val[1];
 	unsigned char bak;
 	unsigned int enable;
+	char buf[2];
+
 	if (len > 2)
 		return 0;
 
-	enable = (buff[0] == 0x30) ? 0 : 1;
+	if (copy_from_user(buf, buff, len)) {
+		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
+		return -EFAULT;
+	}
+
+	enable = (buf[0] == '0') ? 0 : 1;
 	bak = syna_rmi4_data->glove_enable;
 	syna_rmi4_data->glove_enable &= 0x00;
 	if (enable)
@@ -1392,10 +1405,17 @@ static int synaptics_rmi4_proc_pdoze_read(char *page, char **start, off_t off,
 static int synaptics_rmi4_proc_pdoze_write( struct file *filp, const char __user *buff,
 		unsigned long len, void *data ) {
 	unsigned int enable;
+	char buf[2];
+
 	if (len > 2)
 		return 0;
 
-	enable =(buff[0]==0x30)?0:1;
+	if (copy_from_user(buf, buff, len)) {
+		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
+		return -EFAULT;
+	}
+
+	enable = (buf[0] == '0') ? 0 : 1;
 	if (enable == syna_rmi4_data->pdoze_enable)
 		return len;
 
@@ -1417,10 +1437,10 @@ static int keypad_enable_proc_write(struct file *file, const char __user *buffer
 		unsigned long count, void *data)
 {
 	struct synaptics_rmi4_data *ts = data;
-	char buf[10];
+	char buf[2];
 	unsigned int val = 0;
 
-	if (count > 10)
+	if (count > 2)
 		return count;
 
 	if (copy_from_user(buf, buffer, count)) {
@@ -1428,8 +1448,7 @@ static int keypad_enable_proc_write(struct file *file, const char __user *buffer
 		return count;
 	}
 
-	sscanf(buf, "%d", &val);
-	val = (val == 0 ? 0 : 1);
+	val = (buf[0] == '0' ? 0 : 1);
 	atomic_set(&ts->keypad_enable, val);
 	if (val) {
 		set_bit(KEY_BACK, ts->input_dev->keybit);
