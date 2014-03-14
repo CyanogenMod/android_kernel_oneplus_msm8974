@@ -998,7 +998,6 @@ static struct synaptics_rmi4_data *syna_rmi4_data=0;
 static struct regulator *vdd_regulator=0;
 static struct regulator *vdd_regulator_i2c=0;
 static int syna_use_gesture = 0 ;
-static int syna_use_gesture2 = 1 ;  //flag to support tp2.0
 static int syna_test_max_err_count = 10;
 static char synaptics_vendor_str[32];  //vendor string
 static char *synaptics_id_str;
@@ -1292,9 +1291,6 @@ static int synaptics_rmi4_crood_read(char *page, char **start, off_t off,
 		syna_rmi4_data->points[8], syna_rmi4_data->points[9], syna_rmi4_data->points[10], syna_rmi4_data->points[11],
 		syna_rmi4_data->points[12]);	
 
-	syna_use_gesture2 = 1 ;
-
-	
 	return len ;
 }
 
