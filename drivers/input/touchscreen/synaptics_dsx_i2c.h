@@ -277,14 +277,17 @@ struct synaptics_rmi4_data {
 	unsigned short f54_ctrl_base_addr;
 	unsigned short f54_data_base_addr;
 	unsigned char gesturemode;
-	bool gesture;
 	bool pwrrunning;
 	unsigned int old_status;
 	unsigned int reset_count; //for reset count
 	unsigned short points[2*7];
 	struct mutex ops_lock;
 	struct notifier_block fb_notif;
-	unsigned char gesture_enable;
+	atomic_t syna_use_gesture;
+	atomic_t double_tap_enable;
+	atomic_t camera_enable;
+	atomic_t music_enable;
+	atomic_t flashlight_enable;
 	unsigned char glove_enable;  //glove mode
 	unsigned char pdoze_enable;  //pdoze mode
 	unsigned char pdoze_status;
