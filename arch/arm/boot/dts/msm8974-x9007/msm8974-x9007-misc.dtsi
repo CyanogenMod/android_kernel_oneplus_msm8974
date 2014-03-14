@@ -21,8 +21,8 @@
 			compatible = "ti,lm3630";
 			reg = <0x36>;
 			ti,bank-a-ctrl = <0x05>;
-			ti,init-brt-ed1 = <200>;
-			ti,init-brt-led2 = <200>;
+			ti,init-brt-ed1 = <60>;
+			ti,init-brt-led2 = <60>;
 			ti,max-brt-led1 = <255>;
 			ti,max-brt-led2 = <255>;
 			ti,pwm-active = <0>;
