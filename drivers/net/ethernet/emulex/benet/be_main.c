@@ -445,10 +445,10 @@ static struct rtnl_link_stats64 *be_get_stats64(struct net_device *netdev,
 	for_all_rx_queues(adapter, rxo, i) {
 		const struct be_rx_stats *rx_stats = rx_stats(rxo);
 		do {
-			start = u64_stats_fetch_begin_bh(&rx_stats->sync);
+			start = u64_stats_fetch_begin_irq(&rx_stats->sync);
 			pkts = rx_stats(rxo)->rx_pkts;
 			bytes = rx_stats(rxo)->rx_bytes;
-		} while (u64_stats_fetch_retry_bh(&rx_stats->sync, start));
+		} while (u64_stats_fetch_retry_irq(&rx_stats->sync, start));
 		stats->rx_packets += pkts;
 		stats->rx_bytes += bytes;
 		stats->multicast += rx_stats(rxo)->rx_mcast_pkts;
@@ -459,10 +459,10 @@ static struct rtnl_link_stats64 *be_get_stats64(struct net_device *netdev,
 	for_all_tx_queues(adapter, txo, i) {
 		const struct be_tx_stats *tx_stats = tx_stats(txo);
 		do {
-			start = u64_stats_fetch_begin_bh(&tx_stats->sync);
+			start = u64_stats_fetch_begin_irq(&tx_stats->sync);
 			pkts = tx_stats(txo)->tx_pkts;
 			bytes = tx_stats(txo)->tx_bytes;
-		} while (u64_stats_fetch_retry_bh(&tx_stats->sync, start));
+		} while (u64_stats_fetch_retry_irq(&tx_stats->sync, start));
 		stats->tx_packets += pkts;
 		stats->tx_bytes += bytes;
 	}
@@ -1086,9 +1086,9 @@ static void be_eqd_update(struct be_adapter *adapter, struct be_eq_obj *eqo)
 		return;
 
 	do {
-		start = u64_stats_fetch_begin_bh(&stats->sync);
+		start = u64_stats_fetch_begin_irq(&stats->sync);
 		pkts = stats->rx_pkts;
-	} while (u64_stats_fetch_retry_bh(&stats->sync, start));
+	} while (u64_stats_fetch_retry_irq(&stats->sync, start));
 
 	stats->rx_pps = (unsigned long)(pkts - stats->rx_pkts_prev) / (delta / HZ);
 	stats->rx_pkts_prev = pkts;
