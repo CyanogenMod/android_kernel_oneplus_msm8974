@@ -1296,20 +1296,20 @@ static int synaptics_rmi4_pdoze_read(char *page, char **start, off_t off,
 	return len;
 }
 
-static int synaptics_rmi4_proc_read(char *page, char **start, off_t off,
+static int synaptics_rmi4_proc_double_tap_read(char *page, char **start, off_t off,
 		int count, int *eof, void *data)
 {
 	int len = 0;
 	unsigned int enable;
 
-	enable = (syna_rmi4_data->gesture_enable)?1:0;
+	enable = syna_rmi4_data->gesture_enable ? 1 : 0;
 
 	len = sprintf(page, "%d\n", enable);
 
 	return len;
 }
 
-static int synaptics_rmi4_proc_write( struct file *filp, const char __user *buff,
+static int synaptics_rmi4_proc_double_tap_write(struct file *filp, const char __user *buff,
 		unsigned long len, void *data)
 {
 	unsigned char bak;
@@ -1317,7 +1317,7 @@ static int synaptics_rmi4_proc_write( struct file *filp, const char __user *buff
 	if (len > 2)
 		return 0;
 
-	enable =(buff[0]==0x30)?0:1;
+	enable = (buff[0] == 0x30) ? 0 : 1;
 	bak = syna_rmi4_data->gesture_enable;
 	syna_rmi4_data->gesture_enable &= 0x00;
 	if (enable)
@@ -1460,8 +1460,8 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 
 	proc_entry = create_proc_entry("double_tap_enable", 0666, procdir);
 	if (proc_entry) {
-		proc_entry->write_proc = synaptics_rmi4_proc_write;
-		proc_entry->read_proc = synaptics_rmi4_proc_read;
+		proc_entry->write_proc = synaptics_rmi4_proc_double_tap_write;
+		proc_entry->read_proc = synaptics_rmi4_proc_double_tap_read;
 	}
 
 	//for pdoze enable/disable interface
