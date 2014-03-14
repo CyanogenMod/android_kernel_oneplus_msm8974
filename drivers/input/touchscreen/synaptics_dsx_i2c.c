@@ -1462,13 +1462,13 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 
 	struct proc_dir_entry *procdir = proc_mkdir( "touchpanel", NULL );
 	
-    //glove mode inteface	
-//	proc_entry = create_proc_entry("glove_mode_enable", 0666, procdir);
+    //glove mode inteface
+	proc_entry = create_proc_entry("glove_mode_enable", 0666, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_glove_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_glove_read;
 	}
-	
+
 	proc_entry = create_proc_entry("double_tap_enable", 0666, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_write;
@@ -3968,6 +3968,9 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 	rmi4_data->i2c_write = synaptics_rmi4_i2c_write;
 	rmi4_data->irq_enable = synaptics_rmi4_irq_enable;
 	rmi4_data->reset_device = synaptics_rmi4_reset_device;
+
+	// disable glove mode by default
+	rmi4_data->glove_enable = 0;
 
     //init sensor size
 	rmi4_data->sensor_max_x = LCD_SENSOR_X ;
