@@ -97,8 +97,6 @@ static int dsi_panel_handler(struct mdss_panel_data *pdata, int enable)
 	if (enable &&
 		(pdata->panel_info.panel_power_state == MDSS_PANEL_POWER_OFF)) {
 		if (!pdata->panel_info.dynamic_switch_pending) {
-			if (pdata->panel_info.type == MIPI_CMD_PANEL)
-				dsi_ctrl_gpio_request(ctrl_pdata);
 			mdss_dsi_panel_reset(pdata, 1);
 		}
 		if (!pdata->panel_info.dynamic_switch_pending) {
@@ -119,18 +117,13 @@ static int dsi_panel_handler(struct mdss_panel_data *pdata, int enable)
 			(pdata->panel_info.mipi.mode ? "video" : "command"));
 			if (pdata->panel_info.type == MIPI_CMD_PANEL) {
 				ctrl_pdata->switch_mode(pdata, DSI_VIDEO_MODE);
-				dsi_ctrl_gpio_free(ctrl_pdata);
 			} else if (pdata->panel_info.type == MIPI_VIDEO_PANEL) {
 				ctrl_pdata->switch_mode(pdata, DSI_CMD_MODE);
-				dsi_ctrl_gpio_request(ctrl_pdata);
 				mdss_dsi_set_tear_off(ctrl_pdata);
-				dsi_ctrl_gpio_free(ctrl_pdata);
 			}
 		}
 		pdata->panel_info.panel_power_state = MDSS_PANEL_POWER_OFF;
 		if (!pdata->panel_info.dynamic_switch_pending) {
-			if (pdata->panel_info.type == MIPI_CMD_PANEL)
-				dsi_ctrl_gpio_free(ctrl_pdata);
 			mdss_dsi_panel_reset(pdata, 0);
 		}
 	}
@@ -216,16 +209,6 @@ static int dsi_parse_gpio(struct platform_device *pdev,
 		pr_err("%s:%d, Disp_en gpio not specified\n",
 						__func__, __LINE__);
 
-	ctrl_pdata->disp_te_gpio = -1;
-	if (ctrl_pdata->panel_data.panel_info.mipi.mode == DSI_CMD_MODE ||
-		ctrl_pdata->panel_data.panel_info.mipi.dynamic_switch_enabled) {
-		ctrl_pdata->disp_te_gpio = of_get_named_gpio(np,
-						"qcom,platform-te-gpio", 0);
-		if (!gpio_is_valid(ctrl_pdata->disp_te_gpio))
-			pr_err("%s:%d, Disp_te gpio not specified\n",
-							__func__, __LINE__);
-	}
-
 	ctrl_pdata->rst_gpio = of_get_named_gpio(np,
 					"qcom,platform-reset-gpio", 0);
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio))
@@ -247,6 +230,7 @@ static int dsi_parse_gpio(struct platform_device *pdev,
 static void mdss_dsi_put_dt_vreg_data(struct device *dev,
 	struct dss_module_power *module_power)
 {
+	struct dss_module_power *module_power = &(ctrl_pdata->power_data);
 	if (!module_power) {
 		pr_err("%s: invalid input\n", __func__);
 		return;
@@ -257,29 +241,6 @@ static void mdss_dsi_put_dt_vreg_data(struct device *dev,
 		module_power->vreg_config = NULL;
 	}
 	module_power->num_vreg = 0;
-}
-
-int dsi_ctrl_gpio_request(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
-{
-	int rc = 0;
-
-	if (gpio_is_valid(ctrl_pdata->disp_te_gpio)) {
-		rc = gpio_request(ctrl_pdata->disp_te_gpio, "disp_te");
-		if (rc)
-			ctrl_pdata->disp_te_gpio_requested = 0;
-		else
-			ctrl_pdata->disp_te_gpio_requested = 1;
-	}
-
-	return rc;
-}
-
-void dsi_ctrl_gpio_free(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
-{
-	if (ctrl_pdata->disp_te_gpio_requested) {
-		gpio_free(ctrl_pdata->disp_te_gpio);
-		ctrl_pdata->disp_te_gpio_requested = 0;
-	}
 }
 
 static int mdss_dsi_get_dt_vreg_data(struct device *dev,
