@@ -795,6 +795,8 @@ struct dwc3 {
 	void (*notify_event) (struct dwc3 *, unsigned);
 	int			tx_fifo_size;
 	bool			tx_fifo_reduced;
+
+	bool			hsphy_auto_suspend_disable;
 };
 
 /* -------------------------------------------------------------------------- */

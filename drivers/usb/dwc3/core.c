@@ -145,9 +145,11 @@ void dwc3_set_mode(struct dwc3 *dwc, u32 mode)
 	reg = dwc3_readl(dwc->regs, DWC3_GUSB3PIPECTL(0));
 	reg |= DWC3_GUSB3PIPECTL_SUSPHY;
 	dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(0), reg);
-	reg = dwc3_readl(dwc->regs, DWC3_GUSB2PHYCFG(0));
-	reg |= DWC3_GUSB2PHYCFG_SUSPHY;
-	dwc3_writel(dwc->regs, DWC3_GUSB2PHYCFG(0), reg);
+	if (!dwc->hsphy_auto_suspend_disable) {
+		reg = dwc3_readl(dwc->regs, DWC3_GUSB2PHYCFG(0));
+		reg |= DWC3_GUSB2PHYCFG_SUSPHY;
+		dwc3_writel(dwc->regs, DWC3_GUSB2PHYCFG(0), reg);
+	}
 }
 
 /**
@@ -599,6 +601,9 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 		dev_err(dev, "ioremap failed\n");
 		return -ENOMEM;
 	}
+
+	dwc->hsphy_auto_suspend_disable = of_property_read_bool(node,
+						"snps,hsphy-auto-suspend-disable");
 
 	spin_lock_init(&dwc->lock);
 	platform_set_drvdata(pdev, dwc);
