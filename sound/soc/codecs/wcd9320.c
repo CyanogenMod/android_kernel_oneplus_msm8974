@@ -39,6 +39,12 @@
 #include "wcd9xxx-resmgr.h"
 #include "wcd9xxx-common.h"
 
+#ifdef CONFIG_MACH_OPPO
+//liuyan add for dvt
+#include <linux/pcb_version.h>
+//liuyan add end
+#endif
+
 #define TAIKO_MAD_SLIMBUS_TX_PORT 12
 #define TAIKO_MAD_AUDIO_FIRMWARE_PATH "wcd9320/wcd9320_mad_audio.bin"
 #define TAIKO_VALIDATE_RX_SBPORT_RANGE(port) ((port >= 16) && (port <= 22))
@@ -56,6 +62,11 @@ static atomic_t kp_taiko_priv;
 static int spkr_drv_wrnd_param_set(const char *val,
 				   const struct kernel_param *kp);
 static int spkr_drv_wrnd = 1;
+
+#ifdef CONFIG_MACH_OPPO
+//liuyan add for dvt
+static int pcb_version;
+#endif
 
 static struct kernel_param_ops spkr_drv_wrnd_param_ops = {
 	.set = spkr_drv_wrnd_param_set,
@@ -1526,8 +1537,71 @@ static const char * const taiko_2_x_ear_pa_gain_text[] = {
 static const struct soc_enum taiko_2_x_ear_pa_gain_enum =
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(taiko_2_x_ear_pa_gain_text),
 			taiko_2_x_ear_pa_gain_text);
+
+/*liuyan 2013-8-19 add for spk*/
+#ifdef CONFIG_MACH_OPPO
+static int spkr_put_control(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	struct taiko_priv *taiko = snd_soc_codec_get_drvdata(codec);
+	unsigned int value;
+	value = ucontrol->value.integer.value[0];
+	printk("%s:val %d\n",__func__,value);
+	if(value){
+		//liuyan add for dvt
+		if(pcb_version>=HW_VERSION__12){
+		gpio_set_value(taiko->mbhc.mbhc_cfg->yda145_boost_gpio,1);
+		pr_debug("%s:gpio:%d %d\n",__func__,taiko->mbhc.mbhc_cfg->yda145_boost_gpio,
+			    gpio_get_value(taiko->mbhc.mbhc_cfg->yda145_boost_gpio));
+		msleep(20);
+		gpio_set_value(taiko->mbhc.mbhc_cfg->yda145_ctr_gpio,1);
+		pr_debug("%s:gpio:%d %d\n",__func__,taiko->mbhc.mbhc_cfg->yda145_ctr_gpio,
+			    gpio_get_value(taiko->mbhc.mbhc_cfg->yda145_ctr_gpio));
+		}
+		gpio_set_value(taiko->mbhc.mbhc_cfg->enable_spk_gpio,1);
+		pr_debug("%s:gpio:%d %d\n",__func__,taiko->mbhc.mbhc_cfg->enable_spk_gpio,
+			    gpio_get_value(taiko->mbhc.mbhc_cfg->enable_spk_gpio));
+	}else{
+		gpio_set_value(taiko->mbhc.mbhc_cfg->enable_spk_gpio,0);
+		pr_debug("%s:gpio:%d %d\n",__func__,taiko->mbhc.mbhc_cfg->enable_spk_gpio,
+			     gpio_get_value(taiko->mbhc.mbhc_cfg->enable_spk_gpio));
+		//liuyan add for dvt
+		if(pcb_version>=HW_VERSION__12){
+		gpio_set_value(taiko->mbhc.mbhc_cfg->yda145_ctr_gpio,0);
+		pr_debug("%s:gpio:%d %d\n",__func__,taiko->mbhc.mbhc_cfg->yda145_ctr_gpio,
+			    gpio_get_value(taiko->mbhc.mbhc_cfg->yda145_ctr_gpio));
+		msleep(20);
+		gpio_set_value(taiko->mbhc.mbhc_cfg->yda145_boost_gpio,0);
+		pr_debug("%s:gpio:%d %d\n",__func__,taiko->mbhc.mbhc_cfg->yda145_boost_gpio,
+			    gpio_get_value(taiko->mbhc.mbhc_cfg->yda145_boost_gpio));
+		}
+	}
+
+	return 0;
+}
+
+static int spkr_get_control(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol)
+{
+	/* struct snd_soc_codec *codec = es325_priv.codec; */
+	//unsigned int value;
+
+	//ucontrol->value.integer.value[0] = value;
+
+	return 0;
+}
+
+#endif
+/*liuyan add end*/
 static const struct snd_kcontrol_new taiko_2_x_analog_gain_controls[] = {
 
+//liuyan 2013-8-12 add power on max2777
+#ifdef CONFIG_MACH_OPPO
+	SOC_SINGLE_EXT("SPKR Enable", 0, 0, 1, 0,
+		                 spkr_get_control, spkr_put_control),
+#endif	
+//liuyan add end
 	SOC_ENUM_EXT("EAR PA Gain", taiko_2_x_ear_pa_gain_enum,
 		taiko_pa_gain_get, taiko_pa_gain_put),
 
