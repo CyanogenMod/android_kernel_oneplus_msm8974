@@ -232,9 +232,6 @@ struct wcd9xxx_mbhc_config {
 	struct regulator *cdc_hpmic_switch;
 	int hpmic_regulator_count;
 	int count_regulator;
-	int enable_spk_gpio;
-	int yda145_ctr_gpio;
-	int yda145_boost_gpio;
 	int headset_type;
 #endif
 //liuyan add end
