@@ -18,32 +18,6 @@
 			cdc-hpmic_switch-1-supply = <&pm8941_l24>;
 			qcom,cdc-micbias-cfilt2-mv = <2000>;
 		};
-
-		es325_codec_gen0 {
-			compatible = "adnc,es325-codec-gen0";
-			elemental-addr = [00 01 02 00 BE 02];
-
-			adnc,es325-codec-gen0 = "es325-codec-gen0";
-			adnc,es325-codec-gen0-eaddr = [00 01  02 00 BE 02];
-
-			adnc,wakeup-gpio = <&msmgpio 23 0>;
-
-			es325-mclk-clk =  <&pm8941_clkdiv2>;
-			adnc,es325-mclk-clk-freq = <19200000>;
-		};
-
-		es325_codec_intf {
-			compatible = "adnc,es325-codec-intf";
-			elemental-addr =  [00 00 02 00 BE 02];
-
-			adnc,es325-codec-intf ="es325-codec-intf";
-			adnc,es325-codec-intf-eaddr = [00 01 02 00 BE 02];
-
-			adnc,wakeup-gpio = <&msmgpio 23 0>;/* DEFINED BY CUSTOMER*/
-
-			es325-mclk-clk = <&pm8941_clkdiv2>;
-			adnc,es325-mclk-clk-freq = <19200000>;
-		};
 	};
 
 	sound {
