@@ -33,6 +33,7 @@
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/pm_runtime.h>
+#include <linux/pm.h>
 #include <linux/kernel.h>
 #include <linux/gpio.h>
 #include "wcd9320.h"
@@ -470,6 +471,9 @@ struct taiko_priv {
 	int hpmic_regulator_count;
 	/*endif*/
 	#endif
+
+	struct wakeup_source mad_wakeup_source;
+
 };
 
 /* OPPO 2013-11-12 xuzhaoan Add begin for American Headset Detect */
@@ -2766,26 +2770,30 @@ static int taiko_codec_config_mad(struct snd_soc_codec *codec)
 	const struct firmware *fw;
 	struct mad_audio_cal *mad_cal;
 	const char *filename = TAIKO_MAD_AUDIO_FIRMWARE_PATH;
+	struct taiko_priv *taiko = snd_soc_codec_get_drvdata(codec);
 
 	pr_debug("%s: enter\n", __func__);
+	__pm_stay_awake(&taiko->mad_wakeup_source);
+
 	ret = request_firmware(&fw, filename, codec->dev);
 	if (ret != 0) {
 		pr_err("Failed to acquire MAD firwmare data %s: %d\n", filename,
 		       ret);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto out;
 	}
 
 	if (fw->size < sizeof(struct mad_audio_cal)) {
 		pr_err("%s: incorrect firmware size %u\n", __func__, fw->size);
-		release_firmware(fw);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out;
 	}
 
 	mad_cal = (struct mad_audio_cal *)(fw->data);
 	if (!mad_cal) {
 		pr_err("%s: Invalid calibration data\n", __func__);
-		release_firmware(fw);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
 	snd_soc_write(codec, TAIKO_A_CDC_MAD_MAIN_CTL_2,
@@ -2835,7 +2843,10 @@ static int taiko_codec_config_mad(struct snd_soc_codec *codec)
 	snd_soc_write(codec, TAIKO_A_CDC_MAD_ULTR_CTL_6,
 		      mad_cal->ultrasound_info.rms_threshold_msb);
 
+out:
 	release_firmware(fw);
+	__pm_relax(&taiko->mad_wakeup_source);
+
 	pr_debug("%s: leave ret %d\n", __func__, ret);
 
 	return ret;
@@ -7138,6 +7149,8 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 		goto err_irq;
 	}
 
+	wakeup_source_init(&taiko->mad_wakeup_source, "mad_wakeup_source");
+
 	atomic_set(&kp_taiko_priv, (unsigned long)taiko);
 	mutex_lock(&dapm->codec->mutex);
 	snd_soc_dapm_disable_pin(dapm, "ANC HPHL");
@@ -7193,6 +7206,8 @@ static int taiko_codec_remove(struct snd_soc_codec *codec)
 	wcd9xxx_resmgr_deinit(&taiko->resmgr);
 
 	taiko->spkdrv_reg = NULL;
+
+	wakeup_source_trash(&taiko->mad_wakeup_source);
 
 	kfree(taiko);
 	return 0;
