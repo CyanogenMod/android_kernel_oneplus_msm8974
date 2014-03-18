@@ -34,11 +34,6 @@
 #include "../codecs/wcd9xxx-common.h"
 #include "../codecs/wcd9320.h"
 
-//OPPO 2013-12-13 liuyan add version recognition 
-#ifdef CONFIG_MACH_OPPO 
-#include <linux/pcb_version.h>
-#endif
-//liuyan add end
 #define DRV_NAME "msm8974-asoc-taiko"
 
 #define MSM8974_SPK_ON 1
@@ -86,12 +81,6 @@ static void *adsp_state_notifier;
 
 #define ADSP_STATE_READY_TIMEOUT_MS 3000
 
-//OPPO 2013-12-13 liuyan add  for dvt
-#ifdef CONFIG_MACH_OPPO 
-int pcb_version;
-#endif
-
-//liuyan add end
 static inline int param_is_mask(int p)
 {
 	return ((p >= SNDRV_PCM_HW_PARAM_FIRST_MASK) &&
@@ -154,9 +143,6 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 /* OPPO 2013-10-22 liuyan Modify end */
 #ifdef CONFIG_MACH_OPPO  //liuyan add 2013-4-18
 	.hpmic_switch_gpio=0,
-	.enable_spk_gpio=0,
-	.yda145_ctr_gpio=0,
-	.yda145_boost_gpio=0,
 	.count_regulator=0,
 #endif
 	.enable_anc_mic_detect = false,
@@ -178,13 +164,6 @@ struct msm8974_asoc_mach_data {
 //liuyan 2013-3-14 add,hp mic switch
 #ifdef CONFIG_MACH_OPPO
        int hpmic_switch_gpio;
-#ifdef CONFIG_MACH_FIND7OP
-/* xiaojun.lv@Prd.AudioDrv,2014/2/10,add for 14001 regulator*/       
-	struct regulator	*cdc_spk;
-#endif
-	int enable_spk_gpio;
-	int yda145_ctr_gpio;
-	int yda145_boost_gpio;
 #endif
 //liuyan add end
 	int mclk_gpio;
@@ -254,6 +233,12 @@ static int clk_users;
 static atomic_t prim_auxpcm_rsc_ref;
 static atomic_t sec_auxpcm_rsc_ref;
 
+#ifdef CONFIG_MACH_OPPO
+static int msm8974_oppo_ext_spk;
+static int oppo_enable_spk_gpio = -1;
+static int yda145_boost_gpio = -1;
+static int yda145_ctr_gpio = -1;
+#endif
 
 static int msm8974_liquid_ext_spk_power_amp_init(void)
 {
@@ -301,6 +286,54 @@ static int msm8974_liquid_ext_spk_power_amp_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_MACH_OPPO
+static int oppo_ext_spk_power_init(void)
+{
+	int ret = 0;
+
+	oppo_enable_spk_gpio = of_get_named_gpio(spdev->dev.of_node,
+			"enable_spk-gpio", 0);
+	if (oppo_enable_spk_gpio >= 0) {
+		ret = gpio_request(oppo_enable_spk_gpio, "enable_spk_gpio");
+		if (ret) {
+			pr_err("%s: gpio_request failed for enable_spk-gpio.\n",
+				__func__);
+			return -EINVAL;
+		}
+		gpio_direction_output(oppo_enable_spk_gpio, 0);
+	}
+
+	yda145_ctr_gpio = of_get_named_gpio(spdev->dev.of_node,
+			"qcom,yda145_ctr-gpio", 0);
+	if (yda145_ctr_gpio >= 0) {
+		ret = gpio_request(yda145_ctr_gpio, "yda145_ctr_gpio");
+		if (ret) {
+			gpio_free(oppo_enable_spk_gpio);
+			pr_err("%s: gpio_request failed for yda145_ctr-gpio.\n",
+				__func__);
+			return -EINVAL;
+		}
+		gpio_direction_output(yda145_ctr_gpio, 0);
+	}
+
+	yda145_boost_gpio = of_get_named_gpio(spdev->dev.of_node,
+			"qcom,yda145_boost-gpio", 0);
+	if (yda145_boost_gpio >= 0) {
+		ret = gpio_request(yda145_boost_gpio, "yda145_boost_gpio");
+		if (ret) {
+			gpio_free(yda145_ctr_gpio);
+			gpio_free(oppo_enable_spk_gpio);
+			pr_err("%s: gpio_request failed for yda145_boost-gpio.\n",
+				__func__);
+			return -EINVAL;
+		}
+		gpio_direction_output(yda145_boost_gpio, 0);
+	}
+
+	return 0;
+}
+#endif
+
 static void msm8974_liquid_ext_ult_spk_power_amp_enable(u32 on)
 {
 	if (on) {
@@ -344,6 +377,25 @@ static void msm8974_liquid_ext_spk_power_amp_enable(u32 on)
 	pr_debug("%s: %s external speaker PAs.\n", __func__,
 			on ? "Enable" : "Disable");
 }
+
+#ifdef CONFIG_MACH_OPPO
+static void msm8974_oppo_ext_spk_power_amp_enable(bool enable)
+{
+	if (enable) {
+		gpio_set_value(oppo_enable_spk_gpio, 1);
+
+		gpio_set_value(yda145_boost_gpio, 1);
+		usleep_range(15000, 25000);
+		gpio_set_value(yda145_ctr_gpio, 1);
+	} else {
+		gpio_set_value(yda145_ctr_gpio, 0);
+		usleep_range(15000, 25000);
+		gpio_set_value(yda145_boost_gpio, 0);
+
+		gpio_set_value(oppo_enable_spk_gpio, 0);
+	}
+}
+#endif
 
 static void msm8974_liquid_docking_irq_work(struct work_struct *work)
 {
@@ -506,12 +558,30 @@ static void msm8974_fluid_ext_us_amp_off(u32 spk)
 	}
 }
 
+#ifdef CONFIG_MACH_OPPO
+static void msm8974_oppo_ext_spk_power_amp_on(u32 spk)
+{
+	if (spk & (LO_1_SPK_AMP | LO_3_SPK_AMP)) {
+		pr_debug("%s Turn on amp, spk=%d", __func__, spk);
+		if (!msm8974_oppo_ext_spk)
+			msm8974_oppo_ext_spk_power_amp_enable(true);
+		msm8974_oppo_ext_spk |= spk;
+	}
+}
+#endif
+
 static void msm8974_ext_spk_power_amp_on(u32 spk)
 {
 	if (gpio_is_valid(ext_spk_amp_gpio))
 		msm8974_liquid_ext_spk_power_amp_on(spk);
 	else if (gpio_is_valid(ext_ult_lo_amp_gpio))
 		msm8974_fluid_ext_us_amp_on(spk);
+#ifdef CONFIG_MACH_OPPO
+	else if (gpio_is_valid(oppo_enable_spk_gpio) &&
+			gpio_is_valid(yda145_ctr_gpio) &&
+			gpio_is_valid(yda145_boost_gpio))
+		msm8974_oppo_ext_spk_power_amp_on(spk);
+#endif
 }
 
 static void msm8974_liquid_ext_spk_power_amp_off(u32 spk)
@@ -540,12 +610,30 @@ static void msm8974_liquid_ext_spk_power_amp_off(u32 spk)
 	}
 }
 
+#ifdef CONFIG_MACH_OPPO
+static void msm8974_oppo_ext_spk_power_amp_off(u32 spk)
+{
+	if (spk & (LO_1_SPK_AMP | LO_3_SPK_AMP)) {
+		pr_debug("%s: Turn off amp, spk=%d", __func__, spk);
+		msm8974_oppo_ext_spk &= ~spk;
+		if (!msm8974_oppo_ext_spk)
+			msm8974_oppo_ext_spk_power_amp_enable(false);
+	}
+}
+#endif
+
 static void msm8974_ext_spk_power_amp_off(u32 spk)
 {
 	if (gpio_is_valid(ext_spk_amp_gpio))
 		msm8974_liquid_ext_spk_power_amp_off(spk);
 	else if (gpio_is_valid(ext_ult_lo_amp_gpio))
 		msm8974_fluid_ext_us_amp_off(spk);
+#ifdef CONFIG_MACH_OPPO
+	else if (gpio_is_valid(oppo_enable_spk_gpio) &&
+			gpio_is_valid(yda145_ctr_gpio) &&
+			gpio_is_valid(yda145_boost_gpio))
+		msm8974_oppo_ext_spk_power_amp_off(spk);
+#endif
 }
 
 static void msm8974_ext_control(struct snd_soc_codec *codec)
@@ -741,7 +829,7 @@ static const struct snd_soc_dapm_widget msm8974_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("ANCLeft Headset Mic", NULL),
 #else
-       SND_SOC_DAPM_MIC("Main Mic", NULL),
+	SND_SOC_DAPM_MIC("Main Mic", NULL),
 	SND_SOC_DAPM_MIC("Second Mic", NULL),
 	SND_SOC_DAPM_MIC("ANC Mic", NULL),
 #endif
@@ -1625,6 +1713,15 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		return err;
 	}
 
+#ifdef CONFIG_MACH_OPPO
+	err = oppo_ext_spk_power_init();
+	if (err) {
+		pr_err("%s: Oppo external speaker power init failed (%d)\n",
+			__func__, err);
+		return err;
+	}
+#endif
+
 	err = msm8974_liquid_init_docking(dapm);
 	if (err) {
 		pr_err("%s: LiQUID 8974 init Docking stat IRQ failed (%d)\n",
@@ -1698,50 +1795,6 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	       
 	}
 	gpio_direction_output(mbhc_cfg.hpmic_switch_gpio, 1);
-	mbhc_cfg.enable_spk_gpio=mach_data->enable_spk_gpio;
-	if (mbhc_cfg.enable_spk_gpio) {
-		err = gpio_request(mbhc_cfg.enable_spk_gpio, "ENABLE_SPK");
-		if (err) {
-			pr_err("%s: Failed to request gpio %d\n", __func__,
-				mbhc_cfg.enable_spk_gpio);
-			mbhc_cfg.enable_spk_gpio = 0;
-
-		}
-	       
-	}
-	gpio_direction_output(mbhc_cfg.enable_spk_gpio, 0);
-	printk("%s:enable_spk_gpio(%d)\n",__func__,mbhc_cfg.enable_spk_gpio);
-	//mbhc_cfg.cdc_spk=mach_data->cdc_spk;
-	//liuyan add for dvt
-	if(pcb_version>=HW_VERSION__12){
-           mbhc_cfg.yda145_ctr_gpio=mach_data->yda145_ctr_gpio;
-	if (mbhc_cfg.yda145_ctr_gpio) {
-		err = gpio_request(mbhc_cfg.yda145_ctr_gpio, "YDA145_CTR");
-		if (err) {
-			pr_err("%s: Failed to request gpio %d\n", __func__,
-				mbhc_cfg.yda145_ctr_gpio);
-			mbhc_cfg.yda145_ctr_gpio = 0;
-
-		}
-	       
-	}
-	gpio_direction_output(mbhc_cfg.yda145_ctr_gpio, 0);
-	printk("%s:yda145_ctr_gpio(%d)\n",__func__,mbhc_cfg.yda145_ctr_gpio);
-
-	mbhc_cfg.yda145_boost_gpio=mach_data->yda145_boost_gpio;
-	if (mbhc_cfg.yda145_boost_gpio) {
-		err = gpio_request(mbhc_cfg.yda145_boost_gpio, "YDA145_BOOST");
-		if (err) {
-			pr_err("%s: Failed to request gpio %d\n", __func__,
-				mbhc_cfg.yda145_boost_gpio);
-			mbhc_cfg.yda145_boost_gpio = 0;
-
-		}
-	       
-	}
-	gpio_direction_output(mbhc_cfg.yda145_boost_gpio, 0);
-	printk("%s:yda145_boost_gpio(%d)\n",__func__,mbhc_cfg.yda145_boost_gpio);
-	}
 #endif
 //liuyan add end
 	mbhc_cfg.calibration = def_taiko_mbhc_cal();
@@ -2883,8 +2936,6 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 	}
 //liuyan 2013-3-14 add,hp mic switch
 #ifdef CONFIG_MACH_OPPO
-       pcb_version=get_pcb_version();//liuyan add for dvt
-       printk("%s:pcb_version %d\n",__func__,pcb_version);
        pdata->hpmic_switch_gpio= of_get_named_gpio(pdev->dev.of_node,
 				"qcom,hpmic-switch-gpio", 0);
 	if (pdata->hpmic_switch_gpio < 0) {
@@ -2895,47 +2946,6 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 		//ret = -ENODEV;
 		//goto err;
 	}
-	 pdata->enable_spk_gpio= of_get_named_gpio(pdev->dev.of_node,
-				"enable_spk-gpio", 0);
-	if (pdata->enable_spk_gpio < 0) {
-		dev_err(&pdev->dev,
-			"Looking up %s property in node %s failed %d\n",
-			"enable_spk-gpio", pdev->dev.of_node->full_name,
-			pdata->enable_spk_gpio);
-		//ret = -ENODEV;
-		//goto err;
-	}
-
-        //liuyan add for dvt
-        if(pcb_version>=HW_VERSION__12){
-	     pdata->yda145_ctr_gpio= of_get_named_gpio(pdev->dev.of_node,
-				"qcom,yda145_ctr-gpio", 0);
-	     if (pdata->yda145_ctr_gpio < 0) {
-		  dev_err(&pdev->dev,
-			"Looking up %s property in node %s failed %d\n",
-			"qcom,yda145_ctr-gpio", pdev->dev.of_node->full_name,
-			pdata->yda145_ctr_gpio);
-		//ret = -ENODEV;
-		//goto err;
-	    }
-	    pdata->yda145_boost_gpio= of_get_named_gpio(pdev->dev.of_node,
-				"qcom,yda145_boots-gpio", 0);
-	     if (pdata->yda145_ctr_gpio < 0) {
-		  dev_err(&pdev->dev,
-			"Looking up %s property in node %s failed %d\n",
-			"qcom,yda145_boots-gpio", pdev->dev.of_node->full_name,
-			pdata->yda145_boost_gpio);
-		//ret = -ENODEV;
-		//goto err;
-	    }
-        }
-
-	/*pdata->cdc_spk= regulator_get(&pdev->dev, "cdc_spk");
-		if (IS_ERR(pdata->cdc_spk)) {
-			pr_err("%s:Failed to get hpmic switch regulator\n",__func__);
-			pdata->cdc_spk= NULL;
-			//ret = -EINVAL;
-		}*/
 #endif
 //liuyan add end
 	pdata->mclk_gpio = of_get_named_gpio(pdev->dev.of_node,
@@ -3014,18 +3024,6 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 			ret);
 		goto err;
 	}
-
-#ifdef CONFIG_MACH_FIND7OP
-/* xiaojun.lv@Prd.AudioDrv,2014/2/10,add for 14001 regulator*/
-        pdata->cdc_spk= regulator_get(&pdev->dev, "cdc_spk");
-		if (IS_ERR(pdata->cdc_spk)) {
-			pr_err("%s:Failed to get cdc_spk regulator\n",__func__);
-			pdata->cdc_spk= NULL;
-			//ret = -EINVAL;
-		}
-		printk("%s regulator_enable(pdata->cdc_spk);\n",__func__);
-		regulator_enable(pdata->cdc_spk);
-#endif
 
 	/* Parse Primary AUXPCM info from DT */
 	ret = msm8974_dtparse_auxpcm(pdev, &pdata->pri_auxpcm_ctrl,
@@ -3167,6 +3165,17 @@ static int __devexit msm8974_asoc_machine_remove(struct platform_device *pdev)
 
 	if (gpio_is_valid(ext_ult_lo_amp_gpio))
 		gpio_free(ext_ult_lo_amp_gpio);
+
+#ifdef CONFIG_MACH_OPPO
+	if (gpio_is_valid(oppo_enable_spk_gpio))
+		gpio_free(oppo_enable_spk_gpio);
+
+	if (gpio_is_valid(yda145_ctr_gpio))
+		gpio_free(yda145_ctr_gpio);
+
+	if (gpio_is_valid(yda145_boost_gpio))
+		gpio_free(yda145_boost_gpio);
+#endif
 
 	gpio_free(pdata->mclk_gpio);
 	gpio_free(pdata->us_euro_gpio);
