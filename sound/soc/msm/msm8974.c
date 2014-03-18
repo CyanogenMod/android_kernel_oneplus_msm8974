@@ -140,11 +140,6 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 			    1 << MBHC_CS_ENABLE_REMOVAL),
 	.do_recalibration = true,
 	.use_vddio_meas = true,
-/* OPPO 2013-10-22 liuyan Modify end */
-#ifdef CONFIG_MACH_OPPO  //liuyan add 2013-4-18
-	.hpmic_switch_gpio=0,
-	.count_regulator=0,
-#endif
 	.enable_anc_mic_detect = false,
 	.hw_jack_type = SIX_POLE_JACK,
 };
@@ -161,11 +156,6 @@ struct msm_auxpcm_ctrl {
 };
 
 struct msm8974_asoc_mach_data {
-//liuyan 2013-3-14 add,hp mic switch
-#ifdef CONFIG_MACH_OPPO
-       int hpmic_switch_gpio;
-#endif
-//liuyan add end
 	int mclk_gpio;
 	u32 mclk_freq;
 	int us_euro_gpio;
@@ -238,6 +228,7 @@ static int msm8974_oppo_ext_spk;
 static int oppo_enable_spk_gpio = -1;
 static int yda145_boost_gpio = -1;
 static int yda145_ctr_gpio = -1;
+static int hpmic_switch_gpio = -1;
 #endif
 
 static int msm8974_liquid_ext_spk_power_amp_init(void)
@@ -328,6 +319,25 @@ static int oppo_ext_spk_power_init(void)
 			return -EINVAL;
 		}
 		gpio_direction_output(yda145_boost_gpio, 0);
+	}
+
+	return 0;
+}
+
+static int oppo_hpmic_switch_power_init(void)
+{
+	int ret = 0;
+
+	hpmic_switch_gpio = of_get_named_gpio(spdev->dev.of_node,
+			"qcom,hpmic-switch-gpio", 0);
+	if (hpmic_switch_gpio >= 0) {
+		ret = gpio_request(hpmic_switch_gpio, "hpmic_switch_gpio");
+		if (ret) {
+			pr_err("%s: gpio_request failed for hpmic_switch_gpio.\n",
+				__func__);
+			return -EINVAL;
+		}
+		gpio_direction_output(hpmic_switch_gpio, 1);
 	}
 
 	return 0;
@@ -824,7 +834,7 @@ static const struct snd_soc_dapm_widget msm8974_dapm_widgets[] = {
 
 	SND_SOC_DAPM_MIC("Handset Mic", NULL),
 	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-//liuyan 2013-4-18 modify
+
 #ifndef CONFIG_MACH_OPPO
 	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
 	SND_SOC_DAPM_MIC("ANCLeft Headset Mic", NULL),
@@ -833,7 +843,6 @@ static const struct snd_soc_dapm_widget msm8974_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Second Mic", NULL),
 	SND_SOC_DAPM_MIC("ANC Mic", NULL),
 #endif
-//liuyan modify end
 	SND_SOC_DAPM_MIC("Analog Mic4", NULL),
 	SND_SOC_DAPM_MIC("Analog Mic6", NULL),
 	SND_SOC_DAPM_MIC("Analog Mic7", NULL),
@@ -1679,11 +1688,6 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-//liuyan 2013-3-14 add,hpmic switch
-#ifdef CONFIG_MACH_OPPO
-       struct msm8974_asoc_mach_data *mach_data;
-#endif
-//liuyan add end
 
 	/* Taiko SLIMBUS configuration
 	 * RX1, RX2, RX3, RX4, RX5, RX6, RX7, RX8, RX9, RX10, RX11, RX12, RX13
@@ -1717,6 +1721,13 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	err = oppo_ext_spk_power_init();
 	if (err) {
 		pr_err("%s: Oppo external speaker power init failed (%d)\n",
+			__func__, err);
+		return err;
+	}
+
+	err = oppo_hpmic_switch_power_init();
+	if (err) {
+		pr_err("%s: Oppo HPMIC switch power init failed (%d)\n",
 			__func__, err);
 		return err;
 	}
@@ -1780,23 +1791,6 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		}
 	}
 	/* start mbhc */
-//liuyan 2013-3-14 add, hpmi switch gpio
-#ifdef CONFIG_MACH_OPPO
-       mach_data=(struct msm8974_asoc_mach_data*)(rtd->card->drvdata);
-	mbhc_cfg.hpmic_switch_gpio=mach_data->hpmic_switch_gpio;
-	if (mbhc_cfg.hpmic_switch_gpio) {
-		err = gpio_request(mbhc_cfg.hpmic_switch_gpio, "HPMIC_SWITCH");
-		if (err) {
-			pr_err("%s: Failed to request gpio %d\n", __func__,
-				mbhc_cfg.hpmic_switch_gpio);
-			mbhc_cfg.hpmic_switch_gpio = 0;
-
-		}
-	       
-	}
-	gpio_direction_output(mbhc_cfg.hpmic_switch_gpio, 1);
-#endif
-//liuyan add end
 	mbhc_cfg.calibration = def_taiko_mbhc_cal();
 	if (mbhc_cfg.calibration) {
 		err = taiko_hs_detect(codec, &mbhc_cfg);
@@ -2934,20 +2928,6 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err;
 	}
-//liuyan 2013-3-14 add,hp mic switch
-#ifdef CONFIG_MACH_OPPO
-       pdata->hpmic_switch_gpio= of_get_named_gpio(pdev->dev.of_node,
-				"qcom,hpmic-switch-gpio", 0);
-	if (pdata->hpmic_switch_gpio < 0) {
-		dev_err(&pdev->dev,
-			"Looking up %s property in node %s failed %d\n",
-			"qcom,hpmic-switch-gpio", pdev->dev.of_node->full_name,
-			pdata->hpmic_switch_gpio);
-		//ret = -ENODEV;
-		//goto err;
-	}
-#endif
-//liuyan add end
 	pdata->mclk_gpio = of_get_named_gpio(pdev->dev.of_node,
 				"qcom,cdc-mclk-gpios", 0);
 	if (pdata->mclk_gpio < 0) {
@@ -3175,6 +3155,9 @@ static int __devexit msm8974_asoc_machine_remove(struct platform_device *pdev)
 
 	if (gpio_is_valid(yda145_boost_gpio))
 		gpio_free(yda145_boost_gpio);
+
+	if (gpio_is_valid(hpmic_switch_gpio))
+		gpio_free(hpmic_switch_gpio);
 #endif
 
 	gpio_free(pdata->mclk_gpio);

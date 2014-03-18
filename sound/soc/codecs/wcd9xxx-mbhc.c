@@ -35,11 +35,6 @@
 #include <linux/kernel.h>
 #include <linux/gpio.h>
 #include <linux/input.h>
-//liuyan 2013-12-26 add for hpmic switch power
-#ifdef CONFIG_MACH_OPPO
-#include <linux/regulator/consumer.h>
-#endif
-//liuyan add end
 #include "wcd9320.h"
 #include "wcd9306.h"
 #include "wcd9xxx-mbhc.h"
@@ -71,13 +66,7 @@
 #define HS_DETECT_PLUG_TIME_MS (5 * 1000)
 #define ANC_HPH_DETECT_PLUG_TIME_MS (5 * 1000)
 
-//liuyan 2013-1-2 for delay detect headset
-#ifdef CONFIG_MACH_OPPO
-#define HS_DETECT_PLUG_INERVAL_MS 500
-#else
 #define HS_DETECT_PLUG_INERVAL_MS 100
-#endif
-//liuyan modify end
 #define SWCH_REL_DEBOUNCE_TIME_MS 50
 #define SWCH_IRQ_DEBOUNCE_TIME_US 5000
 #define BTN_RELEASE_DEBOUNCE_TIME_MS 25
@@ -139,12 +128,7 @@
 #define WCD9XXX_V_CS_NO_MIC 5
 #define WCD9XXX_MB_MEAS_DELTA_MAX_MV 80
 #ifdef CONFIG_MACH_OPPO
-//liuyan 2013-12-9 add for headset type detec
 #define WCD9XXX_CS_MEAS_DELTA_MAX_MV 10
-#define WCD9XXX_CS_MAX_MV 120
-#define WCD9xxx_CS_THRESHED 10
-#define WCD9XXX_CS_IPHONE_HIG_THRD 665
-#define WCD9XXX_CS_IPHONE_LOW_THRD 590
 #else
 #define WCD9XXX_CS_MEAS_DELTA_MAX_MV 12
 #endif
@@ -877,38 +861,11 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 		mbhc->zl = mbhc->zr = 0;
 		pr_debug("%s: Reporting removal %d(%x)\n", __func__,
 			 jack_type, mbhc->hph_status);
-	#ifdef CONFIG_MACH_OPPO
-              //liuyan 2013-3-13 add
-              switch_set_state(&mbhc->wcd9xxx_sdev,0);
-	       //gpio_set_value(mbhc->mbhc_cfg->hpmic_switch_gpio,0);
-		//mdelay(20);
-              printk("%s: Reporting removal %d(%x)\n", __func__,
-			 jack_type, mbhc->hph_status);
-		if(mbhc->mbhc_cfg->cdc_hpmic_switch){
-		    if(mbhc->mbhc_cfg->hpmic_regulator_count){
-		           printk("%s: hpmic regulator count %d\n",__func__,\
-			 	                  mbhc->mbhc_cfg->hpmic_regulator_count);
-			    if(regulator_disable(mbhc->mbhc_cfg->cdc_hpmic_switch)){
-				   pr_err("%s:disable hpmic switch regulator faild!\n",__func__);
-			    }else{
-                               mbhc->mbhc_cfg->hpmic_regulator_count--;
-				   printk("%s:disable the parent hpmic switch regulator\n",__func__);
-			    }
-		    }
-		    //printk("%s: count regulator %d\n",__func__,mbhc->mbhc_cfg->count_regulator);
-	           if(mbhc->mbhc_cfg->count_regulator){
-			    if(regulator_disable(mbhc->mbhc_cfg->cdc_hpmic_switch)){
-				   pr_err("%s:disable hpmic switch regulator faild!\n",__func__);
-			    }else{
-                               mbhc->mbhc_cfg->count_regulator--;
-				   printk("%s:disable the hpmic switch regulator\n",__func__);
-			    }
-	           }
-		}else{
-                  pr_err("%s:disable cdc_hpmic_switch pointer is null\n",__func__);
-		}
-	       //liuyan add end
-	#endif
+#ifdef CONFIG_MACH_OPPO
+		//liuyan 2013-3-13 add
+		switch_set_state(&mbhc->wcd9xxx_sdev, 0);
+		//liuyan add end
+#endif
 		wcd9xxx_jack_report(mbhc, &mbhc->headset_jack, mbhc->hph_status,
 				    WCD9XXX_JACK_MASK);
 		wcd9xxx_set_and_turnoff_hph_padac(mbhc);
@@ -973,30 +930,27 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 
 		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
 			 jack_type, mbhc->hph_status);
-	#ifdef CONFIG_MACH_OPPO
-              //liuyan 2013-3-13 add
-              switch(mbhc->current_plug){
-               case PLUG_TYPE_HEADPHONE:
-		case PLUG_TYPE_HIGH_HPH:
-			switch_set_state(&mbhc->wcd9xxx_sdev,2);
-			break;
-	        case PLUG_TYPE_GND_MIC_SWAP:
-			//gpio_set_value(mbhc->mbhc_cfg->hpmic_switch_gpio,1);
-			switch_set_state(&mbhc->wcd9xxx_sdev,1);
-			//mdelay(20);
-			break;
-		 case PLUG_TYPE_HEADSET:
-		 	//gpio_set_value(mbhc->mbhc_cfg->hpmic_switch_gpio,0);
-		 	switch_set_state(&mbhc->wcd9xxx_sdev,1);
-			break;
-		default:
-			switch_set_state(&mbhc->wcd9xxx_sdev,0);
-			break;
+#ifdef CONFIG_MACH_OPPO
+		//liuyan 2013-3-13 add
+		switch (mbhc->current_plug){
+			case PLUG_TYPE_HEADPHONE:
+			case PLUG_TYPE_HIGH_HPH:
+				switch_set_state(&mbhc->wcd9xxx_sdev,2);
+				break;
+			case PLUG_TYPE_GND_MIC_SWAP:
+				switch_set_state(&mbhc->wcd9xxx_sdev,1);
+				break;
+			case PLUG_TYPE_HEADSET:
+				switch_set_state(&mbhc->wcd9xxx_sdev,1);
+				break;
+			default:
+				switch_set_state(&mbhc->wcd9xxx_sdev,0);
+				break;
 		}
-              printk("%s: Reporting insertion %d(%x)\n", __func__,
-			 jack_type, mbhc->hph_status);
-	       // liuyan add end
-	#endif
+		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
+				jack_type, mbhc->hph_status);
+		// liuyan add end
+#endif
 		wcd9xxx_jack_report(mbhc, &mbhc->headset_jack,
 				    mbhc->hph_status, WCD9XXX_JACK_MASK);
 		wcd9xxx_clr_and_turnon_hph_padac(mbhc);
@@ -3211,27 +3165,6 @@ static void wcd9xxx_swch_irq_handler(struct wcd9xxx_mbhc *mbhc)
 	insert = !wcd9xxx_swch_level_remove(mbhc);
 	pr_debug("%s: Current plug type %d, insert %d\n", __func__,
 		 mbhc->current_plug, insert);
-#ifdef CONFIG_MACH_OPPO
-       //liuyan 2013-3-13 add
-	printk("%s: Current plug type %d, insert %d\n", __func__,
-		 mbhc->current_plug, insert);
-       if(mbhc->mbhc_cfg->cdc_hpmic_switch){
-		 if(mbhc->mbhc_cfg->hpmic_regulator_count){
-		      printk("%s: hpmic regulator count %d\n",__func__,\
-			 	   mbhc->mbhc_cfg->hpmic_regulator_count);
-		 }else if(mbhc->mbhc_cfg->count_regulator==0){
-        	     if(regulator_enable(mbhc->mbhc_cfg->cdc_hpmic_switch)){
-			     pr_err("%s:enable hpmic switch regulator faild!\n",__func__);
-		        }else{
-                          mbhc->mbhc_cfg->count_regulator++;
-			     printk("%s: enable hpmic switch regulator\n",__func__);
-			 }
-		    }
-	}else{
-            pr_err("%s:enable cdc_hpmic_switch pointer is null\n",__func__);
-	}
-       //liuyan add end
-#endif
 	if ((mbhc->current_plug == PLUG_TYPE_NONE) && insert) {
 		mbhc->lpi_enabled = false;
 		wmb();

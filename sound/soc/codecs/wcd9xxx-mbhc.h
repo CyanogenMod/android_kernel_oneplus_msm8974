@@ -239,15 +239,9 @@ struct wcd9xxx_mbhc_config {
 	unsigned int mclk_rate;
 	unsigned int gpio;
 	unsigned int gpio_irq;
-//liuyan add 2013-3-14,hpmic switch gpio
 #ifdef CONFIG_MACH_OPPO
-	int hpmic_switch_gpio;
-	struct regulator *cdc_hpmic_switch;
-	int hpmic_regulator_count;
-	int count_regulator;
 	int headset_type;
 #endif
-//liuyan add end
 	int gpio_level_insert;
 	bool insert_detect; /* codec has own MBHC_INSERT_DETECT */
 	bool detect_extn_cable;

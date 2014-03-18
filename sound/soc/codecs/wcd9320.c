@@ -450,12 +450,6 @@ struct taiko_priv {
 	 * end of impedance measurement
 	 */
 	struct list_head reg_save_restore;
-	#ifdef CONFIG_MACH_OPPO
-	/*liuyan add 2013-11-26 for hpmic regulator*/
-	struct regulator	*cdc_hpmic_switch;
-	int hpmic_regulator_count;
-	/*endif*/
-	#endif
 
 	struct wakeup_source mad_wakeup_source;
 
@@ -463,7 +457,9 @@ struct taiko_priv {
 
 /* OPPO 2013-11-12 xuzhaoan Add begin for American Headset Detect */
 #ifdef CONFIG_MACH_OPPO
-    struct taiko_priv *priv_headset_type;
+static struct taiko_priv *priv_headset_type;
+static struct regulator *cdc_hpmic_reg = NULL;
+static atomic_t cdc_hpmic_reg_ref;
 #endif
 /* OPPO 2013-11-12 xuzhaoan Add end */
 
@@ -546,35 +542,137 @@ static unsigned short tx_digital_gain_reg[] = {
 	TAIKO_A_CDC_TX9_VOL_CTL_GAIN,
 	TAIKO_A_CDC_TX10_VOL_CTL_GAIN,
 };
-//liuyan 2013-3-13 add for headset detect
+
 #ifdef CONFIG_MACH_OPPO
-enum 
-{
-	NO_DEVICE	= 0,
-	HS_WITH_MIC	= 1,
-	HS_WITHOUT_MIC = 2,
+enum {
+	NO_DEVICE = 0,
+	HS_WITH_MIC,
+	HS_WITHOUT_MIC,
 };
+
 static ssize_t wcd9xxx_print_name(struct switch_dev *sdev, char *buf)
 {
-	switch (switch_get_state(sdev)) 
-	{
+	switch (switch_get_state(sdev)) {
 		case NO_DEVICE:
 			return sprintf(buf, "No Device\n");
 		case HS_WITH_MIC:
-            if(priv_headset_type->mbhc.mbhc_cfg->headset_type == 1) {
-		        return sprintf(buf, "American Headset\n");
-            } else {
-                return sprintf(buf, "Headset\n");
-            }
-
+			if (priv_headset_type->mbhc.mbhc_cfg->headset_type == 1)
+				return sprintf(buf, "American Headset\n");
+			else
+				return sprintf(buf, "Headset\n");
 		case HS_WITHOUT_MIC:
 			return sprintf(buf, "Handset\n");
-
 	}
 	return -EINVAL;
 }
+
+static void micbias_regulator_control(bool enable)
+{
+	int ret = 0;
+
+	if (!cdc_hpmic_reg)
+		return;
+
+	pr_debug("%s() enable: %d, ref count: %d",
+			__func__, enable, atomic_read(&cdc_hpmic_reg_ref));
+
+	if (enable) {
+		if (atomic_inc_return(&cdc_hpmic_reg_ref) == 1) {
+			ret = regulator_enable(cdc_hpmic_reg);
+			if (ret) {
+				pr_err("%s: Failed to enable cdc_hpmic\n",
+						__func__);
+			}
+		}
+	} else {
+		if (atomic_read(&cdc_hpmic_reg_ref) == 0)
+			return;
+
+		if (atomic_dec_return(&cdc_hpmic_reg_ref) == 0) {
+			ret = regulator_disable(cdc_hpmic_reg);
+			if (ret) {
+				pr_err("%s: Failed to disable cdc_hpmic\n",
+						__func__);
+			}
+		}
+	}
+}
+
+static int taiko_codec_enable_micbias_supply(struct snd_soc_dapm_widget *w,
+				       struct snd_kcontrol *kcontrol,
+				       int event)
+{
+	pr_debug("%s() %s: event: %d\n", __func__, w->name, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		micbias_regulator_control(true);
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		micbias_regulator_control(false);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int taiko_enable_ext_mb_source(struct snd_soc_codec *codec,
+				      bool turn_on, bool use_dapm)
+{
+	int ret = 0;
+
+	if (use_dapm) {
+		if (turn_on)
+			ret = snd_soc_dapm_force_enable_pin(&codec->dapm,
+					"MICBIAS_REGULATOR");
+		else
+			ret = snd_soc_dapm_disable_pin(&codec->dapm,
+					"MICBIAS_REGULATOR");
+
+		snd_soc_dapm_sync(&codec->dapm);
+	} else {
+		micbias_regulator_control(turn_on);
+	}
+
+	if (ret)
+		dev_err(codec->dev, "%s: Failed to %s micbias source\n",
+			__func__, turn_on ? "enable" : "disable");
+	else
+		dev_dbg(codec->dev, "%s: %s micbias source\n",
+			__func__, turn_on ? "enable" : "disable");
+
+	return ret;
+}
+
+static int taiko_micbias_supply_init(struct device *dev)
+{
+	atomic_set(&cdc_hpmic_reg_ref, 0);
+
+	if (cdc_hpmic_reg == NULL) {
+		cdc_hpmic_reg = regulator_get(dev->parent, "cdc-hpmic_switch-1");
+		if (IS_ERR(cdc_hpmic_reg)) {
+			pr_err("%s: Cannot get regulator %s.\n",
+					__func__, "cdc-hpmic_switch-1");
+			return PTR_ERR(cdc_hpmic_reg);
+		}
+	}
+
+	return 0;
+}
+
+static int taiko_micbias_supply_close(void)
+{
+	atomic_set(&cdc_hpmic_reg_ref, 0);
+
+	if (cdc_hpmic_reg)
+		regulator_put(cdc_hpmic_reg);
+
+	return 0;
+}
 #endif
-//liuyan add end
+
 static int spkr_drv_wrnd_param_set(const char *val,
 				   const struct kernel_param *kp)
 {
@@ -5666,6 +5764,12 @@ static const struct snd_soc_dapm_widget taiko_dapm_widgets[] = {
 	SND_SOC_DAPM_MUX("RDAC7 MUX", SND_SOC_NOPM, 0, 0,
 		&rx_dac7_mux),
 
+#ifdef CONFIG_MACH_OPPO
+	SND_SOC_DAPM_SUPPLY("MICBIAS_REGULATOR", SND_SOC_NOPM, 0, 0,
+		taiko_codec_enable_micbias_supply, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMD),
+#endif
+
 	SND_SOC_DAPM_MUX_E("CLASS_H_DSM MUX", SND_SOC_NOPM, 0, 0,
 		&class_h_dsm_mux, taiko_codec_dsm_mux_event,
 		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
@@ -6619,16 +6723,6 @@ int taiko_hs_detect(struct snd_soc_codec *codec,
 {
 	int rc;
 	struct taiko_priv *taiko = snd_soc_codec_get_drvdata(codec);
-	#ifdef CONFIG_MACH_OPPO
-       /*liuyan add for hpmic regulator*/
-	if(taiko->cdc_hpmic_switch){
-	    printk("%s: get the hpmic regulator\n",__func__);
-	    mbhc_cfg->cdc_hpmic_switch=taiko->cdc_hpmic_switch;
-	    mbhc_cfg->hpmic_regulator_count=taiko->hpmic_regulator_count;
-      }else{
-           printk("%s: do not get the regulator\n",__func__);
-      }
-	#endif
 	rc = wcd9xxx_mbhc_start(&taiko->mbhc, mbhc_cfg);
 	if (!rc)
 		taiko->mbhc_started = true;
@@ -6875,6 +6969,9 @@ static const struct wcd9xxx_mbhc_cb mbhc_cb = {
 	.get_cdc_type = taiko_get_cdc_type,
 	.setup_zdet = taiko_setup_zdet,
 	.compute_impedance = taiko_compute_impedance,
+#ifdef CONFIG_MACH_OPPO
+	.enable_mb_source = taiko_enable_ext_mb_source,
+#endif
 };
 
 static const struct wcd9xxx_mbhc_intr cdc_intr_ids = {
@@ -7136,26 +7233,15 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 		pr_err("%s: mbhc init failed %d\n", __func__, ret);
 		goto err_init;
 	}
-//liuyan 2013-3-13 add, headset detec
 #ifdef CONFIG_MACH_OPPO
-       /*liuyan add for hpmic regulator*/
-	if(pdata->cdc_hpmic_switch){
-	    printk("%s: get the hpmic regulator\n",__func__);
-	    taiko->cdc_hpmic_switch=pdata->cdc_hpmic_switch;
-	    taiko->hpmic_regulator_count=pdata->hpmic_regulator_count;
-      }else{
-           printk("%s: do not get the regulator\n",__func__);
-      }
-
 	taiko->mbhc.wcd9xxx_sdev.name= "h2w";
 	taiko->mbhc.wcd9xxx_sdev.print_name = wcd9xxx_print_name;
 	ret = switch_dev_register(&taiko->mbhc.wcd9xxx_sdev);
 	if (ret)
-	{
 		goto err_switch_dev_register;
-	}
+
+	taiko_micbias_supply_init(codec->dev);
 #endif
-//liuyan add end
 	taiko->codec = codec;
 	for (i = 0; i < COMPANDER_MAX; i++) {
 		taiko->comp_enabled[i] = 0;
@@ -7274,7 +7360,7 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 
 /* OPPO 2013-11-12 xuzhaoan Add begin for America Headset Detect */
 #ifdef CONFIG_MACH_OPPO
-    priv_headset_type = taiko;
+	priv_headset_type = taiko;
 #endif
 /* OPPO 2013-11-12 xuzhaoan Add end */
 
@@ -7287,7 +7373,7 @@ err_pdata:
 err_nomem_slimch:
 //luiyan 2013-3-13 add for headset detect
 #ifdef CONFIG_MACH_OPPO
-switch_dev_unregister(&taiko->mbhc.wcd9xxx_sdev);
+	switch_dev_unregister(&taiko->mbhc.wcd9xxx_sdev);
 err_switch_dev_register:
 #endif
 //liuyan add end
@@ -7308,6 +7394,11 @@ static int taiko_codec_remove(struct snd_soc_codec *codec)
 	WCD9XXX_BG_CLK_UNLOCK(&taiko->resmgr);
 
 	taiko_cleanup_irqs(taiko);
+
+#ifdef CONFIG_MACH_OPPO
+	switch_dev_unregister(&taiko->mbhc.wcd9xxx_sdev);
+	taiko_micbias_supply_close();
+#endif
 
 	/* cleanup MBHC */
 	wcd9xxx_mbhc_deinit(&taiko->mbhc);
