@@ -1941,7 +1941,6 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 	 
 	 gpio_set_value(mbhc->mbhc_cfg->hpmic_switch_gpio,1);
 	 msleep(50);
-	 WCD9XXX_BCL_ASSERT_LOCKED(mbhc->resmgr);
 	BUG_ON(NUM_DCE_PLUG_INS_DETECT < 4);
 	wcd9xxx_mbhc_ctrl_clk_bandgap(mbhc, true);
 	ret = wcd9xxx_cs_get_vdec_value(mbhc, rt, ARRAY_SIZE(rt),highhph,
@@ -1972,7 +1971,6 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		}
 	}else if(abs(dce_value1)<=WCD9xxx_CS_THRESHED){
 	    gpio_set_value(mbhc->mbhc_cfg->hpmic_switch_gpio,0);
-	    WCD9XXX_BCL_ASSERT_LOCKED(mbhc->resmgr);
 	    BUG_ON(NUM_DCE_PLUG_INS_DETECT < 4);
 	    wcd9xxx_mbhc_ctrl_clk_bandgap(mbhc, true);
            ret = wcd9xxx_cs_get_vdec_value(mbhc, rt, ARRAY_SIZE(rt),highhph,
@@ -2075,6 +2073,7 @@ wcd9xxx_codec_cs_get_plug_type(struct wcd9xxx_mbhc *mbhc, bool highhph)
 	enum wcd9xxx_mbhc_plug_type type = PLUG_TYPE_INVALID;
 
 	pr_debug("%s: enter\n", __func__);
+	WCD9XXX_BCL_ASSERT_LOCKED(mbhc->resmgr);
 
 	type = wcd9xxx_cs_find_plug_type(mbhc, NULL,0, highhph,
 					 mbhc->event_state);
@@ -3590,11 +3589,6 @@ irqreturn_t wcd9xxx_dce_handler(int irq, void *data)
 			__func__);
 		goto done;
 	}
-//liuan 2013-4-18 add
-#ifdef CONFIG_MACH_OPPO
-       printk("press button\n");
-#endif
-//liuyan add end
 
 	/* If switch nterrupt already kicked in, ignore button press */
 	if (mbhc->in_swch_irq_handler) {
@@ -3762,11 +3756,6 @@ static irqreturn_t wcd9xxx_release_handler(int irq, void *data)
 	bool waitdebounce = true;
 	struct wcd9xxx_mbhc *mbhc = data;
 
-//liuyan 2013-4-18 add
-#ifdef CONFIG_MACH_OPPO
-        printk("release button\n");
-#endif
-//liuyan add end
 	pr_debug("%s: enter\n", __func__);
 	WCD9XXX_BCL_LOCK(mbhc->resmgr);
 	mbhc->mbhc_state = MBHC_STATE_RELEASE;
@@ -4911,18 +4900,8 @@ static int wcd9xxx_detect_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 int wcd9xxx_mbhc_get_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 			       uint32_t *zr)
 {
-      //liuyan 2014-1-7 del for pluging headset deadlock   
-       #ifndef CONFIG_MACH_OPPO
-	WCD9XXX_BCL_LOCK(mbhc->resmgr);
-	#endif 
-	//liuyan del end
 	*zl = mbhc->zl;
 	*zr = mbhc->zr;
-	//liuyan 2014-1-7 del for pluging headset deadlock   
-       #ifndef CONFIG_MACH_OPPO
-	WCD9XXX_BCL_UNLOCK(mbhc->resmgr);
-       #endif
-	 //liuyan del end
 
 	if (*zl && *zr)
 		return 0;
