@@ -22,7 +22,15 @@
 /include/ "msm8974-x9007-leds.dtsi"
 
 &soc {
+};
 
+&slim_msm {
+	taiko_codec {
+		cdc-vdd-spkdrv-supply = <&pm8941_boost>;
+		qcom,cdc-vdd-spkdrv-voltage = <5000000 5000000>;
+		qcom,cdc-vdd-spkdrv-current = <1250000>;
+		qcom,cdc-on-demand-supplies = "cdc-vdd-spkdrv";
+	};
 };
 
 &cci {
