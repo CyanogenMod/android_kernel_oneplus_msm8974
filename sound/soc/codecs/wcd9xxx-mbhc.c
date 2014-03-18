@@ -2388,10 +2388,6 @@ static void wcd9xxx_mbhc_decide_swch_plug(struct wcd9xxx_mbhc *mbhc)
 
 	mbhc->scaling_mux_in = 0x04;
 
-#ifdef CONFIG_MACH_OPPO
-	plug_type = PLUG_TYPE_INVALID;
-#else
-
 	if (current_source_enable) {
 		wcd9xxx_turn_onoff_current_source(mbhc, true, false);
 		plug_type = wcd9xxx_codec_cs_get_plug_type(mbhc, false);
@@ -2401,7 +2397,6 @@ static void wcd9xxx_mbhc_decide_swch_plug(struct wcd9xxx_mbhc *mbhc)
 		plug_type = wcd9xxx_codec_get_plug_type(mbhc, true);
 		wcd9xxx_turn_onoff_override(mbhc, false);
 	}
-#endif
 
 	if (wcd9xxx_swch_level_remove(mbhc)) {
 		pr_debug("%s: Switch level is low when determining plug\n",
