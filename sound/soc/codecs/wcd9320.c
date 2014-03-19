@@ -7008,19 +7008,10 @@ static int taiko_post_reset_cb(struct wcd9xxx *wcd9xxx)
 		else
 			rco_clk_rate = TAIKO_MCLK_CLK_9P6MHZ;
 
-		//liuyan 2014-1-10 modify for low frequence noise in
-		//pluging headset
-              #ifndef CONFIG_MACH_OPPO
 		ret = wcd9xxx_mbhc_init(&taiko->mbhc, &taiko->resmgr, codec,
 					taiko_enable_mbhc_micbias,
 					&mbhc_cb, &cdc_intr_ids,
 					rco_clk_rate, true);
-	       #else
-		ret = wcd9xxx_mbhc_init(&taiko->mbhc, &taiko->resmgr, codec,
-					taiko_enable_mbhc_micbias,
-					&mbhc_cb, &cdc_intr_ids,
-					rco_clk_rate, false);
-		#endif
 
 		if (ret)
 			pr_err("%s: mbhc init failed %d\n", __func__, ret);
@@ -7208,20 +7199,11 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 	else
 		rco_clk_rate = TAIKO_MCLK_CLK_9P6MHZ;
 
-        //liuyan 2014-1-10 modify for low frequence nois in
-        //pluging headset
-	#ifndef CONFIG_MACH_OPPO
 	/* init and start mbhc */
 	ret = wcd9xxx_mbhc_init(&taiko->mbhc, &taiko->resmgr, codec,
 				taiko_enable_mbhc_micbias,
 				&mbhc_cb, &cdc_intr_ids,
 				rco_clk_rate, true);
-	#else
-	ret = wcd9xxx_mbhc_init(&taiko->mbhc, &taiko->resmgr, codec,
-				taiko_enable_mbhc_micbias,
-				&mbhc_cb, &cdc_intr_ids,
-				rco_clk_rate, false);
-	#endif
 
 	if (ret) {
 		pr_err("%s: mbhc init failed %d\n", __func__, ret);
