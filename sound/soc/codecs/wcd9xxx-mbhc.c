@@ -938,9 +938,8 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 				switch_set_state(&mbhc->wcd9xxx_sdev,2);
 				break;
 			case PLUG_TYPE_GND_MIC_SWAP:
-				switch_set_state(&mbhc->wcd9xxx_sdev,1);
-				break;
 			case PLUG_TYPE_HEADSET:
+			case PLUG_TYPE_ANC_HEADPHONE:
 				switch_set_state(&mbhc->wcd9xxx_sdev,1);
 				break;
 			default:
