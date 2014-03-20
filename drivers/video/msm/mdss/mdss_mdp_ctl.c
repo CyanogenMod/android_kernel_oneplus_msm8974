@@ -348,7 +348,7 @@ int mdss_mdp_perf_calc_pipe(struct mdss_mdp_pipe *pipe,
 		}
 		xres = pinfo->xres;
 		is_fbc = pinfo->fbc.enabled;
-		h_total = mdss_panel_get_htotal(pinfo);
+		h_total = mdss_panel_get_htotal(pinfo, false);
 	} else {
 		v_total = mixer->height;
 		xres = mixer->width;
