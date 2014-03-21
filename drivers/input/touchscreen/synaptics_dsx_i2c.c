@@ -962,16 +962,6 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define SYNA_ADDR_TOUCH_FEATURE      0x1E  //ThreeD Touch Features
 
 extern int rmi4_fw_module_init(bool insert);
-extern int get_boot_mode(void);
-enum {
-	MSM_BOOT_MODE__NORMAL,
-	MSM_BOOT_MODE__FASTBOOT,
-	MSM_BOOT_MODE__RECOVERY,
-	MSM_BOOT_MODE__FACTORY,
-	MSM_BOOT_MODE__RF,
-	MSM_BOOT_MODE__WLAN,
-	MSM_BOOT_MODE__CHARGE,
-};
 
 #define F54_CTRL_BASE_ADDR		(syna_rmi4_data->f54_ctrl_base_addr)
 #define F54_CMD_BASE_ADDR		(syna_rmi4_data->f54_cmd_base_addr)
@@ -3971,12 +3961,6 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 		return -EIO;
 	}
 
-	if ((get_boot_mode() == MSM_BOOT_MODE__FACTORY ||
-				get_boot_mode() == MSM_BOOT_MODE__RF ||
-				get_boot_mode() == MSM_BOOT_MODE__WLAN) ) {
-		return -EINVAL;
-	}
-
 	if (!platform_data) {
 		dev_err(&client->dev,
 				"%s: No platform data found\n",
@@ -4123,23 +4107,19 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 		exp_data.initialized = true;
 	}
 
-	if (!(get_boot_mode() == MSM_BOOT_MODE__FACTORY ||
-				get_boot_mode() == MSM_BOOT_MODE__RF ||
-				get_boot_mode() == MSM_BOOT_MODE__WLAN) ) {
-		exp_data.workqueue = create_singlethread_workqueue("dsx_exp_workqueue");
-		INIT_DELAYED_WORK(&exp_data.work, synaptics_rmi4_exp_fn_work);
-		exp_data.rmi4_data = rmi4_data;
-		exp_data.queue_work = true;
-		queue_delayed_work(exp_data.workqueue,
-				&exp_data.work,
-				msecs_to_jiffies(EXP_FN_WORK_DELAY_MS));
-		rmi4_fw_module_init(true);
-		while(1) {
-			msleep(50);
-			if (rmi4_data->bcontinue) {
-				rmi4_fw_module_init(false);
-				break;
-			}
+	exp_data.workqueue = create_singlethread_workqueue("dsx_exp_workqueue");
+	INIT_DELAYED_WORK(&exp_data.work, synaptics_rmi4_exp_fn_work);
+	exp_data.rmi4_data = rmi4_data;
+	exp_data.queue_work = true;
+	queue_delayed_work(exp_data.workqueue,
+			&exp_data.work,
+			msecs_to_jiffies(EXP_FN_WORK_DELAY_MS));
+	rmi4_fw_module_init(true);
+	while(1) {
+		msleep(50);
+		if (rmi4_data->bcontinue) {
+			rmi4_fw_module_init(false);
+			break;
 		}
 	}
 
