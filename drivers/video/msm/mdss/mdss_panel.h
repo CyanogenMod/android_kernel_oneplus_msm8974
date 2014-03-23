@@ -314,6 +314,11 @@ struct mdss_panel_info {
 	struct mipi_panel_info mipi;
 	struct lvds_panel_info lvds;
 	struct edp_panel_info edp;
+
+#ifdef CONFIG_MACH_OPPO
+    int cabc_available;
+    int cabc_mode;
+#endif
 };
 
 struct mdss_panel_data {

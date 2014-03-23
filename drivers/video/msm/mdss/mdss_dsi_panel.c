@@ -30,6 +30,136 @@ DEFINE_LED_TRIGGER(bl_led_trigger);
 
 #ifdef CONFIG_MACH_OPPO
 extern int lm3630_bank_a_update_status(u32 bl_level);
+
+/* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/02/17  Add for set cabc */
+static struct dsi_panel_cmds cabc_off_sequence;
+static struct dsi_panel_cmds cabc_user_interface_image_sequence;
+static struct dsi_panel_cmds cabc_still_image_sequence;
+static struct dsi_panel_cmds cabc_video_image_sequence;
+
+static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
+			struct dsi_panel_cmds *pcmds);
+
+extern int set_backlight_pwm(int state);
+
+enum
+{
+	CABC_CLOSE = 0,
+	CABC_LOW_MODE,
+	CABC_MIDDLE_MODE,
+	CABC_HIGH_MODE,
+
+};
+
+static DEFINE_MUTEX(cabc_mutex);
+int mdss_dsi_panel_set_cabc(struct mdss_panel_data *pdata, int level)
+{
+	int ret = 0;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+
+    if (pdata == NULL) {
+	    pr_err("%s: Invalid input data\n", __func__);
+	    return -EINVAL;
+    }
+
+    ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata, panel_data);
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+    if (!pinfo->cabc_available)
+        return 0;
+
+	pr_info("%s : %d \n", __func__, level);
+
+	mutex_lock(&cabc_mutex);
+
+	if (!pinfo->panel_power_on)
+	{
+		pr_info("%s: lcd is off,don't allow to set cabc\n", __func__);
+		pinfo->cabc_mode = level;
+		mutex_unlock(&cabc_mutex);
+		return 0;
+	}
+
+	mdss_dsi_clk_ctrl(ctrl_pdata, 1);
+
+	switch(level)
+	{
+		case 0:
+			set_backlight_pwm(0);
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
+			pinfo->cabc_mode = CABC_CLOSE;
+			break;
+		case 1:
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
+			pinfo->cabc_mode = CABC_LOW_MODE;
+			set_backlight_pwm(1);
+			break;
+		case 2:
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_still_image_sequence);
+			pinfo->cabc_mode = CABC_MIDDLE_MODE;
+			set_backlight_pwm(1);
+			break;
+		case 3:
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_video_image_sequence);
+			pinfo->cabc_mode = CABC_HIGH_MODE;
+			set_backlight_pwm(1);
+			break;
+		default:
+			pr_err("%s Level %d is not supported!\n",__func__,level);
+			ret = -1;
+			break;
+	}
+	mdss_dsi_clk_ctrl(ctrl_pdata, 0);
+	mutex_unlock(&cabc_mutex);
+	return ret;
+
+}
+
+static int set_cabc_resume_mode(struct mdss_panel_data *pdata, int mode)
+{
+	int ret;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+
+    if (pdata == NULL) {
+	    pr_err("%s: Invalid input data\n", __func__);
+	    return -EINVAL;
+    }
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata, panel_data);
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+    if (!pinfo->cabc_available)
+        return 0;
+
+	pr_info("%s : %d yxr \n", __func__, mode);
+
+	switch (mode)
+	{
+		case 0:
+			set_backlight_pwm(0);
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
+			break;
+		case 1:
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
+			set_backlight_pwm(1);
+			break;
+		case 2:
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_still_image_sequence);
+			set_backlight_pwm(1);
+			break;
+		case 3:
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_video_image_sequence);
+			set_backlight_pwm(1);
+			break;
+		default:
+			pr_err("%s  %d is not supported!\n",__func__,mode);
+			ret = -1;
+			break;
+	}
+	return ret;
+}
 #endif
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
@@ -85,7 +215,11 @@ static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 	ctrl->pwm_enabled = 1;
 }
 
+#ifdef CONFIG_MACH_OPPO
+static char dcs_cmd[2] = {0x56, 0x00}; /* DTYPE_DCS_READ */
+#else
 static char dcs_cmd[2] = {0x54, 0x00}; /* DTYPE_DCS_READ */
+#endif
 static struct dsi_cmd_desc dcs_read_cmd = {
 	{DTYPE_DCS_READ, 1, 0, 1, 5, sizeof(dcs_cmd)},
 	dcs_cmd
@@ -351,6 +485,14 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 
 	if (ctrl->on_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
+
+#ifdef CONFIG_MACH_OPPO
+/* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/02/17  Add for set cabc */
+	set_backlight_pwm(1);
+	if (pdata->panel_info.cabc_mode != CABC_HIGH_MODE) {
+		set_cabc_resume_mode(pdata, pdata->panel_info.cabc_mode);
+	}
+#endif
 
 	pr_debug("%s:-\n", __func__);
 	return 0;
@@ -933,6 +1075,23 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
 		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
+
+#ifdef CONFIG_MACH_OPPO
+/* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/02/17  Add for set cabc */
+	rc = mdss_dsi_parse_dcs_cmds(np, &cabc_off_sequence,
+		"qcom,mdss-dsi-cabc-off-command", "qcom,mdss-dsi-off-command-state");
+
+	pinfo->cabc_available = rc == 0 ? 1 : 0;
+
+	mdss_dsi_parse_dcs_cmds(np, &cabc_user_interface_image_sequence,
+		"qcom,mdss-dsi-cabc-ui-command", "qcom,mdss-dsi-off-command-state");
+
+	mdss_dsi_parse_dcs_cmds(np, &cabc_still_image_sequence,
+		"qcom,mdss-dsi-cabc-still-image-command", "qcom,mdss-dsi-off-command-state");
+
+	mdss_dsi_parse_dcs_cmds(np, &cabc_video_image_sequence,
+		"qcom,mdss-dsi-cabc-video-command", "qcom,mdss-dsi-off-command-state");
+#endif
 
 	return 0;
 
