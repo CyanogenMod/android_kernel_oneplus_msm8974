@@ -952,12 +952,16 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define BLANK		1
 #define UNBLANK		0
 
+#define SYNA_SMARTCOVER_MIN	0
+#define SYNA_SMARTCOVER_MAN	750
+
 //以下寄存器总是修改，因此抽出来定义在这里
 #define SYNA_ADDR_REPORT_FLAG        0x1b  //report mode register
 #define SYNA_ADDR_GESTURE_FLAG       0x20  //gesture enable register
 #define SYNA_ADDR_GLOVE_FLAG         0x1f  //glove enable register
 #define SYNA_ADDR_GESTURE_OFFSET     0x08  //gesture register addr=0x08
 #define SYNA_ADDR_GESTURE_EXT        0x402  //gesture ext data
+#define SYNA_ADDR_SMARTCOVER_EXT     0x41f  //smartcover mode
 #define SYNA_ADDR_PDOZE_FLAG         0x07  //pdoze status register
 #define SYNA_ADDR_TOUCH_FEATURE      0x1E  //ThreeD Touch Features
 
@@ -987,6 +991,8 @@ static struct regulator *vdd_regulator_i2c=0;
 static int syna_test_max_err_count = 10;
 static char synaptics_vendor_str[32];  //vendor string
 static char *synaptics_id_str;
+static unsigned int syna_lcd_ratio1;
+static unsigned int syna_lcd_ratio2;
 
 /***** For virtual key definition begin *******************/
 enum tp_vkey_enum {
@@ -1011,7 +1017,8 @@ static struct tp_vkey_button {
 #define LCD_MAX_Y  (1920)
 #define LCD_MAX_X_FIND7S  (1440)
 #define LCD_MAX_Y_FIND7S  (2560)
-#define VK_LCD_WIDTH  (LCD_MAX_X/TP_VKEY_COUNT)   // 3 keys
+#define LCD_MULTI_RATIO(m)   (((syna_lcd_ratio1)*(m))/(syna_lcd_ratio2))
+#define VK_LCD_WIDTH  LCD_MULTI_RATIO(LCD_MAX_X/TP_VKEY_COUNT)   // 3 keys
 static void vk_calculate_area(void)  //added by liujun
 {
 	int i;
@@ -1023,9 +1030,9 @@ static void vk_calculate_area(void)  //added by liujun
 	int margin_x = 85;
 	printk("[syna]maxx=%d,maxy=%d,vkh=%d\n",syna_ts_data->sensor_max_x,syna_ts_data->sensor_max_y,syna_ts_data->virtual_key_height);
 
-	syna_ts_data->vk_prop_width = 190;
-	syna_ts_data->vk_prop_center_y = 1977;
-	syna_ts_data->vk_prop_height = 114;
+	syna_ts_data->vk_prop_width = LCD_MULTI_RATIO(190);
+	syna_ts_data->vk_prop_center_y = LCD_MULTI_RATIO(1977);
+	syna_ts_data->vk_prop_height = LCD_MULTI_RATIO(114);
 
 	for (i = 0; i < TP_VKEY_COUNT; ++i) {
 		vkey_buttons[i].width = vk_width - margin_x*2;
@@ -1041,23 +1048,14 @@ static ssize_t vk_syna_show(struct kobject *kobj,
 {
 	struct synaptics_rmi4_data *ts = syna_rmi4_data;
 	int len;
-	if (get_pcb_version() >= HW_VERSION__20) { /* For Find7S */
-		len =  sprintf(buf,
-				__stringify(EV_KEY) ":" __stringify(KEY_MENU)  ":%d:%d:%d:%d"
-				":" __stringify(EV_KEY) ":" __stringify(KEY_HOMEPAGE)  ":%d:%d:%d:%d"
-				":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)  ":%d:%d:%d:%d" "\n",
-				((VK_LCD_WIDTH/2 + 0)*(LCD_MAX_X_FIND7S))/(LCD_MAX_X),   ((ts->vk_prop_center_y)*(LCD_MAX_Y_FIND7S))/(LCD_MAX_Y), ((ts->vk_prop_width)*(LCD_MAX_X_FIND7S))/(LCD_MAX_X), ((ts->vk_prop_height)*(LCD_MAX_Y_FIND7S))/(LCD_MAX_Y),
-				((VK_LCD_WIDTH*3/2)*(LCD_MAX_X_FIND7S))/(LCD_MAX_X), ((ts->vk_prop_center_y)*(LCD_MAX_Y_FIND7S))/(LCD_MAX_Y), ((ts->vk_prop_width)*(LCD_MAX_X_FIND7S))/(LCD_MAX_X), ((ts->vk_prop_height)*(LCD_MAX_Y_FIND7S))/(LCD_MAX_Y),
-				((VK_LCD_WIDTH*5/2+20)*(LCD_MAX_X_FIND7S))/(LCD_MAX_X) , ((ts->vk_prop_center_y)*(LCD_MAX_Y_FIND7S))/(LCD_MAX_Y), ((ts->vk_prop_width)*(LCD_MAX_X_FIND7S))/(LCD_MAX_X), ((ts->vk_prop_height)*(LCD_MAX_Y_FIND7S))/(LCD_MAX_Y));
-	} else {
-		len =  sprintf(buf,
-				__stringify(EV_KEY) ":" __stringify(KEY_MENU)  ":%d:%d:%d:%d"
-				":" __stringify(EV_KEY) ":" __stringify(KEY_HOMEPAGE)  ":%d:%d:%d:%d"
-				":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)  ":%d:%d:%d:%d" "\n",
-				VK_LCD_WIDTH/2 + 0,   ts->vk_prop_center_y, ts->vk_prop_width, ts->vk_prop_height,
-				VK_LCD_WIDTH*3/2, ts->vk_prop_center_y, ts->vk_prop_width, ts->vk_prop_height,
-				VK_LCD_WIDTH*5/2+20 , ts->vk_prop_center_y, ts->vk_prop_width, ts->vk_prop_height);
-	}
+	len = sprintf(buf,
+		__stringify(EV_KEY) ":" __stringify(KEY_MENU)  ":%d:%d:%d:%d"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_HOMEPAGE)  ":%d:%d:%d:%d"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)  ":%d:%d:%d:%d" "\n",
+		VK_LCD_WIDTH/2 + 0,   ts->vk_prop_center_y, ts->vk_prop_width, ts->vk_prop_height,
+		VK_LCD_WIDTH*3/2, ts->vk_prop_center_y, ts->vk_prop_width, ts->vk_prop_height,
+		VK_LCD_WIDTH*5/2+20 , ts->vk_prop_center_y, ts->vk_prop_width, ts->vk_prop_height);
+
 	return len;
 }
 
@@ -1079,7 +1077,6 @@ static struct attribute_group syna_properties_attr_group = {
 };
 
 static void synaptics_ts_init_area(struct synaptics_rmi4_data *ts){
-	ts->virtual_key_height = 114;
 	ts->snap_top = 0;
 	ts->snap_left = 0;
 	ts->snap_right = 0;
@@ -1411,6 +1408,54 @@ static int synaptics_rmi4_proc_flashlight_write(struct file *filp, const char __
 	return len;
 }
 
+//smartcover proc read function
+static int synaptics_rmi4_proc_smartcover_read(char *page, char **start, off_t off,
+		int count, int *eof, void *data) {
+	int len = 0;
+	unsigned int enable;
+
+	enable = (syna_rmi4_data->smartcover_enable) ? 1 : 0;
+
+	len = sprintf(page, "%d\n", enable);
+
+	return len ;
+}
+
+//smartcover proc write function
+static int synaptics_rmi4_proc_smartcover_write(struct file *filp, const char __user *buff,
+		unsigned long len, void *data) {
+	int retval;
+	unsigned char val[1];
+	unsigned char bak;
+	unsigned int enable;
+	char buf[2];
+
+	if (len > 2)
+		return 0;
+
+	if (copy_from_user(buf, buff, len)) {
+		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
+		return -EFAULT;
+	}
+
+	enable = (buf[0] == '0') ? 0 : 1;
+	bak = syna_rmi4_data->smartcover_enable;
+	syna_rmi4_data->smartcover_enable &= 0x00;
+	if (enable)
+		syna_rmi4_data->smartcover_enable |= 0x01;
+	if (bak == syna_rmi4_data->smartcover_enable)
+		return len;
+
+	print_ts(TS_DEBUG, KERN_ERR "smartcover enable=0x%x\n", syna_rmi4_data->smartcover_enable);
+
+	retval = synaptics_rmi4_i2c_read(syna_rmi4_data,SYNA_ADDR_SMARTCOVER_EXT,val,sizeof(val));
+
+	val[0] = syna_rmi4_data->smartcover_enable & 0xff;
+	retval = synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_SMARTCOVER_EXT,val,sizeof(val));
+
+	return (retval == sizeof(val))  ? len : 0;
+}
+
 //glove proc read function
 static int synaptics_rmi4_proc_glove_read(char *page, char **start, off_t off,
 		int count, int *eof, void *data)
@@ -1583,6 +1628,13 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_pdoze_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_pdoze_read;
+	}
+
+	//for smartcover
+	proc_entry = create_proc_entry("smartcover_mode_enable", 0666, procdir);
+	if (proc_entry) {
+		proc_entry->write_proc = synaptics_rmi4_proc_smartcover_write;
+		proc_entry->read_proc = synaptics_rmi4_proc_smartcover_read;
 	}
 
 	//for pdoze status
@@ -2278,6 +2330,10 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				if (get_virtual_key_button(x, y) == TP_VKEY_NONE) {
 					continue;
 				}
+			}
+
+			if ((y > SYNA_SMARTCOVER_MAN || y < SYNA_SMARTCOVER_MIN) && rmi4_data->smartcover_enable) {
+				continue;
 			}
 
 			input_mt_slot(rmi4_data->input_dev, finger);
@@ -3852,50 +3908,70 @@ exit:
 }
 EXPORT_SYMBOL(synaptics_rmi4_new_function);
 
+int synaptics_rmi4_get_vendorid1(int id1, int id2, int id3) {
+	if (id1 == 0 && id2 == 0 && id3 == 0)
+		return TP_VENDOR_TPK;
+	else if(id1 == 0 && id2 == 1 && id3 == 0)
+		return TP_VENDOR_WINTEK;
+
+	return 0;
+}
+
+int synaptics_rmi4_get_vendorid2(int id1, int id2, int id3) {
+	if (id1 == 0 && id2 == 0 && id3 == 0)
+		return TP_VENDOR_YOUNGFAST;
+	else if (id1 == 0 && id2 == 1 && id3 == 0)
+		return TP_VENDOR_TRULY;
+	else if (id1 == 1 && id2 == 0 && id3 == 0)
+		return TP_VENDOR_TPK;
+	else if (id1 == 1 && id2 == 1 && id3 == 0)
+		return TP_VENDOR_WINTEK;
+
+	return 0;
+}
+
 //return firmware version and string
 extern int synaptics_rmi4_get_firmware_version(int vendor_id);
+char *synaptics_rmi4_get_vendorstring(int id) {
+	char *pconst = "UNKNOWN";
+
+	switch(id) {
+		case TP_VENDOR_WINTEK:
+			pconst = "WINTEK";
+			break;
+		case TP_VENDOR_TPK:
+			pconst = "TPK";
+			break;
+		case TP_VENDOR_TRULY:
+			pconst = "TRULY";
+			break;
+		case TP_VENDOR_YOUNGFAST:
+			pconst = "YOUNGFAST";
+			break;
+	}
+
+	sprintf(synaptics_vendor_str, "%s(%x)", pconst,
+			synaptics_rmi4_get_firmware_version(id));
+
+	return synaptics_vendor_str;
+}
+
 static void synaptics_rmi4_get_vendorid(struct synaptics_rmi4_data *rmi4_data) {
 	int vendor_id = 0;
-	int wakeup_gpio, id_gpio, id3_gpio;
 
-	wakeup_gpio = gpio_get_value(rmi4_data->wakeup_gpio);
-	id_gpio = gpio_get_value(rmi4_data->id_gpio);
-	print_ts(TS_DEBUG, KERN_ERR "[syna] value id0=%d, id1=%d\n", id_gpio,wakeup_gpio);
 #ifdef CONFIG_MACH_FIND7OP
-	id3_gpio = 0;
-	if (id_gpio== 0 && wakeup_gpio == 0) {
-		vendor_id = TP_VENDOR_TPK;
-		sprintf(synaptics_vendor_str,"TPK(%x)",synaptics_rmi4_get_firmware_version(vendor_id));
-	}
-	else if (id_gpio== 0 && wakeup_gpio == 1) {
-		vendor_id = TP_VENDOR_WINTEK;
-		sprintf(synaptics_vendor_str,"WINTEK(%x)",synaptics_rmi4_get_firmware_version(vendor_id));
-	}
-	else {
-		sprintf(synaptics_vendor_str,"UNKNOWN(%x)",synaptics_rmi4_get_firmware_version(vendor_id));
-	}
+	vendor_id = synaptics_rmi4_get_vendorid1(gpio_get_value(rmi4_data->id_gpio),
+			gpio_get_value(rmi4_data->wakeup_gpio), 0);
 #else
-	id3_gpio = gpio_get_value(rmi4_data->id3_gpio);
-	if (id_gpio== 0 && wakeup_gpio == 0 && id3_gpio == 0) {
-		vendor_id = TP_VENDOR_YOUNGFAST;
-		sprintf(synaptics_vendor_str,"YOUNGFAST(%x)",synaptics_rmi4_get_firmware_version(vendor_id));
-	}
-	else if (id_gpio== 1 && wakeup_gpio == 0 && id3_gpio == 0) {
-		vendor_id = TP_VENDOR_TPK;
-		sprintf(synaptics_vendor_str,"TPK(%x)",synaptics_rmi4_get_firmware_version(vendor_id));
-	}
-	else if (id_gpio== 0 && wakeup_gpio == 1 && id3_gpio == 0) {
-		vendor_id = TP_VENDOR_TRULY;
-		sprintf(synaptics_vendor_str,"TRULY(%x)",synaptics_rmi4_get_firmware_version(vendor_id));
-	}
-	else if (id_gpio== 1 && wakeup_gpio == 1 && id3_gpio == 0) {
-		vendor_id = TP_VENDOR_WINTEK;
-		sprintf(synaptics_vendor_str,"WINTEK(%x)",synaptics_rmi4_get_firmware_version(vendor_id));
-	} else {
-		sprintf(synaptics_vendor_str,"UNKNOWN(%x)",synaptics_rmi4_get_firmware_version(vendor_id));
-	}
+	if (get_pcb_version() >= HW_VERSION__21)
+		vendor_id = synaptics_rmi4_get_vendorid1(gpio_get_value(rmi4_data->id_gpio),
+				gpio_get_value(rmi4_data->wakeup_gpio), 0);
+	else
+		vendor_id = synaptics_rmi4_get_vendorid2(gpio_get_value(rmi4_data->id_gpio),
+				gpio_get_value(rmi4_data->wakeup_gpio), 0);
 #endif
 	rmi4_data->vendor_id = vendor_id;
+	synaptics_rmi4_get_vendorstring(rmi4_data->vendor_id);
 	print_ts(TS_INFO, KERN_ERR "[syna] vendor id: %x\n", vendor_id);
 }
 
@@ -3993,8 +4069,21 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 	rmi4_data->glove_enable = 0;
 
 	//init sensor size
-	rmi4_data->sensor_max_x = LCD_SENSOR_X;
-	rmi4_data->sensor_max_y = LCD_SENSOR_Y;
+	if (get_pcb_version() <= HW_VERSION__20) {
+		rmi4_data->virtual_key_height = 114;
+		rmi4_data->sensor_max_x = LCD_MAX_X;
+		rmi4_data->sensor_max_y = LCD_MAX_Y+120;
+		syna_lcd_ratio1 = 100;
+		syna_lcd_ratio2 = 100;
+		if (get_pcb_version() == HW_VERSION__20)
+			syna_lcd_ratio1 = 135;
+	} else {
+		rmi4_data->virtual_key_height = 142;
+		rmi4_data->sensor_max_x = LCD_MAX_X_FIND7S;
+		rmi4_data->sensor_max_y = LCD_MAX_Y_FIND7S+152;
+		syna_lcd_ratio1 = 133;
+		syna_lcd_ratio2 = 100;
+	}
 
 	mutex_init(&(rmi4_data->rmi4_io_ctrl_mutex));
 	mutex_init(&(rmi4_data->rmi4_reset_mutex));
@@ -4409,6 +4498,10 @@ static int synaptics_rmi4_suspend(struct device *dev)
 
 	rmi4_data->pwrrunning = true;
 
+	if (rmi4_data->smartcover_enable)
+		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_SMARTCOVER_EXT,
+				&val, sizeof(val));
+
 	if (rmi4_data->glove_enable)
 		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
 				&val, sizeof(val));
@@ -4472,6 +4565,10 @@ static int synaptics_rmi4_resume(struct device *dev)
 		return 0;
 
 	rmi4_data->pwrrunning = true;
+
+	if (rmi4_data->smartcover_enable)
+		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_SMARTCOVER_EXT,
+				&val, sizeof(val));
 
 	if (rmi4_data->glove_enable)
 		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,

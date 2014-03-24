@@ -775,6 +775,11 @@ qpnp_chg_is_usb_chg_plugged_in(struct qpnp_chg_chip *chip)
 	}
 	pr_debug("chgr usb sts 0x%x\n", usbin_valid_rt_sts);
 
+#ifdef CONFIG_BQ24196_CHARGER
+	if (is_otg_en_set == true)
+		return 0;
+#endif
+
 	return (usbin_valid_rt_sts & USB_VALID_BIT) ? 1 : 0;
 }
 
@@ -2293,11 +2298,14 @@ switch_usb_to_charge_mode(struct qpnp_chg_chip *chip)
 #endif
 
 #ifdef CONFIG_BQ24196_CHARGER
+static void qpnp_chg_ext_charger_hwinit(struct qpnp_chg_chip *chip);
+
 static int
 switch_usb_to_host_mode(struct qpnp_chg_chip *chip)
 {
 	is_otg_en_set = true;
 	if (qpnp_ext_charger && qpnp_ext_charger->chg_charge_en) {
+		qpnp_chg_ext_charger_hwinit(chip);
 		return qpnp_ext_charger->chg_charge_en(2);
 	} else {
 		pr_err("qpnp-charger no externel charger\n");
@@ -3614,8 +3622,13 @@ qpnp_chg_ext_charger_wdt_set(struct qpnp_chg_chip *chip,int seconds)
 
 static void qpnp_chg_ext_charger_hwinit(struct qpnp_chg_chip *chip)
 {
-	qpnp_chg_ext_charger_reset(chip,0);	//reset bq24196 regs to default
-	qpnp_chg_ext_charger_wdt_set(chip,0);	//disable wdt
+	qpnp_chg_ext_charger_reset(chip, 1);
+	qpnp_chg_ext_charger_reset(chip, 0); //reset bq24196 regs to default
+	qpnp_chg_ext_charger_wdt_set(chip, 0); //disable wdt
+
+	qpnp_chg_vinmin_set(chip, chip->min_voltage_mv);
+	qpnp_chg_ibatterm_set(chip, chip->term_current);
+	qpnp_chg_tchg_max_set(chip, chip->tchg_mins);
 }
 
 static void
@@ -4045,6 +4058,7 @@ qpnp_chg_adjust_vddmax(struct qpnp_chg_chip *chip, int vbat_mv)
 #endif
 
 #define CONSECUTIVE_COUNT	3
+#define CONSECUTIVE_COUNT_POSITIVE	6
 #define VBATDET_MAX_ERR_MV	50
 #ifdef CONFIG_BQ24196_CHARGER
 static void
@@ -4112,19 +4126,24 @@ qpnp_eoc_work(struct work_struct *work)
 			count = 0;
 		} else if (ibat_ma >= 0) {
 			count = 0;
-			if (qpnp_ext_charger && qpnp_ext_charger->chg_get_system_status)
-				bat_status = qpnp_ext_charger->chg_get_system_status();
-			if((bat_status & 0x30) == 0x30) {
-				pr_info("End of Charging when ibat>=0\n");
-				chip->delta_vddmax_mv = 0;
-				qpnp_chg_set_appropriate_vddmax(chip);
-				chip->chg_done = true;
-				chip->chg_display_full = true;//wangjc add for charge full
-				qpnp_chg_charge_en(chip, 0);
-				power_supply_changed(&chip->batt_psy);
-				qpnp_chg_enable_irq(&chip->chg_vbatdet_lo);
-				count = 0;
-				goto stop_eoc;
+			if (count == CONSECUTIVE_COUNT_POSITIVE) {
+				if (qpnp_ext_charger && qpnp_ext_charger->chg_get_system_status)
+					bat_status = qpnp_ext_charger->chg_get_system_status();
+				if((bat_status & 0x30) == 0x30) {
+					pr_info("End of Charging when ibat>=0\n");
+					chip->delta_vddmax_mv = 0;
+					qpnp_chg_set_appropriate_vddmax(chip);
+					chip->chg_done = true;
+					chip->chg_display_full = true;//wangjc add for charge full
+					qpnp_chg_charge_en(chip, 0);
+					power_supply_changed(&chip->batt_psy);
+					qpnp_chg_enable_irq(&chip->chg_vbatdet_lo);
+					count = 0;
+					goto stop_eoc;
+				}
+			} else {
+				count += 1;
+				pr_debug("EOC count = %d\n", count);
 			}
 		} else {
 			if (count == CONSECUTIVE_COUNT) {
@@ -6430,7 +6449,10 @@ static void switch_fast_chg(struct qpnp_chg_chip *chip)
 
 	if(gpio_get_value(96))
 		return;
-	
+
+	if (!qpnp_chg_is_usb_chg_plugged_in(chip))
+		return;
+
 	if(qpnp_get_fast_chg_allow(chip) == false){
 		if(is_alow_fast_chg(chip) == true) {
 			//swtich on fast chg
@@ -6479,6 +6501,8 @@ static void update_heartbeat(struct work_struct *work)
 	qpnp_check_charge_timeout(chip);
 	qpnp_check_battery_uovp(chip);
 	qpnp_check_battery_temp(chip);
+
+	pr_info("%s current:%d\n", __func__, get_prop_current_now(chip));
 	
 	qpnp_check_recharging(chip);
 

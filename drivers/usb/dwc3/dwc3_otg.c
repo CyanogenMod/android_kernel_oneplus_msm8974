@@ -27,7 +27,9 @@
 #ifdef CONFIG_MACH_OPPO
 #include <linux/pcb_version.h>
 
+#ifdef CONFIG_MACH_FIND7
 static bool non_standard = false;
+#endif
 #endif
 
 #define VBUS_REG_CHECK_DELAY	(msecs_to_jiffies(1000))
@@ -591,8 +593,10 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 
 	power_supply_changed(dotg->psy);
 #ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7
 	if (get_pcb_version() < HW_VERSION__12 && mA == 500)
 		non_standard = false;
+#endif
 #endif
 	dotg->charger->max_power = mA;
 	return 0;
@@ -708,6 +712,7 @@ void dwc3_otg_init_sm(struct dwc3_otg *dotg)
 }
 
 #ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7
 static void non_standard_charger_detect_work(struct work_struct *work)
 {
 	struct delayed_work *dwork = to_delayed_work(work);
@@ -720,6 +725,7 @@ static void non_standard_charger_detect_work(struct work_struct *work)
 		dwc3_otg_set_power(phy, DWC3_IDEV_CHG_FLOATED);
 	}
 }
+#endif
 
 static void dwc3_otg_detect_work(struct work_struct *w)
 {
@@ -819,6 +825,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					phy->state = OTG_STATE_B_PERIPHERAL;
 					work = 1;
 #ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7
 					if (get_pcb_version() < HW_VERSION__12) {
 						cancel_delayed_work_sync(&dotg->non_standard_charger_work);
 						non_standard = true;
@@ -828,6 +835,10 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 						power_supply_set_online(dotg->psy, true);
 						power_supply_changed(dotg->psy);
 					}
+#else
+					power_supply_set_online(dotg->psy, true);
+					power_supply_changed(dotg->psy);
+#endif
 #endif
 					break;
 				case DWC3_FLOATED_CHARGER:
@@ -887,9 +898,11 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			}
 		} else {
 #ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7
 			if (get_pcb_version() < HW_VERSION__12) {
 				cancel_delayed_work_sync(&dotg->non_standard_charger_work);
 			}
+#endif
 			cancel_delayed_work_sync(&dotg->detect_work);
 #endif
 			if (charger)
@@ -1091,9 +1104,11 @@ int dwc3_otg_init(struct dwc3 *dwc)
 	init_completion(&dotg->dwc3_xcvr_vbus_init);
 	INIT_DELAYED_WORK(&dotg->sm_work, dwc3_otg_sm_work);
 #ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7
 	if (get_pcb_version() < HW_VERSION__12)
 		INIT_DELAYED_WORK(&dotg->non_standard_charger_work,
 				non_standard_charger_detect_work);
+#endif
 	INIT_DELAYED_WORK(&dotg->detect_work, dwc3_otg_detect_work);
 #endif
 

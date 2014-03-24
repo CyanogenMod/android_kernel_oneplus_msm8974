@@ -396,7 +396,13 @@ static void msm8974_oppo_ext_spk_power_amp_enable(bool enable)
 
 		gpio_set_value(yda145_boost_gpio, 1);
 		usleep_range(15000, 25000);
+#ifdef CONFIG_MACH_FIND7OP
 		gpio_set_value(yda145_ctr_gpio, 1);
+		usleep_range(15000, 25000);
+		gpio_set_value(yda145_ctr_gpio, 0);
+#else
+		gpio_set_value(yda145_ctr_gpio, 1);
+#endif
 	} else {
 		gpio_set_value(yda145_ctr_gpio, 0);
 		usleep_range(15000, 25000);
@@ -1876,15 +1882,27 @@ void *def_taiko_mbhc_cal(void)
 	btn_low = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_V_BTN_LOW);
 	btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg,
 					       MBHC_BTN_DET_V_BTN_HIGH);
-#ifndef CONFIG_MACH_OPPO //liuyan 2013-12-10 modify the switch reange
-	btn_low[0] = -50;
-	btn_high[0] = 20;
-	btn_low[1] = 21;
-#else
+#ifdef CONFIG_MACH_FIND7OP
+	btn_low[0] = -70;
+	btn_high[0] = 50;
+	btn_low[1] = 51;
+	btn_high[1] = 52;
+	btn_low[2] = 53;
+	btn_high[2] = 54;
+	btn_low[3] = 55;
+	btn_high[3] = 263;
+	btn_low[4] = 264;
+	btn_high[4] = 265;
+	btn_low[5] = 266;
+	btn_high[5] = 267;
+	btn_low[6] = 268;
+	btn_high[6] = 269;
+	btn_low[7] = 270;
+	btn_high[7] = 600;
+#elif defined(CONFIG_MACH_FIND7)
 	btn_low[0] = -70;
 	btn_high[0] = 40;
 	btn_low[1] = 41;
-#endif
 	btn_high[1] = 61;
 	btn_low[2] = 62;
 	btn_high[2] = 104;
@@ -1898,6 +1916,24 @@ void *def_taiko_mbhc_cal(void)
 	btn_high[6] = 269;
 	btn_low[7] = 270;
 	btn_high[7] = 500;
+#else
+	btn_low[0] = -50;
+	btn_high[0] = 20;
+	btn_low[1] = 21;
+	btn_high[1] = 61;
+	btn_low[2] = 62;
+	btn_high[2] = 104;
+	btn_low[3] = 105;
+	btn_high[3] = 148;
+	btn_low[4] = 149;
+	btn_high[4] = 189;
+	btn_low[5] = 190;
+	btn_high[5] = 228;
+	btn_low[6] = 229;
+	btn_high[6] = 269;
+	btn_low[7] = 270;
+	btn_high[7] = 500;
+#endif
 	n_ready = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_N_READY);
 	n_ready[0] = 80;
 	n_ready[1] = 68;
