@@ -464,6 +464,7 @@ void adreno_coresight_remove(struct platform_device *pdev);
 int adreno_coresight_init(struct platform_device *pdev);
 
 bool adreno_hw_isidle(struct kgsl_device *device);
+int adreno_spin_idle(struct kgsl_device *device);
 int adreno_idle(struct kgsl_device *device);
 bool adreno_isidle(struct kgsl_device *device);
 
@@ -489,6 +490,7 @@ void adreno_dispatcher_start(struct kgsl_device *device);
 int adreno_dispatcher_init(struct adreno_device *adreno_dev);
 void adreno_dispatcher_close(struct adreno_device *adreno_dev);
 int adreno_dispatcher_idle(struct adreno_device *adreno_dev);
+int adreno_dispatcher_idle_unsafe(struct adreno_device *adreno_dev);
 void adreno_dispatcher_irq_fault(struct kgsl_device *device);
 void adreno_dispatcher_stop(struct adreno_device *adreno_dev);
 

@@ -636,6 +636,44 @@ static inline void refcount_group(struct adreno_perfcount_group *group,
 		*hi = group->regs[reg].offset_hi;
 }
 
+
+/**
+ * adreno_idle_unsafe() - wait for the GPU hardware to go idle
+ *
+ * This doesn't check for dispatcher mutex owner. Hence this function
+ * should be called only if we are sure that we dont own dispatcher mutex
+ * in this thread.
+ *
+ * @device: Pointer to the KGSL device structure for the GPU
+ *
+ * Wait up to ADRENO_IDLE_TIMEOUT milliseconds for the GPU hardware to go quiet.
+ */
+
+static int adreno_idle_unsafe(struct kgsl_device *device)
+{
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	int ret;
+
+	/*
+	 * Make sure the device mutex is held so the dispatcher can't send any
+	 * more commands to the hardware
+	 */
+
+	BUG_ON(!mutex_is_locked(&device->mutex));
+
+	/* Check if we are already idle before idling dispatcher */
+	if (adreno_isidle(device))
+		return 0;
+	/*
+	 * Wait for dispatcher to finish completing commands
+	 * already submitted
+	 */
+	ret = adreno_dispatcher_idle_unsafe(adreno_dev);
+	if (ret)
+		return ret;
+
+	return adreno_spin_idle(device);
+}
 /**
  * adreno_perfcounter_get: Try to put a countable in an available counter
  * @adreno_dev: Adreno device to configure
@@ -717,7 +755,8 @@ int adreno_perfcounter_get(struct adreno_device *adreno_dev,
 	if (empty == -1)
 		return -EBUSY;
 
-	ret = adreno_idle(&adreno_dev->dev);
+	ret = adreno_idle_unsafe(&adreno_dev->dev);
+
 	if (ret)
 		return ret;
 
@@ -2486,8 +2525,11 @@ static int adreno_set_constraint(struct kgsl_device *device,
 
 	/* If a new constraint has been set for a context, cancel the old one */
 	if ((status == 0) &&
-		(context->id == device->pwrctrl.constraint.owner_id))
+		(context->id == device->pwrctrl.constraint.owner_id)) {
+		trace_kgsl_constraint(device, device->pwrctrl.constraint.type,
+					device->pwrctrl.active_pwrlevel, 0);
 		device->pwrctrl.constraint.type = KGSL_CONSTRAINT_NONE;
+	}
 
 	return status;
 }
@@ -2699,44 +2741,19 @@ bool adreno_isidle(struct kgsl_device *device)
 }
 
 /**
- * adreno_idle() - wait for the GPU hardware to go idle
- * @device: Pointer to the KGSL device structure for the GPU
+ * adreno_spin_idle() - Spin wait for the GPU to idle
+ * @device: Pointer to the KGSL device
  *
- * Wait up to ADRENO_IDLE_TIMEOUT milliseconds for the GPU hardware to go quiet.
+ * Spin the CPU waiting for the RBBM status to return idle
  */
-
-int adreno_idle(struct kgsl_device *device)
+int adreno_spin_idle(struct kgsl_device *device)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	unsigned long wait = jiffies + msecs_to_jiffies(ADRENO_IDLE_TIMEOUT);
-	int ret;
 
-	/*
-	 * Make sure the device mutex is held so the dispatcher can't send any
-	 * more commands to the hardware
-	 */
-
-	BUG_ON(!mutex_is_locked(&device->mutex));
-
-	if (adreno_is_a3xx(adreno_dev))
-		kgsl_cffdump_regpoll(device,
-			adreno_getreg(adreno_dev, ADRENO_REG_RBBM_STATUS) << 2,
-			0x00000000, 0x80000000);
-	else
-		kgsl_cffdump_regpoll(device,
-			adreno_getreg(adreno_dev, ADRENO_REG_RBBM_STATUS) << 2,
-			0x110, 0x110);
-
-	/* Check if we are already idle before idling dispatcher */
-	if (adreno_isidle(device))
-		return 0;
-	/*
-	 * Wait for dispatcher to finish completing commands
-	 * already submitted
-	 */
-	ret = adreno_dispatcher_idle(adreno_dev);
-	if (ret)
-		return ret;
+	kgsl_cffdump_regpoll(device,
+		adreno_getreg(adreno_dev, ADRENO_REG_RBBM_STATUS) << 2,
+		0x00000000, 0x80000000);
 
 	while (time_before(jiffies, wait)) {
 		/*
@@ -2754,6 +2771,39 @@ int adreno_idle(struct kgsl_device *device)
 	}
 
 	return -ETIMEDOUT;
+}
+
+/**
+ * adreno_idle() - wait for the GPU hardware to go idle
+ * @device: Pointer to the KGSL device structure for the GPU
+ *
+ * Wait up to ADRENO_IDLE_TIMEOUT milliseconds for the GPU hardware to go quiet.
+ */
+
+int adreno_idle(struct kgsl_device *device)
+{
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	int ret;
+
+	/*
+	 * Make sure the device mutex is held so the dispatcher can't send any
+	 * more commands to the hardware
+	 */
+
+	BUG_ON(!mutex_is_locked(&device->mutex));
+
+	/* Check if we are already idle before idling dispatcher */
+	if (adreno_isidle(device))
+		return 0;
+	/*
+	 * Wait for dispatcher to finish completing commands
+	 * already submitted
+	 */
+	ret = adreno_dispatcher_idle(adreno_dev);
+	if (ret)
+		return ret;
+
+	return adreno_spin_idle(device);
 }
 
 /**

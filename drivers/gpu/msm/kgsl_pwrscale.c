@@ -182,6 +182,21 @@ void kgsl_pwrscale_enable(struct kgsl_device *device)
 }
 EXPORT_SYMBOL(kgsl_pwrscale_enable);
 
+static int _thermal_adjust(struct kgsl_pwrctrl *pwr, int level)
+{
+	if (level < pwr->active_pwrlevel)
+		return pwr->active_pwrlevel;
+
+	/*
+	 * A lower frequency has been recommended!  Stop thermal
+	 * cycling (but keep the upper thermal limit) and switch to
+	 * the lower frequency.
+	 */
+	pwr->thermal_cycle = CYCLE_ENABLE;
+	del_timer_sync(&pwr->thermal_timer);
+	return level;
+}
+
 /*
  * kgsl_devfreq_target - devfreq_dev_profile.target callback
  * @dev: see devfreq.h
@@ -218,13 +233,19 @@ int kgsl_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 	cur_freq = kgsl_pwrctrl_active_freq(pwr);
 	level = pwr->active_pwrlevel;
 
+	/* If the governor recommends a new frequency, update it here */
 	if (*freq != cur_freq) {
 		level = pwr->max_pwrlevel;
 		for (i = pwr->min_pwrlevel; i >= pwr->max_pwrlevel; i--)
 			if (*freq <= pwr->pwrlevels[i].gpu_freq) {
-				level = i;
+				if (pwr->thermal_cycle == CYCLE_ACTIVE)
+					level = _thermal_adjust(pwr, i);
+				else
+					level = i;
 				break;
 			}
+		if (level != pwr->active_pwrlevel)
+			kgsl_pwrctrl_pwrlevel_change(device, level);
 	} else if (flags && pwr->bus_control) {
 		/*
 		 * Signal for faster or slower bus.  If KGSL isn't already
@@ -244,30 +265,7 @@ int kgsl_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 			kgsl_pwrctrl_buslevel_update(device, true);
 	}
 
-	/*
-	 * The power constraints need an entire interval to do their magic, so
-	 * skip changing the powerlevel if the time hasn't expired yet  and the
-	 * new level is less than the constraint
-	 */
-	if ((pwr->constraint.type != KGSL_CONSTRAINT_NONE) &&
-		(!time_after(jiffies, pwr->constraint.expires)))
-			*freq = cur_freq;
-	else {
-		/* Change the power level */
-		kgsl_pwrctrl_pwrlevel_change(device, level);
-		if (pwr->constraint.type != KGSL_CONSTRAINT_NONE) {
-			/* Trace the constraint being un-set by the driver */
-			trace_kgsl_constraint(device,
-				pwr->constraint.type,
-				level,
-				0);
-			/*Invalidate the constraint set */
-			pwr->constraint.type = KGSL_CONSTRAINT_NONE;
-		}
-		pwr->constraint.expires = 0;
-
-		*freq = kgsl_pwrctrl_active_freq(pwr);
-	}
+	*freq = kgsl_pwrctrl_active_freq(pwr);
 
 	kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
 	return 0;

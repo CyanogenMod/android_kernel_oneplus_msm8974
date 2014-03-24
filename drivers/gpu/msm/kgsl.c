@@ -2975,7 +2975,8 @@ error:
 	return result;
 }
 
-static int _kgsl_gpumem_sync_cache(struct kgsl_mem_entry *entry, int op)
+static int _kgsl_gpumem_sync_cache(struct kgsl_mem_entry *entry,
+				size_t offset, size_t length, unsigned int op)
 {
 	int ret = 0;
 	int cacheop;
@@ -2998,11 +2999,17 @@ static int _kgsl_gpumem_sync_cache(struct kgsl_mem_entry *entry, int op)
 		goto done;
 	}
 
+	if (!(op & KGSL_GPUMEM_CACHE_RANGE)) {
+		offset = 0;
+		length = entry->memdesc.size;
+	}
+
 	mode = kgsl_memdesc_get_cachemode(&entry->memdesc);
 	if (mode != KGSL_CACHEMODE_UNCACHED
 		&& mode != KGSL_CACHEMODE_WRITECOMBINE) {
-		trace_kgsl_mem_sync_cache(entry, op);
-		kgsl_cache_range_op(&entry->memdesc, cacheop);
+		trace_kgsl_mem_sync_cache(entry, offset, length, op);
+		ret = kgsl_cache_range_op(&entry->memdesc, offset,
+					length, cacheop);
 	}
 
 done:
@@ -3039,7 +3046,8 @@ kgsl_ioctl_gpumem_sync_cache(struct kgsl_device_private *dev_priv,
 		return -EINVAL;
 	}
 
-	ret = _kgsl_gpumem_sync_cache(entry, param->op);
+	ret = _kgsl_gpumem_sync_cache(entry, param->offset,
+					param->length, param->op);
 	kgsl_mem_entry_put(entry);
 	return ret;
 }
@@ -3125,9 +3133,13 @@ kgsl_ioctl_gpumem_sync_cache_bulk(struct kgsl_device_private *dev_priv,
 		__cpuc_flush_kern_all();
 	}
 
+	param->op &= ~KGSL_GPUMEM_CACHE_RANGE;
+
 	for (i = 0; i < actual_count; i++) {
 		if (!full_flush)
-			_kgsl_gpumem_sync_cache(entries[i], param->op);
+			_kgsl_gpumem_sync_cache(entries[i], 0,
+						entries[i]->memdesc.size,
+						param->op);
 		kgsl_mem_entry_put(entries[i]);
 	}
 end:
@@ -3155,10 +3167,14 @@ kgsl_ioctl_sharedmem_flush_cache(struct kgsl_device_private *dev_priv,
 		return -EINVAL;
 	}
 
-	ret = _kgsl_gpumem_sync_cache(entry, KGSL_GPUMEM_CACHE_FLUSH);
+	ret = _kgsl_gpumem_sync_cache(entry, 0, entry->memdesc.size,
+					KGSL_GPUMEM_CACHE_FLUSH);
 	kgsl_mem_entry_put(entry);
 	return ret;
 }
+
+/* The largest allowable alignment for a GPU object is 32MB */
+#define KGSL_MAX_ALIGN (32 * SZ_1M)
 
 /*
  * The common parts of kgsl_ioctl_gpumem_alloc and kgsl_ioctl_gpumem_alloc_id.
@@ -3186,11 +3202,13 @@ _gpumem_alloc(struct kgsl_device_private *dev_priv,
 	/* Cap the alignment bits to the highest number we can handle */
 
 	align = (flags & KGSL_MEMALIGN_MASK) >> KGSL_MEMALIGN_SHIFT;
-	if (align >= 32) {
-		KGSL_CORE_ERR("Alignment too big, restricting to 2^31\n");
+	if (align >= ilog2(KGSL_MAX_ALIGN)) {
+		KGSL_CORE_ERR("Alignment too large; restricting to %dK\n",
+			KGSL_MAX_ALIGN >> 10);
 
 		flags &= ~KGSL_MEMALIGN_MASK;
-		flags |= (31 << KGSL_MEMALIGN_SHIFT) & KGSL_MEMALIGN_MASK;
+		flags |= (ilog2(KGSL_MAX_ALIGN) << KGSL_MEMALIGN_SHIFT) &
+			KGSL_MEMALIGN_MASK;
 	}
 
 	entry = kgsl_mem_entry_create();
