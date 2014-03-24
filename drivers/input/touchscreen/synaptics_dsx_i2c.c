@@ -3652,6 +3652,15 @@ static int synaptics_rmi4_set_input_dev(struct synaptics_rmi4_data *rmi4_data)
 
 	atomic_set(&rmi4_data->keypad_enable, 1);
 
+	atomic_set(&rmi4_data->syna_use_gesture, 0);
+	atomic_set(&rmi4_data->double_tap_enable, 0);
+	atomic_set(&rmi4_data->camera_enable, 0);
+	atomic_set(&rmi4_data->music_enable, 0);
+	atomic_set(&rmi4_data->flashlight_enable, 0);
+
+	rmi4_data->glove_enable = 0;
+	rmi4_data->pdoze_enable = 0;
+
 #ifdef INPUT_PROP_DIRECT
 	set_bit(INPUT_PROP_DIRECT, rmi4_data->input_dev->propbit);
 #endif
@@ -4064,9 +4073,6 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 	rmi4_data->i2c_write = synaptics_rmi4_i2c_write;
 	rmi4_data->irq_enable = synaptics_rmi4_irq_enable;
 	rmi4_data->reset_device = synaptics_rmi4_reset_device;
-
-	// disable glove mode by default
-	rmi4_data->glove_enable = 0;
 
 	//init sensor size
 	if (get_pcb_version() <= HW_VERSION__20) {
