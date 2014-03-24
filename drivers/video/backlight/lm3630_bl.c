@@ -94,13 +94,13 @@ static int lm3630_chip_init(struct lm3630_chip_data *pchip)
 	if (ret < 0)
 		goto out;
     /* For normal mode, enable pwm control by Xinqin.Yang@PhoneSW.Driver, 2013/12/20 */
-    if (get_pcb_version() < HW_VERSION__20) { /* For Find7 */
+    //if (get_pcb_version() < HW_VERSION__20) { /* For Find7 */
         if (get_boot_mode() == MSM_BOOT_MODE__NORMAL) {
         	ret = regmap_update_bits(pchip->regmap, REG_CONFIG, 0x01, 0x01);
         	if (ret < 0)
         		goto out;
         }
-    }
+    //}
 
 #ifdef CONGIF_OPPO_CMCC_OPTR
     reg_val = 0x12; /* For 13077 CMCC */
@@ -538,12 +538,16 @@ static ssize_t ftmbacklight_store(struct device *dev,
     if (!count)
 		return -EINVAL;
 
+#if 0
     /* this function is for ftm mode, it doesn't work when normal boot */
     if(get_boot_mode() == MSM_BOOT_MODE__FACTORY) {
         level = simple_strtoul(buf, NULL, 10);
 
         lm3630_bank_a_update_status(level);
     }
+#endif
+    level = simple_strtoul(buf, NULL, 10);
+    lm3630_bank_a_update_status(level);
 
     return count;
 }
@@ -774,7 +778,7 @@ static int lm3630_resume(struct i2c_client *client)
 int set_backlight_pwm(int state)
 {
     int rc = 0;
-	if (get_pcb_version() < HW_VERSION__20) { /* For Find7 */
+	//if (get_pcb_version() < HW_VERSION__20) { /* For Find7 */
         if (get_boot_mode() == MSM_BOOT_MODE__NORMAL) {
         	if(state == 1)
     		{
@@ -785,7 +789,7 @@ int set_backlight_pwm(int state)
     		     rc = regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x01, 0x00);
   			}
         }
-    }
+    //}
     return rc;
 }
 

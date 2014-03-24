@@ -576,6 +576,30 @@ static struct msm_gpiomux_config msm_epm_configs[] __initdata = {
 	},
 };
 
+static struct gpiomux_setting gpio_blsp6_spi3_config = {
+	.func = GPIOMUX_FUNC_2,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+static struct gpiomux_setting gpio_blsp6_spi2_config = {
+	.func = GPIOMUX_FUNC_2,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+static struct gpiomux_setting gpio_blsp6_spi1_config = {
+	.func = GPIOMUX_FUNC_2,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+static struct gpiomux_setting gpio_blsp6_spi_suspend_config = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
 static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 #if defined(CONFIG_KS8851) || defined(CONFIG_KS8851_MODULE)
 	{
@@ -671,6 +695,34 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 		.settings = {
 			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
 			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
+		},
+	},
+	{                           /* NFC */
+		.gpio      = 49,		/* BLSP1 QUP5 (BLSP6) MOSI */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi3_config,
+			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
+		},
+	},
+	{                           /* NFC */
+		.gpio      = 50,		/* BLSP1 QUP5 (BLSP6) MISO */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi2_config,
+			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
+		},
+	},
+	{                           /* NFC */
+		.gpio      = 51,		/* BLSP1 QUP5 (BLSP6) CS */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi1_config,
+			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
+		},
+	},
+	{                           /* NFC */
+		.gpio      = 52,		/* BLSP1 QUP5 (BLSP6) CLK */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi1_config,
+			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
 		},
 	},
 	{
@@ -780,6 +832,7 @@ static struct gpiomux_setting es_active_config = {
 	.dir = GPIOMUX_IN,
 };
 
+#ifdef CONFIG_MACH_FIND7
 static struct gpiomux_setting sd_card_det_active_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -801,6 +854,7 @@ static struct msm_gpiomux_config sd_card_det __initdata = {
 		[GPIOMUX_SUSPENDED] = &sd_card_det_sleep_config,
 	},
 };
+#endif
 
 static struct msm_gpiomux_config external_pa_configs[] __initdata = {
 	{
@@ -1450,7 +1504,9 @@ void __init msm_8974_init_gpiomux(void)
 		msm_gpiomux_install(msm_sensor_configs, \
 				ARRAY_SIZE(msm_sensor_configs));
 	msm_gpiomux_install(external_pa_configs, ARRAY_SIZE(external_pa_configs));
+#ifdef CONFIG_MACH_FIND7
 	msm_gpiomux_install(&sd_card_det, 1);
+#endif
 
 	if (machine_is_apq8074() && (of_board_is_liquid() || \
 	    of_board_is_dragonboard()))

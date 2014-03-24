@@ -117,8 +117,15 @@ extern int pic16f_fw_update(void);
 #define BQ27541_SUBCMD_RESET   0x0041
 #define ZERO_DEGREE_CELSIUS_IN_TENTH_KELVIN   (-2731)
 #define BQ27541_INIT_DELAY   ((HZ)*1)
-#define CAPACITY_SALTATE_COUNTER 12
-
+#ifdef CONFIG_MACH_OPPO
+#define CAPACITY_SALTATE_COUNTER  12
+#define CAPACITY_SALTATE_COUNTER_NOT_CHARGING  48
+#define CAPACITY_SALTATE_COUNTER_HIGH  72
+#define CAPACITY_SALTATE_COUNTER_90  60
+#define CAPACITY_SALTATE_COUNTER_95  100
+#define CAPACITY_SALTATE_COUNTER_99  120
+#define CAPACITY_SALTATE_COUNTER_FULL  144
+#endif
 /* If the system has several batteries we need a different name for each
  * of them...
  */
@@ -251,24 +258,25 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 {
 	union power_supply_propval ret = {0,};
 	unsigned int soc_calib;
+	int counter_temp = 0;
+
 	if (!di->batt_psy){
 		di->batt_psy = power_supply_get_by_name("battery");
 		di->soc_pre = soc;
 	}
 	if (di->batt_psy) {
 		di->batt_psy->get_property(di->batt_psy,POWER_SUPPLY_PROP_STATUS, &ret);
-		if (abs(soc - di->soc_pre) >= 2) {
-			di->saltate_counter++;
-			if(di->saltate_counter < CAPACITY_SALTATE_COUNTER)
-				return di->soc_pre;
-			else
-				di->saltate_counter = 0;
-		}
-		else
-			di->saltate_counter = 0;
 
-		if (ret.intval == POWER_SUPPLY_STATUS_CHARGING ||
-				ret.intval == POWER_SUPPLY_STATUS_FULL) { // is charging
+		if (ret.intval == POWER_SUPPLY_STATUS_CHARGING || ret.intval == POWER_SUPPLY_STATUS_FULL) { // is charging
+			if (abs(soc - di->soc_pre) >= 2) {
+				di->saltate_counter++;
+				if(di->saltate_counter < CAPACITY_SALTATE_COUNTER)
+					return di->soc_pre;
+				else
+					di->saltate_counter = 0;
+			} else
+				di->saltate_counter = 0;
+
 			if (soc > di->soc_pre)
 				soc_calib = di->soc_pre + 1;
 			else
@@ -276,13 +284,35 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 			
 			/* jingchun.wang@Onlinerd.Driver, 2013/12/12  Add for set capacity to 100 when full in normal temp */
 			if (ret.intval == POWER_SUPPLY_STATUS_FULL) {
-				if (bq27541_battery_temperature(bq27541_di) > 100
-						&& bq27541_battery_temperature(bq27541_di) < 450) {
+				if (soc > 95) {
 					soc_calib = 100;
 				}
 			}
 		} else {
 			// not charging
+			if ((abs(soc - di->soc_pre) >= 2) || (di->soc_pre > 80)) {
+				di->saltate_counter++;
+				if (di->soc_pre == 100) {
+					counter_temp = CAPACITY_SALTATE_COUNTER_FULL;
+				} else if (di->soc_pre == 99) {
+					counter_temp = CAPACITY_SALTATE_COUNTER_99;//6
+				} else if (di->soc_pre > 95) {
+					counter_temp = CAPACITY_SALTATE_COUNTER_95;//5
+				} else if (di->soc_pre > 90) {
+					counter_temp = CAPACITY_SALTATE_COUNTER_90;///3
+				//} else if(soc > 90) {
+				//	counter_temp = CAPACITY_SALTATE_COUNTER_HIGH;
+				} else {
+					counter_temp = CAPACITY_SALTATE_COUNTER_NOT_CHARGING;
+				}
+				if(di->saltate_counter < counter_temp)
+					return di->soc_pre;
+				else
+					di->saltate_counter = 0;
+			}
+			else
+				di->saltate_counter = 0;
+
 			if (soc < di->soc_pre)
 				soc_calib = di->soc_pre - 1;
 			else
@@ -294,7 +324,6 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 	if (soc >= 100)
 		soc_calib = 100;
 	di->soc_pre = soc_calib;
-
 	return soc_calib;
 }
 
@@ -321,6 +350,9 @@ static int bq27541_battery_soc(struct bq27541_device_info *di, bool raw)
 	}
 
 	if (raw == true) {
+		if(soc > 90) {
+			soc += 2;
+		}
 		if(soc <= di->soc_pre) {
 			di->soc_pre = soc;
 		}
@@ -925,6 +957,8 @@ static bool bq27541_authenticate(struct i2c_client *client)
 #define BATTERY_3000MA		1
 #define TYPE_INFO_LEN		8
 
+#ifndef CONFIG_OPPO_DEVICE_FIND7OP
+/* jingchun.wang@Onlinerd.Driver, 2014/03/10  Modify for 14001 */
 static int bq27541_batt_type_detect(struct i2c_client *client)
 {
 	char blockA_cmd_buf[1] = {0x01};
@@ -951,6 +985,12 @@ static int bq27541_batt_type_detect(struct i2c_client *client)
 	pr_info("%s battery_type:%d\n",__func__,rc);
 	return rc;
 }
+#else /*CONFIG_OPPO_DEVICE_FIND7OP*/
+static int bq27541_batt_type_detect(struct i2c_client *client)
+{
+	return BATTERY_3000MA;
+}
+#endif /*CONFIG_OPPO_DEVICE_FIND7OP*/
 #endif
 
 /* OPPO 2013-12-12 liaofuchun add for fastchg */
@@ -997,6 +1037,19 @@ static void fastcg_work_func(struct work_struct *work)
 		if((i == 2) && (data != 0x50) && (!fw_ver_info)){
 			//data recvd not start from "101"
 			pr_err("%s data err:%d\n",__func__,data);
+			if(bq27541_di->fast_chg_started == true) {
+				bq27541_di->alow_reading = true;
+				bq27541_di->fast_chg_started = false;
+				bq27541_di->fast_chg_allow = false;
+				bq27541_di->fast_switch_to_normal = false;
+				bq27541_di->fast_normal_to_warm = false;
+				gpio_set_value(96, 0);
+				retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
+				if (retval) {
+					pr_err("%s switch usb error %d\n", __func__, retval);
+				}
+				power_supply_changed(bq27541_di->batt_psy);
+			}
 			goto out;
 		}
 	}

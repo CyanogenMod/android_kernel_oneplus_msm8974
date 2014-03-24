@@ -184,7 +184,7 @@ static int SN3193_workmod_sled( int rgb)
 static int SN3193_setCurrent_sled( u8 cs)
 {
    	 int ret=0;
-	ret=SN3193_write_reg(0x03,0x00);
+	ret=SN3193_write_reg(0x03,0x10);
 	return ret;
 }
 /*static int SN3193_setColor_sled(u8 r,u8 g,u8 b) //r,g,b 0~255
