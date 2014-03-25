@@ -1269,7 +1269,7 @@ static int synaptics_rmi4_proc_double_tap_read(char *page, char **start, off_t o
 static int synaptics_rmi4_proc_double_tap_write(struct file *filp, const char __user *buff,
 		unsigned long len, void *data)
 {
-	bool enable;
+	int enable;
 	char buf[2];
 
 	if (len > 2)
@@ -1280,19 +1280,9 @@ static int synaptics_rmi4_proc_double_tap_write(struct file *filp, const char __
 		return -EFAULT;
 	}
 
-	enable = (buf[0] == '0') ? false : true;
+	enable = (buf[0] == '0') ? 0 : 1;
 
-	if (enable) {
-		atomic_set(&syna_rmi4_data->double_tap_enable, 1);
-		atomic_set(&syna_rmi4_data->syna_use_gesture, 1);
-	} else {
-		atomic_set(&syna_rmi4_data->double_tap_enable, 0);
-		if (!atomic_read(&syna_rmi4_data->camera_enable) &&
-				!atomic_read(&syna_rmi4_data->music_enable) &&
-				!atomic_read(&syna_rmi4_data->flashlight_enable)) {
-			atomic_set(&syna_rmi4_data->syna_use_gesture, 0);
-		}
-	}
+	atomic_set(&syna_rmi4_data->double_tap_enable, enable);
 
 	return len;
 }
@@ -1306,7 +1296,7 @@ static int synaptics_rmi4_proc_camera_read(char *page, char **start, off_t off,
 static int synaptics_rmi4_proc_camera_write(struct file *filp, const char __user *buff,
 		unsigned long len, void *data)
 {
-	bool enable;
+	int enable;
 	char buf[2];
 
 	if (len > 2)
@@ -1317,19 +1307,9 @@ static int synaptics_rmi4_proc_camera_write(struct file *filp, const char __user
 		return -EFAULT;
 	}
 
-	enable = (buf[0] == '0') ? false : true;
+	enable = (buf[0] == '0') ? 0 : 1;
 
-	if (enable) {
-		atomic_set(&syna_rmi4_data->camera_enable, 1);
-		atomic_set(&syna_rmi4_data->syna_use_gesture, 1);
-	} else {
-		atomic_set(&syna_rmi4_data->camera_enable, 0);
-		if (!atomic_read(&syna_rmi4_data->double_tap_enable) &&
-				!atomic_read(&syna_rmi4_data->music_enable) &&
-				!atomic_read(&syna_rmi4_data->flashlight_enable)) {
-			atomic_set(&syna_rmi4_data->syna_use_gesture, 0);
-		}
-	}
+	atomic_set(&syna_rmi4_data->camera_enable, enable);
 
 	return len;
 }
@@ -1343,7 +1323,7 @@ static int synaptics_rmi4_proc_music_read(char *page, char **start, off_t off,
 static int synaptics_rmi4_proc_music_write(struct file *filp, const char __user *buff,
 		unsigned long len, void *data)
 {
-	bool enable;
+	int enable;
 	char buf[2];
 
 	if (len > 2)
@@ -1354,19 +1334,9 @@ static int synaptics_rmi4_proc_music_write(struct file *filp, const char __user 
 		return -EFAULT;
 	}
 
-	enable = (buf[0] == '0') ? false : true;
+	enable = (buf[0] == '0') ? 0 : 1;
 
-	if (enable) {
-		atomic_set(&syna_rmi4_data->music_enable, 1);
-		atomic_set(&syna_rmi4_data->syna_use_gesture, 1);
-	} else {
-		atomic_set(&syna_rmi4_data->music_enable, 0);
-		if (!atomic_read(&syna_rmi4_data->double_tap_enable) &&
-				!atomic_read(&syna_rmi4_data->camera_enable) &&
-				!atomic_read(&syna_rmi4_data->flashlight_enable)) {
-			atomic_set(&syna_rmi4_data->syna_use_gesture, 0);
-		}
-	}
+	atomic_set(&syna_rmi4_data->music_enable, enable);
 
 	return len;
 }
@@ -1380,7 +1350,7 @@ static int synaptics_rmi4_proc_flashlight_read(char *page, char **start, off_t o
 static int synaptics_rmi4_proc_flashlight_write(struct file *filp, const char __user *buff,
 		unsigned long len, void *data)
 {
-	bool enable;
+	int enable;
 	char buf[2];
 
 	if (len > 2)
@@ -1391,19 +1361,9 @@ static int synaptics_rmi4_proc_flashlight_write(struct file *filp, const char __
 		return -EFAULT;
 	}
 
-	enable = (buf[0] == '0') ? false : true;
+	enable = (buf[0] == '0') ? 0 : 1;
 
-	if (enable) {
-		atomic_set(&syna_rmi4_data->flashlight_enable, 1);
-		atomic_set(&syna_rmi4_data->syna_use_gesture, 1);
-	} else {
-		atomic_set(&syna_rmi4_data->flashlight_enable, 0);
-		if (!atomic_read(&syna_rmi4_data->double_tap_enable) &&
-				!atomic_read(&syna_rmi4_data->camera_enable) &&
-				!atomic_read(&syna_rmi4_data->music_enable)) {
-			atomic_set(&syna_rmi4_data->syna_use_gesture, 0);
-		}
-	}
+	atomic_set(&syna_rmi4_data->flashlight_enable, enable);
 
 	return len;
 }
@@ -4512,10 +4472,15 @@ static int synaptics_rmi4_suspend(struct device *dev)
 		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
 				&val, sizeof(val));
 
-	synaptics_enable_gesture(rmi4_data,true);
-	synaptics_enable_pdoze(rmi4_data,true);
+	atomic_set(&rmi4_data->syna_use_gesture,
+			atomic_read(&rmi4_data->double_tap_enable) &&
+			atomic_read(&rmi4_data->camera_enable) &&
+			atomic_read(&rmi4_data->music_enable) &&
+			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
 
 	if (atomic_read(&rmi4_data->syna_use_gesture) || rmi4_data->pdoze_enable) {
+		synaptics_enable_gesture(rmi4_data,true);
+		synaptics_enable_pdoze(rmi4_data,true);
 		synaptics_enable_irqwake(rmi4_data,true);
 		rmi4_data->pwrrunning = false;
 		return 0;
@@ -4584,6 +4549,11 @@ static int synaptics_rmi4_resume(struct device *dev)
 		synaptics_enable_gesture(rmi4_data,false);
 		synaptics_enable_pdoze(rmi4_data,false);
 		synaptics_enable_irqwake(rmi4_data,false);
+		atomic_set(&rmi4_data->syna_use_gesture,
+			atomic_read(&rmi4_data->double_tap_enable) &&
+			atomic_read(&rmi4_data->camera_enable) &&
+			atomic_read(&rmi4_data->music_enable) &&
+			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
 		rmi4_data->pwrrunning = false;
 		return 0;
 	}
