@@ -7680,8 +7680,12 @@ int hdd_wlan_startup(struct device *dev )
 
       serialno = wcnss_get_serial_number();
       if ((0 != serialno) &&
+#ifdef WLAN_AUTOGEN_MACADDR_ALWAYS
+          1)
+#else
           (0 == memcmp(&default_address, &pHddCtx->cfg_ini->intfMacAddr[0],
                        sizeof(default_address))))
+#endif
       {
          /* cfg.ini has the default address, invoke autogen logic */
 
