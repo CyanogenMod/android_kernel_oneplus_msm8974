@@ -120,6 +120,7 @@ void mdss_dsi_clk_req(struct mdss_dsi_ctrl_pdata *ctrl, int enable)
 	}
 	MDSS_XLOG(ctrl->ndx, enable, ctrl->mdp_busy, current->pid);
 
+	MDSS_XLOG(ctrl->ndx, enable, ctrl->mdp_busy, current->pid);
 	mdss_dsi_clk_ctrl(ctrl, DSI_ALL_CLKS, enable);
 }
 
