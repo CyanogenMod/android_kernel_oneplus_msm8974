@@ -1003,6 +1003,7 @@ enum {
 	metadata_op_wb_secure,
 	metadata_op_get_caps,
 	metadata_op_crc,
+	metadata_op_get_ion_fd,
 	metadata_op_max
 };
 
@@ -1036,6 +1037,7 @@ struct msmfb_metadata {
 		uint32_t video_info_code;
 		struct mdss_hw_caps caps;
 		uint8_t secure_en;
+		int fbmem_ionfd;
 	} data;
 };
 

@@ -236,6 +236,7 @@ struct msm_fb_data_type {
 	u32 wait_for_kickoff;
 	struct ion_client *fb_ion_client;
 	struct ion_handle *fb_ion_handle;
+	struct dma_buf *fbmem_buf;
 };
 
 static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)
