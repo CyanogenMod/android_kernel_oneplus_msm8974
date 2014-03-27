@@ -4473,9 +4473,9 @@ static int synaptics_rmi4_suspend(struct device *dev)
 				&val, sizeof(val));
 
 	atomic_set(&rmi4_data->syna_use_gesture,
-			atomic_read(&rmi4_data->double_tap_enable) &&
-			atomic_read(&rmi4_data->camera_enable) &&
-			atomic_read(&rmi4_data->music_enable) &&
+			atomic_read(&rmi4_data->double_tap_enable) ||
+			atomic_read(&rmi4_data->camera_enable) ||
+			atomic_read(&rmi4_data->music_enable) ||
 			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
 
 	if (atomic_read(&rmi4_data->syna_use_gesture) || rmi4_data->pdoze_enable) {
@@ -4550,9 +4550,9 @@ static int synaptics_rmi4_resume(struct device *dev)
 		synaptics_enable_pdoze(rmi4_data,false);
 		synaptics_enable_irqwake(rmi4_data,false);
 		atomic_set(&rmi4_data->syna_use_gesture,
-			atomic_read(&rmi4_data->double_tap_enable) &&
-			atomic_read(&rmi4_data->camera_enable) &&
-			atomic_read(&rmi4_data->music_enable) &&
+			atomic_read(&rmi4_data->double_tap_enable) ||
+			atomic_read(&rmi4_data->camera_enable) ||
+			atomic_read(&rmi4_data->music_enable) ||
 			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
 		rmi4_data->pwrrunning = false;
 		return 0;
