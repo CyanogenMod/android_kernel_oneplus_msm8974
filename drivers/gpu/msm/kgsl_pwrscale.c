@@ -93,38 +93,19 @@ void kgsl_pwrscale_busy(struct kgsl_device *device)
 }
 EXPORT_SYMBOL(kgsl_pwrscale_busy);
 
-/**
- * kgsl_pwrscale_update_stats() - update device busy statistics
+/*
+ * kgsl_pwrscale_update - update device busy statistics
  * @device: The device
  *
- * Read hardware busy counters and accumulate the results.
- */
-void kgsl_pwrscale_update_stats(struct kgsl_device *device)
-{
-	BUG_ON(!mutex_is_locked(&device->mutex));
-
-	if (!device->pwrscale.enabled)
-		return;
-
-	if (device->state == KGSL_STATE_ACTIVE) {
-		struct kgsl_power_stats stats;
-		device->ftbl->power_stats(device, &stats);
-		device->pwrscale.accum_stats.busy_time += stats.busy_time;
-		device->pwrscale.accum_stats.ram_time += stats.ram_time;
-		device->pwrscale.accum_stats.ram_wait += stats.ram_wait;
-	}
-}
-EXPORT_SYMBOL(kgsl_pwrscale_update_stats);
-
-/**
- * kgsl_pwrscale_update() - update device busy statistics
- * @device: The device
- *
- * If enough time has passed schedule the next call to devfreq
- * get_dev_status.
+ * Read hardware busy counters when the device is likely to be
+ * on and accumulate the results between devfreq get_dev_status
+ * calls. This is limits the need to turn on clocks to read these
+ * values for governors that run independently of hardware
+ * activity (for example, by time based polling).
  */
 void kgsl_pwrscale_update(struct kgsl_device *device)
 {
+	struct kgsl_power_stats stats;
 	BUG_ON(!mutex_is_locked(&device->mutex));
 
 	if (!device->pwrscale.enabled)
@@ -135,6 +116,13 @@ void kgsl_pwrscale_update(struct kgsl_device *device)
 
 	device->pwrscale.next_governor_call = jiffies
 			+ msecs_to_jiffies(KGSL_GOVERNOR_CALL_INTERVAL);
+
+	if (device->state == KGSL_STATE_ACTIVE) {
+		device->ftbl->power_stats(device, &stats);
+		device->pwrscale.accum_stats.busy_time += stats.busy_time;
+		device->pwrscale.accum_stats.ram_time += stats.ram_time;
+		device->pwrscale.accum_stats.ram_wait += stats.ram_wait;
+	}
 
 	/* to call srcu_notifier_call_chain() from a kernel thread */
 	if (device->requested_state != KGSL_STATE_SLUMBER)
@@ -195,7 +183,6 @@ int kgsl_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 {
 	struct kgsl_device *device = dev_get_drvdata(dev);
 	struct kgsl_pwrctrl *pwr;
-	struct kgsl_pwrlevel *pwr_level;
 	int level, i, b;
 	unsigned long cur_freq;
 
@@ -219,7 +206,6 @@ int kgsl_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 	mutex_lock(&device->mutex);
 	cur_freq = kgsl_pwrctrl_active_freq(pwr);
 	level = pwr->active_pwrlevel;
-	pwr_level = &pwr->pwrlevels[level];
 
 	if (*freq != cur_freq) {
 		level = pwr->max_pwrlevel;
@@ -236,13 +222,13 @@ int kgsl_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 		 */
 		b = pwr->bus_mod;
 		if ((flags & DEVFREQ_FLAG_FAST_HINT) &&
-			((pwr_level->bus_freq + pwr->bus_mod)
-				< pwr_level->bus_max))
-			pwr->bus_mod++;
+			(pwr->bus_mod != FAST_BUS))
+			pwr->bus_mod = (pwr->bus_mod == SLOW_BUS) ?
+					0 : FAST_BUS;
 		else if ((flags & DEVFREQ_FLAG_SLOW_HINT) &&
-			((pwr_level->bus_freq + pwr->bus_mod)
-				> pwr_level->bus_min))
-			pwr->bus_mod--;
+			(pwr->bus_mod != SLOW_BUS))
+			pwr->bus_mod = (pwr->bus_mod == FAST_BUS) ?
+					0 : SLOW_BUS;
 		if (pwr->bus_mod != b)
 			kgsl_pwrctrl_buslevel_update(device, true);
 	}
@@ -295,12 +281,14 @@ int kgsl_devfreq_get_dev_status(struct device *dev,
 	pwrscale = &device->pwrscale;
 
 	mutex_lock(&device->mutex);
-	/*
-	 * If the GPU clock is on grab the latest power counter
-	 * values.  Otherwise the most recent ACTIVE values will
-	 * already be stored in accum_stats.
-	 */
-	kgsl_pwrscale_update_stats(device);
+	/* make sure we don't turn on clocks just to read stats */
+	if (device->state == KGSL_STATE_ACTIVE) {
+		struct kgsl_power_stats extra;
+		device->ftbl->power_stats(device, &extra);
+		device->pwrscale.accum_stats.busy_time += extra.busy_time;
+		device->pwrscale.accum_stats.ram_time += extra.ram_time;
+		device->pwrscale.accum_stats.ram_wait += extra.ram_wait;
+	}
 
 	tmp = ktime_to_us(ktime_get());
 	stat->total_time = tmp - pwrscale->time;
@@ -359,8 +347,7 @@ EXPORT_SYMBOL(kgsl_devfreq_get_cur_freq);
  * Add a notifier to recieve ADRENO_DEVFREQ_NOTIFY_* events
  * from the device.
  */
-int kgsl_devfreq_add_notifier(struct device *dev,
-		struct notifier_block *nb)
+int kgsl_devfreq_add_notifier(struct device *dev, struct notifier_block *nb)
 {
 	struct kgsl_device *device = dev_get_drvdata(dev);
 
@@ -372,7 +359,14 @@ int kgsl_devfreq_add_notifier(struct device *dev,
 
 	return srcu_notifier_chain_register(&device->pwrscale.nh, nb);
 }
-EXPORT_SYMBOL(kgsl_devfreq_add_notifier);
+
+void kgsl_pwrscale_idle(struct kgsl_device *device)
+{
+	BUG_ON(!mutex_is_locked(&device->mutex));
+	queue_work(device->pwrscale.devfreq_wq,
+		&device->pwrscale.devfreq_notify_ws);
+}
+EXPORT_SYMBOL(kgsl_pwrscale_idle);
 
 /*
  * kgsl_devfreq_del_notifier - remove a fine grained notifier.

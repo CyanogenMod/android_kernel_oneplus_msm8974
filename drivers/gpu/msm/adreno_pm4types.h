@@ -96,11 +96,6 @@
 /* initiate fetch of bin IDs and draw using supplied indices */
 #define CP_DRAW_INDX_2_BIN	0x35
 
-/* New draw packets defined for A4XX */
-#define CP_DRAW_INDX_OFFSET	0x38
-#define CP_DRAW_INDIRECT	0x28
-#define CP_DRAW_INDX_INDIRECT	0x29
-#define CP_DRAW_AUTO		0x24
 
 /* begin/end initiator for viz query extent processing */
 #define CP_VIZ_QUERY		0x23
@@ -185,9 +180,6 @@
 #define CP_INDIRECT_BUFFER_PFE 0x3F
 
 #define CP_EXEC_CL 0x31
-
-/* (A4x) save PM4 stream pointers to execute upon a visible draw */
-#define CP_SET_DRAW_STATE 0x43
 
 #define CP_LOADSTATE_DSTOFFSET_SHIFT 0x00000000
 #define CP_LOADSTATE_STATESRC_SHIFT 0x00000010

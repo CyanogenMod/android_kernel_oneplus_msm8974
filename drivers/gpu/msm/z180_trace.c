@@ -12,8 +12,9 @@
  */
 
 #include "kgsl.h"
-#include "kgsl_device.h"
+#include "z180.h"
+#include "z180_reg.h"
 
 /* Instantiate tracepoints */
 #define CREATE_TRACE_POINTS
-#include "kgsl_trace.h"
+#include "z180_trace.h"
