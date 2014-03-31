@@ -62,20 +62,36 @@ static inline u32 left_lm_w_from_mfd(struct msm_fb_data_type *mfd)
 	return ctl->mixer_left->width;
 }
 
+static struct mdss_mdp_pipe *__overlay_find_pipe(
+		struct msm_fb_data_type *mfd, u32 ndx)
+{
+	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
+	struct mdss_mdp_pipe *tmp, *pipe = NULL;
+
+	mutex_lock(&mdp5_data->list_lock);
+	list_for_each_entry(tmp, &mdp5_data->pipes_used, list) {
+		if (tmp->ndx == ndx) {
+			pipe = tmp;
+			break;
+		}
+	}
+	mutex_unlock(&mdp5_data->list_lock);
+
+	return pipe;
+}
+
 static int mdss_mdp_overlay_get(struct msm_fb_data_type *mfd,
 				struct mdp_overlay *req)
 {
 	struct mdss_mdp_pipe *pipe;
-	struct mdss_data_type *mdata = mfd_to_mdata(mfd);
 
-	pipe = mdss_mdp_pipe_get(mdata, req->id);
-	if (IS_ERR_OR_NULL(pipe)) {
+	pipe = __overlay_find_pipe(mfd, req->id);
+	if (!pipe) {
 		pr_err("invalid pipe ndx=%x\n", req->id);
 		return pipe ? PTR_ERR(pipe) : -ENODEV;
 	}
 
 	*req = pipe->req_data;
-	mdss_mdp_pipe_unmap(pipe);
 
 	return 0;
 }
@@ -580,10 +596,17 @@ int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 		pipe->pid = current->tgid;
 		pipe->play_cnt = 0;
 	} else {
-		pipe = mdss_mdp_pipe_get(mdp5_data->mdata, req->id);
-		if (IS_ERR_OR_NULL(pipe)) {
+		pipe = __overlay_find_pipe(mfd, req->id);
+		if (!pipe) {
 			pr_err("invalid pipe ndx=%x\n", req->id);
-			return pipe ? PTR_ERR(pipe) : -ENODEV;
+			return -ENODEV;
+		}
+
+		ret = mdss_mdp_pipe_map(pipe);
+		if (IS_ERR_VALUE(ret)) {
+			pr_err("Unable to map used pipe%d ndx=%x\n",
+					pipe->num, pipe->ndx);
+			return ret;
 		}
 
 		if (pipe->mixer != mixer) {
@@ -1690,10 +1713,17 @@ static int mdss_mdp_overlay_queue(struct msm_fb_data_type *mfd,
 	int ret;
 	u32 flags;
 
-	pipe = mdss_mdp_pipe_get(mdata, req->id);
-	if (IS_ERR_OR_NULL(pipe)) {
+	pipe = __overlay_find_pipe(mfd, req->id);
+	if (!pipe) {
 		pr_err("pipe ndx=%x doesn't exist\n", req->id);
-		return pipe ? PTR_ERR(pipe) : -ENODEV;
+		return -ENODEV;
+	}
+
+	ret = mdss_mdp_pipe_map(pipe);
+	if (IS_ERR_VALUE(ret)) {
+		pr_err("Unable to map used pipe%d ndx=%x\n",
+				pipe->num, pipe->ndx);
+		return ret;
 	}
 
 	if (pipe->dirty) {
