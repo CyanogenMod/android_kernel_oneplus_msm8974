@@ -2277,7 +2277,7 @@ static DEVICE_ATTR(lut_flags, 0664, NULL, lut_flags_store);
 static DEVICE_ATTR(duty_pcts, 0664, NULL, duty_pcts_store);
 static DEVICE_ATTR(blink, 0664, NULL, blink_store);
 #ifdef CONFIG_MACH_OPPO
-static DEVICE_ATTR(flash_blink, 0666, NULL, led_flash_blink_store);
+static DEVICE_ATTR(flash_blink, 0664, NULL, led_flash_blink_store);
 #endif
 
 static struct attribute *led_attrs[] = {
