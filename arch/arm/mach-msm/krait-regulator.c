@@ -194,6 +194,9 @@ struct pmic_gang_vreg {
 	int			pfm_threshold;
 	bool			force_auto_mode;
 	int			efuse_phase_scaling_factor;
+	bool			auto_mode;
+	int			max_cores_auto_mode;
+	int			max_load_auto_mode;
 };
 
 static struct pmic_gang_vreg *the_gang;
@@ -523,19 +526,29 @@ static unsigned int pmic_gang_set_phases(struct krait_power_vreg *from,
 	if (phase_count > n_online)
 		phase_count = n_online;
 
-	if (phase_count != pvreg->pmic_phase_count) {
-		if (pvreg->force_auto_mode && phase_count > 1) {
-			/* Disable Auto Mode prior to setting phase count > 1 */
-			rc = msm_spm_enable_fts_lpm(PMIC_FTS_MODE_PWM);
-			if (rc) {
-				dev_err(&from->rdev->dev,
-					"failed to force PWM, rc=%d\n", rc);
-				return rc;
-			}
-			/* complete the writes before switching phases */
-			mb();
-		}
+	/* Check if we have to exit auto mode */
+	if (pvreg->force_auto_mode && krait_pmic_is_ready()
+		&& pvreg->auto_mode
+		&& (phase_count > 1
+			|| n_online > pvreg->max_cores_auto_mode
+			|| load_total > pvreg->max_load_auto_mode)) {
 
+		/* Disable Auto Mode prior to setting phase count > 1 */
+		rc = msm_spm_enable_fts_lpm(PMIC_FTS_MODE_PWM);
+		if (rc) {
+			dev_err(&from->rdev->dev,
+				"failed to force PWM, rc=%d\n", rc);
+			return rc;
+		}
+		pvreg->auto_mode = false;
+		/* complete the writes before configuring pmic */
+		mb();
+		krait_pmic_post_pwm_entry();
+		/* complete the writes before switching phases */
+		mb();
+	}
+
+	if (phase_count != pvreg->pmic_phase_count) {
 		rc = set_pmic_gang_phases(pvreg, phase_count);
 		if (rc < 0) {
 			pr_err("%s failed set phase %d rc = %d\n",
@@ -553,18 +566,27 @@ static unsigned int pmic_gang_set_phases(struct krait_power_vreg *from,
 		if (phase_count > pvreg->pmic_phase_count)
 			udelay(PHASE_SETTLING_TIME_US);
 
-		if (pvreg->force_auto_mode && phase_count == 1) {
-			/* Enable Auto Mode after setting phase count = 1 */
-			rc = msm_spm_enable_fts_lpm(PMIC_FTS_MODE_AUTO);
-			if (rc) {
-				dev_err(&from->rdev->dev,
-					"failed to force AUTO, rc=%d\n", rc);
-				return rc;
-			}
-			/* complete the writes before any other access */
-			mb();
-		}
 		pvreg->pmic_phase_count = phase_count;
+	}
+
+	if (pvreg->force_auto_mode && krait_pmic_is_ready()
+		&& !pvreg->auto_mode
+		&& phase_count == 1
+		&& n_online <= pvreg->max_cores_auto_mode
+		&& load_total <= pvreg->max_load_auto_mode) {
+
+
+		krait_pmic_post_pfm_entry();
+		/* Enable Auto Mode after setting phase count = 1 */
+		rc = msm_spm_enable_fts_lpm(PMIC_FTS_MODE_AUTO);
+		if (rc) {
+			dev_err(&from->rdev->dev,
+				"failed to force AUTO, rc=%d\n", rc);
+			return rc;
+		}
+		pvreg->auto_mode = true;
+		/* complete the writes before any other access */
+		mb();
 	}
 
 	return rc;
@@ -1565,6 +1587,7 @@ static int __devinit krait_pdn_probe(struct platform_device *pdev)
 	struct pmic_gang_vreg *pvreg;
 	struct resource *res;
 	bool force_auto_mode;
+	int max_cores_auto_mode, max_load_auto_mode;
 
 	if (!dev->of_node) {
 		dev_err(dev, "device tree information missing\n");
@@ -1585,6 +1608,16 @@ static int __devinit krait_pdn_probe(struct platform_device *pdev)
 			return -EINVAL;
 		}
 	}
+
+	rc = of_property_read_u32(pdev->dev.of_node, "qcom,max-cores-auto-mode",
+			&max_cores_auto_mode);
+	if (rc < 0)
+		max_cores_auto_mode = INT_MAX;
+
+	rc = of_property_read_u32(pdev->dev.of_node, "qcom,max-load-auto-mode",
+			&max_load_auto_mode);
+	if (rc < 0)
+		max_load_auto_mode = INT_MAX;
 
 	pvreg = devm_kzalloc(&pdev->dev,
 			sizeof(struct pmic_gang_vreg), GFP_KERNEL);
@@ -1617,6 +1650,8 @@ static int __devinit krait_pdn_probe(struct platform_device *pdev)
 	pvreg->use_phase_switching = use_phase_switching;
 	pvreg->pfm_threshold = pfm_threshold;
 	pvreg->force_auto_mode = force_auto_mode;
+	pvreg->max_cores_auto_mode = max_cores_auto_mode;
+	pvreg->max_load_auto_mode = max_load_auto_mode;
 
 	mutex_init(&pvreg->krait_power_vregs_lock);
 	INIT_LIST_HEAD(&pvreg->krait_power_vregs);

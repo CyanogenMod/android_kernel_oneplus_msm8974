@@ -38,6 +38,13 @@ Optional properties:
 				qcom,pfm-threshold must be specified.
 - qcom,pfm-threshold		The power coeff threshold in abstract power units below which
 				pmic will be made to operate in PFM mode.
+- qcom,max-cores-auto-mode	The max numbers of cores online for entering auto mode. Use this to restrict
+				when auto mode is enabled. If not specified INT_MAX is assumed which
+				means auto mode entry may be allowed with any number of cores online.
+- qcom,max-load-auto-mode	The power coeff threshold in abstract units above which auto mode is not
+				allowed. Use this to restrict auto mode based on how fast cpus are runnings.
+				If not specified INT_MAX is assumed which means auto mode may be allowed
+				regardless of cpu's speed.
 
 [Second Level Nodes]
 Required properties:
