@@ -6151,6 +6151,12 @@ static irqreturn_t taiko_slimbus_irq(int irq, void *data)
 					 */
 				}
 			}
+			if (tx && port_id == TAIKO_MAD_SLIMBUS_TX_PORT) {
+				/* MAD is expected to hold the port open */
+				pr_debug("%s: MAD holding port %d open",
+						__func__, TAIKO_MAD_SLIMBUS_TX_PORT);
+				continue;
+			}
 			WARN(!cleared,
 			     "Couldn't find slimbus %s port %d for closing\n",
 			     (tx ? "TX" : "RX"), port_id);
