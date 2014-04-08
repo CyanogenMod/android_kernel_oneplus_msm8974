@@ -1126,10 +1126,12 @@ static void fastcg_work_func(struct work_struct *work)
 		ret_info = 0x2;
 	} else if(data == 0x59){
 		//usb bad connected,stop fastchg
+#if 0  //lfc modify for it(set fast_switch_to_normal ture) is earlier than usb_plugged_out irq(set it false)
 		bq27541_di->alow_reading = true;
 		bq27541_di->fast_chg_started = false;
 		bq27541_di->fast_chg_allow = false;
 		bq27541_di->fast_switch_to_normal = true;
+#endif
 		//switch off fast chg
 		pr_info("%s usb bad connect,switch off fastchg\n", __func__);
 		gpio_set_value(96, 0);
@@ -1194,9 +1196,9 @@ out:
 	gpio_tlmm_config(GPIO_CFG(1,0,GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
 	gpio_direction_input(1);
 	
-	//lfc add for it is faster than usb_plugged_out irq to send 0x5a(fast_chg full) to AP
-	if(data == 0x5a){
-		usleep_range(120000,120000);
+	//lfc add for it is faster than usb_plugged_out irq to send 0x5a(fast_chg full and usb bad connected) to AP
+	if(data == 0x5a || data == 0x59){
+		usleep_range(180000,180000);
 		bq27541_di->fast_switch_to_normal = true;
 		bq27541_di->alow_reading = true;
 		bq27541_di->fast_chg_started = false;
@@ -1204,7 +1206,7 @@ out:
 	}
 	//fastchg temp over( > 45 or < 20)
 	if(data == 0x5c){
-		usleep_range(120000,120000);
+		usleep_range(180000,180000);
 		bq27541_di->fast_normal_to_warm = true;
 		bq27541_di->alow_reading = true;
 		bq27541_di->fast_chg_started = false;

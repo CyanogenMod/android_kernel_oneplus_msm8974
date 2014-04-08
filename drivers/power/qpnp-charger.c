@@ -4682,7 +4682,7 @@ qpnp_eoc_work(struct work_struct *work)
 			if (count == CONSECUTIVE_COUNT_POSITIVE) {
 				if (qpnp_ext_charger && qpnp_ext_charger->chg_get_system_status)
 					bat_status = qpnp_ext_charger->chg_get_system_status();
-				if((bat_status & 0x30) == 0x30) {
+				if(((bat_status & 0x30) == 0x30) && (vbat_mv > max_comp_volt + 50)) {
 					pr_info("End of Charging when ibat>=0\n");
 					chip->delta_vddmax_mv = 0;
 					qpnp_chg_set_appropriate_vddmax(chip);
@@ -4693,6 +4693,8 @@ qpnp_eoc_work(struct work_struct *work)
 					qpnp_chg_enable_irq(&chip->chg_vbatdet_lo);
 					count = 0;
 					goto stop_eoc;
+				} else {
+					count = 0;
 				}
 			} else {
 				count += 1;
@@ -6314,6 +6316,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 		if(chg_vol < SOFT_AICL_VOL) {
 			qpnp_chg_iusbmax_set(chip, 900);
 			chip->aicl_current = 900;
+			qpnp_chg_vinmin_set(chip, chip->min_voltage_mv + 280);///4.68V sjc0401 add for improving current noise (bq24196 hardware bug)
 			return 0;
 		}
 	}
@@ -6324,6 +6327,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 		if(chg_vol < SOFT_AICL_VOL) {
 			qpnp_chg_iusbmax_set(chip, 1500);
 			chip->aicl_current = 1500;
+			qpnp_chg_vinmin_set(chip, chip->min_voltage_mv + 280);///4.68V sjc0401 add for improving current noise (bq24196 hardware bug)
 			return 0;
 		}
 	}

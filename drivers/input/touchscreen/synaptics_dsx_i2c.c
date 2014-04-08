@@ -1031,8 +1031,13 @@ static void vk_calculate_area(void)  //added by liujun
 	printk("[syna]maxx=%d,maxy=%d,vkh=%d\n",syna_ts_data->sensor_max_x,syna_ts_data->sensor_max_y,syna_ts_data->virtual_key_height);
 
 	syna_ts_data->vk_prop_width = LCD_MULTI_RATIO(190);
-	syna_ts_data->vk_prop_center_y = LCD_MULTI_RATIO(1977);
-	syna_ts_data->vk_prop_height = LCD_MULTI_RATIO(114);
+	if (get_pcb_version() <= HW_VERSION__20) {
+		syna_ts_data->vk_prop_center_y = LCD_MULTI_RATIO(1974);
+		syna_ts_data->vk_prop_height = LCD_MULTI_RATIO(120);
+	} else {
+		syna_ts_data->vk_prop_center_y = 2626;
+		syna_ts_data->vk_prop_height = 152;
+	}
 
 	for (i = 0; i < TP_VKEY_COUNT; ++i) {
 		vkey_buttons[i].width = vk_width - margin_x*2;
@@ -1104,10 +1109,17 @@ static int synaptics_ts_init_virtual_key(struct synaptics_rmi4_data *ts )
 static int get_virtual_key_button(int x, int y)
 {
 	int i;
+	int lcdheight = LCD_MAX_Y;
+
+	if (get_pcb_version() > HW_VERSION__20)
+		lcdheight = LCD_MAX_Y_FIND7S;
+
+	if (y <= lcdheight)
+		return 0;
+
 	for (i = 0; i < TP_VKEY_NONE; ++i) {
 		struct tp_vkey_button* button = &vkey_buttons[i];
-		if ((x >= button->x) && (x <= button->x + button->width)
-				&& (y >= button->y) && (y <= button->y + button->height))
+		if ((x >= button->x) && (x <= button->x + button->width))
 			break;
 	}
 	return i;
@@ -1657,7 +1669,8 @@ static int synaptics_set_int_mask(struct synaptics_rmi4_data *ts, int enable)
 static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 {
 	int ret = 0;
-	int x, y, i;
+	int x, y, i, j;
+	uint8_t use_cbc = 0;
 	int16_t read_data;
 	uint8_t tmp_old = 0;
 	uint8_t tmp_old2 = 0;
@@ -1668,6 +1681,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 	uint rx2rx_lower_limit = 0;
 	uint rx2rx_upper_limit = 0;
 	const int16_t *raw_cap_data = NULL;
+	int16_t *cdata;
 	int16_t *Rxdata = NULL;
 	int error_count = 0;
 	static bool isbaseline = 0;
@@ -1709,6 +1723,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 		rx2rx_lower_limit = DiagonalLowerLimit_TPK;
 		rx2rx_upper_limit = DiagonalUpperLimit_TPK;
 		raw_cap_data = (const int16_t *)raw_cap_data_tpk;
+		use_cbc = 1;
 	} else if (syna_ts_data->vendor_id == TP_VENDOR_YOUNGFAST) {
 		tx_num = TX_NUM_YOUNGFAST;
 		rx_num = RX_NUM_YOUNGFAST;
@@ -1737,24 +1752,6 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 	//set report type
 	tmp_new = 0x03;//set report type 0x03
 	synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR,	&tmp_new,1);
-
-	// forbid CBC
-	tmp_new = 1;
-	synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR +20, &tmp_new,1);
-
-	synaptics_rmi4_i2c_read(syna_ts_data, F54_CTRL_BASE_ADDR+23, &tmp_old,1);
-	tmp_new = tmp_old & 0xef;
-	synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR +23, &tmp_new,1);
-
-	synaptics_rmi4_i2c_read(syna_ts_data, F54_CTRL_BASE_ADDR+25, &tmp_old2,1);
-	tmp_new = tmp_old2 & 0xdf;
-	print_ts(TS_DEBUG, "tmp_old =0x%x ,tmp_new = 0x%x\n", tmp_old2, tmp_new);
-	synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR +25, &tmp_new,1);
-
-	tmp_new = 0x04;
-	synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new,1); // force update
-	wait_test_cmd_finished();
-	print_ts(TS_DEBUG, "Forbid CBC oK\n");
 
 	// Forbid NoiseMitigation
 	tmp_new = 0x01;
@@ -1791,52 +1788,129 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 		}
 	}
 
-	for (x = 0; x < tx_num; x++) {
-		i = 0;
-		for (y = 0; y < rx_num; y++) {
-			ret = i2c_smbus_read_word_data(client,F54_DATA_BASE_ADDR+3);
-			read_data = ret & 0xffff;
+	cdata = (int16_t *)raw_cap_data ;
+	for (j = 0; j < 2; j++) {
+		if ((!use_cbc && !j) || (use_cbc && j)) {
+			tmp_new = 20 ;//set report type 0x20, for disable cbc
+			synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR, &tmp_new, 1);
 
-			print_ts(TS_DEBUG, "Raw[%d][%d] = %d,  ", x, y, read_data);
-			print_ts(TS_DEBUG, "range:[%d ~ %d], ", raw_cap_data[x*rx_num*2+i], raw_cap_data[x*rx_num*2+i+1]);
+			// forbid CBC
+			tmp_new = 1;
+			synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR+20, &tmp_new, 1);
+
+			synaptics_rmi4_i2c_read(syna_ts_data, F54_CTRL_BASE_ADDR+23, &tmp_old, 1);
+			tmp_new = tmp_old & 0xef;
+			synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR +23, &tmp_new, 1);
+
+			synaptics_rmi4_i2c_read(syna_ts_data, F54_CTRL_BASE_ADDR+25, &tmp_old2, 1);
+			tmp_new = tmp_old2 & 0xdf;
+			print_ts(TS_DEBUG, "tmp_old =0x%x ,tmp_new = 0x%x\n", tmp_old2, tmp_new);
+			synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR +25, &tmp_new, 1);
+
+			tmp_new = 0x04 ;
+			synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1); // force update
+			wait_test_cmd_finished();
+			print_ts(TS_DEBUG, "Forbid CBC oK\n");
+
+			// Forbid NoiseMitigation
+			tmp_new = 0x01 ;
+			synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR +7, &tmp_new, 1);
+			tmp_new = 0x04 ;
+			synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1); // force update
+			wait_test_cmd_finished();
+			print_ts(TS_DEBUG, "Forbid NoiseMitigation oK\n");
+			tmp_new = 0x02 ;
+			synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1); // force cal
+			wait_test_cmd_finished();
+			print_ts(TS_DEBUG, "Force Cal oK\n");
+
+			word_value = 0 ;//set fifo 00
+			synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR+1, (unsigned char*)&word_value, 2);
+			tmp_new = 0x01 ;
+			synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1);
+			wait_test_cmd_finished();
+
+		} else if (!use_cbc && j) {
+			break;
+		}
+
+		for (x = 0; x < tx_num; x++) {
+			i = 0;
+			for (y = 0; y < rx_num; y++) {
+				ret = i2c_smbus_read_word_data(client,F54_DATA_BASE_ADDR+3);
+				read_data = ret & 0xffff;
+
+				print_ts(TS_DEBUG, "Raw[%d][%d] = %d,  ", x, y, read_data);
+				print_ts(TS_DEBUG, "range:[%d ~ %d], ", cdata[0], cdata[1]);
+
+				if (fd >= 0) {
+					sprintf(data_buf, "%d,", read_data);
+					sys_write(fd, data_buf, strlen(data_buf));
+				}
+
+				if (read_data >= cdata[0] && read_data <= cdata[1]) {
+					print_ts(TS_DEBUG, "pass.\n");
+				} else {
+					print_ts(TS_DEBUG, "NOT in range!!\n");
+
+					if (error_count >= syna_test_max_err_count) {
+						if (!savefile) {
+							num_read_chars += sprintf(&(buf[num_read_chars]), "  == Reach max error count (%d), stop test.\n", syna_test_max_err_count);
+							goto END_TP_TEST;
+						}
+					} else {
+						num_read_chars += sprintf(&(buf[num_read_chars]), "%2d++ raw_cap[%02d][%02d]=%4d is not in range[%04d~%04d].\n",
+								++error_count,x,y,read_data,cdata[0],cdata[1]);
+					}
+				}
+				i += 2;
+				cdata += 2 ;
+			}
 
 			if (fd >= 0) {
-				sprintf(data_buf, "%d,", read_data);
-				sys_write(fd, data_buf, strlen(data_buf));
+				sys_write(fd, "\n", 1);
 			}
 
-			if (read_data >= raw_cap_data[x*rx_num*2+i] && read_data <= raw_cap_data[x*rx_num*2+i+1]) {
-				print_ts(TS_DEBUG, "pass.\n");
-			} else {
-				print_ts(TS_DEBUG, "NOT in range!!\n");
-
-				if (error_count >= syna_test_max_err_count) {
-					if (!savefile) {
-						num_read_chars += sprintf(&(buf[num_read_chars]), "  == Reach max error count (%d), stop test.\n", syna_test_max_err_count);
-						goto END_TP_TEST;
-					}
-				} else {
-					num_read_chars += sprintf(&(buf[num_read_chars]), "%2d++ raw_cap[%02d][%02d]=%4d is not in range[%04d~%04d].\n",
-							++error_count,x,y,read_data,raw_cap_data[x*rx_num*2+i],raw_cap_data[x*rx_num*2+i+1]);
-				}
-			}
-			i += 2;
+			print_ts(TS_DEBUG, "------------------------------\n");
 		}
 
-		if (fd >= 0) {
-			sys_write(fd, "\n", 1);
+		if ((!use_cbc && !j) || (use_cbc && j)) {
+			synaptics_rmi4_i2c_write(syna_ts_data,F54_CTRL_BASE_ADDR+23, (unsigned char*)&tmp_old, 1);
+			synaptics_rmi4_i2c_write(syna_ts_data,F54_CTRL_BASE_ADDR+25, (unsigned char*)&tmp_old2, 1);
+			tmp_new = 0;
+			synaptics_rmi4_i2c_write(syna_ts_data,F54_CTRL_BASE_ADDR+20, &tmp_new, 1);
+			tmp_new = 4;
+			synaptics_rmi4_i2c_write(syna_ts_data,F54_CMD_BASE_ADDR, (unsigned char*)&tmp_new, 1); // force update
+			wait_test_cmd_finished();
 		}
-
-		print_ts(TS_DEBUG, "------------------------------\n");
 	}
 
-	synaptics_rmi4_i2c_write(syna_ts_data,F54_CTRL_BASE_ADDR+23,	(unsigned char*)&tmp_old,1);
-	synaptics_rmi4_i2c_write(syna_ts_data,F54_CTRL_BASE_ADDR+25,	(unsigned char*)&tmp_old2,1);
+	print_ts(TS_DEBUG, "Step 2 : Check trx-to-trx  \n");
+	tmp_new = 26;
+	synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR, (unsigned char*)&tmp_new, 1); //select report type 0x05
+
 	tmp_new = 0;
-	synaptics_rmi4_i2c_write(syna_ts_data,F54_CTRL_BASE_ADDR+20, &tmp_new,1);
-	tmp_new = 4;
-	synaptics_rmi4_i2c_write(syna_ts_data,F54_CMD_BASE_ADDR,	(unsigned char*)&tmp_new,1); // force update
+	data_buf[0] = 0;
+	data_buf[1] = 0;
+	synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR+1, (unsigned char*)data_buf, 2);
+	tmp_new = 1;
+	synaptics_rmi4_i2c_write(syna_ts_data,F54_CMD_BASE_ADDR, (unsigned char*)&tmp_new, 1); //get report
 	wait_test_cmd_finished();
+	x = 0;
+	y = synaptics_rmi4_i2c_read(syna_ts_data, F54_DATA_BASE_ADDR+3, data_buf, 7) ;
+	for (i = 0; i < 7 && y >= 0; i++) {
+		if (data_buf[i]) {
+			print_ts(TS_DEBUG, "Not in range!! value=0x%x\n", data_buf[i]);
+			x++;
+			error_count++;
+		} else {
+			print_ts(TS_DEBUG, "pass.\n");
+		}
+	}
+	if (x > 0) {
+		num_read_chars += sprintf(&(buf[num_read_chars]), " TRx To TRx Short Test Failed[%d]!\n",x);
+		//goto END_TP_TEST;
+	}
 
 	//step 5:reset touchpanel and reconfig the device
 END_TP_TEST:
@@ -2287,9 +2361,9 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				if (!atomic_read(&rmi4_data->keypad_enable)) {
 					continue;
 				}
-				if (get_virtual_key_button(x, y) == TP_VKEY_NONE) {
-					continue;
-				}
+			}
+			if (get_virtual_key_button(x, y) == TP_VKEY_NONE) {
+				continue;
 			}
 
 			if ((y > SYNA_SMARTCOVER_MAN || y < SYNA_SMARTCOVER_MIN) && rmi4_data->smartcover_enable) {

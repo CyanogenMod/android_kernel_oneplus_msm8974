@@ -27,7 +27,7 @@
 &slim_msm {
 	taiko_codec {
 		cdc-vdd-spkdrv-supply = <&pm8941_boost>;
-		qcom,cdc-vdd-spkdrv-voltage = <5000000 5000000>;
+		qcom,cdc-vdd-spkdrv-voltage = <4500000 4500000>;
 		qcom,cdc-vdd-spkdrv-current = <1250000>;
 		qcom,cdc-on-demand-supplies = "cdc-vdd-spkdrv";
 	};
@@ -61,4 +61,9 @@
 	qcom,bam-consumer-pipe-index;
 	qcom,bam-producer-pipe-index;
 	qcom,master-id;
+};
+
+&pm8941_boost {
+	regulator-min-microvolt = <4500000>;
+	regulator-max-microvolt = <4500000>;
 };
