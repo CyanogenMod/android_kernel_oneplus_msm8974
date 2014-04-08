@@ -294,6 +294,9 @@ static bool use_fake_temp = false;
 static int fake_temp = 300;
 static bool use_fake_chgvol = false;
 static int fake_chgvol = 0;
+#ifdef CONFIG_MACH_FIND7OP
+static atomic_t allow_fastchg;
+#endif
 
 #ifdef CONFIG_BATTERY_BQ27541
 static struct qpnp_battery_gauge *qpnp_batt_gauge = NULL;
@@ -1195,6 +1198,29 @@ qpnp_chg_usb_suspend_enable(struct qpnp_chg_chip *chip, int enable)
 #ifdef CONFIG_BQ24196_CHARGER
 static int
 qpnp_chg_charge_en(struct qpnp_chg_chip *chip, int enable)
+{
+	if (get_boot_mode() != MSM_BOOT_MODE__NORMAL)
+		return -EINVAL;
+
+	if (qpnp_ext_charger && qpnp_ext_charger->chg_charge_en) {
+		return qpnp_ext_charger->chg_charge_en(enable);
+	} else {
+		pr_err("qpnp-charger no externel charger\n");
+		return -ENODEV;
+	}
+}
+
+int qpnp_chg_get_charge_en(void)
+{
+	if (qpnp_ext_charger && qpnp_ext_charger->chg_get_charge_en) {
+		return qpnp_ext_charger->chg_get_charge_en();
+	} else {
+		pr_err("qpnp-charger no externel charger\n");
+		return -ENODEV;
+	}
+}
+
+int qpnp_chg_ext_charge_en(int enable)
 {
 	if (get_boot_mode() != MSM_BOOT_MODE__NORMAL)
 		return -EINVAL;
@@ -2625,6 +2651,9 @@ get_prop_batt_health(struct qpnp_chg_chip *chip)
 	} else if (qpnp_battery_status_get(chip) == BATTERY_STATUS_BAD) {
 		return POWER_SUPPLY_HEALTH_DEAD;
 	} else if (chip->charger_status == CHARGER_STATUS_OVER) {
+		if (get_prop_fast_chg_started(chip) == true) {
+			return POWER_SUPPLY_HEALTH_GOOD;
+		}
 		return POWER_SUPPLY_HEALTH_OVERVOLTAGE;
 	} else {
 		return POWER_SUPPLY_HEALTH_GOOD;
@@ -2759,6 +2788,13 @@ get_prop_batt_status(struct qpnp_chg_chip *chip)
 	} else if ((status & 0x30) == 0x30) {
 		return POWER_SUPPLY_STATUS_CHARGING;
 	} else {
+		if (get_prop_fast_switch_to_normal(chip) == true) {
+			if (chip->time_out != true &&
+					(get_prop_batt_health(chip) == POWER_SUPPLY_HEALTH_GOOD ||
+					 get_prop_batt_health(chip) == POWER_SUPPLY_HEALTH_OVERVOLTAGE)) {
+				return POWER_SUPPLY_STATUS_CHARGING;
+			}
+		}
 		return POWER_SUPPLY_STATUS_DISCHARGING;
 	}
 }
@@ -3076,7 +3112,9 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 #endif
 					}
 				} else {
-					qpnp_start_charging(chip);
+					if (get_prop_fast_chg_started(chip) == false) {
+						qpnp_start_charging(chip);
+					}
 				}
 #ifndef CONFIG_BQ24196_CHARGER
 				if ((chip->flags & POWER_STAGE_WA)
@@ -3626,6 +3664,10 @@ static void qpnp_chg_ext_charger_hwinit(struct qpnp_chg_chip *chip)
 	qpnp_chg_ext_charger_reset(chip, 0); //reset bq24196 regs to default
 	qpnp_chg_ext_charger_wdt_set(chip, 0); //disable wdt
 
+#ifdef CONFIG_MACH_OPPO
+	qpnp_chg_charge_en(chip, 0);
+	qpnp_chg_vddmax_set(chip, chip->max_voltage_mv);
+#endif
 	qpnp_chg_vinmin_set(chip, chip->min_voltage_mv);
 	qpnp_chg_ibatterm_set(chip, chip->term_current);
 	qpnp_chg_tchg_max_set(chip, chip->tchg_mins);
@@ -6412,6 +6454,12 @@ bool is_alow_fast_chg(struct qpnp_chg_chip *chip)
 	int temp = 0;
 	int cap = 0;
 	int chg_type = 0;
+
+#ifdef CONFIG_MACH_FIND7OP
+	if(atomic_read(&allow_fastchg) == 0) {
+		return false;
+	}
+#endif
 	
 	auth = get_prop_authenticate(chip);
 	temp = get_prop_batt_temp(chip);
@@ -6581,6 +6629,10 @@ static void qpnp_charge_info_init(struct qpnp_chg_chip *chip)
 	chip->charger_status = CHARGER_STATUS_GOOD;
 	/* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
 	chip->aicl_current = 0;
+/* jingchun.wang@Onlinerd.Driver, 2014/03/27  Add for fast charger control of 1+ */
+#ifdef CONFIG_MACH_FIND7OP
+	atomic_set(&allow_fastchg, 0);
+#endif
 }
 
 static ssize_t test_temp_store(struct device *dev,

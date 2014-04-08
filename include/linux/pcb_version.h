@@ -36,6 +36,8 @@ enum {
 	RF_VERSION__44 = 19,	//
 	RF_VERSION__66 = 30,
 	RF_VERSION__67,
+	RF_VERSION__76,
+	RF_VERSION__77,
 };
 
 int get_pcb_version(void);
