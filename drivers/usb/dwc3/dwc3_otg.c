@@ -875,6 +875,11 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					dev_dbg(phy->dev, "chg_det started\n");
 #ifdef CONFIG_MACH_OPPO
 					cancel_delayed_work_sync(&dotg->detect_work);
+					if (charger)
+						charger->start_detection(dotg->charger, false);
+					dotg->charger_retry_count = 0;
+					dwc3_otg_set_power(phy, 0);
+
 					queue_delayed_work(system_nrt_wq,
 							&dotg->detect_work,
 							msecs_to_jiffies(600));
