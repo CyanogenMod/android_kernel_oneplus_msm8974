@@ -850,7 +850,7 @@ void mdss_mdp_handoff_cleanup_pipes(struct msm_fb_data_type *mfd,
 		if (pipe->is_handed_off) {
 			pr_debug("Unmapping handed off pipe %d\n", pipe->num);
 			list_add(&pipe->list, &mdp5_data->pipes_cleanup);
-			mdss_mdp_mixer_pipe_unstage(pipe, pipe->mixer);
+			mdss_mdp_mixer_pipe_unstage(pipe);
 			pipe->is_handed_off = false;
 		}
 	}
@@ -1140,7 +1140,7 @@ int mdss_mdp_overlay_release(struct msm_fb_data_type *mfd, int ndx)
 				continue;
 			}
 
-			unset_ndx |= ndx;
+			unset_ndx |= pipe->ndx;
 
 			pipe->pid = 0;
 			destroy_pipe = pipe->play_cnt == 0;
