@@ -74,7 +74,7 @@ struct pn544_dev
 /*OPPO yuyi 2013-10-24 add begin for nfc_devinfo*/
 struct manufacture_info mainboard_info;
 struct manufacture_info nfc_info = {
-	.version = "pn65o",
+	.version = "pn65T",
 	.manufacture = "NXP",
 };
 
@@ -95,6 +95,22 @@ static void mainboard_verify(void)
 			break;
 		case HW_VERSION__13:
 			mainboard_info.version = "13";
+			mainboard_info.manufacture = "SD";
+			break;
+		case HW_VERSION__20:
+			mainboard_info.version ="20";
+			mainboard_info.manufacture = "SA";
+			break;
+		case HW_VERSION__21:
+			mainboard_info.version = "21";
+			mainboard_info.manufacture = "SB";
+			break;
+		case HW_VERSION__22:
+			mainboard_info.version = "22";
+			mainboard_info.manufacture = "SC";
+			break;
+		case HW_VERSION__23:
+			mainboard_info.version = "23";
 			mainboard_info.manufacture = "SD";
 			break;
 		default:

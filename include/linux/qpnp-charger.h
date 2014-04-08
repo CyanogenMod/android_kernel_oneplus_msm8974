@@ -48,6 +48,7 @@ struct qpnp_external_charger {
 	int (*chg_charge_en) (int enable);
 	int (*check_charge_timeout) (int hours);
 	int (*chg_get_system_status) (void);
+	int (*chg_get_charge_en) (void);
 	int (*chg_usb_suspend_enable) (int enable);
 	int (*chg_otg_current_set) (int mA);
 	int (*chg_wdt_set) (int seconds);
