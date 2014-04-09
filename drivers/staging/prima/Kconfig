@@ -49,4 +49,8 @@ config CONFIG_ENABLE_LINUX_REG
 	bool "Enable linux regulatory feature"
 	default n
 
+config QCOM_TDLS
+    bool "Enable TDLS feature"
+    default n
+
 endif # PRIMA_WLAN || PRONTO_WLAN
