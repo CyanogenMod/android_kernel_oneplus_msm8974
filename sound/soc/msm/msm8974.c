@@ -396,17 +396,11 @@ static void msm8974_oppo_ext_spk_power_amp_enable(bool enable)
 
 		gpio_set_value(yda145_boost_gpio, 1);
 		usleep_range(15000, 25000);
-#ifdef CONFIG_MACH_FIND7OP
 		gpio_set_value(yda145_ctr_gpio, 1);
-		usleep_range(15000, 25000);
-		gpio_set_value(yda145_ctr_gpio, 0);
-#else
-		gpio_set_value(yda145_ctr_gpio, 1);
-#endif
 	} else {
-		gpio_set_value(yda145_ctr_gpio, 0);
-		usleep_range(15000, 25000);
 		gpio_set_value(yda145_boost_gpio, 0);
+		usleep_range(15000, 25000);
+		gpio_set_value(yda145_ctr_gpio, 0);
 
 		gpio_set_value(oppo_enable_spk_gpio, 0);
 	}
