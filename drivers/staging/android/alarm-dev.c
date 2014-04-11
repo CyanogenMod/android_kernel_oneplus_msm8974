@@ -47,6 +47,7 @@ module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 static int alarm_opened;
 static DEFINE_SPINLOCK(alarm_slock);
+static DEFINE_MUTEX(alarm_mutex);
 static struct wakeup_source alarm_wake_lock;
 static DECLARE_WAIT_QUEUE_HEAD(alarm_wait_queue);
 static uint32_t alarm_pending;
@@ -106,6 +107,7 @@ static void alarm_clear(enum android_alarm_type alarm_type, struct timespec *ts)
 	uint32_t alarm_type_mask = 1U << alarm_type;
 	unsigned long flags;
 
+	mutex_lock(&alarm_mutex);
 	spin_lock_irqsave(&alarm_slock, flags);
 	alarm_dbg(IO, "alarm %d clear\n", alarm_type);
 	devalarm_try_to_cancel(&alarms[alarm_type]);
@@ -119,6 +121,7 @@ static void alarm_clear(enum android_alarm_type alarm_type, struct timespec *ts)
 
 	if (alarm_type == ANDROID_ALARM_RTC_POWEROFF_WAKEUP)
 		set_power_on_alarm(ts->tv_sec, 0);
+	mutex_unlock(&alarm_mutex);
 }
 
 static void alarm_set(enum android_alarm_type alarm_type,
@@ -127,6 +130,7 @@ static void alarm_set(enum android_alarm_type alarm_type,
 	uint32_t alarm_type_mask = 1U << alarm_type;
 	unsigned long flags;
 
+	mutex_lock(&alarm_mutex);
 	spin_lock_irqsave(&alarm_slock, flags);
 	alarm_dbg(IO, "alarm %d set %ld.%09ld\n",
 			alarm_type, ts->tv_sec, ts->tv_nsec);
@@ -136,6 +140,7 @@ static void alarm_set(enum android_alarm_type alarm_type,
 
 	if (alarm_type == ANDROID_ALARM_RTC_POWEROFF_WAKEUP)
 		set_power_on_alarm(ts->tv_sec, 1);
+	mutex_unlock(&alarm_mutex);
 }
 
 static int alarm_wait(void)
