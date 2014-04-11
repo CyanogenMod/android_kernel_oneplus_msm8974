@@ -20,6 +20,7 @@
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/regmap.h>
+#include <linux/async.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/compress_driver.h>
@@ -796,6 +797,14 @@ struct snd_soc_platform {
 #endif
 };
 
+enum snd_soc_async_ops {
+	ASYNC_DPCM_SND_SOC_OPEN = 1 << 0,
+	ASYNC_DPCM_SND_SOC_CLOSE = 1 << 1,
+	ASYNC_DPCM_SND_SOC_PREPARE = 1 << 2,
+	ASYNC_DPCM_SND_SOC_HW_PARAMS = 1 << 3,
+	ASYNC_DPCM_SND_SOC_FREE = 1 << 4,
+};
+
 struct snd_soc_dai_link {
 	/* config - must be set by machine driver */
 	const char *name;			/* Codec name */
@@ -839,6 +848,9 @@ struct snd_soc_dai_link {
 	/* machine stream operations */
 	struct snd_soc_ops *ops;
 	struct snd_soc_compr_ops *compr_ops;
+
+	/* this value determines what all ops can be started asynchronously */
+	enum snd_soc_async_ops async_ops;
 };
 
 struct snd_soc_codec_conf {
@@ -991,6 +1003,9 @@ struct snd_soc_pcm_runtime {
 	int fe_compr;
 
 	long pmdown_time;
+
+	/* err in case of ops failed */
+	int err_ops;
 
 	/* runtime devices */
 	struct snd_pcm *pcm;
