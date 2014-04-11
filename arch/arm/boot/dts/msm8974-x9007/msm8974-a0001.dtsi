@@ -11,6 +11,7 @@
  */
 
 /include/ "msm8974-x9007-common.dtsi"
+/include/ "msm8974-a0001-camera-sensor.dtsi"
 /include/ "msm8974-x9007-camera.dtsi"
 /include/ "msm8974-x9007-input.dtsi"
 /include/ "msm8974-x9007-usb.dtsi"
