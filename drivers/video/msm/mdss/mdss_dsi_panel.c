@@ -81,7 +81,7 @@ int mdss_dsi_panel_set_cabc(struct mdss_panel_data *pdata, int level)
 		return 0;
 	}
 
-	mdss_dsi_clk_ctrl(ctrl_pdata, 1);
+	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 1);
 
 	switch(level)
 	{
@@ -110,7 +110,7 @@ int mdss_dsi_panel_set_cabc(struct mdss_panel_data *pdata, int level)
 			ret = -1;
 			break;
 	}
-	mdss_dsi_clk_ctrl(ctrl_pdata, 0);
+	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 0);
 	mutex_unlock(&cabc_mutex);
 	return ret;
 
