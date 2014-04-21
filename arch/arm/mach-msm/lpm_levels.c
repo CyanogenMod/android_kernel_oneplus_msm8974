@@ -546,6 +546,11 @@ static noinline int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 			if (!dev->cpu && msm_rpm_waiting_for_ack())
 					break;
 
+		if ((MSM_PM_SLEEP_MODE_POWER_COLLAPSE == mode)
+				&& (num_online_cpus() > 1)
+				&& !sys_state.allow_synched_levels)
+			continue;
+
 		if ((next_wakeup_us >> 10) > pwr->time_overhead_us) {
 			power = pwr->ss_power;
 		} else {
