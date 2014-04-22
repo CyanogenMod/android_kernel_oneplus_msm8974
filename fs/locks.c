@@ -132,7 +132,7 @@
 #define IS_POSIX(fl)	(fl->fl_flags & FL_POSIX)
 #define IS_FLOCK(fl)	(fl->fl_flags & FL_FLOCK)
 #define IS_LEASE(fl)	(fl->fl_flags & FL_LEASE)
-#define IS_FILE_PVT(fl)	(fl->fl_flags & FL_FILE_PVT)
+#define IS_OFDLCK(fl)	(fl->fl_flags & FL_OFDLCK)
 
 static bool lease_breaking(struct file_lock *fl)
 {
@@ -1698,7 +1698,7 @@ EXPORT_SYMBOL_GPL(vfs_test_lock);
 
 static int posix_lock_to_flock(struct flock *flock, struct file_lock *fl)
 {
-	flock->l_pid = IS_FILE_PVT(fl) ? -1 : fl->fl_pid;
+	flock->l_pid = IS_OFDLCK(fl) ? -1 : fl->fl_pid;
 #if BITS_PER_LONG == 32
 	/*
 	 * Make sure we can represent the posix lock via
@@ -1720,7 +1720,7 @@ static int posix_lock_to_flock(struct flock *flock, struct file_lock *fl)
 #if BITS_PER_LONG == 32
 static void posix_lock_to_flock64(struct flock64 *flock, struct file_lock *fl)
 {
-	flock->l_pid = IS_FILE_PVT(fl) ? -1 : fl->fl_pid;
+	flock->l_pid = IS_OFDLCK(fl) ? -1 : fl->fl_pid;
 	flock->l_start = fl->fl_start;
 	flock->l_len = fl->fl_end == OFFSET_MAX ? 0 :
 		fl->fl_end - fl->fl_start + 1;
@@ -1751,7 +1751,7 @@ int fcntl_getlk(struct file *filp, unsigned int cmd, struct flock __user *l)
 
 	if (cmd == F_OFD_GETLK) {
 		cmd = F_GETLK;
-		file_lock.fl_flags |= FL_FILE_PVT;
+		file_lock.fl_flags |= FL_OFDLCK;
 		file_lock.fl_owner = (fl_owner_t)filp;
 	}
 
@@ -1877,17 +1877,17 @@ again:
 
 	/*
 	 * If the cmd is requesting file-private locks, then set the
-	 * FL_FILE_PVT flag and override the owner.
+	 * FL_OFDLCK flag and override the owner.
 	 */
 	switch (cmd) {
 	case F_OFD_SETLK:
 		cmd = F_SETLK;
-		file_lock->fl_flags |= FL_FILE_PVT;
+		file_lock->fl_flags |= FL_OFDLCK;
 		file_lock->fl_owner = (fl_owner_t)filp;
 		break;
 	case F_OFD_SETLKW:
 		cmd = F_SETLKW;
-		file_lock->fl_flags |= FL_FILE_PVT;
+		file_lock->fl_flags |= FL_OFDLCK;
 		file_lock->fl_owner = (fl_owner_t)filp;
 		/* Fallthrough */
 	case F_SETLKW:
@@ -1958,7 +1958,7 @@ int fcntl_getlk64(struct file *filp, unsigned int cmd, struct flock64 __user *l)
 
 	if (cmd == F_OFD_GETLK) {
 		cmd = F_GETLK64;
-		file_lock.fl_flags |= FL_FILE_PVT;
+		file_lock.fl_flags |= FL_OFDLCK;
 		file_lock.fl_owner = (fl_owner_t)filp;
 	}
 
@@ -2017,17 +2017,17 @@ again:
 
 	/*
 	 * If the cmd is requesting file-private locks, then set the
-	 * FL_FILE_PVT flag and override the owner.
+	 * FL_OFDLCK flag and override the owner.
 	 */
 	switch (cmd) {
 	case F_OFD_SETLK:
 		cmd = F_SETLK64;
-		file_lock->fl_flags |= FL_FILE_PVT;
+		file_lock->fl_flags |= FL_OFDLCK;
 		file_lock->fl_owner = (fl_owner_t)filp;
 		break;
 	case F_OFD_SETLKW:
 		cmd = F_SETLKW64;
-		file_lock->fl_flags |= FL_FILE_PVT;
+		file_lock->fl_flags |= FL_OFDLCK;
 		file_lock->fl_owner = (fl_owner_t)filp;
 		/* Fallthrough */
 	case F_SETLKW64:
@@ -2215,7 +2215,7 @@ static void lock_get_status(struct seq_file *f, struct file_lock *fl,
 	if (IS_POSIX(fl)) {
 		if (fl->fl_flags & FL_ACCESS)
 			seq_printf(f, "ACCESS");
-		else if (IS_FILE_PVT(fl))
+		else if (IS_OFDLCK(fl))
 			seq_printf(f, "FLPVT ");
 		else
 			seq_printf(f, "POSIX ");
