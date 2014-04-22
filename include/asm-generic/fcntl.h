@@ -140,9 +140,9 @@
  * automatically when the last reference to the the open file against which
  * they were acquired is put.
  */
-#define F_GETLKP	36
-#define F_SETLKP	37
-#define F_SETLKPW	38
+#define F_OFD_GETLK	36
+#define F_OFD_SETLK	37
+#define F_OFD_SETLKW	38
 
 #define F_OWNER_TID	0
 #define F_OWNER_PID	1
