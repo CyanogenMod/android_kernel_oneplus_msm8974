@@ -128,7 +128,7 @@ static bool io_is_busy;
 
 /*
  * If the max load among other CPUs is higher than up_threshold_any_cpu_load
- * and if the highest frequency among the other CPUs is higher than
+ * or if the highest frequency among the other CPUs is higher than
  * up_threshold_any_cpu_freq then do not let the frequency to drop below
  * sync_freq
  */
@@ -455,7 +455,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 				max_freq = max(max_freq, picpu->target_freq);
 			}
 
-			if (max_freq > up_threshold_any_cpu_freq &&
+			if (max_freq > up_threshold_any_cpu_freq ||
 				max_load >= up_threshold_any_cpu_load)
 				new_freq = sync_freq;
 		}
