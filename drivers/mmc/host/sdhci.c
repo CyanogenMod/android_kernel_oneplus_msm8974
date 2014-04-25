@@ -572,8 +572,6 @@ static int sdhci_pre_dma_transfer(struct sdhci_host *host,
 static int sdhci_adma_table_pre(struct sdhci_host *host,
 	struct mmc_data *data)
 {
-	int direction;
-
 	u8 *desc;
 	u8 *align;
 	dma_addr_t addr;
@@ -590,26 +588,9 @@ static int sdhci_adma_table_pre(struct sdhci_host *host,
 	 * We currently guess that it is LE.
 	 */
 
-	if (data->flags & MMC_DATA_READ)
-		direction = DMA_FROM_DEVICE;
-	else
-		direction = DMA_TO_DEVICE;
-
-	/*
-	 * The ADMA descriptor table is mapped further down as we
-	 * need to fill it with data first.
-	 */
-	host->align_addr = dma_map_single(mmc_dev(host->mmc),
-					  host->align_buffer,
-					  host->align_buf_sz,
-					  direction);
-	if (dma_mapping_error(mmc_dev(host->mmc), host->align_addr))
-		goto fail;
-	BUG_ON(host->align_addr & 0x3);
-
 	host->sg_count = sdhci_pre_dma_transfer(host, data, NULL);
 	if (host->sg_count < 0)
-		goto unmap_align;
+		goto fail;
 
 	desc = host->adma_desc;
 	align = host->align_buffer;
@@ -681,32 +662,8 @@ static int sdhci_adma_table_pre(struct sdhci_host *host,
 		sdhci_set_adma_desc(desc, 0, 0, 0x3);
 	}
 
-	/*
-	 * Resync align buffer as we might have changed it.
-	 */
-	if (data->flags & MMC_DATA_WRITE) {
-		dma_sync_single_for_device(mmc_dev(host->mmc),
-					   host->align_addr,
-					   host->align_buf_sz,
-					   direction);
-	}
-
-	host->adma_addr = dma_map_single(mmc_dev(host->mmc),
-					 host->adma_desc,
-					 host->adma_desc_sz,
-					 DMA_TO_DEVICE);
-	if (dma_mapping_error(mmc_dev(host->mmc), host->adma_addr))
-		goto unmap_entries;
-	BUG_ON(host->adma_addr & 0x3);
-
 	return 0;
 
-unmap_entries:
-	dma_unmap_sg(mmc_dev(host->mmc), data->sg,
-		data->sg_len, direction);
-unmap_align:
-	dma_unmap_single(mmc_dev(host->mmc), host->align_addr,
-			 host->align_buf_sz, direction);
 fail:
 	return -EINVAL;
 }
@@ -715,25 +672,27 @@ static void sdhci_adma_table_post(struct sdhci_host *host,
 	struct mmc_data *data)
 {
 	int direction;
-
 	struct scatterlist *sg;
 	int i, size;
 	u8 *align;
 	char *buffer;
 	unsigned long flags;
-
-	if (data->flags & MMC_DATA_READ)
-		direction = DMA_FROM_DEVICE;
-	else
-		direction = DMA_TO_DEVICE;
-
-	dma_unmap_single(mmc_dev(host->mmc), host->adma_addr,
-			 host->adma_desc_sz, DMA_TO_DEVICE);
-
-	dma_unmap_single(mmc_dev(host->mmc), host->align_addr,
-			 host->align_buf_sz, direction);
+	bool has_unaligned = false;
 
 	if (data->flags & MMC_DATA_READ) {
+		direction = DMA_FROM_DEVICE;
+		/* Do a quick scan of the SG list for any unaligned mappings */
+		for_each_sg(data->sg, sg, host->sg_count, i) {
+			if (sg_dma_address(sg) & 0x3) {
+				has_unaligned = true;
+				break;
+			}
+		}
+	} else {
+		direction = DMA_TO_DEVICE;
+	}
+
+	if (has_unaligned) {
 		dma_sync_sg_for_cpu(mmc_dev(host->mmc), data->sg,
 			data->sg_len, direction);
 
@@ -1025,8 +984,14 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
 
 	if (data->flags & MMC_DATA_READ) {
 		mode |= SDHCI_TRNS_READ;
-		if (host->ops->toggle_cdr)
-			host->ops->toggle_cdr(host, true);
+		if (host->ops->toggle_cdr) {
+			if ((cmd->opcode == MMC_SEND_TUNING_BLOCK_HS200) ||
+				(cmd->opcode == MMC_SEND_TUNING_BLOCK_HS400) ||
+				(cmd->opcode == MMC_SEND_TUNING_BLOCK))
+				host->ops->toggle_cdr(host, false);
+			else
+				host->ops->toggle_cdr(host, true);
+		}
 	}
 	if (host->ops->toggle_cdr && (data->flags & MMC_DATA_WRITE))
 		host->ops->toggle_cdr(host, false);
@@ -1516,6 +1481,9 @@ static int sdhci_notify_load(struct mmc_host *mmc, enum mmc_load state)
 	case MMC_LOAD_HIGH:
 		sdhci_update_power_policy(host, SDHCI_PERFORMANCE_MODE);
 		break;
+	case MMC_LOAD_INIT:
+		sdhci_update_power_policy(host, SDHCI_PERFORMANCE_MODE_INIT);
+		break;
 	case MMC_LOAD_LOW:
 		sdhci_update_power_policy(host, SDHCI_POWER_SAVE_MODE);
 		break;
@@ -1595,6 +1563,21 @@ static int sdhci_get_tuning_cmd(struct sdhci_host *host)
 	else
 		return MMC_SEND_TUNING_BLOCK;
 }
+
+void sdhci_cfg_irq(struct sdhci_host *host, bool enable, bool sync)
+{
+	if (enable && !host->irq_enabled) {
+		enable_irq(host->irq);
+		host->irq_enabled = true;
+	} else if (!enable && host->irq_enabled) {
+		if (sync)
+			disable_irq(host->irq);
+		else
+			disable_irq_nosync(host->irq);
+		host->irq_enabled = false;
+	}
+}
+EXPORT_SYMBOL(sdhci_cfg_irq);
 
 static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 {
@@ -1714,17 +1697,6 @@ static void sdhci_cfg_async_intr(struct sdhci_host *host, bool enable)
 			     SDHCI_HOST_CONTROL2);
 }
 
-static void sdhci_cfg_irq(struct sdhci_host *host, bool enable)
-{
-	if (enable && !host->irq_enabled) {
-		enable_irq(host->irq);
-		host->irq_enabled = true;
-	} else if (!enable && host->irq_enabled) {
-		disable_irq_nosync(host->irq);
-		host->irq_enabled = false;
-	}
-}
-
 static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 {
 	unsigned long flags;
@@ -1742,7 +1714,7 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 
 	spin_lock_irqsave(&host->lock, flags);
 	/* lock is being released intermittently below, hence disable irq */
-	sdhci_cfg_irq(host, false);
+	sdhci_cfg_irq(host, false, false);
 	spin_unlock_irqrestore(&host->lock, flags);
 	if (ios->clock) {
 		sdhci_set_clock(host, ios->clock);
@@ -1782,10 +1754,21 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 							      vdd_bit);
 			}
 		}
+		/*
+		 * make sure interrupts are enabled, these are the same
+		 * interrupts which get enabled in sdhci_init().
+		 */
+		sdhci_clear_set_irqs(host, 0,
+			SDHCI_INT_BUS_POWER | SDHCI_INT_DATA_END_BIT |
+			SDHCI_INT_DATA_CRC | SDHCI_INT_DATA_TIMEOUT |
+			SDHCI_INT_INDEX |
+			SDHCI_INT_END_BIT | SDHCI_INT_CRC | SDHCI_INT_TIMEOUT |
+			SDHCI_INT_DATA_END | SDHCI_INT_RESPONSE |
+			SDHCI_INT_AUTO_CMD_ERR);
 	}
 	spin_lock_irqsave(&host->lock, flags);
 	if (!host->clock) {
-		sdhci_cfg_irq(host, true);
+		sdhci_cfg_irq(host, true, false);
 		spin_unlock_irqrestore(&host->lock, flags);
 		mutex_unlock(&host->ios_mutex);
 		return;
@@ -1955,6 +1938,13 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 		vdd_bit = sdhci_set_power(host, -1);
 		if (host->vmmc && vdd_bit != -1)
 			mmc_regulator_set_ocr(host->mmc, host->vmmc, vdd_bit);
+		if ((host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) ||
+		    (host->mmc->caps & MMC_CAP_NONREMOVABLE)) {
+			/* clear all the pending interrupts */
+			sdhci_writel(host, sdhci_readl(host, SDHCI_INT_STATUS),
+				     SDHCI_INT_STATUS);
+			sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
+		}
 	}
 	if (!ios->clock) {
 		if (host->async_int_supp && host->mmc->card &&
@@ -1965,9 +1955,18 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 		}
 		sdhci_set_clock(host, ios->clock);
 	}
+
+	if (ios->power_mode == MMC_POWER_OFF) {
+		/* Keep interrupt line disabled as card is anyway powered off */
+		if ((host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) ||
+		    (host->mmc->caps & MMC_CAP_NONREMOVABLE))
+			goto out;
+	}
+
 	spin_lock_irqsave(&host->lock, flags);
-	sdhci_cfg_irq(host, true);
+	sdhci_cfg_irq(host, true, false);
 	spin_unlock_irqrestore(&host->lock, flags);
+out:
 	mmiowb();
 	mutex_unlock(&host->ios_mutex);
 }
@@ -2894,7 +2893,7 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 	if (!host->clock && host->mmc->card &&
 	    mmc_card_sdio(host->mmc->card)) {
 		/* SDIO async. interrupt is level-sensitive */
-		sdhci_cfg_irq(host, false);
+		sdhci_cfg_irq(host, false, false);
 		pr_debug("%s: got async-irq: clocks: %d gated: %d host-irq[en:1/dis:0]: %d\n",
 			mmc_hostname(host->mmc), host->clock,
 			host->mmc->clk_gated, host->irq_enabled);
@@ -2906,6 +2905,13 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
 					SDHCI_SUSPEND_TIMEOUT);
 		else
 			mmc_signal_sdio_irq(host->mmc);
+		return IRQ_HANDLED;
+	} else if (!host->clock) {
+		/*
+		 * As clocks are disabled, controller registers might not be
+		 * accessible hence return from here.
+		 */
+		spin_unlock(&host->lock);
 		return IRQ_HANDLED;
 	}
 	intmask = sdhci_readl(host, SDHCI_INT_STATUS);
@@ -3020,6 +3026,32 @@ out:
 \*****************************************************************************/
 
 #ifdef CONFIG_PM
+void sdhci_enable_irq_wakeups(struct sdhci_host *host)
+{
+	u8 val;
+	u8 mask = SDHCI_WAKE_ON_INSERT | SDHCI_WAKE_ON_REMOVE
+			| SDHCI_WAKE_ON_INT;
+
+	val = sdhci_readb(host, SDHCI_WAKE_UP_CONTROL);
+	val |= mask ;
+	/* Avoid fake wake up */
+	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+		val &= ~(SDHCI_WAKE_ON_INSERT | SDHCI_WAKE_ON_REMOVE);
+	sdhci_writeb(host, val, SDHCI_WAKE_UP_CONTROL);
+}
+EXPORT_SYMBOL_GPL(sdhci_enable_irq_wakeups);
+
+void sdhci_disable_irq_wakeups(struct sdhci_host *host)
+{
+	u8 val;
+	u8 mask = SDHCI_WAKE_ON_INSERT | SDHCI_WAKE_ON_REMOVE
+			| SDHCI_WAKE_ON_INT;
+
+	val = sdhci_readb(host, SDHCI_WAKE_UP_CONTROL);
+	val &= ~mask;
+	sdhci_writeb(host, val, SDHCI_WAKE_UP_CONTROL);
+}
+EXPORT_SYMBOL_GPL(sdhci_disable_irq_wakeups);
 
 int sdhci_suspend_host(struct sdhci_host *host)
 {
@@ -3049,8 +3081,13 @@ int sdhci_suspend_host(struct sdhci_host *host)
 		return ret;
 	}
 
-	free_irq(host->irq, host);
-
+	if (!device_may_wakeup(mmc_dev(host->mmc))) {
+		sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
+		free_irq(host->irq, host);
+	} else {
+		sdhci_enable_irq_wakeups(host);
+		enable_irq_wake(host->irq);
+	}
 	return ret;
 }
 
@@ -3065,10 +3102,15 @@ int sdhci_resume_host(struct sdhci_host *host)
 			host->ops->enable_dma(host);
 	}
 
-	ret = request_irq(host->irq, sdhci_irq, IRQF_SHARED,
-			  mmc_hostname(host->mmc), host);
-	if (ret)
-		return ret;
+	if (!device_may_wakeup(mmc_dev(host->mmc))) {
+		ret = request_irq(host->irq, sdhci_irq, IRQF_SHARED,
+				  mmc_hostname(host->mmc), host);
+		if (ret)
+			return ret;
+	} else {
+		sdhci_disable_irq_wakeups(host);
+		disable_irq_wake(host->irq);
+	}
 
 	if ((host->mmc->pm_flags & MMC_PM_KEEP_POWER) &&
 	    (host->quirks2 & SDHCI_QUIRK2_HOST_OFF_CARD_ON)) {
@@ -3096,17 +3138,6 @@ int sdhci_resume_host(struct sdhci_host *host)
 }
 
 EXPORT_SYMBOL_GPL(sdhci_resume_host);
-
-void sdhci_enable_irq_wakeups(struct sdhci_host *host)
-{
-	u8 val;
-	val = sdhci_readb(host, SDHCI_WAKE_UP_CONTROL);
-	val |= SDHCI_WAKE_ON_INT;
-	sdhci_writeb(host, val, SDHCI_WAKE_UP_CONTROL);
-}
-
-EXPORT_SYMBOL_GPL(sdhci_enable_irq_wakeups);
-
 #endif /* CONFIG_PM */
 
 #ifdef CONFIG_PM_RUNTIME
@@ -3318,17 +3349,44 @@ int sdhci_add_host(struct sdhci_host *host)
 
 		pr_debug("%s: %s: dma_desc_size: %d\n",
 			mmc_hostname(host->mmc), __func__, host->adma_desc_sz);
-		host->adma_desc = kmalloc(host->adma_desc_sz,
-					  GFP_KERNEL);
-		host->align_buffer = kmalloc(host->align_buf_sz,
-					     GFP_KERNEL);
+		host->adma_desc = dma_alloc_coherent(mmc_dev(host->mmc),
+						     host->adma_desc_sz,
+						     &host->adma_addr,
+						     GFP_KERNEL);
+		host->align_buffer = dma_alloc_coherent(mmc_dev(host->mmc),
+							host->align_buf_sz,
+							&host->align_addr,
+							GFP_KERNEL);
 		if (!host->adma_desc || !host->align_buffer) {
-			kfree(host->adma_desc);
-			kfree(host->align_buffer);
-			pr_warning("%s: Unable to allocate ADMA "
+			dma_free_coherent(mmc_dev(host->mmc),
+					  host->adma_desc_sz,
+					  host->adma_desc,
+					  host->adma_addr);
+			dma_free_coherent(mmc_dev(host->mmc),
+					  host->align_buf_sz,
+					  host->align_buffer,
+					  host->align_addr);
+			pr_warn("%s: Unable to allocate ADMA "
 				"buffers. Falling back to standard DMA.\n",
 				mmc_hostname(mmc));
 			host->flags &= ~SDHCI_USE_ADMA;
+			host->adma_desc = NULL;
+			host->align_buffer = NULL;
+		} else if ((host->adma_addr & 0x3) ||
+			   (host->align_addr & 0x3)) {
+			dma_free_coherent(mmc_dev(host->mmc),
+					  host->adma_desc_sz,
+					  host->adma_desc,
+					  host->adma_addr);
+			dma_free_coherent(mmc_dev(host->mmc),
+					  host->align_buf_sz,
+					  host->align_buffer,
+					  host->align_addr);
+			pr_warn("%s: Unable to allocate aligned ADMA buffers.\n",
+				   mmc_hostname(mmc));
+			host->flags &= ~SDHCI_USE_ADMA;
+			host->adma_desc = NULL;
+			host->align_buffer = NULL;
 		}
 	}
 
@@ -3352,6 +3410,7 @@ int sdhci_add_host(struct sdhci_host *host)
 			>> SDHCI_CLOCK_BASE_SHIFT;
 
 	host->max_clk *= 1000000;
+	sdhci_update_power_policy(host, SDHCI_PERFORMANCE_MODE_INIT);
 	if (host->max_clk == 0 || host->quirks &
 			SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN) {
 		if (!host->ops->get_max_clock) {
@@ -3721,6 +3780,7 @@ int sdhci_add_host(struct sdhci_host *host)
 #ifdef SDHCI_USE_LEDS_CLASS
 reset:
 	sdhci_reset(host, SDHCI_RESET_ALL);
+	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
 	free_irq(host->irq, host);
 #endif
 untasklet:
@@ -3752,6 +3812,7 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 		spin_unlock_irqrestore(&host->lock, flags);
 	}
 
+	sdhci_update_power_policy(host, SDHCI_POWER_SAVE_MODE);
 	sdhci_disable_card_detection(host);
 
 	if (host->cpu_dma_latency_us)
@@ -3765,6 +3826,7 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 	if (!dead)
 		sdhci_reset(host, SDHCI_RESET_ALL);
 
+	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
 	free_irq(host->irq, host);
 
 	del_timer_sync(&host->timer);
@@ -3775,8 +3837,12 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 	if (host->vmmc)
 		regulator_put(host->vmmc);
 
-	kfree(host->adma_desc);
-	kfree(host->align_buffer);
+	if (host->adma_desc)
+		dma_free_coherent(mmc_dev(host->mmc), host->adma_desc_sz,
+				  host->adma_desc, host->adma_addr);
+	if (host->align_buffer)
+		dma_free_coherent(mmc_dev(host->mmc), host->align_buf_sz,
+				  host->align_buffer, host->align_addr);
 
 	host->adma_desc = NULL;
 	host->align_buffer = NULL;
