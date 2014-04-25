@@ -228,7 +228,7 @@ static inline void mdss_mdp_cmd_clk_on(struct mdss_mdp_cmd_ctx *ctx)
 			mdss_mdp_ctl_restore(ctx->ctl);
 			mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 
-			if (mdss_mdp_cmd_tearcheck_setup(ctx->ctl))
+			if (mdss_mdp_cmd_tearcheck_setup(ctx->ctl, true))
 				pr_warn("tearcheck setup failed\n");
 			ctx->idle_pc = false;
 		} else {
