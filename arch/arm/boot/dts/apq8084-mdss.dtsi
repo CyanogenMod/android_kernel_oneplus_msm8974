@@ -74,6 +74,35 @@
 		qcom,mdss-has-bwc;
 		qcom,mdss-has-decimation;
 
+		qcom,vbif-settings = <0x0B0 0x00080808>,
+				     <0x0B4 0x08000808>,
+				     <0x0B8 0x00080808>,
+				     <0x0BC 0x00000808>,
+				     <0x0C0 0x10000000>,
+				     <0x0C4 0x00100000>,
+				     <0x0C8 0x10000000>,
+				     <0x0CC 0x00000000>,
+				     <0x070 0x00013FFF>,
+				     <0x074 0x000000A4>,
+				     <0x0A8 0x00003FFF>,
+				     <0x124 0x00000003>;
+
+		qcom,mdp-settings = <0x000002E0 0x000000FA>,
+				    <0x000002E4 0x00000055>,
+				    <0x000003AC 0xC0000CCD>,
+				    <0x000003B4 0xC0000CCC>,
+				    <0x000003BC 0x00CCCCCC>,
+				    <0x000003C4 0x000000CC>,
+				    <0x000004A8 0x0CCCC0C0>,
+				    <0x000004B0 0xCCCCC0C0>,
+				    <0x000004B8 0xCCCCC0C0>,
+				    <0x000004D0 0x00CCC000>,
+				    <0x00011148 0x00000058>,
+				    <0x00011548 0x00000058>,
+				    <0x00011948 0x00000058>,
+				    <0x00011D48 0x00000058>,
+				    <0x00012148 0x00000058>;
+
 		/* buffer parameters to calculate prefill bandwidth */
 		qcom,mdss-prefill-outstanding-buffer-bytes = <1024>;
 		qcom,mdss-prefill-y-buffer-bytes = <4096>;
