@@ -97,3 +97,16 @@ int __init board_rf_version_init(char *s)
 	return 0;
 }
 __setup("oppo.rf_version", board_rf_version_init);
+
+static int lcd_id = 0;
+int __init board_lcd_id_init(char *s)
+{
+	if (!strncmp(s, "4", 1)) {
+		lcd_id = 4;
+	} else {
+		lcd_id = 2;
+	}
+
+	return 0;
+}
+__setup("LCD_id=", board_lcd_id_init);

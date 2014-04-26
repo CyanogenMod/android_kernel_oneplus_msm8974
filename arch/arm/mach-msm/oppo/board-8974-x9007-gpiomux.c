@@ -342,13 +342,6 @@ static struct gpiomux_setting hsic_act_cfg = {
 	.pull = GPIOMUX_PULL_NONE,
 };
 
-static struct gpiomux_setting hsic_hub_act_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_UP,
-	.dir = GPIOMUX_IN,
-};
-
 static struct gpiomux_setting hsic_resume_act_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -382,16 +375,6 @@ static struct msm_gpiomux_config msm_hsic_configs[] = {
 		.settings = {
 			[GPIOMUX_ACTIVE] = &hsic_resume_act_cfg,
 			[GPIOMUX_SUSPENDED] = &hsic_resume_susp_cfg,
-		},
-	},
-};
-
-static struct msm_gpiomux_config msm_hsic_hub_configs[] = {
-	{
-		.gpio = 50,               /* HSIC_HUB_INT_N */
-		.settings = {
-			[GPIOMUX_ACTIVE] = &hsic_hub_act_cfg,
-			[GPIOMUX_SUSPENDED] = &hsic_sus_cfg,
 		},
 	},
 };
@@ -585,7 +568,7 @@ static struct gpiomux_setting gpio_blsp6_spi3_config = {
 static struct gpiomux_setting gpio_blsp6_spi2_config = {
 	.func = GPIOMUX_FUNC_2,
 	.drv = GPIOMUX_DRV_8MA,
-	.pull = GPIOMUX_PULL_NONE,
+	.pull = GPIOMUX_PULL_UP,
 };
 
 static struct gpiomux_setting gpio_blsp6_spi1_config = {
@@ -1257,13 +1240,6 @@ static struct msm_gpiomux_config wcnss_5wire_interface[] = {
 
 static struct msm_gpiomux_config ath_gpio_configs[] = {
 	{
-		.gpio = 51,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &ath_gpio_active_cfg,
-			[GPIOMUX_SUSPENDED] = &ath_gpio_suspend_cfg,
-		},
-	},
-	{
 		.gpio = 79,
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &ath_gpio_active_cfg,
@@ -1518,8 +1494,6 @@ void __init msm_8974_init_gpiomux(void)
 	msm_gpiomux_install(msm_taiko_config, ARRAY_SIZE(msm_taiko_config));
 
 	msm_gpiomux_install(msm_hsic_configs, ARRAY_SIZE(msm_hsic_configs));
-	msm_gpiomux_install(msm_hsic_hub_configs,
-				ARRAY_SIZE(msm_hsic_hub_configs));
 
 	msm_gpiomux_install(msm_hdmi_configs, ARRAY_SIZE(msm_hdmi_configs));
 	if (of_board_is_fluid())

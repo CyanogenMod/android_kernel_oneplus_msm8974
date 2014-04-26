@@ -8,6 +8,11 @@
 ** Date : 2014/03/18	
 ** Author: yuyi@Dep.Group.Module
 ** 
+
+** --------------------------- Revision History: --------------------------------
+** <author>		                      <data> 	<version >  <desc>
+** ------------------------------------------------------------------------------
+** Yuyi@Driver.NFC  2014/04/03   1.1	    modify for debug spi
 ****************************************************************/
 
 #include <linux/kernel.h>
@@ -29,9 +34,10 @@
 #include <linux/spi/spi.h>
 #include <linux/sched.h>
 #include <linux/poll.h>
+#include <linux/timer.h>
 
-#define DBG_MODULE 0
-
+#define DBG_MODULE 1
+#define TIMER_ENABLE 1
 #if DBG_MODULE
 #define NFC_DBG_MSG(msg...) printk(KERN_ERR "[NFC PN61] :  " msg);
 #else
@@ -88,12 +94,13 @@ typedef struct respData {
 	int len;
 }respData_t;
 
-respData_t *gStRecvData;
-unsigned char *gSendframe;
-unsigned char *gDataPackage;
+respData_t *gStRecvData=NULL;
+unsigned char *gSendframe=NULL;
+unsigned char *gDataPackage=NULL;
+unsigned char *data1=NULL;
 
 #define MEM_CHUNK_SIZE (256)
-unsigned char *lastFrame;
+unsigned char *lastFrame=NULL;
 int lastFrameLen;
 void init(void);
 void setAddress(short address);
@@ -145,20 +152,40 @@ struct p61_control {
 	unsigned char *tx_buff; 
 	unsigned char *rx_buff;
 };
-#if 1
-static void p61_disable_irq(struct p61_dev *p61_dev)
-{
-	unsigned long flags;
 
-	NFC_DBG_MSG("Entry : %s\n", __FUNCTION__);
-	spin_lock_irqsave(&p61_dev->irq_enabled_lock, flags);
-	if (p61_dev->irq_enabled)
-	{
-		disable_irq_nosync(p61_dev->spi->irq);
-		p61_dev->irq_enabled = false;
-	}
-	spin_unlock_irqrestore(&p61_dev->irq_enabled_lock, flags);
-	NFC_DBG_MSG("Exit : %s\n", __FUNCTION__);
+
+static int timer_expired = 0;
+#ifdef TIMER_ENABLE
+static struct timer_list recovery_timer;
+static int timer_started = 0;
+
+void my_timer_callback( unsigned long data )
+{
+  timer_expired = 1;
+}
+
+static int start_timer(void)
+{
+    int ret;
+    setup_timer( &recovery_timer, my_timer_callback, 0 );
+    ret = mod_timer( &recovery_timer, jiffies + msecs_to_jiffies(2000) );
+    if (ret) 
+    {
+       printk(KERN_INFO "Error in mod_timer\n");
+    }
+    else
+    {
+      timer_started = 1;
+    }
+	return 0;
+}
+
+void cleanup_timer( void )
+{
+  int ret;
+
+  ret = del_timer( &recovery_timer );
+  return;
 }
 #endif
 static int p61_dev_open(struct inode *inode, struct file *filp)
@@ -172,18 +199,29 @@ static int p61_dev_open(struct inode *inode, struct file *filp)
 	checksum = (unsigned char*)kmalloc(csSize,GFP_KERNEL);
 	gSendframe=(unsigned char*)kmalloc(300,GFP_KERNEL);
 	gDataPackage = (unsigned char*)kmalloc(300,GFP_KERNEL);
-	printk("%s : Major No: %d, Minor No: %d\n", __func__, imajor(inode), iminor(inode));
+	apduBuffer = (unsigned char*) kmalloc(apduBufferlen,GFP_KERNEL);
+	data1 = (unsigned char *)kmalloc(1,GFP_KERNEL);
+	NFC_DBG_MSG("%s :  Major No: %d, Minor No: %d\n", __func__, imajor(inode), iminor(inode));
 
 	return 0;
 }
 
 static int p61_dev_close(void)
 {
-	kfree(checksum);
+        if(checksum != NULL)
+        kfree(checksum);
+        if(gRecvBuff != NULL)
 	kfree(gRecvBuff);
+        if(gStRecvData != NULL)
 	kfree(gStRecvData);
+        if(gSendframe != NULL)
 	kfree(gSendframe);
+        if(gDataPackage != NULL)
 	kfree(gDataPackage);
+        if(apduBuffer != NULL)
+	kfree(apduBuffer);
+        if(data1 != NULL)
+	kfree(data1);
 	return 0;
 }
 
@@ -256,9 +294,10 @@ static respData_t* p61_dev_receiveData_internal(struct file *filp)
 	respData_t *respData=NULL;
 	unsigned char *wtx=NULL;
 	unsigned char *data=NULL;
-	unsigned char *data1=NULL;
+	//unsigned char *data1=NULL;
 	int len=0;
 	int len1=0;
+	int stat_timer;
 Start:
 	NFC_DBG_MSG(KERN_INFO  "receiveData -Enter\n");
 
@@ -287,26 +326,31 @@ Start:
 		receiveAndCheckChecksum(filp,rPcb, rLen, data,len);
 		NFC_DBG_MSG(KERN_ALERT "receiveDatav - WTX3 requested\n");
 		NFC_DBG_MSG(KERN_ALERT "value is %x %x",data[0],data[1]);
+                memset(gRecvBuff,0,300);
 		wtx = gRecvBuff;
 		wtx[0] = 0x00; wtx[1] = 0xE3; wtx[2] = 0x01; wtx[3] = 0x01; wtx[4] = 0xE3;
 		len1 = 5;
 		udelay(1000);
 		send(filp,&wtx, C_TRANSMIT_NORMAL_SPI_OPERATION,len1);
 		udelay(1000);
-		goto Start;
+
+                gStRecvData->len = 5;
+                memcpy(gStRecvData->data, wtx, 5);;
+#ifdef TIMER_ENABLE
+                stat_timer = start_timer();
+#endif
+                return gStRecvData;
 	}
 
 	//check the header if retransmit is requested
 	if ((rPcb & PH_SCAL_T1_R_BLOCK) == PH_SCAL_T1_R_BLOCK)
 	{
-		NFC_DBG_MSG(KERN_ALERT "Retransmit is requested\n");
-
-		data1 = (unsigned char *)kmalloc(1,GFP_KERNEL);
+		memset(data1,0,1);
 		len1=1;
 		receiveAndCheckChecksum(filp,rPcb, rLen, data1,len1);
-
+		udelay(1000);
 		send(filp,&lastFrame, C_TRANSMIT_NORMAL_SPI_OPERATION,lastFrameLen);
-		kfree(data1);
+		udelay(1000);
 		goto Start;
 //		return (ssize_t)p61_dev_receiveData_internal(filp);
 	}
@@ -375,8 +419,8 @@ respData_t *receiveFrame(struct file *filp,short rPcb, short rLen)
 
 respData_t *receiveChainedFrame(struct file *filp,short rPcb, short rLen) 
 {
-	respData_t *data = NULL;
-	respData_t *header = NULL;
+	respData_t *data_rec=NULL;
+	respData_t *header=NULL ;
 	respData_t *respData=NULL;
 	respData_t *apdbuff=NULL;
 	NFC_DBG_MSG(KERN_ALERT "receiveChainedFrame -Enter\n");
@@ -384,43 +428,24 @@ respData_t *receiveChainedFrame(struct file *filp,short rPcb, short rLen)
 	do
 	{
 		// receive the DATA field of the current frame
-		data = receiveFrame(filp,rPcb, rLen);
+		NFC_DBG_MSG(KERN_ALERT "p61_dev_read - test4 count [0x%x] \n",rLen);
+		data_rec = receiveFrame(filp,rPcb, rLen);
 		// write it into an apduBuffer memory
-		if(data->len > (apduBufferlen - apduBufferidx) )
-		{
-			apduBufferlen += MEM_CHUNK_SIZE;
-
-			apduBuffer=(unsigned char*)kmalloc(apduBufferlen,GFP_KERNEL);
-			if(apduBuffer == NULL)
-			{
-				NFC_ERR_MSG(KERN_ALERT "receiveChainedFrame -KMALLOC FAILED!!!\n");
-				return NULL;
-			}
-		}
-
-		memcpy((apduBuffer+apduBufferidx),data->data,data->len);
+		memcpy((apduBuffer+apduBufferidx),data_rec->data,data_rec->len);
 
 		//update the index to next free slot
-		apduBufferidx += data->len;
+		apduBufferidx += data_rec->len;
 
 		// send the acknowledge for the current frame
+		udelay(1000);
 		sendAcknowledge(filp);
-
-		// igeceive the header of the next frame
+		udelay(1000);
+		// receive the header of the next frame
 		header = receiveHeader(filp);
 
 		rPcb = header->data[0];
 		rLen = (header->data[1] & 0xFF);
 
-		if(NULL != data && NULL != data->data)
-		{
-			NFC_ERR_MSG(KERN_ALERT "data pointer is NULL!!!\n");
-		}
-
-		if(NULL != header && NULL != header->data)
-		{
-			NFC_ERR_MSG(KERN_ALERT "header pointer is NULL!!!\n");
-		}
 
 	}while ((rPcb & PH_SCAL_T1_CHAINING) == PH_SCAL_T1_CHAINING);
 
@@ -428,42 +453,10 @@ respData_t *receiveChainedFrame(struct file *filp,short rPcb, short rLen)
 	// receive the DATA field of the last frame
 
 	respData = receiveFrame(filp,rPcb, rLen);
-
-	if(respData->len > (apduBufferlen - apduBufferidx) )
-	{
-
-		apduBufferlen += MEM_CHUNK_SIZE;
-
-		apduBuffer1=(unsigned char*)kmalloc( apduBufferidx+respData->len,GFP_KERNEL);
-		if(apduBuffer1 == NULL)
-		{
-			NFC_ERR_MSG(KERN_ALERT "receiveChainedFrame 1-KMALLOC FAILED!!!\n");
-			return NULL;
-		}
-
-		memset(apduBuffer1,0,apduBufferidx+respData->len);
-		memcpy(apduBuffer1,apduBuffer,apduBufferidx);
-
-		// append the received data to the apduBuffer memory
-
-		memcpy((apduBuffer1+apduBufferidx),respData->data,respData->len);
-
-		kfree(apduBuffer);
-	}
-	else
-	{
-		memcpy(apduBuffer+apduBufferidx,respData->data,respData->len);
-	}
-
-
+	memcpy(apduBuffer+apduBufferidx,respData->data,respData->len);
 	//update the index to next free slot
 	apduBufferidx += respData->len;
 
-	if(NULL != respData && NULL != respData->data)
-	{
-		kfree(respData->data);
-		kfree(respData);
-	}
 
 	// return the entire received apdu
 	apdbuff=(respData_t *)kmalloc(sizeof(respData_t),GFP_KERNEL);
@@ -479,20 +472,8 @@ respData_t *receiveChainedFrame(struct file *filp,short rPcb, short rLen)
 		NFC_ERR_MSG(KERN_ALERT "receiveChainedFrame 3-KMALLOC FAILED!!!\n");
 		return NULL;
 	}
-
-	if(respData->len > (apduBufferlen - (apduBufferidx-respData->len)) )
-	{
-		memcpy(apdbuff->data,apduBuffer1,apduBufferidx);
-
-		apdbuff->len=apduBufferidx;
-		kfree(apduBuffer1);
-	}
-	else
-	{
-		memcpy(apdbuff->data,apduBuffer,apduBufferidx);
-		apdbuff->len=apduBufferidx;
-		kfree(apduBuffer);
-	}
+	memcpy(apdbuff->data,apduBuffer,apduBufferidx);
+	apdbuff->len=apduBufferidx;
 
 	NFC_DBG_MSG(KERN_ALERT "receiveChainedFrame -Exit\n");
 	return apdbuff;
@@ -504,17 +485,17 @@ respData_t *receiveChainedFrame(struct file *filp,short rPcb, short rLen)
     */
 void sendAcknowledge(struct file *filp) 
 {
-	unsigned char ack[4];
+	unsigned char *ack=NULL;
 	NFC_DBG_MSG(KERN_ALERT "sendAcknowledge - Enter\n");
-
+	ack=gSendframe;
 	// prepare the acknowledge and send it
-
+	NFC_DBG_MSG(KERN_ALERT "seqCounterCard value is [0x%x]\n",seqCounterCard);
 	ack[0] = 0x00;
-	ack[1] = (PH_SCAL_T1_R_BLOCK | (seqCounterCard << 4));
+	ack[1] = (unsigned char)(PH_SCAL_T1_R_BLOCK | (unsigned char)(seqCounterCard << 4));
 	ack[2] = 0x00;
-	ack[3] = helperComputeLRC(ack, 0, sizeof(ack) / sizeof(ack[0]) - 2);
+	ack[3] = helperComputeLRC(ack, 0, (sizeof(ack) / sizeof(ack[0])) - 2);
 
-	send(filp,(unsigned char **)&ack, C_TRANSMIT_NORMAL_SPI_OPERATION,sizeof(ack)/sizeof(ack[0]-2));
+	send(filp,&ack, C_TRANSMIT_NORMAL_SPI_OPERATION,sizeof(ack)/sizeof(ack[0]));
 
 	NFC_DBG_MSG(KERN_ALERT "sendAcknowledge - Exit\n");
 
@@ -545,7 +526,7 @@ static ssize_t p61_dev_sendData(struct file *filp, const char __user *buf,
 		//return sendChainedFrame(data);
 		ret=sendChainedFrame(filp,buf,count);
 	}
-	printk("p61_dev_sendData: count_status is %d \n",ret);
+	NFC_DBG_MSG(KERN_INFO "p61_dev_sendData: count_status is %d \n",ret);
 	return ret;
 }
 
@@ -568,21 +549,21 @@ static long  p61_dev_ioctl(struct file *filp, unsigned int cmd,
 			/* power on with firmware download (requires hw reset)
 			 */
 			gpio_set_value(P61_RST, 1);
-			//NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-1\n");
+			NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-1\n");
 			msleep(20);
 			gpio_set_value(P61_RST, 0);
-			//NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-0\n");
+			NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-0\n");
 			msleep(50);
 			ret = spi_read (p61_dev -> spi,(void *) buf, sizeof(buf));
 			msleep(50);
 			gpio_set_value(P61_RST, 1);
-			//NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-1 \n");
+			NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-1 \n");
 			msleep(20);
 
 		} else if (arg == 1) {
 			//printk("yuyi,p61_dev_ioctl   power on \n");
 			/* power on */
-			//NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-1 (arg = 1)\n");
+			NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-1 (arg = 1)\n");
 			gpio_set_value(P61_RST, 1);
 
 		} else  if (arg == 0) {
@@ -690,6 +671,7 @@ respData_t * receiveHeader(struct file *filp)
 	int count_status = 0;
 	//unsigned char *ready=NULL;
 	respData_t *header=NULL;
+	unsigned char *r_frame=NULL;
 	int len=1;
 	NFC_DBG_MSG(KERN_ALERT "receiveHeader - Enter\n");
 	header = gStRecvData;
@@ -698,14 +680,36 @@ respData_t * receiveHeader(struct file *filp)
 	count_status = receive(filp,&gRecvBuff,len, C_TRANSMIT_NO_STOP_CONDITION);
     NFC_DBG_MSG(KERN_ALERT "sof is :0x%x\n",gRecvBuff[0]);
 	// check if we received ready
-#if 1
-	while(gRecvBuff[0] != sof)
+#ifdef TIMER_ENABLE
+again:
+#endif
+        timer_expired = 0;
+	while(gRecvBuff[0] != sof && (timer_expired == 0))
 	{
 		NFC_DBG_MSG(KERN_ALERT "SOF not found\n");
 		// receive one byte and keep SS line low
 		count_status = receive(filp,&gRecvBuff,len, C_TRANSMIT_NO_STOP_CONDITION | C_TRANSMIT_NO_START_CONDITION);
 		NFC_DBG_MSG(KERN_ALERT "in While SOF is : 0x%x \n",gRecvBuff[0]);
 	}
+#ifdef TIMER_ENABLE
+        if (timer_started)
+        {
+            timer_started  = 0;
+            cleanup_timer();
+        }
+        if (timer_expired == 1)
+        {   
+             memset(gSendframe,0,300); 
+             r_frame=gSendframe;
+             r_frame[0] = 0x00;r_frame[1]=0x00;r_frame[2]=0x00;r_frame[3]=0x00;
+             timer_started  = 0;
+             timer_expired = 0;
+             cleanup_timer();
+            // printk(KERN_INFO "************* Sending R Frame \n");
+	     send(filp,&r_frame, C_TRANSMIT_NORMAL_SPI_OPERATION, 4);
+             goto again;
+
+        }    
 #endif
 	NFC_DBG_MSG(KERN_ALERT "SOF FOUND\n");
 	// we received ready byte, so we can receive the rest of the header and keep SS line low
@@ -785,7 +789,7 @@ int receive(struct file *filp,unsigned char **data, int len, unsigned char mode)
 	static int count_status;
 	NFC_DBG_MSG(KERN_ALERT "receive -Enter\n");
 	count_status = p61_dev_read(filp, *data,len,0x00);
-	if(count_status==0)
+	if(count_status==0 && len != 0)
 	{
 		NFC_ERR_MSG(KERN_ALERT "ERROR:Failed to receive data from device\n");
 		return -1;
@@ -801,18 +805,10 @@ static ssize_t p61_dev_write(struct file *filp, const char *buf,
                 size_t count, loff_t *offset)
 {
 	int ret = -1;
-	struct p61_dev  *p61_dev;
+	struct p61_dev  *p61_dev=NULL;
 	//char tmp[MAX_BUFFER_SIZE];
 	NFC_DBG_MSG(KERN_ALERT "p61_dev_write -Enter\n");
 	p61_dev = filp->private_data;
-
-#if 0
-	if (copy_from_user(tmp, buf, count))
-	{
-		NFC_ERR_MSG("%s : failed to copy from user space\n", __func__);
-		return -EFAULT;
-	}
-#endif
 	/* Write data */
 	ret = spi_write(p61_dev->spi, buf, count);
 	NFC_DBG_MSG ("spi_write status = %d\n",ret);
@@ -929,20 +925,9 @@ unsigned char helperComputeLRC(unsigned char data[], int offset, int length)
 void init()
 {
 	NFC_DBG_MSG(KERN_INFO  "init - Enter\n");
-	apduBuffer = (unsigned char*) kmalloc(apduBufferlen,GFP_KERNEL);
-	if(apduBuffer == NULL)
-	{
-		NFC_ERR_MSG(KERN_INFO  "init - FAILED TO ALLOCATE MEMORYS \n");
-		return;
-	}
-
-	memset(apduBuffer, 0, apduBufferlen);
-
 	apduBufferidx = 0;
 	setAddress(0);
 	setBitrate(100);
-	seqCounterCard = 0;
-	seqCounterTerm = 1;
 
 	NFC_DBG_MSG(KERN_INFO  "init - Exit\n");
 }
@@ -988,21 +973,6 @@ int nativeSetBitrate(short bitrate)
 	return 0;
 }
 
-#if 1
-static irqreturn_t p61_dev_irq_handler(int irq, void *dev_id)
-{
-	struct p61_dev *p61_dev = dev_id;
-
-	NFC_DBG_MSG("Entry : %s\n", __FUNCTION__);
-	p61_disable_irq(p61_dev);
-
-	/* Wake up waiting readers */
-	wake_up(&p61_dev->read_wq);
-
-	NFC_DBG_MSG("Exit : %s\n", __FUNCTION__);
-	return IRQ_HANDLED;
-}
-#endif
 static int p61_enable_irq(struct p61_dev *p61_dev)
 {
 	int ret = -1;
@@ -1017,13 +987,14 @@ static int p61_enable_irq(struct p61_dev *p61_dev)
 	}
 
 	//yuyi add begin 
-	ret = request_irq(p61_dev->spi->irq, p61_dev_irq_handler, IRQF_TRIGGER_HIGH, p61_dev -> p61_device.name, p61_dev);
+/*	ret = request_irq(p61_dev->spi->irq, p61_dev_irq_handler, IRQF_TRIGGER_HIGH, p61_dev -> p61_device.name, p61_dev);
 	NFC_DBG_MSG("%s  name: %s  irq: %d\n", __FUNCTION__,p61_dev -> p61_device.name,p61_dev->spi->irq);
 	if (ret) 
 	{
 		NFC_ERR_MSG( "P61 request_irq failed\n");
 		//goto err_request_irq_failed;
 	}
+	*/
 	//yuyi add end
 	ret = gpio_direction_input(P61_IRQ);
 	if (ret < 0)
@@ -1056,13 +1027,15 @@ static int p61_enable_irq(struct p61_dev *p61_dev)
 	}
 
 	NFC_DBG_MSG("Exit : %s\n", __FUNCTION__);
+	gpio_set_value(P61_RST, 1);
+	msleep(20);
 	return ret;
         fail_gpio:
 	gpio_free(P61_RST);
 	fail_irq:
 	gpio_free(P61_IRQ);
 	fail:
-	NFC_DBG_MSG(KERN_ERR, "irq initialisation failed\n");
+	NFC_DBG_MSG("irq initialisation failed\n");
 	return ret;
 }
 
@@ -1084,20 +1057,11 @@ static const struct file_operations p61_dev_fops = {
 static int __devinit p61_probe(struct spi_device *spi)
 {
 	int ret = 0;
-	struct p61_dev *p61_dev;
+	struct p61_dev *p61_dev=NULL;
 
 	NFC_DBG_MSG("Entry : %s\n", __FUNCTION__);
 
 	NFC_DBG_MSG("chip select : %d , bus number = %d \n", spi->chip_select, spi->master->bus_num);
-
-//	spi->dev.platform_data = &p61_data;
-
-	if (!spi->irq)
-	{
-		NFC_ERR_MSG("No SPI IRQ");
-		return -ENODEV;
-	}
-
 	p61_dev = kzalloc(sizeof(*p61_dev), GFP_KERNEL);
 	if (p61_dev == NULL)
 	{
@@ -1107,11 +1071,6 @@ static int __devinit p61_probe(struct spi_device *spi)
 	}
 
 
-	 ret = gpio_tlmm_config(NFC_p61_rst, GPIO_CFG_ENABLE);
-	 if (ret) {
-		 printk(KERN_ERR "%s:gpio_tlmm_config(%#x)=%d\n",
-			 __func__, NFC_p61_rst, ret);
-	 }
 	spi->bits_per_word = 8;
 	spi->mode = SPI_MODE_0;
 	spi->max_speed_hz = 7000000;//1000000;
@@ -1135,7 +1094,6 @@ static int __devinit p61_probe(struct spi_device *spi)
 	/* init mutex and queues */
 	init_waitqueue_head(&p61_dev->read_wq);
 	mutex_init(&p61_dev->read_mutex);
-	spin_lock_init(&p61_dev->irq_enabled_lock);
 
 	ret = misc_register(&p61_dev->p61_device);
 	if (ret < 0)
@@ -1150,12 +1108,14 @@ static int __devinit p61_probe(struct spi_device *spi)
 		goto err_exit1;
 	}
 	NFC_DBG_MSG("Exit : %s\n", __FUNCTION__);
+
 	return ret;
 
 	err_exit1:
 	misc_deregister(&p61_dev->p61_device);
 	err_exit0:
 	mutex_destroy(&p61_dev->read_mutex);
+        if(p61_dev != NULL)
 	kfree(p61_dev);
 	err_exit:
 	return ret;
@@ -1176,6 +1136,7 @@ static int __devexit p61_remove(struct spi_device *spi)
 	misc_deregister(&p61_dev->p61_device);
 	gpio_free(P61_IRQ);
 	gpio_free(P61_RST);
+        if(p61_dev != NULL)
 	kfree(p61_dev);
 	NFC_DBG_MSG("Exit : %s\n", __FUNCTION__);
 	return 0;

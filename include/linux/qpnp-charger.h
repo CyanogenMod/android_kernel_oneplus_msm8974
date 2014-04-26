@@ -35,6 +35,7 @@ struct qpnp_battery_gauge {
 	int (*get_fast_chg_allow) (void);
 	int (*fast_normal_to_warm)	(void);	
 	int (*set_normal_to_warm_false)	(void);
+	int	(*get_fast_chg_ing)	(void);
 	//lfc add for fastchg end
 };
 
