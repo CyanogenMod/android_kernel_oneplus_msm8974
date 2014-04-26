@@ -158,8 +158,8 @@
 		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana",
 				     "cam_vaf";
 		qcom,cam-vreg-type = <0 1 0 0>;
-		qcom,cam-vreg-min-voltage = <1000000 0 2700000 2800000>;
-		qcom,cam-vreg-max-voltage = <1000000 0 2700000 2800000>;
+		qcom,cam-vreg-min-voltage = <1000000 0 2800000 2800000>;
+		qcom,cam-vreg-max-voltage = <1000000 0 2800000 2800000>;
 		qcom,cam-vreg-op-mode = <105000 0 80000 100000>;
 		qcom,gpio-no-mux = <0>;
 		gpios = <&msmgpio 15 0>,

@@ -294,9 +294,6 @@ static bool use_fake_temp = false;
 static int fake_temp = 300;
 static bool use_fake_chgvol = false;
 static int fake_chgvol = 0;
-#ifdef CONFIG_MACH_FIND7OP
-static atomic_t allow_fastchg;
-#endif
 
 #ifdef CONFIG_BATTERY_BQ27541
 static struct qpnp_battery_gauge *qpnp_batt_gauge = NULL;
@@ -1210,23 +1207,10 @@ qpnp_chg_charge_en(struct qpnp_chg_chip *chip, int enable)
 	}
 }
 
-int qpnp_chg_get_charge_en(void)
+static int qpnp_chg_get_charge_en(void)
 {
 	if (qpnp_ext_charger && qpnp_ext_charger->chg_get_charge_en) {
 		return qpnp_ext_charger->chg_get_charge_en();
-	} else {
-		pr_err("qpnp-charger no externel charger\n");
-		return -ENODEV;
-	}
-}
-
-int qpnp_chg_ext_charge_en(int enable)
-{
-	if (get_boot_mode() != MSM_BOOT_MODE__NORMAL)
-		return -EINVAL;
-
-	if (qpnp_ext_charger && qpnp_ext_charger->chg_charge_en) {
-		return qpnp_ext_charger->chg_charge_en(enable);
 	} else {
 		pr_err("qpnp-charger no externel charger\n");
 		return -ENODEV;
@@ -1754,6 +1738,17 @@ qpnp_get_fast_chg_allow(struct qpnp_chg_chip *chip)
 {
 	if (qpnp_batt_gauge && qpnp_batt_gauge->get_fast_chg_allow)
 		return qpnp_batt_gauge->get_fast_chg_allow();
+	else {
+		pr_err("qpnp-charger no batt gauge assuming false\n");
+		return false;
+	}
+}
+
+static int
+qpnp_get_fast_chg_ing(struct qpnp_chg_chip *chip)
+{
+	if (qpnp_batt_gauge && qpnp_batt_gauge->get_fast_chg_ing)
+		return qpnp_batt_gauge->get_fast_chg_ing();
 	else {
 		pr_err("qpnp-charger no batt gauge assuming false\n");
 		return false;
@@ -6455,12 +6450,6 @@ bool is_alow_fast_chg(struct qpnp_chg_chip *chip)
 	int cap = 0;
 	int chg_type = 0;
 
-#ifdef CONFIG_MACH_FIND7OP
-	if(atomic_read(&allow_fastchg) == 0) {
-		return false;
-	}
-#endif
-	
 	auth = get_prop_authenticate(chip);
 	temp = get_prop_batt_temp(chip);
 	cap = get_prop_capacity(chip);
@@ -6536,7 +6525,11 @@ static void update_heartbeat(struct work_struct *work)
 		switch_fast_chg(chip);
 		pr_info("%s fast chg started,GPIO96:%d\n", __func__,gpio_get_value(96));
 		power_supply_changed(&chip->batt_psy);
-		
+		//lfc add for disable normal charge begin
+		if(qpnp_chg_get_charge_en() == 1 && qpnp_get_fast_chg_ing(chip) == 1){
+			qpnp_chg_charge_en(chip,false);
+		}
+		//lfc add for disable normal charge end
 		/*update time 6s*/
 		schedule_delayed_work(&chip->update_heartbeat_work,
 				      round_jiffies_relative(msecs_to_jiffies
@@ -6630,9 +6623,6 @@ static void qpnp_charge_info_init(struct qpnp_chg_chip *chip)
 	/* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
 	chip->aicl_current = 0;
 /* jingchun.wang@Onlinerd.Driver, 2014/03/27  Add for fast charger control of 1+ */
-#ifdef CONFIG_MACH_FIND7OP
-	atomic_set(&allow_fastchg, 0);
-#endif
 }
 
 static ssize_t test_temp_store(struct device *dev,

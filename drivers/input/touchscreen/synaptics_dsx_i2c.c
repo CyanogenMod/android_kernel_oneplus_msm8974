@@ -1723,9 +1723,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 		rx2rx_lower_limit = DiagonalLowerLimit_TPK;
 		rx2rx_upper_limit = DiagonalUpperLimit_TPK;
 		raw_cap_data = (const int16_t *)raw_cap_data_tpk;
-#ifndef CONFIG_MACH_FIND7OP
 		use_cbc = 1;
-#endif
 	} else if (syna_ts_data->vendor_id == TP_VENDOR_YOUNGFAST) {
 		tx_num = TX_NUM_YOUNGFAST;
 		rx_num = RX_NUM_YOUNGFAST;
