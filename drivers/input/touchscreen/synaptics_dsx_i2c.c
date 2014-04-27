@@ -2171,7 +2171,6 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 			switch (gesture[2]) {
 				case 0x01:  //UP
 					gesturemode = DownVee;
-					keyvalue = KEY_GESTURE_V;
 					break;
 				case 0x02:  //DOWN
 					gesturemode = UpVee;
