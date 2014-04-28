@@ -290,7 +290,7 @@ static int snd_usb_create_streams(struct snd_usb_audio *chip, int ctrlif)
 		break;
 	}
 	}
-	switch_set_state(usbaudiosdev, 1);
+	switch_set_state(usbaudiosdev, 2);
 	return 0;
 }
 
