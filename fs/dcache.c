@@ -207,6 +207,15 @@ static void __d_free(struct rcu_head *head)
 	kmem_cache_free(dentry_cache, dentry); 
 }
 
+static void dentry_free(struct dentry *dentry)
+{
+    /* if dentry was never visible to RCU, immediate free is OK */
+    if (!(dentry->d_flags & DCACHE_RCUACCESS))
+        __d_free(&dentry->d_u.d_rcu);
+    else
+        call_rcu(&dentry->d_u.d_rcu, __d_free);
+}
+
 /*
  * no locks, please.
  */
@@ -218,11 +227,7 @@ static void d_free(struct dentry *dentry)
 	if (dentry->d_op && dentry->d_op->d_release)
 		dentry->d_op->d_release(dentry);
 
-	/* if dentry was never visible to RCU, immediate free is OK */
-	if (!(dentry->d_flags & DCACHE_RCUACCESS))
-		__d_free(&dentry->d_u.d_rcu);
-	else
-		call_rcu(&dentry->d_u.d_rcu, __d_free);
+	dentry_free(dentry);
 }
 
 void take_dentry_name_snapshot(struct name_snapshot *name, struct dentry *dentry)
