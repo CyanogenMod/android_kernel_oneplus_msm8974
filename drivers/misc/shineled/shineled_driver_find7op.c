@@ -269,6 +269,8 @@ static int 	SN3193_TurnOffOut_sled(void)
 static int SN3193_SetBrightness(int color,u8 brightness)
 {
 	int ret=0;
+	if (color == RED_SLED)
+		brightness = brightness/4;
 	SN3193_write_reg(0x04+color, brightness);
 	return ret;
 }
