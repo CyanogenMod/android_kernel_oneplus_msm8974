@@ -242,23 +242,6 @@ Optional properties:
 					in dsi controller.
 					"high" = Set GPIO to HIGH
 					"low" = Set GPIO to LOW
-- qcom,partial-update-enabled:		Boolean used to enable partial
-					panel update for command mode panels.
-- qcom,mdss-dsi-reset-sequence:		An array that lists the
-					sequence of reset gpio values and sleeps
-					Each command will have the format defined
-					as below:
-					--> Reset GPIO value
-					--> Sleep value (in ms)
-- qcom,mdss-dsi-lp11-init:		Boolean used to enable the DSI clocks and data lanes (low power 11)
-					before issuing hardware reset line.
-- qcom,mdss-dsi-init-delay-us:		Delay in microseconds(us) before performing any DSI activity in lp11
-					mode. This master delay (t_init_delay as per DSI spec) should be sum
-					of DSI internal delay to reach fuctional after power up and minimum
-					delay required by panel to reach functional.
-- qcom,mdss-dsi-rx-eot-ignore:		Boolean used to enable ignoring end of transmission packets.
-- qcom,mdss-dsi-tx-eot-append:		Boolean used to enable appending end of transmission packets.
-- qcom,ulps-enabled:			Boolean to enable support for Ultra Low Power State (ULPS) mode.
 - qcom,mdss-tear-check-disable:		Boolean to disable mdp tear check. Tear check is enabled by default to avoid
 					tearing. Other tear-check properties are ignored if this property is present.
 					The below tear check configuration properties can be individually tuned if
@@ -290,6 +273,28 @@ Optional properties:
 - qcom,mdss-tear-check-frame-rate:	Specify the value to be a real frame rate(fps) x 100 factor to tune the
 					timing of TE simulation with more precision.
 					The default value is 6000 with 60 fps.
+- qcom,mdss-dsi-reset-sequence:		An array that lists the
+					sequence of reset gpio values and sleeps
+					Each command will have the format defined
+					as below:
+					--> Reset GPIO value
+					--> Sleep value (in ms)
+- qcom,partial-update-enabled:		Boolean used to enable partial
+					panel update for command mode panels.
+- qcom,mdss-dsi-horizontal-line-idle:	A list of horizontal line idle value.
+					--> (EC - SC) range (low and hight) + idle value.
+- qcom,partial-update-roi-merge:	Boolean indicates roi combination is need
+					and function has been provided for dcs
+					2A/2B command.
+- qcom,mdss-dsi-lp11-init:		Boolean used to enable the DSI clocks and data lanes (low power 11)
+					before issuing hardware reset line.
+- qcom,mdss-dsi-init-delay-us:		Delay in microseconds(us) before performing any DSI activity in lp11
+					mode. This master delay (t_init_delay as per DSI spec) should be sum
+					of DSI internal delay to reach fuctional after power up and minimum
+					delay required by panel to reach functional.
+- qcom,mdss-dsi-rx-eot-ignore:		Boolean used to enable ignoring end of transmission packets.
+- qcom,mdss-dsi-tx-eot-append:		Boolean used to enable appending end of transmission packets.
+- qcom,ulps-enabled:			Boolean to enable support for Ultra Low Power State (ULPS) mode.
 - qcom,panel-roi-alignment:		Specifies the panel ROI alignment restrictions on its
 					left, top, width, height alignments and minimum width and
 					height values
@@ -406,5 +411,8 @@ Example:
 		mdss-dsi-tx-eot-append;
 		qcom,ulps-enabled;
 		qcom,panel-roi-alignment = <4 4 2 2 20 20>;
+		qcom,mdss-dsi-hor-line-idle = <0 40 256>,
+						<40 120 128>,
+						<128 240 64>;
 	};
 };

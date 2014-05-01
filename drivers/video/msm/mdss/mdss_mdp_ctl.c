@@ -1626,6 +1626,7 @@ int mdss_mdp_ctl_split_display_setup(struct mdss_mdp_ctl *ctl,
 
 	sctl->width = pdata->panel_info.xres;
 	sctl->height = pdata->panel_info.yres;
+	sctl->roi = (struct mdss_rect){0, 0, sctl->width, sctl->height};
 
 	ctl->mixer_left = mdss_mdp_mixer_alloc(ctl, MDSS_MDP_MIXER_TYPE_INTF,
 			false);
@@ -1943,45 +1944,6 @@ int mdss_mdp_ctl_stop(struct mdss_mdp_ctl *ctl)
 	return ret;
 }
 
-void mdss_mdp_set_roi(struct mdss_mdp_ctl *ctl,
-		struct mdp_display_commit *data)
-{
-	struct mdss_rect temp_roi, mixer_roi;
-
-	temp_roi.x =  data->roi.x;
-	temp_roi.y =  data->roi.y;
-	temp_roi.w =  data->roi.w;
-	temp_roi.h =  data->roi.h;
-
-	/*
-	 * No Partial Update for:
-	 * 1) dual DSI panels
-	 * 2) non-cmd mode panels
-	*/
-	if (!temp_roi.w || !temp_roi.h || ctl->mixer_right ||
-			(ctl->panel_data->panel_info.type != MIPI_CMD_PANEL) ||
-			!ctl->panel_data->panel_info.partial_update_enabled) {
-		temp_roi = (struct mdss_rect)
-				{0, 0, ctl->mixer_left->width,
-					ctl->mixer_left->height};
-	}
-
-	ctl->roi_changed = 0;
-	if (!mdss_rect_cmp(&temp_roi, &ctl->roi)) {
-		ctl->roi = temp_roi;
-		ctl->roi_changed++;
-
-		mixer_roi = ctl->mixer_left->roi;
-		if ((mixer_roi.w != temp_roi.w) ||
-			(mixer_roi.h != temp_roi.h)) {
-			ctl->mixer_left->roi = temp_roi;
-			ctl->mixer_left->params_changed++;
-		}
-	}
-	pr_debug("ROI requested: [%d, %d, %d, %d]\n",
-			ctl->roi.x, ctl->roi.y, ctl->roi.w, ctl->roi.h);
-}
-
 /*
  * mdss_mdp_ctl_reset() - reset mdp ctl path.
  * @ctl: mdp controller.
@@ -2015,6 +1977,68 @@ int mdss_mdp_ctl_reset(struct mdss_mdp_ctl *ctl)
 	} while (status);
 
 	return 0;
+}
+
+void mdss_mdp_set_mixer_roi(struct mdss_mdp_ctl *ctl, struct mdss_rect *roi)
+{
+	struct mdss_rect mixer_roi;
+
+	ctl->valid_roi = (roi->w && roi->h);
+	ctl->roi_changed = 0;
+	if (((temp_roi.x != ctl->roi.x) ||
+			(temp_roi.y != ctl->roi.y)) ||
+			((temp_roi.w != ctl->roi.w) ||
+			 (temp_roi.h != ctl->roi.h))) {
+		ctl->roi = temp_roi;
+		ctl->roi_changed++;
+
+		mixer_roi = ctl->mixer_left->roi;
+		if ((mixer_roi.w != roi->w) ||
+			(mixer_roi.h != roi->h)) {
+			ctl->mixer_left->roi = *roi;
+			ctl->mixer_left->params_changed++;
+		}
+	}
+
+	pr_debug("ROI requested: [%d]: [%d, %d, %d, %d]\n",
+		ctl->num, ctl->roi.x, ctl->roi.y, ctl->roi.w, ctl->roi.h);
+}
+
+void mdss_mdp_set_roi(struct mdss_mdp_ctl *ctl,
+		struct mdp_display_commit *data)
+{
+	struct mdss_rect l_roi, r_roi;
+
+	l_roi.x = data->l_roi.x;
+	l_roi.y = data->l_roi.y;
+	l_roi.w = data->l_roi.w;
+	l_roi.h = data->l_roi.h;
+
+	r_roi.x = data->r_roi.x;
+	r_roi.y = data->r_roi.y;
+	r_roi.w = data->r_roi.w;
+	r_roi.h = data->r_roi.h;
+
+
+	/* Reset ROI when we have (1) invalid ROI (2) feature disabled */
+	if ((!l_roi.w && l_roi.h) || (l_roi.w && !l_roi.h) ||
+		(!r_roi.w && r_roi.h) || (r_roi.w && !r_roi.h) ||
+		!ctl->panel_data->panel_info.partial_update_enabled) {
+		l_roi = (struct mdss_rect)
+		{0, 0, ctl->mixer_left->width,
+			ctl->mixer_left->height};
+
+		if (ctl->mixer_right) {
+			r_roi = (struct mdss_rect)
+			{0, 0, ctl->mixer_right->width,
+				ctl->mixer_right->height};
+		}
+	}
+
+	mdss_mdp_set_mixer_roi(ctl, &l_roi);
+
+	if (ctl->mixer_right)
+		mdss_mdp_set_mixer_roi(ctl->mixer_right->ctl, &r_roi);
 }
 
 static int mdss_mdp_mixer_setup(struct mdss_mdp_ctl *ctl,
@@ -2579,6 +2603,7 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 	int mixer1_changed, mixer2_changed;
 	int ret = 0;
 	bool is_bw_released;
+	int split_enable;
 
 	if (!ctl) {
 		pr_err("display function not set\n");
@@ -2605,8 +2630,23 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 	 * pending, so we want to re-calculate the bandwidth in this situation
 	 */
 	is_bw_released = !mdss_mdp_ctl_perf_get_transaction_status(ctl);
-	mdss_mdp_ctl_perf_set_transaction_status(ctl, PERF_SW_COMMIT_STATE,
-		PERF_STATUS_BUSY);
+	if (is_bw_released) {
+		if (sctl)
+			is_bw_released =
+				!mdss_mdp_ctl_perf_get_transaction_status(sctl);
+	}
+
+	if (sctl && !ctl->valid_roi && sctl->valid_roi) {
+		/*
+		 * Seperate kickoff on DSI1 is needed only when we have
+		 * ONLY right half updating on a dual DSI panel
+		 */
+		mdss_mdp_ctl_perf_set_transaction_status(sctl,
+				PERF_SW_COMMIT_STATE, PERF_STATUS_BUSY);
+	} else {
+		mdss_mdp_ctl_perf_set_transaction_status(ctl,
+				PERF_SW_COMMIT_STATE, PERF_STATUS_BUSY);
+	}
 
 	if (is_bw_released || mixer1_changed || mixer2_changed
 			|| ctl->force_screen_state) {
@@ -2651,6 +2691,18 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 	ctl->roi_bkup.w = ctl->roi.w;
 	ctl->roi_bkup.h = ctl->roi.h;
 
+	if (sctl && sctl->wait_pingpong)
+		sctl->wait_pingpong(sctl, NULL);
+
+	/* 
+	 *With partial frame update, enable split display bit only
+	 * when validity of ROI's on both the DSI's are identical
+	 */
+	if (sctl) {
+		split_enable = (ctl->valid_roi == sctl->valid_roi);
+		mdss_mdp_ctl_split_display_enable(split_enable, ctl, sctl);
+	}
+
 	ATRACE_BEGIN("postproc_programming");
 	if (ctl->mfd && ctl->mfd->dcm_state != DTM_ENTER)
 		/* postprocessing setup, including dspp */
@@ -2669,8 +2721,23 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 
 	mdss_mdp_xlog_mixer_reg(ctl);
 
-	if (ctl->display_fnc)
-		ret = ctl->display_fnc(ctl, arg); /* kickoff */
+	if (sctl && !ctl->valid_roi && sctl->valid_roi) {
+		/*
+		 * Seperate kickoff on DSI1 is needed only when we have
+		 * ONLY right half updating on a dual DSI panel
+		 */
+		if (sctl->display_fnc)
+			ret = sctl->display_fnc(sctl, arg); /* DSI1 kickoff */
+	} else {
+		if (ctl->display_fnc)
+			ret = ctl->display_fnc(ctl, arg); /* DSI0 kickoff */
+	}
+
+	if (sctl)
+		sctl->valid_roi = 0;
+
+	ctl->valid_roi = 0;
+
 	if (ret)
 		pr_warn("error displaying frame\n");
 
@@ -2688,13 +2755,26 @@ done:
 void mdss_mdp_ctl_notifier_register(struct mdss_mdp_ctl *ctl,
 	struct notifier_block *notifier)
 {
+	struct mdss_mdp_ctl *sctl;
+
 	blocking_notifier_chain_register(&ctl->notifier_head, notifier);
+
+	sctl = mdss_mdp_get_split_ctl(ctl);
+	if (sctl)
+		blocking_notifier_chain_register(&sctl->notifier_head,
+						notifier);
 }
 
 void mdss_mdp_ctl_notifier_unregister(struct mdss_mdp_ctl *ctl,
 	struct notifier_block *notifier)
 {
+	struct mdss_mdp_ctl *sctl;
 	blocking_notifier_chain_unregister(&ctl->notifier_head, notifier);
+
+	sctl = mdss_mdp_get_split_ctl(ctl);
+	if (sctl)
+		blocking_notifier_chain_unregister(&sctl->notifier_head,
+						notifier);
 }
 
 int mdss_mdp_ctl_notify(struct mdss_mdp_ctl *ctl, int event)
