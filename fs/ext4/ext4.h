@@ -1155,6 +1155,12 @@ struct ext4_sb_info {
 	ext4_fsblk_t s_sb_block;
 	uid_t s_resuid;
 	gid_t s_resgid;
+#ifdef CONFIG_MACH_FIND7
+	uid_t s_uid;
+	gid_t s_gid;
+	unsigned short s_dmask;
+	unsigned short s_fmask;
+#endif
 	unsigned short s_mount_state;
 	unsigned short s_pad;
 	int s_addr_per_block_bits;
@@ -2351,6 +2357,32 @@ static inline void set_bitmap_uptodate(struct buffer_head *bh)
 }
 
 #define in_range(b, first, len)	((b) >= (first) && (b) <= (first) + (len) - 1)
+
+#ifdef CONFIG_MACH_FIND7
+static inline umode_t ext4_make_mode(struct ext4_sb_info *ei, umode_t i_mode)
+{
+	umode_t mode;
+	if (S_ISDIR(i_mode) || (i_mode == 0)) {
+		mode = (S_IRWXUGO & ~ei->s_dmask) | S_IFDIR;
+	}
+	else {
+		mode = (S_IRWXUGO & ~ei->s_fmask) | S_IFREG;
+	}
+	return mode;
+}
+static inline void ext4_fill_inode(struct super_block *sb, struct inode *inode)
+{
+	if (EXT4_SB(sb)->s_dmask  || EXT4_SB(sb)->s_fmask) {
+		inode->i_mode = ext4_make_mode(EXT4_SB(sb), inode->i_mode);
+	}
+	if (EXT4_SB(sb)->s_uid) {
+		inode->i_uid = EXT4_SB(sb)->s_uid;
+	}
+	if (EXT4_SB(sb)->s_gid) {
+		inode->i_gid = EXT4_SB(sb)->s_gid;
+	}
+}
+#endif
 
 /* For ioend & aio unwritten conversion wait queues */
 #define EXT4_WQ_HASH_SZ		37

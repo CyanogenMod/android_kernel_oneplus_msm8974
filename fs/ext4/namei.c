@@ -1756,6 +1756,9 @@ retry:
 		ext4_handle_sync(handle);
 
 	inode = ext4_new_inode(handle, dir, mode, &dentry->d_name, 0, NULL);
+#ifdef CONFIG_MACH_FIND7
+	ext4_fill_inode(dir->i_sb, inode);
+#endif
 	err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
 		inode->i_op = &ext4_file_inode_operations;
@@ -1832,6 +1835,9 @@ retry:
 
 	inode = ext4_new_inode(handle, dir, S_IFDIR | mode,
 			       &dentry->d_name, 0, NULL);
+#ifdef CONFIG_MACH_FIND7
+	ext4_fill_inode(dir->i_sb, inode);
+#endif
 	err = PTR_ERR(inode);
 	if (IS_ERR(inode))
 		goto out_stop;
