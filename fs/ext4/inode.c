@@ -3704,6 +3704,9 @@ struct inode *ext4_iget(struct super_block *sb, unsigned long ino)
 		inode->i_uid |= le16_to_cpu(raw_inode->i_uid_high) << 16;
 		inode->i_gid |= le16_to_cpu(raw_inode->i_gid_high) << 16;
 	}
+#ifdef CONFIG_MACH_FIND7
+	ext4_fill_inode(sb, inode);
+#endif
 	set_nlink(inode, le16_to_cpu(raw_inode->i_links_count));
 
 	ext4_clear_state_flags(ei);	/* Only relevant on 32-bit archs */
@@ -3938,6 +3941,9 @@ static int ext4_do_update_inode(handle_t *handle,
 		memset(raw_inode, 0, EXT4_SB(inode->i_sb)->s_inode_size);
 
 	ext4_get_inode_flags(ei);
+#ifdef CONFIG_MACH_FIND7
+	ext4_fill_inode(inode->i_sb, inode);
+#endif
 	raw_inode->i_mode = cpu_to_le16(inode->i_mode);
 	if (!(test_opt(inode->i_sb, NO_UID32))) {
 		raw_inode->i_uid_low = cpu_to_le16(low_16_bits(inode->i_uid));
