@@ -160,6 +160,8 @@
 &pm8941_chg {
 	status = "ok";
 	qcom,battery-data = <&mtp_batterydata>;
+	qcom,cool-bat-decidegc;
+	qcom,warm-bat-decidegc;
 
 	qcom,chgr@1000 {
 		status = "ok";
