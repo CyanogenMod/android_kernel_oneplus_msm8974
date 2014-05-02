@@ -6231,7 +6231,7 @@ do {									\
 					"qcom," qpnp_dt_property,	\
 					&chip->prop);			\
 									\
-	if ((retval == -EINVAL) && optional)				\
+	if (retval && optional)						\
 		retval = 0;						\
 	else if (retval)						\
 		pr_err("Error reading " #qpnp_dt_property		\
