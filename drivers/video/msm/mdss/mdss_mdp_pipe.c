@@ -897,7 +897,7 @@ static int mdss_mdp_image_setup(struct mdss_mdp_pipe *pipe,
 	u32 img_size, src_size, src_xy, dst_size, dst_xy, ystride0, ystride1;
 	u32 width, height;
 	u32 decimation;
-	struct mdss_mdp_img_rect sci, dst, src;
+	struct mdss_rect sci, dst, src;
 	int ret = 0;
 	bool rotation = false;
 
