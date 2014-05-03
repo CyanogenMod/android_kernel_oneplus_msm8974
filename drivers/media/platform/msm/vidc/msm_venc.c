@@ -1001,53 +1001,11 @@ static int msm_venc_queue_setup(struct vb2_queue *q,
 	return rc;
 }
 
-static int msm_venc_enable_hier_p(struct msm_vidc_inst *inst)
-{
-	int num_enh_layers = 0;
-	u32 property_id = 0;
-	struct hfi_device *hdev = NULL;
-	int rc = 0;
-
-	if (!inst || !inst->core || !inst->core->device) {
-		dprintk(VIDC_ERR, "%s invalid parameters\n", __func__);
-		return -EINVAL;
-	}
-
-	if (inst->fmts[CAPTURE_PORT]->fourcc != V4L2_PIX_FMT_VP8)
-		return 0;
-
-	num_enh_layers = inst->capability.hier_p.max - 1;
-	if (!num_enh_layers)
-		return 0;
-
-	hdev = inst->core->device;
-	property_id = HAL_PARAM_VENC_HIER_P_MAX_ENH_LAYERS;
-
-	rc = call_hfi_op(hdev, session_set_property,
-			(void *)inst->session, property_id,
-			(void *)&num_enh_layers);
-	if (rc) {
-		dprintk(VIDC_ERR,
-			"%s: failed with error = %d\n", __func__, rc);
-	}
-	return rc;
-}
-
 static inline int start_streaming(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
 	struct vb2_buf_entry *temp;
 	struct list_head *ptr, *next;
-
-	if (!inst || !inst->core || !inst->core->device) {
-		dprintk(VIDC_ERR, "%s invalid parameters\n", __func__);
-		return -EINVAL;
-	}
-
-	rc = msm_venc_enable_hier_p(inst);
-	if (rc)
-		return rc;
-
 	if (inst->capability.pixelprocess_capabilities &
 		HAL_VIDEO_ENCODER_SCALING_CAPABILITY)
 		rc = msm_comm_check_scaling_supported(inst);
@@ -2144,7 +2102,7 @@ static int try_set_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 		pdata = &markltr;
 		break;
 	case V4L2_CID_MPEG_VIDC_VIDEO_HIER_P_NUM_LAYERS:
-		property_id = HAL_CONFIG_VENC_HIER_P_NUM_FRAMES;
+		property_id = HAL_PARAM_VENC_HIER_P_NUM_FRAMES;
 		hier_p_layers = ctrl->val;
 		if (hier_p_layers > (inst->capability.hier_p.max - 1)) {
 			dprintk(VIDC_ERR,
@@ -2694,16 +2652,8 @@ int msm_venc_g_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 				buff_req_buffer->buffer_size : 0;
 		}
 		for (i = 0; i < fmt->num_planes; ++i) {
-			if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
-				inst->bufq[OUTPUT_PORT].vb2_bufq.
-				plane_sizes[i] =
-				f->fmt.pix_mp.plane_fmt[i].sizeimage;
-			} else if (f->type ==
-				V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
-				inst->bufq[CAPTURE_PORT].vb2_bufq.
-				plane_sizes[i] =
-				f->fmt.pix_mp.plane_fmt[i].sizeimage;
-			}
+			inst->bufq[CAPTURE_PORT].vb2_bufq.plane_sizes[i] =
+			f->fmt.pix_mp.plane_fmt[i].sizeimage;
 		}
 	} else {
 		dprintk(VIDC_ERR,
