@@ -2155,7 +2155,7 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 				if (abs(points[3] - points[1]) <= 800)
 					gesturemode=UnknownGesture;
 			}
-			if (gesturemode != UnknownGesture) {
+			if (gesturemode == DouSwip) {
 				if (atomic_read(&syna_rmi4_data->music_enable))
 					keyvalue = KEY_GESTURE_SWIPE_DOWN;
 			}
