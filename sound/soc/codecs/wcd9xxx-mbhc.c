@@ -4892,7 +4892,7 @@ int wcd9xxx_mbhc_init(struct wcd9xxx_mbhc *mbhc, struct wcd9xxx_resmgr *resmgr,
 			return ret;
 		}
 
-#ifdef CONFIG_MACH_FIND7OP
+#ifdef CONFIG_MACH_OPPO
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
 				       SND_JACK_BTN_1,
 				       KEY_VOLUMEDOWN);
