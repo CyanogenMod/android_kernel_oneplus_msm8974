@@ -7878,7 +7878,7 @@ static int wlan_hdd_cfg80211_sched_scan_stop(struct wiphy *wiphy,
 #ifdef FEATURE_WLAN_TDLS
 static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *dev,
                      u8 *peer, u8 action_code,  u8 dialog_token,
-                                                 u16 status_code, const u8 *buf, size_t len)
+                     u16 status_code, u32 peer_capability, const u8 *buf, size_t len)
 {
 
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
@@ -8306,7 +8306,7 @@ int wlan_hdd_cfg80211_send_tdls_discover_req(struct wiphy *wiphy,
             peer[0], peer[1], peer[2], peer[3], peer[4], peer[5]);
 
     return wlan_hdd_cfg80211_tdls_mgmt(wiphy, dev, peer,
-                            WLAN_TDLS_DISCOVERY_REQUEST, 1, 0, NULL, 0);
+                            WLAN_TDLS_DISCOVERY_REQUEST, 1, 0, 0, NULL, 0);
 }
 #endif
 
