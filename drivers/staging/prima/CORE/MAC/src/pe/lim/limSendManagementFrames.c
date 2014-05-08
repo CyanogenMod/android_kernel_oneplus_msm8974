@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -43,7 +43,6 @@
  *
  * \brief Code for preparing and sending 802.11 Management frames
  *
- * Copyright (C) 2005-2007 Airgo Networks, Incorporated
  *
  */
 
@@ -215,16 +214,16 @@ limSendProbeReqMgmtFrame(tpAniSirGlobal pMac,
                          tANI_U32 nAdditionalIELen, 
                          tANI_U8 *pAdditionalIE)
 {
-    tDot11fProbeRequest pr;
-    tANI_U32            nStatus, nBytes, nPayload;
-    tSirRetStatus       nSirStatus;
-    tANI_U8            *pFrame;
-    void               *pPacket;
-    eHalStatus          halstatus;
-    tpPESession         psessionEntry;
-    tANI_U8             sessionId;
+    tDot11fProbeRequest  pr;
+    tANI_U32             nStatus, nBytes, nPayload;
+    tSirRetStatus        nSirStatus;
+    tANI_U8             *pFrame;
+    void                *pPacket;
+    eHalStatus           halstatus;
+    tpPESession          psessionEntry;
+    tANI_U8              sessionId;
     tANI_U8             *p2pIe = NULL;
-    tANI_U8             txFlag = 0;
+    tANI_U32             txFlag = 0;
 
 #ifndef GEN4_SCAN
     return eSIR_FAILURE;
@@ -423,7 +422,6 @@ limSendProbeReqMgmtFrame(tpAniSirGlobal pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME; 
     }
 
-
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) sizeof(tSirMacMgmtHdr) + nPayload,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
@@ -507,26 +505,26 @@ limSendProbeRspMgmtFrame(tpAniSirGlobal pMac,
                          tANI_U8        probeReqP2pIe)
 {
     tDot11fProbeResponse *pFrm;
-    tSirRetStatus        nSirStatus;
-    tANI_U32             cfg, nPayload, nBytes, nStatus;
-    tpSirMacMgmtHdr      pMacHdr;
-    tANI_U8             *pFrame;
-    void                *pPacket;
-    eHalStatus           halstatus;
-    tANI_U32             addnIEPresent;
-    tANI_U32             addnIE1Len=0;
-    tANI_U32             addnIE2Len=0;
-    tANI_U32             addnIE3Len=0;
-    tANI_U16             totalAddnIeLen = 0;
-    tANI_U32             wpsApEnable=0, tmp;
-    tANI_U8              txFlag = 0;
+    tSirRetStatus         nSirStatus;
+    tANI_U32              cfg, nPayload, nBytes, nStatus;
+    tpSirMacMgmtHdr       pMacHdr;
+    tANI_U8              *pFrame;
+    void                 *pPacket;
+    eHalStatus            halstatus;
+    tANI_U32              addnIEPresent;
+    tANI_U32              addnIE1Len=0;
+    tANI_U32              addnIE2Len=0;
+    tANI_U32              addnIE3Len=0;
+    tANI_U16              totalAddnIeLen = 0;
+    tANI_U32              wpsApEnable=0, tmp;
+    tANI_U32              txFlag = 0;
     tANI_U8              *addIE = NULL;
-    tANI_U8             *pP2pIe = NULL;
-    tANI_U8              noaLen = 0;
-    tANI_U8              total_noaLen = 0;
-    tANI_U8              noaStream[SIR_MAX_NOA_ATTR_LEN 
+    tANI_U8              *pP2pIe = NULL;
+    tANI_U8               noaLen = 0;
+    tANI_U8               total_noaLen = 0;
+    tANI_U8               noaStream[SIR_MAX_NOA_ATTR_LEN
                                            + SIR_P2P_IE_HEADER_LEN];
-    tANI_U8              noaIe[SIR_MAX_NOA_ATTR_LEN + SIR_P2P_IE_HEADER_LEN];
+    tANI_U8               noaIe[SIR_MAX_NOA_ATTR_LEN + SIR_P2P_IE_HEADER_LEN];
   
     if(pMac->gDriverType == eDRIVER_TYPE_MFG)         // We don't answer requests
     {
@@ -632,7 +630,7 @@ limSendProbeRspMgmtFrame(tpAniSirGlobal pMac,
 #ifdef WLAN_FEATURE_11AC
     if(psessionEntry->vhtCapability)
     {
-        limLog( pMac, LOGW, FL("Populate VHT IE in Probe Response"));
+        limLog( pMac, LOG1, FL("Populate VHT IE in Probe Response"));
         PopulateDot11fVHTCaps( pMac, &pFrm->VHTCaps );
         PopulateDot11fVHTOperation( pMac, &pFrm->VHTOperation );
         // we do not support multi users yet
@@ -640,18 +638,6 @@ limSendProbeRspMgmtFrame(tpAniSirGlobal pMac,
         PopulateDot11fExtCap( pMac, &pFrm->ExtCap);
     }
 #endif
-
-    if (psessionEntry->oxygenNwkIniFeatureEnabled &&
-       (eLIM_STA_IN_IBSS_ROLE == psessionEntry->limSystemRole)) {
-        if (wlan_cfgGetInt(pMac, WNI_CFG_OXYGEN_NETWORK_DATA,
-                                     &tmp) != eSIR_SUCCESS){
-            limLog(pMac, LOGW, FL("Unable to get WNI_CFG_OXYGEN_NETWORK_DATA"));
-        }
-        else {
-            pFrm->OxygenNetwork.present = 1;
-            pFrm->OxygenNetwork.data = (tmp & 0xffff);
-        }
-    }
 
     if ( psessionEntry->pLimStartBssReq ) 
     {
@@ -905,7 +891,8 @@ limSendProbeRspMgmtFrame(tpAniSirGlobal pMac,
         if (total_noaLen > (SIR_MAX_NOA_ATTR_LEN + SIR_P2P_IE_HEADER_LEN))
         {
             limLog(pMac, LOGE,
-                  FL("Not able to insert NoA because of length constraint"));
+                  FL("Not able to insert NoA because of length constraint."
+                                        "Total Length is :%d"),total_noaLen);
             vos_mem_free(addIE);
             vos_mem_free(pFrm);
             palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
@@ -969,7 +956,7 @@ limSendAddtsReqActionFrame(tpAniSirGlobal    pMac,
     tANI_U32               phyMode;
 #endif
     eHalStatus             halstatus;
-    tANI_U8                txFlag = 0;
+    tANI_U32               txFlag = 0;
 
     if(NULL == psessionEntry)
     {
@@ -1188,12 +1175,19 @@ limSendAddtsReqActionFrame(tpAniSirGlobal    pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
+    pMacHdr = ( tpSirMacMgmtHdr ) pFrame;
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
     // Queue Addts Response frame in high priority WQ
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL( "*** Could not send an Add TS Request"
@@ -1222,8 +1216,8 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
     tANI_U32             nPayload, nBytes, nStatus;
     void                *pPacket;
     eHalStatus           halstatus;
-    tUpdateBeaconParams beaconParams;
-    tANI_U8              txFlag = 0;
+    tUpdateBeaconParams  beaconParams;
+    tANI_U32             txFlag = 0;
     tANI_U32             addnIEPresent = false;
     tANI_U32             addnIELen=0;
     tANI_U8              addIE[WNI_CFG_ASSOC_RSP_ADDNIE_DATA_LEN];
@@ -1231,6 +1225,7 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
 
     if(NULL == psessionEntry)
     {
+        limLog( pMac, LOGE, FL("psessionEntry is NULL"));
         return;
     }
 
@@ -1332,7 +1327,7 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
         if( pSta->mlmStaContext.vhtCapability && 
             psessionEntry->vhtCapability )
         {
-            limLog( pMac, LOGW, FL("Populate VHT IEs in Assoc Response"));
+            limLog( pMac, LOG1, FL("Populate VHT IEs in Assoc Response"));
             PopulateDot11fVHTCaps( pMac, &frm.VHTCaps );
             PopulateDot11fVHTOperation( pMac, &frm.VHTOperation);
             PopulateDot11fExtCap( pMac, &frm.ExtCap);
@@ -1384,7 +1379,8 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
         if (wlan_cfgGetInt(pMac, WNI_CFG_ASSOC_RSP_ADDNIE_FLAG, 
                     &addnIEPresent) != eSIR_SUCCESS)
         {
-            limLog(pMac, LOGP, FL("Unable to get WNI_CFG_ASSOC_RSP_ADDNIE_FLAG"));
+            limLog(pMac, LOGP, FL("Unable to get "
+                                  "WNI_CFG_ASSOC_RSP_ADDNIE_FLAG"));
             return;
         }
 
@@ -1394,7 +1390,8 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
             if (wlan_cfgGetStrLen(pMac, WNI_CFG_ASSOC_RSP_ADDNIE_DATA,
                         &addnIELen) != eSIR_SUCCESS)
             {
-                limLog(pMac, LOGP, FL("Unable to get WNI_CFG_ASSOC_RSP_ADDNIE_DATA length"));
+                limLog(pMac, LOGP, FL("Unable to get "
+                           "WNI_CFG_ASSOC_RSP_ADDNIE_DATA length"));
                 return;
             }
 
@@ -1449,8 +1446,8 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
                                        nPayload, &nPayload );
     if ( DOT11F_FAILED( nStatus ) )
     {
-        limLog( pMac, LOGE, FL("Failed to pack an Association Response (0x%08x)."),
-                nStatus );
+        limLog( pMac, LOGE, FL("Failed to pack an Association Response"
+                               " (0x%08x)."), nStatus );
         palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
                     ( void* ) pFrame, ( void* ) pPacket );
         return;                 // allocated!
@@ -1489,12 +1486,24 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
+    limLog( pMac, LOG1, FL("Sending Assoc resp over WQ5 to "MAC_ADDRESS_STR
+                " From " MAC_ADDRESS_STR),MAC_ADDR_ARRAY(pMacHdr->da),
+              MAC_ADDR_ARRAY(psessionEntry->selfMacAddr));
+
+    txFlag |= HAL_USE_FW_IN_TX_PATH;
+
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
     /// Queue Association Response frame in high priority WQ
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog(pMac, LOGE,
@@ -1529,7 +1538,7 @@ limSendAddtsRspActionFrame(tpAniSirGlobal     pMac,
     tANI_U32                i, nBytes, nPayload, nStatus;
     void                   *pPacket;
     eHalStatus              halstatus;
-    tANI_U8                 txFlag = 0;
+    tANI_U32                txFlag = 0;
 
     if(NULL == psessionEntry)
     {
@@ -1767,12 +1776,18 @@ limSendAddtsRspActionFrame(tpAniSirGlobal     pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
     // Queue the frame in high priority WQ:
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL("Failed to send Add TS Response (%X)!"),
@@ -1798,7 +1813,7 @@ limSendDeltsReqActionFrame(tpAniSirGlobal  pMac,
     tANI_U32         nBytes, nPayload, nStatus;
     void            *pPacket;
     eHalStatus       halstatus;
-    tANI_U8          txFlag = 0;
+    tANI_U32         txFlag = 0;
 
     if(NULL == psessionEntry)
     {
@@ -1950,11 +1965,17 @@ limSendDeltsReqActionFrame(tpAniSirGlobal  pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL("Failed to send Del TS (%X)!"),
@@ -1984,21 +2005,19 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
 #if defined WLAN_FEATURE_VOWIFI
     tANI_U8             PowerCapsPopulated = FALSE;
 #endif
-    tANI_U8             txFlag = 0;
+    tpSirMacMgmtHdr     pMacHdr;
+    tANI_U32            txFlag = 0;
 
     if(NULL == psessionEntry)
     {
+        limLog(pMac, LOGE, FL("psessionEntry is NULL") );
         return;
     }
 
-    if(NULL == psessionEntry->pLimJoinReq)
-    {
-        return;
-    }
-    
     /* check this early to avoid unncessary operation */
     if(NULL == psessionEntry->pLimJoinReq)
     {
+        limLog(pMac, LOGE, FL("psessionEntry->pLimJoinReq is NULL") );
         return;
     }
     nAddIELen = psessionEntry->pLimJoinReq->addIEAssoc.length; 
@@ -2007,7 +2026,7 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
     pFrm = vos_mem_malloc(sizeof(tDot11fAssocRequest));
     if ( NULL == pFrm )
     {
-        limLog(pMac, LOGE, FL("Unable to allocate memory in limSendAssocReqMgmtFrame") );
+        limLog(pMac, LOGE, FL("Unable to allocate memory") );
         return;
     }
 
@@ -2152,7 +2171,8 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
 
         if( (psessionEntry->pLimJoinReq != NULL) && (!psessionEntry->pLimJoinReq->bssDescription.aniIndicator))
         {
-                limLog( pMac, LOG1, FL("Sending Assoc Req to Non-TQ AP, Turning off Greenfield"));
+                limLog( pMac, LOG1, FL("Sending Assoc Req to Non-TQ AP,"
+                                        " Turning off Greenfield"));
             pFrm->HTCaps.greenField = WNI_CFG_GREENFIELD_CAPABILITY_DISABLE;
         }
 #endif
@@ -2262,13 +2282,13 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
     }
 
 
-    // That done, pack the Probe Request:
+    // That done, pack the Assoc Request:
     nStatus = dot11fPackAssocRequest( pMac, pFrm, pFrame +
             sizeof(tSirMacMgmtHdr),
             nPayload, &nPayload );
     if ( DOT11F_FAILED( nStatus ) )
     {
-        limLog( pMac, LOGE, FL("Failed to pack a Probe Response (0x%0"
+        limLog( pMac, LOGE, FL("Failed to pack a Assoc Request (0x%0"
                     "8x)."),
                 nStatus );
         palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT,
@@ -2278,8 +2298,8 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
     }
     else if ( DOT11F_WARNED( nStatus ) )
     {
-        limLog( pMac, LOGW, FL("There were warnings while packing a P"
-                    "robe Response (0x%08x).") );
+        limLog( pMac, LOGW, FL("There were warnings while packing a Assoc"
+                               "Request (0x%08x)."), nStatus );
     }
 
     PELOG1(limLog( pMac, LOG1, FL("*** Sending Association Request length %d"
@@ -2304,7 +2324,8 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
     psessionEntry->assocReq = vos_mem_malloc(nPayload);
     if ( NULL == psessionEntry->assocReq )
     {
-        PELOGE(limLog(pMac, LOGE, FL("Unable to allocate memory to store assoc request"));)
+        PELOGE(limLog(pMac, LOGE, FL("Unable to allocate memory to store "
+                                     "assoc request"));)
     }
     else
     {
@@ -2326,11 +2347,24 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
         txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
     }
 
+    pMacHdr = ( tpSirMacMgmtHdr ) pFrame;
+    limLog( pMac, LOG1, FL("Sending Assoc req over WQ5 to "MAC_ADDRESS_STR
+              " From " MAC_ADDRESS_STR),MAC_ADDR_ARRAY(pMacHdr->da),
+              MAC_ADDR_ARRAY(psessionEntry->selfMacAddr));
+    txFlag |= HAL_USE_FW_IN_TX_PATH;
+
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
+
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) (sizeof(tSirMacMgmtHdr) + nPayload),
             HAL_TXRX_FRM_802_11_MGMT,
             ANI_TXDIR_TODS,
             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
             limTxComplete, pFrame, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL("Failed to send Association Request (%X)!"),
@@ -2342,6 +2376,7 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
 
     // Free up buffer allocated for mlmAssocReq
     vos_mem_free(pMlmAssocReq);
+    pMlmAssocReq = NULL;
     vos_mem_free(pFrm);
     return;
 } // End limSendAssocReqMgmtFrame
@@ -2376,7 +2411,8 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
 #if defined FEATURE_WLAN_CCX || defined(FEATURE_WLAN_LFR)
     tANI_U8               *wpsIe = NULL;
 #endif
-    tANI_U8               txFlag = 0;
+    tpSirMacMgmtHdr       pMacHdr;
+    tANI_U32              txFlag = 0;
 
     if (NULL == psessionEntry)
     {
@@ -2589,6 +2625,16 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
     }
 #endif
 
+#ifdef WLAN_FEATURE_11AC
+    if ( psessionEntry->vhtCapability &&
+             psessionEntry->vhtCapabilityPresentInBeacon)
+    {
+        limLog( pMac, LOG1, FL("Populate VHT IEs in Re-Assoc Request"));
+        PopulateDot11fVHTCaps( pMac, &frm.VHTCaps );
+        PopulateDot11fExtCap( pMac, &frm.ExtCap);
+    }
+#endif
+
     nStatus = dot11fGetPackedReAssocRequestSize( pMac, &frm, &nPayload );
     if ( DOT11F_FAILED( nStatus ) )
     {
@@ -2650,7 +2696,7 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
         goto end;
     }
 
-
+    pMacHdr = (tpSirMacMgmtHdr) pFrame;
     // That done, pack the ReAssoc Request:
     nStatus = dot11fPackReAssocRequest( pMac, &frm, pFrame +
             sizeof(tSirMacMgmtHdr),
@@ -2749,11 +2795,17 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
     }
 
 
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) (nBytes + ft_ies_length),
             HAL_TXRX_FRM_802_11_MGMT,
             ANI_TXDIR_TODS,
             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
             limTxComplete, pFrame, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL("Failed to send Re-Association Request"
@@ -2844,10 +2896,11 @@ limSendReassocReqMgmtFrame(tpAniSirGlobal     pMac,
     tANI_U16              nAddIELen; 
     tANI_U8               *pAddIE;
     tANI_U8               *wpsIe = NULL;
-    tANI_U8               txFlag = 0;
+    tANI_U32              txFlag = 0;
 #if defined WLAN_FEATURE_VOWIFI
     tANI_U8               PowerCapsPopulated = FALSE;
 #endif
+    tpSirMacMgmtHdr     pMacHdr;
 
     if(NULL == psessionEntry)
     {
@@ -2996,7 +3049,7 @@ limSendReassocReqMgmtFrame(tpAniSirGlobal     pMac,
     if ( psessionEntry->vhtCapability &&
              psessionEntry->vhtCapabilityPresentInBeacon)
     {
-        limLog( pMac, LOGW, FL("Populate VHT IEs in Re-Assoc Request"));
+        limLog( pMac, LOG1, FL("Populate VHT IEs in Re-Assoc Request"));
         PopulateDot11fVHTCaps( pMac, &frm.VHTCaps );
         PopulateDot11fExtCap( pMac, &frm.ExtCap);
     }
@@ -3048,7 +3101,7 @@ limSendReassocReqMgmtFrame(tpAniSirGlobal     pMac,
         goto end;
     }
 
-
+    pMacHdr = (tpSirMacMgmtHdr) pFrame;
     // That done, pack the Probe Request:
     nStatus = dot11fPackReAssocRequest( pMac, &frm, pFrame +
                                         sizeof(tSirMacMgmtHdr),
@@ -3110,11 +3163,17 @@ limSendReassocReqMgmtFrame(tpAniSirGlobal     pMac,
         txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
     }
 
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) (sizeof(tSirMacMgmtHdr) + nPayload),
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL("Failed to send Re-Association Request"
@@ -3167,13 +3226,20 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
     tANI_U16            i;
     void               *pPacket;
     eHalStatus          halstatus;
-    tANI_U8             txFlag = 0;
+    tANI_U32            txFlag = 0;
 
     if(NULL == psessionEntry)
     {
+        limLog(pMac, LOGE, FL("Error: psession Entry is NULL"));
         return;
     }
-      
+
+    limLog(pMac, LOG1,
+           FL("Sending Auth seq# %d status %d (%d) to "MAC_ADDRESS_STR),
+           pAuthFrameBody->authTransactionSeqNumber,
+           pAuthFrameBody->authStatusCode,
+           (pAuthFrameBody->authStatusCode == eSIR_MAC_SUCCESS_STATUS),
+            MAC_ADDR_ARRAY(peerMacAddr));
     if (wepBit == LIM_WEP_IN_FC)
     {
         /// Auth frame3 to be sent with encrypted framebody
@@ -3216,7 +3282,8 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
                 }
                 else
                 {
-                    limLog(pMac, LOG3, FL("Auth frame, Does not contain FTIES!!!"));
+                    limLog(pMac, LOG3, FL("Auth frame, Does not contain "
+                                          "FTIES!!!"));
                     frameLen += (2+SIR_MDIE_SIZE);
                 }
             }
@@ -3307,6 +3374,8 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
     if (limPopulateMacHeader(pMac, pFrame, SIR_MAC_MGMT_FRAME,
                       SIR_MAC_MGMT_AUTH, peerMacAddr,psessionEntry->selfMacAddr) != eSIR_SUCCESS)
     {
+        limLog(pMac, LOGE, FL("call to limPopulateMacHeader failed for "
+                              "AUTH frame"));
         palPktFree( pMac->hHdd, HAL_TXRX_FRM_802_11_MGMT, ( void* ) pFrame, ( void* ) pPacket );
         return;
     }
@@ -3330,11 +3399,11 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
         vos_mem_copy(pBody, (tANI_U8 *) pAuthFrameBody, bodyLen);
 
         PELOG1(limLog(pMac, LOG1,
-           FL("*** Sending Auth seq# 3 status %d (%d) to"),
+           FL("*** Sending Auth seq# 3 status %d (%d) to"MAC_ADDRESS_STR),
            pAuthFrameBody->authStatusCode,
-           (pAuthFrameBody->authStatusCode == eSIR_MAC_SUCCESS_STATUS));
+           (pAuthFrameBody->authStatusCode == eSIR_MAC_SUCCESS_STATUS),
+           MAC_ADDR_ARRAY(pMacHdr->da));)
 
-        limPrintMacAddr(pMac, pMacHdr->da, LOG1);)
     }
     else
     {
@@ -3391,12 +3460,11 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
 #endif
 
         PELOG1(limLog(pMac, LOG1,
-           FL("*** Sending Auth seq# %d status %d (%d) to "),
+           FL("*** Sending Auth seq# %d status %d (%d) to "MAC_ADDRESS_STR),
            pAuthFrameBody->authTransactionSeqNumber,
            pAuthFrameBody->authStatusCode,
-           (pAuthFrameBody->authStatusCode == eSIR_MAC_SUCCESS_STATUS));
-
-        limPrintMacAddr(pMac, pMacHdr->da, LOG1);)
+           (pAuthFrameBody->authStatusCode == eSIR_MAC_SUCCESS_STATUS),
+           MAC_ADDR_ARRAY(pMacHdr->da));)
     }
     PELOG2(sirDumpBuf(pMac, SIR_LIM_MODULE_ID, LOG2, pFrame, frameLen);)
 
@@ -3417,12 +3485,24 @@ limSendAuthMgmtFrame(tpAniSirGlobal pMac,
         txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
     }
 
+    limLog( pMac, LOG1, FL("Sending Auth Frame over WQ5 to "MAC_ADDRESS_STR
+                   " From " MAC_ADDRESS_STR),MAC_ADDR_ARRAY(pMacHdr->da),
+              MAC_ADDR_ARRAY(psessionEntry->selfMacAddr));
+
+    txFlag |= HAL_USE_FW_IN_TX_PATH;
+
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
     /// Queue Authentication frame in high priority WQ
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) frameLen,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog(pMac, LOGE,
@@ -3470,6 +3550,50 @@ eHalStatus limSendDeauthCnf(tpAniSirGlobal pMac)
 
         /// Receive path cleanup with dummy packet
         limCleanupRxPath(pMac, pStaDs,psessionEntry);
+
+#ifdef WLAN_FEATURE_VOWIFI_11R
+        if  ( (psessionEntry->limSystemRole == eLIM_STA_ROLE ) &&
+                (
+#ifdef FEATURE_WLAN_ESE
+                 (psessionEntry->isESEconnection ) ||
+#endif
+#ifdef FEATURE_WLAN_LFR
+                 (psessionEntry->isFastRoamIniFeatureEnabled ) ||
+#endif
+                 (psessionEntry->is11Rconnection )))
+        {
+            PELOGE(limLog(pMac, LOGE,
+                   FL("FT Preauth Session (%p,%d) Cleanup"
+                      " Deauth reason %d Trigger = %d"),
+                   psessionEntry, psessionEntry->peSessionId,
+                   pMlmDeauthReq->reasonCode,
+                   pMlmDeauthReq->deauthTrigger););
+            limFTCleanup(pMac);
+        }
+        else
+        {
+            PELOGE(limLog(pMac, LOGE,
+                   FL("No FT Preauth Session Cleanup in role %d"
+#ifdef FEATURE_WLAN_ESE
+                   " isESE %d"
+#endif
+#ifdef FEATURE_WLAN_LFR
+                   " isLFR %d"
+#endif
+                   " is11r %d, Deauth reason %d Trigger = %d"),
+                   psessionEntry->limSystemRole,
+#ifdef FEATURE_WLAN_ESE
+                   psessionEntry->isESEconnection,
+#endif
+#ifdef FEATURE_WLAN_LFR
+                   psessionEntry->isFastRoamIniFeatureEnabled,
+#endif
+                   psessionEntry->is11Rconnection,
+                   pMlmDeauthReq->reasonCode,
+                   pMlmDeauthReq->deauthTrigger););
+        }
+#endif
+
         /// Free up buffer allocated for mlmDeauthReq
         vos_mem_free(pMlmDeauthReq);
         pMac->lim.limDisassocDeauthCnfReq.pMlmDeauthReq = NULL;
@@ -3644,7 +3768,7 @@ limSendDisassocMgmtFrame(tpAniSirGlobal pMac,
     tANI_U32              nBytes, nPayload, nStatus;
     void                 *pPacket;
     eHalStatus            halstatus;
-    tANI_U8               txFlag = 0;
+    tANI_U32              txFlag = 0;
     tANI_U32              val = 0;
     if(NULL == psessionEntry)
     {
@@ -3725,9 +3849,11 @@ limSendDisassocMgmtFrame(tpAniSirGlobal pMac,
                                "isassociation (0x%08x).") );
     }
 
-    PELOG1(limLog( pMac, LOG1, FL("*** Sending Disassociation frame with rea"
-                           "son %d to"), nReason );
-    limPrintMacAddr( pMac, pMacHdr->da, LOG1 );)
+    limLog( pMac, LOG1, FL("***Sessionid %d Sending Disassociation frame with "
+          "reason %u and waitForAck %d to "MAC_ADDRESS_STR" ,From "
+          MAC_ADDRESS_STR), psessionEntry->peSessionId, nReason, waitForAck,
+          MAC_ADDR_ARRAY(pMacHdr->da),
+          MAC_ADDR_ARRAY(psessionEntry->selfMacAddr));
 
     if( ( SIR_BAND_5_GHZ == limGetRFBand(psessionEntry->currentOperChannel))
        || ( psessionEntry->pePersona == VOS_P2P_CLIENT_MODE ) ||
@@ -3738,13 +3864,31 @@ limSendDisassocMgmtFrame(tpAniSirGlobal pMac,
     }
 
     if((psessionEntry->pePersona == VOS_P2P_CLIENT_MODE) ||
-       (psessionEntry->pePersona == VOS_P2P_GO_MODE))
+       (psessionEntry->pePersona == VOS_P2P_GO_MODE) ||
+       (psessionEntry->pePersona == VOS_STA_SAP_MODE))
     {
         txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
     }
 
+    if( IS_FW_IN_TX_PATH_FEATURE_ENABLE )
+    {
+        /* This frame will be sent on air by firmware,
+           which will ensure that this frame goes out
+           even though DEL_STA is sent immediately */
+        /* Without this for DEL_STA command there is
+           risk of flushing frame in BTQM queue without
+           sending on air */
+        limLog( pMac, LOG1, FL("Sending Disassoc Frame over WQ5 to "MAC_ADDRESS_STR
+                " From " MAC_ADDRESS_STR),MAC_ADDR_ARRAY(pMacHdr->da),
+              MAC_ADDR_ARRAY(psessionEntry->selfMacAddr));
+        txFlag |= HAL_USE_FW_IN_TX_PATH;
+    }
+
     if (waitForAck)
     {
+        MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+               psessionEntry->peSessionId,
+               pMacHdr->fc.subType));
         // Queue Disassociation frame in high priority WQ
         /* get the duration from the request */
         halstatus = halTxFrameWithTxComplete( pMac, pPacket, ( tANI_U16 ) nBytes,
@@ -3753,6 +3897,11 @@ limSendDisassocMgmtFrame(tpAniSirGlobal pMac,
                 7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                 limTxComplete, pFrame, limDisassocTxCompleteCnf,
                 txFlag );
+
+        MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+               psessionEntry->peSessionId,
+               halstatus));
+
         val = SYS_MS_TO_TICKS(LIM_DISASSOC_DEAUTH_ACK_TIMEOUT);
 
         if (tx_timer_change(
@@ -3774,12 +3923,18 @@ limSendDisassocMgmtFrame(tpAniSirGlobal pMac,
     }
     else 
     {
+        MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+               psessionEntry->peSessionId,
+               pMacHdr->fc.subType));
         // Queue Disassociation frame in high priority WQ
         halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) nBytes,
                 HAL_TXRX_FRM_802_11_MGMT,
                 ANI_TXDIR_TODS,
                 7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                 limTxComplete, pFrame, txFlag );
+        MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+               psessionEntry->peSessionId,
+               halstatus));
         if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
         {
             limLog( pMac, LOGE, FL("Failed to send Disassociation "
@@ -3819,7 +3974,7 @@ limSendDeauthMgmtFrame(tpAniSirGlobal pMac,
     tANI_U32         nBytes, nPayload, nStatus;
     void            *pPacket;
     eHalStatus       halstatus;
-    tANI_U8          txFlag = 0;
+    tANI_U32         txFlag = 0;
     tANI_U32         val = 0;
 #ifdef FEATURE_WLAN_TDLS
     tANI_U16          aid;
@@ -3904,10 +4059,11 @@ limSendDeauthMgmtFrame(tpAniSirGlobal pMac,
         limLog( pMac, LOGW, FL("There were warnings while packing a D"
                                "e-Authentication (0x%08x).") );
     }
-
-    PELOG1(limLog( pMac, LOG1, FL("*** Sending De-Authentication frame with rea"
-                           "son %d to"), nReason );
-    limPrintMacAddr( pMac, pMacHdr->da, LOG1 );)
+     limLog( pMac, LOG1, FL("***Sessionid %d Sending Deauth frame with "
+          "reason %u and waitForAck %d to "MAC_ADDRESS_STR" ,From "
+          MAC_ADDRESS_STR), psessionEntry->peSessionId, nReason, waitForAck,
+          MAC_ADDR_ARRAY(pMacHdr->da),
+          MAC_ADDR_ARRAY(psessionEntry->selfMacAddr));
 
     if( ( SIR_BAND_5_GHZ == limGetRFBand(psessionEntry->currentOperChannel))
        || ( psessionEntry->pePersona == VOS_P2P_CLIENT_MODE ) ||
@@ -3918,9 +4074,24 @@ limSendDeauthMgmtFrame(tpAniSirGlobal pMac,
     }
 
     if((psessionEntry->pePersona == VOS_P2P_CLIENT_MODE) ||
-       (psessionEntry->pePersona == VOS_P2P_GO_MODE))
+       (psessionEntry->pePersona == VOS_P2P_GO_MODE) ||
+       (psessionEntry->pePersona == VOS_STA_SAP_MODE))
     {
         txFlag |= HAL_USE_PEER_STA_REQUESTED_MASK;
+    }
+
+    if( IS_FW_IN_TX_PATH_FEATURE_ENABLE )
+    {
+        /* This frame will be sent on air by firmware,
+           which will ensure that this frame goes out
+           even though DEL_STA is sent immediately */
+        /* Without this for DEL_STA command there is
+           risk of flushing frame in BTQM queue without
+           sending on air */
+        limLog( pMac, LOG1, FL("Sending Deauth Frame over WQ5 to "MAC_ADDRESS_STR
+               " From " MAC_ADDRESS_STR),MAC_ADDR_ARRAY(pMacHdr->da),
+              MAC_ADDR_ARRAY(psessionEntry->selfMacAddr));
+        txFlag |= HAL_USE_FW_IN_TX_PATH;
     }
 
 #ifdef FEATURE_WLAN_TDLS
@@ -3929,16 +4100,23 @@ limSendDeauthMgmtFrame(tpAniSirGlobal pMac,
 
     if (waitForAck)
     {
+        MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+               psessionEntry->peSessionId,
+               pMacHdr->fc.subType));
         // Queue Disassociation frame in high priority WQ
         halstatus = halTxFrameWithTxComplete( pMac, pPacket, ( tANI_U16 ) nBytes,
                 HAL_TXRX_FRM_802_11_MGMT,
                 ANI_TXDIR_TODS,
                 7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                 limTxComplete, pFrame, limDeauthTxCompleteCnf, txFlag );
-        if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
+
+        MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+               psessionEntry->peSessionId,
+               halstatus));
+        if (!HAL_STATUS_SUCCESS(halstatus))
         {
             limLog( pMac, LOGE, FL("Failed to send De-Authentication "
-                        "(%X)!"),
+                    "(%X)!"),
                     nSirStatus );
             //Pkt will be freed up by the callback limTxComplete
 
@@ -3970,6 +4148,9 @@ limSendDeauthMgmtFrame(tpAniSirGlobal pMac,
     }
     else
     {
+        MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+               psessionEntry->peSessionId,
+               pMacHdr->fc.subType));
 #ifdef FEATURE_WLAN_TDLS
         if ((NULL != pStaDs) && (STA_ENTRY_TDLS_PEER == pStaDs->staType))
         {
@@ -3992,6 +4173,9 @@ limSendDeauthMgmtFrame(tpAniSirGlobal pMac,
 #ifdef FEATURE_WLAN_TDLS
         }
 #endif
+        MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+               psessionEntry->peSessionId,
+               halstatus));
         if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
         {
             limLog( pMac, LOGE, FL("Failed to send De-Authentication "
@@ -4024,13 +4208,13 @@ limSendMeasReportFrame(tpAniSirGlobal             pMac,
                        tpSirMacMeasReqActionFrame pMeasReqFrame,
                        tSirMacAddr                peer)
 {
-    tDot11fMeasurementReport frm;
-    tANI_U8                      *pFrame;
-    tSirRetStatus            nSirStatus;
-    tpSirMacMgmtHdr          pMacHdr;
-    tANI_U32                      nBytes, nPayload, nStatus, nCfg;
-    void               *pPacket;
-    eHalStatus          halstatus;
+    tDot11fMeasurementReport  frm;
+    tANI_U8                  *pFrame;
+    tSirRetStatus             nSirStatus;
+    tpSirMacMgmtHdr           pMacHdr;
+    tANI_U32                  nBytes, nPayload, nStatus, nCfg;
+    void                     *pPacket;
+    eHalStatus                halstatus;
    
     vos_mem_set( ( tANI_U8* )&frm, sizeof( frm ), 0 );
 
@@ -4138,11 +4322,17 @@ limSendMeasReportFrame(tpAniSirGlobal             pMac,
                                "easurement Report (0x%08x).") );
     }
 
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           ((psessionEntry)? psessionEntry->peSessionId : NO_SESSION),
+           pMacHdr->fc.subType));
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, 0 );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           ((psessionEntry)? psessionEntry->peSessionId : NO_SESSION),
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL("Failed to send a Measurement Report  "
@@ -4173,12 +4363,12 @@ limSendTpcRequestFrame(tpAniSirGlobal pMac,
                        tSirMacAddr    peer)
 {
     tDot11fTPCRequest  frm;
-    tANI_U8                *pFrame;
+    tANI_U8           *pFrame;
     tSirRetStatus      nSirStatus;
     tpSirMacMgmtHdr    pMacHdr;
-    tANI_U32                nBytes, nPayload, nStatus, nCfg;
-    void               *pPacket;
-    eHalStatus          halstatus;
+    tANI_U32           nBytes, nPayload, nStatus, nCfg;
+    void              *pPacket;
+    eHalStatus         halstatus;
    
     vos_mem_set( ( tANI_U8* )&frm, sizeof( frm ), 0 );
 
@@ -4261,11 +4451,17 @@ limSendTpcRequestFrame(tpAniSirGlobal pMac,
                                "PC Request (0x%08x).") );
     }
 
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           ((psessionEntry)? psessionEntry->peSessionId : NO_SESSION),
+           pMacHdr->fc.subType));
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, 0 );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           ((psessionEntry)? psessionEntry->peSessionId : NO_SESSION),
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL("Failed to send a TPC Request "
@@ -4296,13 +4492,13 @@ limSendTpcReportFrame(tpAniSirGlobal            pMac,
                       tpSirMacTpcReqActionFrame pTpcReqFrame,
                       tSirMacAddr               peer)
 {
-    tDot11fTPCReport frm;
-    tANI_U8              *pFrame;
-    tSirRetStatus    nSirStatus;
-    tpSirMacMgmtHdr  pMacHdr;
-    tANI_U32              nBytes, nPayload, nStatus, nCfg;
-    void               *pPacket;
-    eHalStatus          halstatus;
+    tDot11fTPCReport  frm;
+    tANI_U8          *pFrame;
+    tSirRetStatus     nSirStatus;
+    tpSirMacMgmtHdr   pMacHdr;
+    tANI_U32          nBytes, nPayload, nStatus, nCfg;
+    void             *pPacket;
+    eHalStatus        halstatus;
    
     vos_mem_set( ( tANI_U8* )&frm, sizeof( frm ), 0 );
 
@@ -4393,11 +4589,17 @@ limSendTpcReportFrame(tpAniSirGlobal            pMac,
     }
 
 
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           ((psessionEntry)? psessionEntry->peSessionId : NO_SESSION),
+           pMacHdr->fc.subType));
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, 0 );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           ((psessionEntry)? psessionEntry->peSessionId : NO_SESSION),
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL("Failed to send a TPC Report "
@@ -4440,14 +4642,14 @@ limSendChannelSwitchMgmtFrame(tpAniSirGlobal pMac,
                               tANI_U8        nCount,
                               tpPESession    psessionEntry )
 {
-    tDot11fChannelSwitch frm;
-    tANI_U8                  *pFrame;
-    tSirRetStatus        nSirStatus;
-    tpSirMacMgmtHdr      pMacHdr;
-    tANI_U32                  nBytes, nPayload, nStatus;//, nCfg;
-    void               *pPacket;
-    eHalStatus          halstatus;
-    tANI_U8 txFlag = 0;
+    tDot11fChannelSwitch   frm;
+    tANI_U8                *pFrame;
+    tSirRetStatus          nSirStatus;
+    tpSirMacMgmtHdr        pMacHdr;
+    tANI_U32               nBytes, nPayload, nStatus;//, nCfg;
+    void                   *pPacket;
+    eHalStatus             halstatus;
+    tANI_U32               txFlag = 0;
     
     vos_mem_set( ( tANI_U8* )&frm, sizeof( frm ), 0 );
 
@@ -4545,11 +4747,18 @@ limSendChannelSwitchMgmtFrame(tpAniSirGlobal pMac,
     {
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
+
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL("Failed to send a Channel Switch "
@@ -4572,14 +4781,14 @@ limSendVHTOpmodeNotificationFrame(tpAniSirGlobal pMac,
                               tANI_U8        nMode,
                               tpPESession    psessionEntry )
 {
-    tDot11fOperatingMode  frm;
-    tANI_U8                  *pFrame;
-    tSirRetStatus        nSirStatus;
-    tpSirMacMgmtHdr      pMacHdr;
-    tANI_U32                  nBytes, nPayload = 0, nStatus;//, nCfg;
-    void               *pPacket;
-    eHalStatus          halstatus;
-    tANI_U8 txFlag = 0;
+    tDot11fOperatingMode   frm;
+    tANI_U8                *pFrame;
+    tSirRetStatus          nSirStatus;
+    tpSirMacMgmtHdr        pMacHdr;
+    tANI_U32               nBytes, nPayload = 0, nStatus;//, nCfg;
+    void                   *pPacket;
+    eHalStatus             halstatus;
+    tANI_U32               txFlag = 0;
     
     vos_mem_set( ( tANI_U8* )&frm, sizeof( frm ), 0 );
 
@@ -4660,11 +4869,18 @@ limSendVHTOpmodeNotificationFrame(tpAniSirGlobal pMac,
     {
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
+
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL("Failed to send a Channel Switch "
@@ -4703,14 +4919,14 @@ limSendVHTChannelSwitchMgmtFrame(tpAniSirGlobal pMac,
                               tANI_U8        ncbMode,
                               tpPESession    psessionEntry )
 {
-    tDot11fChannelSwitch  frm;
-    tANI_U8                  *pFrame;
-    tSirRetStatus        nSirStatus;
-    tpSirMacMgmtHdr      pMacHdr;
-    tANI_U32                  nBytes, nPayload, nStatus;//, nCfg;
-    void               *pPacket;
-    eHalStatus          halstatus;
-    tANI_U8 txFlag = 0;
+    tDot11fChannelSwitch   frm;
+    tANI_U8                *pFrame;
+    tSirRetStatus          nSirStatus;
+    tpSirMacMgmtHdr        pMacHdr;
+    tANI_U32               nBytes, nPayload, nStatus;//, nCfg;
+    void                   *pPacket;
+    eHalStatus             halstatus;
+    tANI_U32               txFlag = 0;
     
     vos_mem_set( ( tANI_U8* )&frm, sizeof( frm ), 0 );
                 
@@ -4794,11 +5010,18 @@ limSendVHTChannelSwitchMgmtFrame(tpAniSirGlobal pMac,
     {
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
+
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
     halstatus = halTxFrame( pMac, pPacket, ( tANI_U16 ) nBytes,
                             HAL_TXRX_FRM_802_11_MGMT,
                             ANI_TXDIR_TODS,
                             7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                             limTxComplete, pFrame, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halstatus));
     if ( ! HAL_STATUS_SUCCESS ( halstatus ) )
     {
         limLog( pMac, LOGE, FL("Failed to send a Channel Switch "
@@ -4833,14 +5056,14 @@ limSendVHTChannelSwitchMgmtFrame(tpAniSirGlobal pMac,
 tSirRetStatus limSendAddBAReq( tpAniSirGlobal pMac,
     tpLimMlmAddBAReq pMlmAddBAReq, tpPESession psessionEntry)
 {
-    tDot11fAddBAReq frmAddBAReq;
-    tANI_U8 *pAddBAReqBuffer = NULL;
-    tpSirMacMgmtHdr pMacHdr;
-    tANI_U32 frameLen = 0, nStatus, nPayload;
-    tSirRetStatus statusCode;
-    eHalStatus halStatus;
-    void *pPacket;
-    tANI_U8 txFlag = 0;
+    tDot11fAddBAReq   frmAddBAReq;
+    tANI_U8           *pAddBAReqBuffer = NULL;
+    tpSirMacMgmtHdr   pMacHdr;
+    tANI_U32          frameLen = 0, nStatus, nPayload;
+    tSirRetStatus     statusCode;
+    eHalStatus        halStatus;
+    void              *pPacket;
+    tANI_U32          txFlag = 0;
 
      if(NULL == psessionEntry)
     {
@@ -4988,15 +5211,21 @@ tSirRetStatus limSendAddBAReq( tpAniSirGlobal pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
-    if( eHAL_STATUS_SUCCESS !=
-      (halStatus = halTxFrame( pMac,
-                               pPacket,
-                               (tANI_U16) frameLen,
-                               HAL_TXRX_FRM_802_11_MGMT,
-                               ANI_TXDIR_TODS,
-                               7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
-                               limTxComplete,
-                               pAddBAReqBuffer, txFlag )))
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
+    halStatus = halTxFrame( pMac,
+                            pPacket,
+                            (tANI_U16) frameLen,
+                            HAL_TXRX_FRM_802_11_MGMT,
+                            ANI_TXDIR_TODS,
+                            7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
+                            limTxComplete,
+                            pAddBAReqBuffer, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halStatus));
+    if( eHAL_STATUS_SUCCESS != halStatus )
     {
         limLog( pMac, LOGE,
         FL( "halTxFrame FAILED! Status [%d]"),
@@ -5040,14 +5269,14 @@ tSirRetStatus limSendAddBARsp( tpAniSirGlobal pMac,
     tpLimMlmAddBARsp pMlmAddBARsp,
     tpPESession      psessionEntry)
 {
-    tDot11fAddBARsp frmAddBARsp;
-    tANI_U8 *pAddBARspBuffer = NULL;
-    tpSirMacMgmtHdr pMacHdr;
-    tANI_U32 frameLen = 0, nStatus, nPayload;
-    tSirRetStatus statusCode;
-    eHalStatus halStatus;
-    void *pPacket;
-    tANI_U8 txFlag = 0;
+    tDot11fAddBARsp   frmAddBARsp;
+    tANI_U8          *pAddBARspBuffer = NULL;
+    tpSirMacMgmtHdr   pMacHdr;
+    tANI_U32          frameLen = 0, nStatus, nPayload;
+    tSirRetStatus     statusCode;
+    eHalStatus        halStatus;
+    void             *pPacket;
+    tANI_U32          txFlag = 0;
 
      if(NULL == psessionEntry)
     {
@@ -5200,16 +5429,22 @@ tSirRetStatus limSendAddBARsp( tpAniSirGlobal pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
-  if( eHAL_STATUS_SUCCESS !=
-      (halStatus = halTxFrame( pMac,
-                               pPacket,
-                               (tANI_U16) frameLen,
-                               HAL_TXRX_FRM_802_11_MGMT,
-                               ANI_TXDIR_TODS,
-                               7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
-                               limTxComplete,
-                               pAddBARspBuffer, txFlag )))
-  {
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+           psessionEntry->peSessionId,
+           pMacHdr->fc.subType));
+    halStatus = halTxFrame( pMac,
+                            pPacket,
+                            (tANI_U16) frameLen,
+                            HAL_TXRX_FRM_802_11_MGMT,
+                            ANI_TXDIR_TODS,
+                            7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
+                            limTxComplete,
+                            pAddBARspBuffer, txFlag );
+    MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+           psessionEntry->peSessionId,
+           halStatus));
+    if( eHAL_STATUS_SUCCESS != halStatus )
+    {
     limLog( pMac, LOGE,
         FL( "halTxFrame FAILED! Status [%d]" ),
         halStatus );
@@ -5224,7 +5459,6 @@ tSirRetStatus limSendAddBARsp( tpAniSirGlobal pMac,
     return eSIR_SUCCESS;
 
     returnAfterError:
-
       // Release buffer, if allocated
       if( NULL != pAddBARspBuffer )
         palPktFree( pMac->hHdd,
@@ -5256,15 +5490,15 @@ tSirRetStatus limSendAddBARsp( tpAniSirGlobal pMac,
 tSirRetStatus limSendDelBAInd( tpAniSirGlobal pMac,
     tpLimMlmDelBAReq pMlmDelBAReq,tpPESession psessionEntry)
 {
-    tDot11fDelBAInd frmDelBAInd;
-    tANI_U8 *pDelBAIndBuffer = NULL;
+    tDot11fDelBAInd   frmDelBAInd;
+    tANI_U8           *pDelBAIndBuffer = NULL;
     //tANI_U32 val;
-    tpSirMacMgmtHdr pMacHdr;
-    tANI_U32 frameLen = 0, nStatus, nPayload;
-    tSirRetStatus statusCode;
-    eHalStatus halStatus;
-    void *pPacket;
-    tANI_U8 txFlag = 0;
+    tpSirMacMgmtHdr   pMacHdr;
+    tANI_U32          frameLen = 0, nStatus, nPayload;
+    tSirRetStatus     statusCode;
+    eHalStatus        halStatus;
+    void              *pPacket;
+    tANI_U32          txFlag = 0;
 
      if(NULL == psessionEntry)
     {
@@ -5398,15 +5632,21 @@ tSirRetStatus limSendDelBAInd( tpAniSirGlobal pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
-  if( eHAL_STATUS_SUCCESS !=
-      (halStatus = halTxFrame( pMac,
-                               pPacket,
-                               (tANI_U16) frameLen,
-                               HAL_TXRX_FRM_802_11_MGMT,
-                               ANI_TXDIR_TODS,
-                               7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
-                               limTxComplete,
-                               pDelBAIndBuffer, txFlag )))
+   MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+          psessionEntry->peSessionId,
+          pMacHdr->fc.subType));
+   halStatus = halTxFrame( pMac,
+                           pPacket,
+                           (tANI_U16) frameLen,
+                           HAL_TXRX_FRM_802_11_MGMT,
+                           ANI_TXDIR_TODS,
+                           7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
+                           limTxComplete,
+                           pDelBAIndBuffer, txFlag );
+   MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+          psessionEntry->peSessionId,
+          halStatus));
+  if( eHAL_STATUS_SUCCESS != halStatus )
   {
     PELOGE(limLog( pMac, LOGE, FL( "halTxFrame FAILED! Status [%d]" ), halStatus );)
     statusCode = eSIR_FAILURE;
@@ -5454,14 +5694,14 @@ limSendNeighborReportRequestFrame(tpAniSirGlobal        pMac,
                        tpPESession psessionEntry
                        )
 {
-   tSirRetStatus statusCode = eSIR_SUCCESS;
+   tSirRetStatus                statusCode = eSIR_SUCCESS;
    tDot11fNeighborReportRequest frm;
    tANI_U8                      *pFrame;
-   tpSirMacMgmtHdr          pMacHdr;
-   tANI_U32                      nBytes, nPayload, nStatus;
-   void               *pPacket;
-   eHalStatus          halstatus;
-   tANI_U8             txFlag = 0;
+   tpSirMacMgmtHdr              pMacHdr;
+   tANI_U32                     nBytes, nPayload, nStatus;
+   void                         *pPacket;
+   eHalStatus                   halstatus;
+   tANI_U32                     txFlag = 0;
 
    if ( psessionEntry == NULL )
    {
@@ -5562,15 +5802,21 @@ limSendNeighborReportRequestFrame(tpAniSirGlobal        pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
-   if( eHAL_STATUS_SUCCESS !=
-         (halstatus = halTxFrame( pMac,
-                                  pPacket,
-                                  (tANI_U16) nBytes,
-                                  HAL_TXRX_FRM_802_11_MGMT,
-                                  ANI_TXDIR_TODS,
-                                  7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
-                                  limTxComplete,
-                                  pFrame, txFlag )))
+   MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+          psessionEntry->peSessionId,
+          pMacHdr->fc.subType));
+   halstatus = halTxFrame( pMac,
+                           pPacket,
+                           (tANI_U16) nBytes,
+                           HAL_TXRX_FRM_802_11_MGMT,
+                           ANI_TXDIR_TODS,
+                           7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
+                           limTxComplete,
+                           pFrame, txFlag );
+   MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+          psessionEntry->peSessionId,
+          halstatus));
+   if( eHAL_STATUS_SUCCESS != halstatus )
    {
       PELOGE(limLog( pMac, LOGE, FL( "halTxFrame FAILED! Status [%d]" ), halstatus );)
          statusCode = eSIR_FAILURE;
@@ -5610,14 +5856,14 @@ limSendLinkReportActionFrame(tpAniSirGlobal        pMac,
                        tpPESession psessionEntry
                        )
 {
-   tSirRetStatus statusCode = eSIR_SUCCESS;
+   tSirRetStatus                statusCode = eSIR_SUCCESS;
    tDot11fLinkMeasurementReport frm;
    tANI_U8                      *pFrame;
-   tpSirMacMgmtHdr          pMacHdr;
-   tANI_U32                      nBytes, nPayload, nStatus;
-   void               *pPacket;
-   eHalStatus          halstatus;
-   tANI_U8             txFlag = 0;
+   tpSirMacMgmtHdr              pMacHdr;
+   tANI_U32                     nBytes, nPayload, nStatus;
+   void                         *pPacket;
+   eHalStatus                   halstatus;
+   tANI_U32                     txFlag = 0;
 
 
    if ( psessionEntry == NULL )
@@ -5730,15 +5976,21 @@ limSendLinkReportActionFrame(tpAniSirGlobal        pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
-   if( eHAL_STATUS_SUCCESS !=
-         (halstatus = halTxFrame( pMac,
-                                  pPacket,
-                                  (tANI_U16) nBytes,
-                                  HAL_TXRX_FRM_802_11_MGMT,
-                                  ANI_TXDIR_TODS,
-                                  7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
-                                  limTxComplete,
-                                  pFrame, txFlag )))
+   MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+          psessionEntry->peSessionId,
+          pMacHdr->fc.subType));
+   halstatus = halTxFrame( pMac,
+                           pPacket,
+                           (tANI_U16) nBytes,
+                           HAL_TXRX_FRM_802_11_MGMT,
+                           ANI_TXDIR_TODS,
+                           7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
+                           limTxComplete,
+                           pFrame, txFlag );
+   MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+          psessionEntry->peSessionId,
+          halstatus));
+   if( eHAL_STATUS_SUCCESS != halstatus )
    {
       PELOGE(limLog( pMac, LOGE, FL( "halTxFrame FAILED! Status [%d]" ), halstatus );)
          statusCode = eSIR_FAILURE;
@@ -5784,14 +6036,14 @@ limSendRadioMeasureReportActionFrame(tpAniSirGlobal        pMac,
                        tpPESession psessionEntry
                        )
 {
-   tSirRetStatus statusCode = eSIR_SUCCESS;
-   tANI_U8                      *pFrame;
-   tpSirMacMgmtHdr          pMacHdr;
-   tANI_U32                      nBytes, nPayload, nStatus;
+   tSirRetStatus      statusCode = eSIR_SUCCESS;
+   tANI_U8            *pFrame;
+   tpSirMacMgmtHdr    pMacHdr;
+   tANI_U32           nBytes, nPayload, nStatus;
    void               *pPacket;
-   eHalStatus          halstatus;
-   tANI_U8             i;
-   tANI_U8             txFlag = 0;
+   eHalStatus         halstatus;
+   tANI_U8            i;
+   tANI_U32           txFlag = 0;
 
    tDot11fRadioMeasurementReport *frm =
          vos_mem_malloc(sizeof(tDot11fRadioMeasurementReport));
@@ -5920,15 +6172,21 @@ limSendRadioMeasureReportActionFrame(tpAniSirGlobal        pMac,
         txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
     }
 
-   if( eHAL_STATUS_SUCCESS !=
-         (halstatus = halTxFrame( pMac,
-                                  pPacket,
-                                  (tANI_U16) nBytes,
-                                  HAL_TXRX_FRM_802_11_MGMT,
-                                  ANI_TXDIR_TODS,
-                                  7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
-                                  limTxComplete,
-                                  pFrame, txFlag )))
+   MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+          psessionEntry->peSessionId,
+          pMacHdr->fc.subType));
+   halstatus = halTxFrame( pMac,
+                           pPacket,
+                           (tANI_U16) nBytes,
+                           HAL_TXRX_FRM_802_11_MGMT,
+                           ANI_TXDIR_TODS,
+                           7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
+                           limTxComplete,
+                           pFrame, txFlag );
+   MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+          psessionEntry->peSessionId,
+          halstatus));
+   if( eHAL_STATUS_SUCCESS != halstatus )
    {
       PELOGE(limLog( pMac, LOGE, FL( "halTxFrame FAILED! Status [%d]" ), halstatus );)
          statusCode = eSIR_FAILURE;
@@ -5979,7 +6237,7 @@ tSirMacAddr peer,tpPESession psessionEntry)
    tANI_U32           nBytes, nPayload, nStatus;
    void               *pPacket;
    eHalStatus         halstatus;
-   tANI_U8            txFlag = 0;
+   tANI_U32           txFlag = 0;
    
    vos_mem_set( ( tANI_U8* )&frm, sizeof( frm ), 0 );
    frm.Category.category  = SIR_MAC_ACTION_SA_QUERY;
@@ -6077,6 +6335,9 @@ tSirMacAddr peer,tpPESession psessionEntry)
       txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
    }
 
+   MTRACE(macTrace(pMac, TRACE_CODE_TX_MGMT,
+          psessionEntry->peSessionId,
+          pMacHdr->fc.subType));
    halstatus = halTxFrame( pMac,
                            pPacket,
                            (tANI_U16) nBytes,
@@ -6085,6 +6346,9 @@ tSirMacAddr peer,tpPESession psessionEntry)
                            7,//SMAC_SWBD_TX_TID_MGMT_HIGH,
                            limTxComplete,
                            pFrame, txFlag );
+   MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE,
+          psessionEntry->peSessionId,
+          halstatus));
    if ( eHAL_STATUS_SUCCESS != halstatus )
    {
       PELOGE(limLog( pMac, LOGE, FL( "halTxFrame FAILED! Status [%d]" ), halstatus );)
