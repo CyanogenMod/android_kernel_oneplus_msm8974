@@ -56,7 +56,7 @@
 		qcom,yda145_ctr-gpio = <&msmgpio 77 0>;
 		qcom,yda145_boost-gpio = <&msmgpio 67 0>;
 		enable_spk-gpio = <&msmgpio 73 0>;
-		qcom,mbhc-audio-jack-type = "5-pole-jack";
+		qcom,mbhc-audio-jack-type = "4-pole-jack";
 	};
 };
 
