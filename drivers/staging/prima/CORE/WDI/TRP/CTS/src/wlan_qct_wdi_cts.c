@@ -659,7 +659,7 @@ WCTS_OpenTransport
     * the SMD port was never closed during SSR*/
    if (gwctsHandle) {
        WPAL_TRACE(eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_INFO,
-               "WCTS_OpenTransport port is already open\n");
+               "WCTS_OpenTransport port is already open");
 
        pWCTSCb = gwctsHandle;
        if (WCTS_CB_MAGIC != pWCTSCb->wctsMagic) {
@@ -968,7 +968,6 @@ WCTS_SendMessage
       WPAL_TRACE(eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_ERROR,
                  "WCTS_SendMessage: Failed to send message over the bus.");
       wpalMemoryFree(pMsg);
-      WPAL_ASSERT(0);
       return eWLAN_PAL_STATUS_E_FAILURE;
    } else if (written == len) {
       /* Message sent! No deferred state, free the buffer*/

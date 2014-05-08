@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -78,16 +78,29 @@ static tAniBool glimTriggerBackgroundScanDuringQuietBss_Status = eSIR_TRUE;
 
 /* 11A Channel list to decode RX BD channel information */
 static const tANI_U8 abChannel[]= {36,40,44,48,52,56,60,64,100,104,108,112,116,
-            120,124,128,132,136,140,149,153,157,161,165};
+            120,124,128,132,136,140,149,153,157,161,165
+#ifdef FEATURE_WLAN_CH144
+                ,144
+#endif
+};
+#define abChannelSize (sizeof(abChannel)/  \
+        sizeof(abChannel[0]))
 
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 static const tANI_U8 aUnsortedChannelList[]= {52,56,60,64,100,104,108,112,116,
-            120,124,128,132,136,140,36,40,44,48,149,153,157,161,165};
+            120,124,128,132,136,140,36,40,44,48,149,153,157,161,165
+#ifdef FEATURE_WLAN_CH144
+                ,144
+#endif
+};
+#define aUnsortedChannelListSize (sizeof(aUnsortedChannelList)/  \
+        sizeof(aUnsortedChannelList[0]))
 #endif
 
 //#define LIM_MAX_ACTIVE_SESSIONS 3  //defined temporarily for BT-AMP SUPPORT 
 #define SUCCESS 1                   //defined temporarily for BT-AMP
 
+#define MAX_BA_WINDOW_SIZE_FOR_CISCO 25
 /** -------------------------------------------------------------
 \fn limAssignDialogueToken
 \brief Assigns dialogue token.
@@ -161,6 +174,7 @@ limSearchAndDeleteDialogueToken(tpAniSirGlobal pMac, tANI_U8 token, tANI_U16 ass
         if(NULL == pMac->lim.pDialogueTokenHead)
             pMac->lim.pDialogueTokenTail = NULL;
         vos_mem_free(pCurrNode);
+        pMac->lim.pDialogueTokenHead = NULL;
         return eSIR_SUCCESS;
     }
 
@@ -186,6 +200,7 @@ limSearchAndDeleteDialogueToken(tpAniSirGlobal pMac, tANI_U8 token, tANI_U16 ass
         if(NULL == pCurrNode->next)
               pMac->lim.pDialogueTokenTail = pPrevNode;
         vos_mem_free(pCurrNode);
+        pMac->lim.pDialogueTokenHead = NULL;
         return eSIR_SUCCESS;
     }
 
@@ -1088,9 +1103,6 @@ limCleanupMlm(tpAniSirGlobal pMac)
         tx_timer_delete(&pMac->lim.limTimers.gLimFTPreAuthRspTimer);
 #endif
 
-        // Deactivate and delete remain on channel timer
-        tx_timer_deactivate(&pMac->lim.limTimers.gLimRemainOnChannelTimer);
-        tx_timer_delete(&pMac->lim.limTimers.gLimRemainOnChannelTimer);
 
 #if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
         // Deactivate and delete TSM
@@ -1273,9 +1285,7 @@ void
 limPrintMacAddr(tpAniSirGlobal pMac, tSirMacAddr macAddr, tANI_U8 logLevel)
 {
     limLog(pMac, logLevel,
-           FL("%X:%X:%X:%X:%X:%X"),
-           macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4],
-           macAddr[5]);
+           FL(MAC_ADDRESS_STR), MAC_ADDR_ARRAY(macAddr));
 } /****** end limPrintMacAddr() ******/
 
 
@@ -5097,7 +5107,6 @@ void limTxComplete( tHalHandle hHal, void *pData )
         if(VOS_IS_STATUS_SUCCESS(vosStatus))
         {
             mHdr = WDA_GET_RX_MAC_HEADER(pRxBd);
-            MTRACE(macTrace(pMac, TRACE_CODE_TX_COMPLETE, NO_SESSION, mHdr->fc.subType);)
 
         }   
     }
@@ -5562,6 +5571,7 @@ limProcessAddBaInd(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
     {
         limLog(pMac, LOGE,FL("session does not exist for given BSSId"));
         vos_mem_free(limMsg->bodyptr);
+        limMsg->bodyptr = NULL;
         return;
     }
        
@@ -5573,6 +5583,7 @@ limProcessAddBaInd(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
 #endif
     {
         vos_mem_free(limMsg->bodyptr);
+        limMsg->bodyptr = NULL;
         return;
     }
 
@@ -5598,6 +5609,7 @@ limProcessAddBaInd(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
     if (!htCapable)
     {
         vos_mem_free(limMsg->bodyptr);
+        limMsg->bodyptr = NULL;
         return;
     }
 #endif
@@ -5624,6 +5636,7 @@ limProcessAddBaInd(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
         }
     }
     vos_mem_free(limMsg->bodyptr);
+    limMsg->bodyptr = NULL;
     return;
 }
 
@@ -5777,6 +5790,7 @@ if((psessionEntry = peFindSessionByBssid(pMac,pDelTsParam->bssId,&sessionId))== 
     {
          limLog(pMac, LOGE,FL("session does not exist for given BssId"));
          vos_mem_free(limMsg->bodyptr);
+         limMsg->bodyptr = NULL;
          return;
     }
 
@@ -5816,9 +5830,9 @@ if((psessionEntry = peFindSessionByBssid(pMac,pDelTsParam->bssId,&sessionId))== 
     PELOGE(limLog(pMac, LOGE, FL("limValidateDeltsReq failed"));)
     goto error2;
   }
- PELOG1(limLog(pMac, LOG1, "Sent DELTS request to station with assocId = %d MacAddr = %x:%x:%x:%x:%x:%x",
-            pDelTsReq->aid, peerMacAddr[0], peerMacAddr[1], peerMacAddr[2],
-            peerMacAddr[3], peerMacAddr[4], peerMacAddr[5]);)
+  PELOG1(limLog(pMac, LOG1, "Sent DELTS request to station with "
+         "assocId = %d MacAddr = "MAC_ADDRESS_STR,
+         pDelTsReq->aid, MAC_ADDR_ARRAY(peerMacAddr));)
 
   limSendDeltsReqActionFrame(pMac, peerMacAddr, pDelTsReq->req.wmeTspecPresent, &pDelTsReq->req.tsinfo, &pDelTsReq->req.tspec,
           psessionEntry);
@@ -5845,6 +5859,7 @@ error2:
   vos_mem_free(pDelTsReq);
 error1:
   vos_mem_free(limMsg->bodyptr);
+  limMsg->bodyptr = NULL;
   return;
 }
 
@@ -5907,7 +5922,17 @@ tSirRetStatus limPostMlmAddBAReq( tpAniSirGlobal pMac,
   // Requesting the ADDBA recipient to populate the size.
   // If ADDBA is accepted, a non-zero buffer size should
   // be returned in the ADDBA Rsp
-  pMlmAddBAReq->baBufferSize = 0;
+  if ((TRUE == psessionEntry->isCiscoVendorAP) &&
+        (eHT_CHANNEL_WIDTH_80MHZ != pStaDs->htSupportedChannelWidthSet))
+  {
+      /* Cisco AP has issues in receiving more than 25 "mpdu in ampdu"
+          causing very low throughput in HT40 case */
+      limLog( pMac, LOGW,
+          FL( "Requesting ADDBA with Cisco 1225 AP, window size 25"));
+      pMlmAddBAReq->baBufferSize = MAX_BA_WINDOW_SIZE_FOR_CISCO;
+  }
+  else
+      pMlmAddBAReq->baBufferSize = 0;
 
   limLog( pMac, LOGW,
       FL( "Requesting an ADDBA to setup a %s BA session with STA %d for TID %d" ),
@@ -7207,8 +7232,7 @@ void limHandleHeartBeatFailureTimeout(tpAniSirGlobal pMac)
 #endif
                 if (psessionEntry->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE)
                 {
-                    if ((!LIM_IS_CONNECTION_ACTIVE(psessionEntry))&&
-                                                  (psessionEntry->limSmeState != eLIM_SME_WT_DISASSOC_STATE))
+                    if (psessionEntry->limSmeState != eLIM_SME_WT_DISASSOC_STATE)
                     {
                         limLog(pMac, LOGE, FL("Probe_hb_failure: for session:%d " ),psessionEntry->peSessionId);
                         /* AP did not respond to Probe Request. Tear down link with it.*/
@@ -7284,8 +7308,10 @@ void limHandleDeferMsgError(tpAniSirGlobal pMac, tpSirMsgQ pLimMsg)
             vos_pkt_return_packet((vos_pkt_t*)pLimMsg->bodyptr);
         }
       else if(pLimMsg->bodyptr != NULL)
-            vos_mem_free( pLimMsg->bodyptr);
-
+      {
+          vos_mem_free( pLimMsg->bodyptr);
+          pLimMsg->bodyptr = NULL;
+      }
 }
 
 
@@ -7346,6 +7372,7 @@ void limProcessAddStaSelfRsp(tpAniSirGlobal pMac,tpSirMsgQ limMsgQ)
       /// Buffer not available. Log error
       limLog(pMac, LOGP, FL("call to AllocateMemory failed for Add Sta self RSP"));
       vos_mem_free(pAddStaSelfParams);
+      limMsgQ->bodyptr = NULL;
       return;
    }
 
@@ -7358,6 +7385,7 @@ void limProcessAddStaSelfRsp(tpAniSirGlobal pMac,tpSirMsgQ limMsgQ)
    vos_mem_copy( pRsp->selfMacAddr, pAddStaSelfParams->selfMacAddr, sizeof(tSirMacAddr) );
 
    vos_mem_free(pAddStaSelfParams);
+   limMsgQ->bodyptr = NULL;
 
    mmhMsg.type = eWNI_SME_ADD_STA_SELF_RSP;
    mmhMsg.bodyptr = pRsp;
@@ -7383,6 +7411,7 @@ void limProcessDelStaSelfRsp(tpAniSirGlobal pMac,tpSirMsgQ limMsgQ)
       /// Buffer not available. Log error
       limLog(pMac, LOGP, FL("call to AllocateMemory failed for Add Sta self RSP"));
       vos_mem_free(pDelStaSelfParams);
+      limMsgQ->bodyptr = NULL;
       return;
    }
 
@@ -7395,6 +7424,7 @@ void limProcessDelStaSelfRsp(tpAniSirGlobal pMac,tpSirMsgQ limMsgQ)
    vos_mem_copy( pRsp->selfMacAddr, pDelStaSelfParams->selfMacAddr, sizeof(tSirMacAddr) );
 
    vos_mem_free(pDelStaSelfParams);
+   limMsgQ->bodyptr = NULL;
 
    mmhMsg.type = eWNI_SME_DEL_STA_SELF_RSP;
    mmhMsg.bodyptr = pRsp;
@@ -7412,11 +7442,13 @@ void limProcessDelStaSelfRsp(tpAniSirGlobal pMac,tpSirMsgQ limMsgQ)
 *****************************************************************/
 tANI_U8 limUnmapChannel(tANI_U8 mapChannel)
 {
-   if( mapChannel > 0 && mapChannel < 25 )
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+   if( mapChannel > 0 && mapChannel <= aUnsortedChannelListSize )
        if (IS_ROAM_SCAN_OFFLOAD_FEATURE_ENABLE)
            return aUnsortedChannelList[mapChannel -1];
        else
+#else
+   if( mapChannel > 0 && mapChannel <= abChannelSize )
 #endif
      return abChannel[mapChannel -1];
    else

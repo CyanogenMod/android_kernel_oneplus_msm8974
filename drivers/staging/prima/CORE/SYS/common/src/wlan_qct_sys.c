@@ -114,7 +114,8 @@ typedef struct
 
 } sysContextData;
 
-
+// sysStop 20 Seconds timeout
+#define SYS_STOP_TIMEOUT 20000
 static vos_event_t gStopEvt;
 
 VOS_STATUS sysBuildMessageHeader( SYS_MSG_ID sysMsgId, vos_msg_t *pMsg )
@@ -177,7 +178,7 @@ VOS_STATUS sysStop( v_CONTEXT_t pVosContext )
       vosStatus = VOS_STATUS_E_BADMSG;
    }
 
-   vosStatus = vos_wait_events( &gStopEvt, 1, 0, &evtIndex );
+   vosStatus = vos_wait_events( &gStopEvt, 1, SYS_STOP_TIMEOUT, &evtIndex );
    VOS_ASSERT( VOS_IS_STATUS_SUCCESS ( vosStatus ) );
 
    vosStatus = vos_event_destroy( &gStopEvt );
