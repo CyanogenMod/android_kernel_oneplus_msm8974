@@ -943,7 +943,9 @@ static __ref int do_hotplug(void *data)
 		return -EINVAL;
 
 	while (!kthread_should_stop()) {
-		wait_for_completion_interruptible(&hotplug_notify_complete);
+		while (wait_for_completion_interruptible(
+					&hotplug_notify_complete) != 0)
+			;
 		INIT_COMPLETION(hotplug_notify_complete);
 		mask = 0;
 
@@ -1377,7 +1379,9 @@ static __ref int do_freq_mitigation(void *data)
 	uint32_t cpu = 0, max_freq_req = 0, min_freq_req = 0;
 
 	while (!kthread_should_stop()) {
-		wait_for_completion_interruptible(&freq_mitigation_complete);
+		while (wait_for_completion_interruptible(
+					&freq_mitigation_complete) != 0)
+			;
 		INIT_COMPLETION(freq_mitigation_complete);
 
 		get_online_cpus();
