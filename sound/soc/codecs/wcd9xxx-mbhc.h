@@ -371,9 +371,7 @@ struct wcd9xxx_mbhc {
 	/* Holds codec specific interrupt mapping */
 	const struct wcd9xxx_mbhc_intr *intr_ids;
 #ifdef CONFIG_MACH_OPPO
-	//liuyan 2013-3-1,add for headset report
 	struct switch_dev wcd9xxx_sdev;
-	//liuyan add end
 #endif
 
 #ifdef CONFIG_DEBUG_FS

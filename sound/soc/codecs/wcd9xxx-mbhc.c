@@ -863,9 +863,7 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 		pr_debug("%s: Reporting removal %d(%x)\n", __func__,
 			 jack_type, mbhc->hph_status);
 #ifdef CONFIG_MACH_OPPO
-		//liuyan 2013-3-13 add
 		switch_set_state(&mbhc->wcd9xxx_sdev, 0);
-		//liuyan add end
 #endif
 		wcd9xxx_jack_report(mbhc, &mbhc->headset_jack, mbhc->hph_status,
 				    WCD9XXX_JACK_MASK);
@@ -929,28 +927,24 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 		if (mbhc->impedance_detect && impedance_detect_en)
 			wcd9xxx_detect_impedance(mbhc, &mbhc->zl, &mbhc->zr);
 
-		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
-			 jack_type, mbhc->hph_status);
 #ifdef CONFIG_MACH_OPPO
-		//liuyan 2013-3-13 add
-		switch (mbhc->current_plug){
+		switch (mbhc->current_plug) {
 			case PLUG_TYPE_HEADPHONE:
 			case PLUG_TYPE_HIGH_HPH:
-				switch_set_state(&mbhc->wcd9xxx_sdev,2);
+				switch_set_state(&mbhc->wcd9xxx_sdev, 2);
 				break;
 			case PLUG_TYPE_GND_MIC_SWAP:
 			case PLUG_TYPE_HEADSET:
 			case PLUG_TYPE_ANC_HEADPHONE:
-				switch_set_state(&mbhc->wcd9xxx_sdev,1);
+				switch_set_state(&mbhc->wcd9xxx_sdev, 1);
 				break;
 			default:
-				switch_set_state(&mbhc->wcd9xxx_sdev,0);
+				switch_set_state(&mbhc->wcd9xxx_sdev, 0);
 				break;
 		}
-		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
-				jack_type, mbhc->hph_status);
-		// liuyan add end
 #endif
+		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
+			 jack_type, mbhc->hph_status);
 		wcd9xxx_jack_report(mbhc, &mbhc->headset_jack,
 				    mbhc->hph_status, WCD9XXX_JACK_MASK);
 		wcd9xxx_clr_and_turnon_hph_padac(mbhc);
