@@ -14,6 +14,9 @@ Optional properties:
  - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
  - host-only-mode: if present then dwc3 should be run in HOST only mode.
  - snps,hsphy-auto-suspend-disable: If present, auto suspend feature is not enabled with hsusb phy.
+ - snps,ssphy-clear-auto-suspend-on-disconnect: If present, clear auto suspend feaure with ssusb phy
+   during cable disconnect.
+ - snps,usb3-u1u2-disable: If present, disable u1u2 low power modes for DWC3 core controller in SS mode.
 
 This is usually a subnode to DWC3 glue to which it is connected.
 
@@ -23,4 +26,7 @@ dwc3@4a030000 {
 	interrupts = <0 92 4>, <0 179 0>;
 	interrupt-names = "irq", "otg_irq";
 	tx-fifo-resize;
+	snps,hsphy-auto-suspend-disable;
+	snps,ssphy-clear-auto-suspend-on-disconnect;
+	snps,usb3-u1u2-disable;
 };
