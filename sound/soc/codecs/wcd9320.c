@@ -618,6 +618,11 @@ static int taiko_enable_ext_mb_source(struct snd_soc_codec *codec,
 				      bool turn_on, bool use_dapm)
 {
 	int ret = 0;
+	struct taiko_priv *taiko = snd_soc_codec_get_drvdata(codec);
+
+	if (taiko->mbhc.is_hs_inserted) {
+		return ret;
+	}
 
 	if (use_dapm) {
 		if (turn_on)
@@ -3874,9 +3879,6 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	/* Headset (RX MIX1 and RX MIX2) */
 	{"HEADPHONE", NULL, "HPHL"},
 	{"HEADPHONE", NULL, "HPHR"},
-#ifdef CONFIG_MACH_OPPO
-	{"HEADPHONE", NULL, "HEADPHONE_REGULATOR"},
-#endif
 
 	{"HPHL", NULL, "HPHL_PA_MIXER"},
 	{"HPHL_PA_MIXER", NULL, "HPHL DAC"},
@@ -5786,10 +5788,6 @@ static const struct snd_soc_dapm_widget taiko_dapm_widgets[] = {
 		&rx_dac7_mux),
 
 #ifdef CONFIG_MACH_OPPO
-	SND_SOC_DAPM_SUPPLY("HEADPHONE_REGULATOR", SND_SOC_NOPM, 0, 0,
-		taiko_codec_enable_hph_supply, SND_SOC_DAPM_PRE_PMU |
-		SND_SOC_DAPM_POST_PMD),
-
 	SND_SOC_DAPM_SUPPLY("MICBIAS_REGULATOR", SND_SOC_NOPM, 0, 0,
 		taiko_codec_enable_hph_supply, SND_SOC_DAPM_PRE_PMU |
 		SND_SOC_DAPM_POST_PMD),

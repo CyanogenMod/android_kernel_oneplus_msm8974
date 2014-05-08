@@ -372,6 +372,7 @@ struct wcd9xxx_mbhc {
 	const struct wcd9xxx_mbhc_intr *intr_ids;
 #ifdef CONFIG_MACH_OPPO
 	struct switch_dev wcd9xxx_sdev;
+	bool is_hs_inserted;
 #endif
 
 #ifdef CONFIG_DEBUG_FS

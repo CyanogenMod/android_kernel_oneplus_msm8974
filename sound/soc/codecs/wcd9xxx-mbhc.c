@@ -863,7 +863,11 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 		pr_debug("%s: Reporting removal %d(%x)\n", __func__,
 			 jack_type, mbhc->hph_status);
 #ifdef CONFIG_MACH_OPPO
+		mbhc->is_hs_inserted = false;
 		switch_set_state(&mbhc->wcd9xxx_sdev, 0);
+		/* make sure to turn off micbias source */
+		if (mbhc->mbhc_cb && mbhc->mbhc_cb->enable_mb_source)
+			mbhc->mbhc_cb->enable_mb_source(mbhc->codec, false, true);
 #endif
 		wcd9xxx_jack_report(mbhc, &mbhc->headset_jack, mbhc->hph_status,
 				    WCD9XXX_JACK_MASK);
@@ -893,6 +897,9 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 			pr_debug("%s: Reporting removal (%x)\n",
 				 __func__, mbhc->hph_status);
 			mbhc->zl = mbhc->zr = 0;
+#ifdef CONFIG_MACH_OPPO
+			mbhc->is_hs_inserted = false;
+#endif
 			wcd9xxx_jack_report(mbhc, &mbhc->headset_jack,
 					    0, WCD9XXX_JACK_MASK);
 			mbhc->hph_status &= ~(SND_JACK_HEADSET |
@@ -942,6 +949,7 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 				switch_set_state(&mbhc->wcd9xxx_sdev, 0);
 				break;
 		}
+		mbhc->is_hs_inserted = true;
 #endif
 		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
 			 jack_type, mbhc->hph_status);
