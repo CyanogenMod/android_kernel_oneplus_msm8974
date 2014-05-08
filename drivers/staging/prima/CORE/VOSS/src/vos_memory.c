@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -85,6 +85,7 @@ hdd_list_t vosMemList;
 
 static v_U8_t WLAN_MEM_HEADER[] =  {0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68 };
 static v_U8_t WLAN_MEM_TAIL[]   =  {0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87};
+static int    memory_dbug_flag;
 
 struct s_vos_mem_struct
 {
@@ -116,6 +117,7 @@ void vos_mem_init()
 {
    /* Initalizing the list with maximum size of 60000 */
    hdd_list_init(&vosMemList, 60000);  
+   memory_dbug_flag = 1;
    return; 
 }
 
@@ -189,8 +191,11 @@ void vos_mem_clean()
 
 void vos_mem_exit()
 {
-    vos_mem_clean();    
-    hdd_list_destroy(&vosMemList);
+    if (memory_dbug_flag)
+    {
+       vos_mem_clean();
+       hdd_list_destroy(&vosMemList);
+    }
 }
 
 v_VOID_t * vos_mem_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t lineNum)
@@ -211,6 +216,20 @@ v_VOID_t * vos_mem_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t lineNum)
        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, "%s cannot be "
                  "called from interrupt context!!!", __func__);
        return NULL;
+   }
+
+   if (!memory_dbug_flag)
+   {
+#ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
+      v_VOID_t* pmem;
+      if (size > WCNSS_PRE_ALLOC_GET_THRESHOLD)
+      {
+           pmem = wcnss_prealloc_get(size);
+           if (NULL != pmem)
+               return pmem;
+      }
+#endif
+      return kmalloc(size, GFP_KERNEL);
    }
 
    new_size = size + sizeof(struct s_vos_mem_struct) + 8; 
@@ -234,7 +253,7 @@ v_VOID_t * vos_mem_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t lineNum)
       if(VOS_STATUS_SUCCESS != vosStatus)
       {
          VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, 
-             "%s: Unable to insert node into List vosStatus %d\n", __func__, vosStatus);
+             "%s: Unable to insert node into List vosStatus %d", __func__, vosStatus);
       }
 
       memPtr = (v_VOID_t*)(memStruct + 1); 
@@ -245,6 +264,9 @@ v_VOID_t * vos_mem_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t lineNum)
 v_VOID_t vos_mem_free( v_VOID_t *ptr )
 {
 
+    if (ptr == NULL)
+        return;
+
     if (in_interrupt())
     {
         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, "%s cannot be "
@@ -252,7 +274,15 @@ v_VOID_t vos_mem_free( v_VOID_t *ptr )
         return;
     }
 
-    if (ptr != NULL)
+    if (!memory_dbug_flag)
+    {
+#ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
+        if (wcnss_prealloc_put(ptr))
+           return;
+#endif
+        kfree(ptr);
+    }
+    else
     {
         VOS_STATUS vosStatus;
         struct s_vos_mem_struct* memStruct = ((struct s_vos_mem_struct*)ptr) - 1;
@@ -281,7 +311,7 @@ v_VOID_t vos_mem_free( v_VOID_t *ptr )
         {
             VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
                       "%s: Unallocated memory (double free?)", __func__);
-            VOS_ASSERT(0);
+            VOS_BUG(0);
         }
     }
 }
@@ -467,6 +497,9 @@ v_VOID_t * vos_mem_dma_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t line
       return NULL;
    }
 
+   if (!memory_dbug_flag)
+      return kmalloc(size, GFP_KERNEL);
+
    new_size = size + sizeof(struct s_vos_mem_struct) + 8; 
 
    memStruct = (struct s_vos_mem_struct*)kmalloc(new_size,GFP_KERNEL);
@@ -488,7 +521,7 @@ v_VOID_t * vos_mem_dma_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t line
       if(VOS_STATUS_SUCCESS != vosStatus)
       {
          VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, 
-             "%s: Unable to insert node into List vosStatus %d\n", __func__, vosStatus);
+             "%s: Unable to insert node into List vosStatus %d", __func__, vosStatus);
       }
 
       memPtr = (v_VOID_t*)(memStruct + 1); 
@@ -499,7 +532,10 @@ v_VOID_t * vos_mem_dma_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t line
 
 v_VOID_t vos_mem_dma_free( v_VOID_t *ptr )
 {
-    if (ptr != NULL)
+    if (ptr == NULL)
+        return;
+
+    if (memory_dbug_flag)
     {
         VOS_STATUS vosStatus;
         struct s_vos_mem_struct* memStruct = ((struct s_vos_mem_struct*)ptr) - 1;
@@ -525,6 +561,8 @@ v_VOID_t vos_mem_dma_free( v_VOID_t *ptr )
             kfree((v_VOID_t*)memStruct);
         }
     }
+    else
+       kfree(ptr);
 }
 #else
 v_VOID_t* vos_mem_dma_malloc( v_SIZE_t size )
