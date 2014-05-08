@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -41,12 +41,12 @@
 
 
 /**=========================================================================
-  
+
   \file  sme_Qos.c
-  
+
   \brief implementation for SME QoS APIs
-  
-  
+
+
   ========================================================================*/
 /* $Header$ */
 /*--------------------------------------------------------------------------
@@ -1626,7 +1626,12 @@ sme_QosStatusType sme_QosInternalSetupReq(tpAniSirGlobal pMac,
          else
          {
             tmask = new_tmask;
-            pACInfo->requested_QoSInfo[tmask-1] = Tspec_Info;
+            if(tmask)
+               pACInfo->requested_QoSInfo[tmask-1] = Tspec_Info;
+            else
+               VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                         "%s: %d: ArrayIndexOutOfBoundsException",
+                         __func__, __LINE__);
          }
       }
       else
@@ -1642,8 +1647,15 @@ sme_QosStatusType sme_QosInternalSetupReq(tpAniSirGlobal pMac,
          pSession->readyForPowerSave = VOS_TRUE;
          return status;
       }
-      //although aggregating, make sure to request on the correct UP
+      //although aggregating, make sure to request on the correct UP,TID,PSB
+      //and direction
       pACInfo->requested_QoSInfo[tmask - 1].ts_info.up = Tspec_Info.ts_info.up;
+      pACInfo->requested_QoSInfo[tmask - 1].ts_info.tid =
+                                            Tspec_Info.ts_info.tid;
+      pACInfo->requested_QoSInfo[tmask - 1].ts_info.direction =
+                                            Tspec_Info.ts_info.direction;
+      pACInfo->requested_QoSInfo[tmask - 1].ts_info.psb =
+                                            Tspec_Info.ts_info.psb;
       status = sme_QosSetup(pMac, sessionId,
                             &pACInfo->requested_QoSInfo[tmask - 1], ac);
       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO_HIGH, 
@@ -1728,7 +1740,12 @@ sme_QosStatusType sme_QosInternalSetupReq(tpAniSirGlobal pMac,
             //which index of the AC the request was from
             pACInfo->tspec_pending = tmask;
          }
-         pACInfo->num_flows[tmask - 1]++;
+         if(tmask)
+            pACInfo->num_flows[tmask - 1]++;
+         else
+            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                      "%s: %d: ArrayIndexOutOfBoundsException",
+                       __func__, __LINE__);
          //indicate on which index the flow entry belongs to & add it to the 
          //Flow List at the end
          pentry->tspec_mask = tmask;
@@ -5574,7 +5591,7 @@ eHalStatus sme_QosAggregateParams(
    if(pCurrent_Tspec_Info->ts_info.direction != 
       pInput_Tspec_Info->ts_info.direction)
    {
-      TspecInfo.ts_info.direction = SME_QOS_WMM_TS_DIR_BOTH;
+      TspecInfo.ts_info.direction = pInput_Tspec_Info->ts_info.direction;
    }
    /*-------------------------------------------------------------------------
      Max MSDU size : these sizes are `maxed'
@@ -6099,7 +6116,7 @@ static eHalStatus sme_QosBufferExistingFlows(tpAniSirGlobal pMac,
    pEntry = csrLLPeekHead( &sme_QosCb.flow_list, VOS_FALSE );
    if(!pEntry)
    {
-      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, 
+      VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO_HIGH,
                 "%s: %d: Flow List empty, nothing to buffer",
                 __func__, __LINE__);
       return eHAL_STATUS_FAILURE;
@@ -7166,6 +7183,30 @@ static v_BOOL_t sme_QosIsRspPending(v_U8_t sessionId, sme_QosEdcaAcType ac)
    }
    return status;
 }
+
+/*--------------------------------------------------------------------------
+  \brief sme_QosUpdateHandOff() - Function which can be called to update
+   Hand-off state of SME QoS Session
+  \param sessionId - session id
+  \param updateHandOff - value True/False to update the handoff flag
+
+  \sa
+
+-------------------------------------------------------------------------*/
+void sme_QosUpdateHandOff(v_U8_t sessionId,
+                          v_BOOL_t updateHandOff)
+{
+   sme_QosSessionInfo *pSession;
+   pSession = &sme_QosCb.sessionInfo[sessionId];
+   VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO_MED,
+             "%s: %d: handoffRequested %d updateHandOff %d",
+             __func__, __LINE__,pSession->handoffRequested,
+             updateHandOff);
+
+   pSession->handoffRequested = updateHandOff;
+
+}
+
 /*--------------------------------------------------------------------------
   \brief sme_QosIsUapsdActive() - Function which can be called to determine
   if any sessions require PMC to be in U-APSD mode.
