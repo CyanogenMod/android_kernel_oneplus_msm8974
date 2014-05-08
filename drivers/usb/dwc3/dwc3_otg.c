@@ -848,6 +848,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					dwc3_otg_set_power(phy,
 							DWC3_IDEV_CHG_FLOATED);
 					pm_runtime_put_sync(phy->dev);
+					break;
 #else
 					if (dotg->charger_retry_count <
 							max_chgr_retry_count)
