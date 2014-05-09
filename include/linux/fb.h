@@ -851,6 +851,7 @@ struct fb_info {
 	struct fb_cmap cmap;		/* Current cmap */
 	struct list_head modelist;      /* mode list */
 	struct fb_videomode *mode;	/* current mode */
+	struct file *file;		/* current file node */
 
 #ifdef CONFIG_FB_BACKLIGHT
 	/* assigned backlight device */
