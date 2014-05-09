@@ -902,7 +902,7 @@ static int mdss_mdp_image_setup(struct mdss_mdp_pipe *pipe,
 	bool rotation = false;
 
 	pr_debug("ctl: %d pnum=%d wh=%dx%d src={%d,%d,%d,%d} dst={%d,%d,%d,%d}\n",
-			pipe->mixer_left->ctl->num, pipe->num,
+			pipe->mixer->ctl->num, pipe->num,
 			pipe->img_width, pipe->img_height,
 			pipe->src.x, pipe->src.y, pipe->src.w, pipe->src.h,
 			pipe->dst.x, pipe->dst.y, pipe->dst.w, pipe->dst.h);
@@ -941,8 +941,8 @@ static int mdss_mdp_image_setup(struct mdss_mdp_pipe *pipe,
 	dst = pipe->dst;
 	src = pipe->src;
 
-	if ((pipe->mixer_left->type != MDSS_MDP_MIXER_TYPE_WRITEBACK) &&
-		!pipe->mixer_left->ctl->is_video_mode) {
+	if ((pipe->mixer->type != MDSS_MDP_MIXER_TYPE_WRITEBACK) &&
+		!pipe->mixer->ctl->is_video_mode) {
 		mdss_mdp_crop_rect(&src, &dst, &sci);
 		if (pipe->flags & MDP_FLIP_LR) {
 			src.x = pipe->src.x + (pipe->src.x + pipe->src.w)

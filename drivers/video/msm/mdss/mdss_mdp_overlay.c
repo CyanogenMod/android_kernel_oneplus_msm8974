@@ -3149,9 +3149,6 @@ int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 	mfd->mdp.private1 = mdp5_data;
 	mfd->wait_for_kickoff = true;
 
-	if (mfd->panel_info->partial_update_enabled && mfd->split_display)
-		mdp5_data->mdata->has_src_split = false;
-
 	rc = mdss_mdp_overlay_fb_parse_dt(mfd);
 	if (rc)
 		return rc;

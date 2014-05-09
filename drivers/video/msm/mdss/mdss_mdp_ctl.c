@@ -1985,11 +1985,8 @@ void mdss_mdp_set_mixer_roi(struct mdss_mdp_ctl *ctl, struct mdss_rect *roi)
 
 	ctl->valid_roi = (roi->w && roi->h);
 	ctl->roi_changed = 0;
-	if (((temp_roi.x != ctl->roi.x) ||
-			(temp_roi.y != ctl->roi.y)) ||
-			((temp_roi.w != ctl->roi.w) ||
-			 (temp_roi.h != ctl->roi.h))) {
-		ctl->roi = temp_roi;
+	if (!mdss_rect_cmp(roi, &ctl->roi)) {
+		ctl->roi = *roi;
 		ctl->roi_changed++;
 
 		mixer_roi = ctl->mixer_left->roi;
@@ -2636,16 +2633,13 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 				!mdss_mdp_ctl_perf_get_transaction_status(sctl);
 	}
 
-	if (sctl && !ctl->valid_roi && sctl->valid_roi) {
-		/*
-		 * Seperate kickoff on DSI1 is needed only when we have
-		 * ONLY right half updating on a dual DSI panel
-		 */
+	mdss_mdp_ctl_perf_set_transaction_status(ctl,
+			PERF_SW_COMMIT_STATE, PERF_STATUS_BUSY);
+
+	if (sctl && sctl->roi.w && sctl->roi.h) {
+		/* left + right*/
 		mdss_mdp_ctl_perf_set_transaction_status(sctl,
-				PERF_SW_COMMIT_STATE, PERF_STATUS_BUSY);
-	} else {
-		mdss_mdp_ctl_perf_set_transaction_status(ctl,
-				PERF_SW_COMMIT_STATE, PERF_STATUS_BUSY);
+			PERF_SW_COMMIT_STATE, PERF_STATUS_BUSY);
 	}
 
 	if (is_bw_released || mixer1_changed || mixer2_changed
