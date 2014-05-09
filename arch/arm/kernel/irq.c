@@ -190,9 +190,11 @@ void migrate_irqs(void)
 		affinity_broken = migrate_one_irq(desc);
 		raw_spin_unlock(&desc->lock);
 
+/*
 		if (affinity_broken && printk_ratelimit())
 			pr_debug("IRQ%u no longer affine to CPU%u\n", i,
 				smp_processor_id());
+*/
 	}
 
 	local_irq_restore(flags);
