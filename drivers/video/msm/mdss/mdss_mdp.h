@@ -503,15 +503,15 @@ static inline u32 mdss_mdp_ctl_read(struct mdss_mdp_ctl *ctl, u32 reg)
 	return readl_relaxed(ctl->base + reg);
 }
 
-static inline void mdss_mdp_pingpong_write(struct mdss_mdp_mixer *mixer,
+static inline void mdss_mdp_pingpong_write(char __iomem *pingpong_base,
 				      u32 reg, u32 val)
 {
-	writel_relaxed(val, mixer->pingpong_base + reg);
+	writel_relaxed(val, pingpong_base + reg);
 }
 
-static inline u32 mdss_mdp_pingpong_read(struct mdss_mdp_mixer *mixer, u32 reg)
+static inline u32 mdss_mdp_pingpong_read(char __iomem *pingpong_base, u32 reg)
 {
-	return readl_relaxed(mixer->pingpong_base + reg);
+	return readl_relaxed(pingpong_base + reg);
 }
 
 static inline int mdss_mdp_iommu_dyn_attach_supported(
@@ -589,6 +589,8 @@ int mdss_mdp_ctl_intf_event(struct mdss_mdp_ctl *ctl, int event, void *arg);
 int mdss_mdp_perf_bw_check(struct mdss_mdp_ctl *ctl,
 		struct mdss_mdp_pipe **left_plist, int left_cnt,
 		struct mdss_mdp_pipe **right_plist, int right_cnt);
+int mdss_mdp_perf_bw_check_pipe(struct mdss_mdp_perf_params *perf,
+		struct mdss_mdp_pipe *pipe);
 int mdss_mdp_perf_calc_pipe(struct mdss_mdp_pipe *pipe,
 	struct mdss_mdp_perf_params *perf, struct mdss_rect *roi,
 	bool apply_fudge);
