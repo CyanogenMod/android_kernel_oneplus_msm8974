@@ -957,6 +957,19 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 	pr_debug("starting fb%d overlay\n", mfd->index);
 
 	/*
+	 * If idle pc feature is not enabled, then get a reference to the
+ 	 * runtime device which will be released when overlay is turned off
+	 */
+	if (!mdp5_data->mdata->idle_pc_enabled) {
+		rc = pm_runtime_get_sync(&mfd->pdev->dev);
+		if (IS_ERR_VALUE(rc)) {
+			pr_err("unable to resume with pm_runtime_get_sync rc=%d\n",
+				rc);
+			goto end;
+		}
+	}
+
+	/*
 	 * We need to do hw init before any hw programming.
 	 * Also, hw init involves programming the VBIF registers which
 	 * should be done only after attaching IOMMU which in turn would call
@@ -2789,22 +2802,15 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 		if (IS_ERR_OR_NULL(ctl))
 			return PTR_ERR(ctl);
 		mdp5_data->ctl = ctl;
-	}
-
-	if (!mdp5_data->mdata->idle_pc_enabled) {
-		rc = pm_runtime_get_sync(&mfd->pdev->dev);
-		if (IS_ERR_VALUE(rc)) {
-			pr_err("unable to resume with pm_runtime_get_sync rc=%d\n",
-				rc);
-			goto end;
-		}
+	} else {
+		ctl = mdp5_data->ctl;
 	}
 
 	if (!mfd->panel_info->cont_splash_enabled &&
 		(mfd->panel_info->type != DTV_PANEL)) {
 		rc = mdss_mdp_overlay_start(mfd);
 		if (rc)
-			goto error_pm;
+			goto end;
 		if (mfd->panel_info->type != WRITEBACK_PANEL) {
 			atomic_inc(&mfd->mdp_sync_pt_data.commit_cnt);
 			rc = mdss_mdp_overlay_kickoff(mfd, NULL);
@@ -2812,7 +2818,7 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 	} else {
 		rc = mdss_mdp_ctl_setup(mdp5_data->ctl);
 		if (rc)
-			goto error_pm;
+			goto end;
 	}
 
 	if (IS_ERR_VALUE(rc)) {
@@ -2821,9 +2827,6 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 		goto end;
 	}
 
-error_pm:
-	if (rc)
-		pm_runtime_put_sync(&mfd->pdev->dev);
 end:
 	return rc;
 }
