@@ -1528,7 +1528,7 @@ void msm_comm_scale_clocks_and_bus(struct msm_vidc_inst *inst)
 		dprintk(VIDC_WARN,
 				"Failed to scale DDR bus. Performance might be impacted\n");
 	}
-	if (core->resources.has_ocmem) {
+	if (core->resources.ocmem_size) {
 		if (msm_comm_scale_bus(core, inst->session_type,
 					OCMEM_MEM))
 			dprintk(VIDC_WARN,
@@ -1698,7 +1698,7 @@ static int msm_vidc_deinit_core(struct msm_vidc_inst *inst)
 	mutex_lock(&core->lock);
 	if (list_empty(&core->instances)) {
 		if (core->state > VIDC_CORE_INIT) {
-			if (core->resources.has_ocmem) {
+			if (core->resources.ocmem_size) {
 				if (inst->state != MSM_VIDC_CORE_INVALID)
 					msm_comm_unset_ocmem(core);
 				call_hfi_op(hdev, free_ocmem,
@@ -1718,7 +1718,7 @@ static int msm_vidc_deinit_core(struct msm_vidc_inst *inst)
 		core->state = VIDC_CORE_UNINIT;
 
 		call_hfi_op(hdev, unload_fw, hdev->hfi_device_data);
-		if (core->resources.has_ocmem)
+		if (core->resources.ocmem_size)
 			msm_comm_unvote_buses(core, DDR_MEM|OCMEM_MEM);
 		else
 			msm_comm_unvote_buses(core, DDR_MEM);
@@ -1916,7 +1916,7 @@ static int msm_vidc_load_resources(int flipped_state,
 						inst, inst->state);
 		goto exit;
 	}
-	if (inst->core->resources.has_ocmem) {
+	if (inst->core->resources.ocmem_size) {
 		height = max(inst->prop.height[CAPTURE_PORT],
 			inst->prop.height[OUTPUT_PORT]);
 		width = max(inst->prop.width[CAPTURE_PORT],
@@ -1927,7 +1927,7 @@ static int msm_vidc_load_resources(int flipped_state,
 			mutex_lock(&inst->core->lock);
 			rc = call_hfi_op(hdev, alloc_ocmem,
 					hdev->hfi_device_data,
-					inst->core->resources.has_ocmem);
+					inst->core->resources.ocmem_size);
 			mutex_unlock(&inst->core->lock);
 			if (rc) {
 				dprintk(VIDC_WARN,
