@@ -22,6 +22,10 @@
 #include <linux/of.h>
 #include <linux/cpumask.h>
 
+#ifdef CONFIG_CPU_VOLTAGE_TABLE
+#include <linux/cpufreq.h>
+#endif
+
 #include <asm/cputype.h>
 
 #include <mach/rpm-regulator-smd.h>
@@ -619,6 +623,78 @@ static char table_name[] = "qcom,speedXX-pvsXX-bin-vXX";
 module_param_string(table_name, table_name, sizeof(table_name), S_IRUGO);
 static unsigned int pvs_config_ver;
 module_param(pvs_config_ver, uint, S_IRUGO);
+
+#ifdef CONFIG_CPU_VOLTAGE_TABLE
+
+#define CPU_VDD_MIN	 600
+#define CPU_VDD_MAX	1450
+
+extern bool is_used_by_scaling(unsigned int freq);
+
+ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf)
+{
+	int i, freq, len = 0;
+	/* use only master core 0 */
+	int num_levels = cpu_clk[0]->vdd_class->num_levels;
+
+	/* sanity checks */
+	if (num_levels < 0)
+		return -EINVAL;
+
+	if (!buf)
+		return -EINVAL;
+
+	/* format UV_mv table */
+	for (i = 0; i < num_levels; i++) {
+		/* show only those used in scaling */
+		if (!is_used_by_scaling(freq = cpu_clk[0]->fmax[i] / 1000))
+			continue;
+
+		len += sprintf(buf + len, "%dmhz: %u mV\n", freq / 1000,
+			       cpu_clk[0]->vdd_class->vdd_uv[i] / 1000);
+	}
+	return len;
+}
+
+ssize_t store_UV_mV_table(struct cpufreq_policy *policy, char *buf,
+				size_t count)
+{
+	int i, j;
+	int ret = 0;
+	unsigned int val;
+	char size_cur[8];
+	/* use only master core 0 */
+	int num_levels = cpu_clk[0]->vdd_class->num_levels;
+
+	/* sanity checks */
+	if (num_levels < 0)
+		return -1;
+
+	for (i = 0; i < num_levels; i++) {
+		if (!is_used_by_scaling(cpu_clk[0]->fmax[i] / 1000))
+			continue;
+
+		ret = sscanf(buf, "%u", &val);
+		if (!ret)
+			return -EINVAL;
+
+		/* bounds check */
+		val = min( max((unsigned int)val, (unsigned int)CPU_VDD_MIN),
+			(unsigned int)CPU_VDD_MAX);
+
+		/* apply it to all available cores */
+		for (j = 0; j < NR_CPUS; j++)
+			cpu_clk[j]->vdd_class->vdd_uv[i] = val * 1000;
+
+		/* Non-standard sysfs interface: advance buf */
+		ret = sscanf(buf, "%s", size_cur);
+		buf += strlen(size_cur) + 1;
+	}
+	pr_warn("faux123: user voltage table modified!\n");
+
+	return ret;
+}
+#endif
 
 static int clock_krait_8974_driver_probe(struct platform_device *pdev)
 {
