@@ -2805,6 +2805,7 @@ static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data, 
 	struct synaptics_rmi4_fn *fhandler;
 	struct synaptics_rmi4_exp_fn *exp_fhandler;
 	struct synaptics_rmi4_device_info *rmi;
+	ktime_t timestamp = ktime_get();
 
 	rmi = &(rmi4_data->rmi4_mod_info);
 
