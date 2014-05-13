@@ -105,7 +105,7 @@ int mdss_mdp_video_addr_setup(struct mdss_data_type *mdata,
 		return -ENOMEM;
 
 	for (i = 0; i < count; i++) {
-		head[i].base = mdata->mdss_base + offsets[i];
+		head[i].base = mdata->mdp_base + offsets[i];
 		pr_debug("adding Video Intf #%d offset=0x%x virt=%p\n", i,
 				offsets[i], head[i].base);
 		head[i].ref_cnt = 0;
@@ -303,6 +303,7 @@ static int mdss_mdp_video_stop(struct mdss_mdp_ctl *ctl)
 {
 	struct mdss_mdp_video_ctx *ctx;
 	struct mdss_mdp_vsync_handler *tmp, *handle;
+	struct mdss_mdp_ctl *sctl;
 	int rc;
 	u32 frame_rate = 0;
 
@@ -340,6 +341,10 @@ static int mdss_mdp_video_stop(struct mdss_mdp_ctl *ctl)
 
 		mdss_mdp_irq_disable(MDSS_MDP_IRQ_INTF_UNDER_RUN,
 			ctl->intf_num);
+		sctl = mdss_mdp_get_split_ctl(ctl);
+		if (sctl)
+			mdss_mdp_irq_disable(MDSS_MDP_IRQ_INTF_UNDER_RUN,
+				sctl->intf_num);
 	}
 
 	list_for_each_entry_safe(handle, tmp, &ctx->vsync_handlers, list)
@@ -601,8 +606,8 @@ static int mdss_mdp_video_config_fps(struct mdss_mdp_ctl *ctl,
 			 */
 			msleep(20);
 			rc = mdss_mdp_ctl_intf_event(ctl,
-					MDSS_EVENT_PANEL_UPDATE_FPS,
-					(void *) (unsigned long) new_fps);
+						MDSS_EVENT_PANEL_UPDATE_FPS,
+						(void *)new_fps);
 			WARN(rc, "intf %d panel fps update error (%d)\n",
 							ctl->intf_num, rc);
 			mdp_video_write(ctx,
@@ -656,8 +661,8 @@ static int mdss_mdp_video_config_fps(struct mdss_mdp_ctl *ctl,
 		}
 	} else {
 		rc = mdss_mdp_ctl_intf_event(ctl,
-				MDSS_EVENT_PANEL_UPDATE_FPS,
-				(void *) (unsigned long) new_fps);
+					MDSS_EVENT_PANEL_UPDATE_FPS,
+					(void *)new_fps);
 		WARN(rc, "intf %d panel fps update error (%d)\n",
 						ctl->intf_num, rc);
 	}
@@ -668,6 +673,7 @@ static int mdss_mdp_video_config_fps(struct mdss_mdp_ctl *ctl,
 static int mdss_mdp_video_display(struct mdss_mdp_ctl *ctl, void *arg)
 {
 	struct mdss_mdp_video_ctx *ctx;
+	struct mdss_mdp_ctl *sctl;
 	int rc;
 
 	pr_debug("kickoff ctl=%d\n", ctl->num);
@@ -703,6 +709,11 @@ static int mdss_mdp_video_display(struct mdss_mdp_ctl *ctl, void *arg)
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 
 		mdss_mdp_irq_enable(MDSS_MDP_IRQ_INTF_UNDER_RUN, ctl->intf_num);
+		sctl = mdss_mdp_get_split_ctl(ctl);
+		if (sctl)
+			mdss_mdp_irq_enable(MDSS_MDP_IRQ_INTF_UNDER_RUN,
+				sctl->intf_num);
+
 		mdp_video_write(ctx, MDSS_MDP_REG_INTF_TIMING_ENGINE_EN, 1);
 		wmb();
 

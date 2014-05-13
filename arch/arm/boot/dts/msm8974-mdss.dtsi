@@ -38,8 +38,6 @@
 		qcom,mdss-clk-factor = <5 4>;		/* 1.25 times */
 
 		qcom,max-clk-rate = <320000000>;
-		qcom,mdss-mdp-reg-offset = <0x00000100>;
-
 		qcom,mdss-pipe-vig-off = <0x00001200 0x00001600
 					       0x00001A00>;
 		qcom,mdss-pipe-rgb-off = <0x00001E00 0x00002200
@@ -53,14 +51,14 @@
 		qcom,mdss-pipe-rgb-xin-id = <1 5 9>;
 		qcom,mdss-pipe-dma-xin-id = <2 10>;
 
-		qcom,mdss-pipe-vig-clk-ctrl-offsets = <0x2AC 0 0>,
-											  <0x2B4 0 0>,
-											  <0x2BC 0 0>;
-		qcom,mdss-pipe-rgb-clk-ctrl-offsets = <0x2AC 4 8>,
-											  <0x2B4 4 8>,
-											  <0x2BC 4 8>;
-		qcom,mdss-pipe-dma-clk-ctrl-offsets = <0x2AC 8 12>,
-											  <0x2B4 8 12>;
+		qcom,mdss-pipe-vig-clk-ctrl-offsets = <0x3AC 0 0>,
+											  <0x3B4 0 0>,
+											  <0x3BC 0 0>;
+		qcom,mdss-pipe-rgb-clk-ctrl-offsets = <0x3AC 4 8>,
+											  <0x3B4 4 8>,
+											  <0x3BC 4 8>;
+		qcom,mdss-pipe-dma-clk-ctrl-offsets = <0x3AC 8 12>,
+											  <0x3B4 8 12>;
 
 		qcom,mdss-smp-data = <22 4096>;
 

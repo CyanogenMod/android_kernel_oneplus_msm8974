@@ -797,15 +797,15 @@ static int mdp3_ctrl_reset(struct msm_fb_data_type *mfd)
 	if (panel && panel->set_backlight)
 		panel->set_backlight(panel, 0);
 
+	rc = panel->event_handler(panel, MDSS_EVENT_PANEL_OFF, NULL);
+	if (rc)
+		pr_err("fail to turn off panel\n");
+
 	rc = mdp3_dma->stop(mdp3_dma, mdp3_session->intf);
 	if (rc) {
 		pr_err("fail to stop the MDP3 dma %d\n", rc);
 		goto reset_error;
 	}
-
-	rc = panel->event_handler(panel, MDSS_EVENT_PANEL_OFF, NULL);
-	if (rc)
-		pr_err("fail to turn off panel\n");
 
 	rc = mdp3_put_mdp_dsi_clk();
 	if (rc) {
@@ -898,11 +898,7 @@ static int mdp3_overlay_set(struct msm_fb_data_type *mfd,
 	mdp3_session->overlay = *req;
 	if (req->id == MSMFB_NEW_REQUEST) {
 		if (dma->source_config.stride != stride ||
-				dma->source_config.width != req->src.width ||
-				dma->source_config.height != req->src.height ||
 				dma->source_config.format != format) {
-			dma->source_config.width = req->src.width;
-			dma->source_config.height = req->src.height,
 			dma->source_config.format = format;
 			dma->source_config.stride = stride;
 			dma->output_config.pack_pattern =
@@ -924,7 +920,6 @@ static int mdp3_overlay_unset(struct msm_fb_data_type *mfd, int ndx)
 	struct mdp3_session_data *mdp3_session = mfd->mdp.private1;
 	struct fb_info *fbi = mfd->fbi;
 	struct fb_fix_screeninfo *fix;
-	struct mdss_panel_info *panel_info = mfd->panel_info;
 	int format;
 
 	fix = &fbi->fix;
@@ -1759,6 +1754,9 @@ static int mdp3_ctrl_ioctl_handler(struct msm_fb_data_type *mfd,
 			rc = mdp3_overlay_play(mfd, &ov_data);
 		if (rc)
 			pr_err("OVERLAY_PLAY failed (%d)\n", rc);
+		break;
+	case MSMFB_OVERLAY_PREPARE:
+		rc = mdp3_overlay_prepare(mfd, argp);
 		break;
 	default:
 		break;

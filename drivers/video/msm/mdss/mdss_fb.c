@@ -1323,16 +1323,16 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 		fix->xpanstep = 1;
 		fix->ypanstep = 1;
 		var->vmode = FB_VMODE_NONINTERLACED;
-		var->blue.offset = 24;
-		var->green.offset = 16;
-		var->red.offset = 8;
+		var->blue.offset = 0;
+		var->green.offset = 8;
+		var->red.offset = 16;
 		var->blue.length = 8;
 		var->green.length = 8;
 		var->red.length = 8;
 		var->blue.msb_right = 0;
 		var->green.msb_right = 0;
 		var->red.msb_right = 0;
-		var->transp.offset = 0;
+		var->transp.offset = 24;
 		var->transp.length = 8;
 		bpp = 4;
 		break;
@@ -1342,16 +1342,16 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 		fix->xpanstep = 1;
 		fix->ypanstep = 1;
 		var->vmode = FB_VMODE_NONINTERLACED;
-		var->blue.offset = 16;
-		var->green.offset = 8;
-		var->red.offset = 0;
+		var->blue.offset = 8;
+		var->green.offset = 16;
+		var->red.offset = 24;
 		var->blue.length = 8;
 		var->green.length = 8;
 		var->red.length = 8;
 		var->blue.msb_right = 0;
 		var->green.msb_right = 0;
 		var->red.msb_right = 0;
-		var->transp.offset = 24;
+		var->transp.offset = 0;
 		var->transp.length = 8;
 		bpp = 4;
 		break;
@@ -1807,9 +1807,11 @@ static int __mdss_fb_sync_buf_done_callback(struct notifier_block *p,
 
 	switch (event) {
 	case MDP_NOTIFY_FRAME_BEGIN:
-		if (mfd->idle_time)
-			mod_delayed_work(system_wq, &mfd->idle_notify_work,
+		if (mfd->idle_time) {
+			cancel_delayed_work_sync(&mfd->idle_notify_work);
+			schedule_delayed_work(&mfd->idle_notify_work,
 				msecs_to_jiffies(mfd->idle_time));
+		}
 		break;
 	case MDP_NOTIFY_FRAME_READY:
 		if (sync_pt_data->async_wait_fences)
@@ -2036,14 +2038,9 @@ static int __mdss_fb_display_thread(void *data)
 				mfd->index);
 
 	while (1) {
-		ret = wait_event_interruptible(mfd->commit_wait_q,
+		wait_event(mfd->commit_wait_q,
 				(atomic_read(&mfd->commits_pending) ||
 				 kthread_should_stop()));
-
-		if (ret) {
-			pr_info("%s: interrupted", __func__);
-			continue;
-		}
 
 		if (kthread_should_stop())
 			break;
@@ -2106,22 +2103,21 @@ static int mdss_fb_check_var(struct fb_var_screeninfo *var,
 		break;
 
 	case 32:
-		/* Check user specified color format BGRA/ARGB/RGBA
+		/* Figure out if the user meant RGBA or ARGB
 		   and verify the position of the RGB components */
 
-		if (!((var->transp.offset == 24) &&
-			(var->blue.offset == 0) &&
-			(var->green.offset == 8) &&
-			(var->red.offset == 16)) &&
-		    !((var->transp.offset == 0) &&
-			(var->blue.offset == 24) &&
-			(var->green.offset == 16) &&
-			(var->red.offset == 8)) &&
-		    !((var->transp.offset == 24) &&
-			(var->blue.offset == 16) &&
-			(var->green.offset == 8) &&
-			(var->red.offset == 0)))
+		if (var->transp.offset == 24) {
+			if ((var->blue.offset != 0) ||
+			    (var->green.offset != 8) ||
+			    (var->red.offset != 16))
 				return -EINVAL;
+		} else if (var->transp.offset == 0) {
+			if ((var->blue.offset != 8) ||
+			    (var->green.offset != 16) ||
+			    (var->red.offset != 24))
+				return -EINVAL;
+		} else
+			return -EINVAL;
 
 		/* Check the common values for both RGBA and ARGB */
 
@@ -2208,23 +2204,10 @@ static int mdss_fb_set_par(struct fb_info *info)
 		break;
 
 	case 32:
-		if ((var->red.offset == 0) &&
-		    (var->green.offset == 8) &&
-		    (var->blue.offset == 16) &&
-		    (var->transp.offset == 24))
-			mfd->fb_imgType = MDP_RGBA_8888;
-		else if ((var->red.offset == 16) &&
-		    (var->green.offset == 8) &&
-		    (var->blue.offset == 0) &&
-		    (var->transp.offset == 24))
-			mfd->fb_imgType = MDP_BGRA_8888;
-		else if ((var->red.offset == 8) &&
-		    (var->green.offset == 16) &&
-		    (var->blue.offset == 24) &&
-		    (var->transp.offset == 0))
+		if (var->transp.offset == 24)
 			mfd->fb_imgType = MDP_ARGB_8888;
 		else
-			mfd->fb_imgType = MDP_RGBA_8888;
+			mfd->fb_imgType	= MDP_RGBA_8888;
 		break;
 
 	default:
@@ -2671,13 +2654,6 @@ static int mdss_fb_register_extra_panel(struct platform_device *pdev,
 		pr_err("split panel already setup for framebuffer device %s\n",
 				dev_name(&pdev->dev));
 		return -EEXIST;
-	}
-
-	if ((fb_pdata->panel_info.type != MIPI_VIDEO_PANEL) ||
-			(pdata->panel_info.type != MIPI_VIDEO_PANEL)) {
-		pr_err("Split panel not supported for panel type %d\n",
-				pdata->panel_info.type);
-		return -EINVAL;
 	}
 
 	fb_pdata->next = pdata;

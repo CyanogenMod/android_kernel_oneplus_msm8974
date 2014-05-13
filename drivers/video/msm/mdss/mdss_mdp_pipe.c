@@ -102,19 +102,15 @@ static int mdss_mdp_smp_mmb_set(int client_id, unsigned long *smp)
 {
 	u32 mmb, off, data, s;
 	int cnt = 0;
-	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 
 	for_each_set_bit(mmb, smp, SMP_MB_CNT) {
 		off = (mmb / 3) * 4;
 		s = (mmb % 3) * 8;
-		data = readl_relaxed(mdata->mdp_base +
-			MDSS_MDP_REG_SMP_ALLOC_W0 + off);
+		data = MDSS_MDP_REG_READ(MDSS_MDP_REG_SMP_ALLOC_W0 + off);
 		data &= ~(0xFF << s);
 		data |= client_id << s;
-		writel_relaxed(data, mdata->mdp_base +
-			MDSS_MDP_REG_SMP_ALLOC_W0 + off);
-		writel_relaxed(data, mdata->mdp_base +
-			MDSS_MDP_REG_SMP_ALLOC_R0 + off);
+		MDSS_MDP_REG_WRITE(MDSS_MDP_REG_SMP_ALLOC_W0 + off, data);
+		MDSS_MDP_REG_WRITE(MDSS_MDP_REG_SMP_ALLOC_R0 + off, data);
 		cnt++;
 	}
 	return cnt;
@@ -436,8 +432,7 @@ int mdss_mdp_smp_handoff(struct mdss_data_type *mdata)
 	for (i = 0; i < SMP_MB_CNT; i++) {
 		off = (i / 3) * 4;
 		s = (i % 3) * 8;
-		data = readl_relaxed(mdata->mdp_base +
-			MDSS_MDP_REG_SMP_ALLOC_W0 + off);
+		data = MDSS_MDP_REG_READ(MDSS_MDP_REG_SMP_ALLOC_W0 + off);
 		client_id = (data >> s) & 0xFF;
 		if (test_bit(i, mdata->mmb_alloc_map)) {
 			/*
@@ -885,11 +880,9 @@ static int mdss_mdp_image_setup(struct mdss_mdp_pipe *pipe,
 {
 	u32 img_size, src_size, src_xy, dst_size, dst_xy, ystride0, ystride1;
 	u32 width, height;
-	u32 decimation, reg_data;
-	u32 tmp_src_xy, tmp_src_size;
-	int ret = 0;
-	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
+	u32 decimation;
 	struct mdss_mdp_img_rect sci, dst, src;
+	int ret = 0;
 
 	pr_debug("pnum=%d wh=%dx%d src={%d,%d,%d,%d} dst={%d,%d,%d,%d}\n",
 			pipe->num, pipe->img_width, pipe->img_height,
@@ -964,21 +957,6 @@ static int mdss_mdp_image_setup(struct mdss_mdp_pipe *pipe,
 	}
 	img_size = (height << 16) | width;
 
-	if (IS_MDSS_MAJOR_MINOR_SAME(mdata->mdp_rev, MDSS_MDP_HW_REV_103) &&
-		pipe->bwc_mode) {
-		/* check source dimensions change */
-		tmp_src_size = mdss_mdp_pipe_read(pipe,
-						 MDSS_MDP_REG_SSPP_SRC_SIZE);
-		tmp_src_xy = mdss_mdp_pipe_read(pipe,
-						 MDSS_MDP_REG_SSPP_SRC_XY);
-		if (src_xy != tmp_src_xy || tmp_src_size != src_size) {
-			reg_data = readl_relaxed(mdata->mdp_base +
-							 AHB_CLK_OFFSET);
-			reg_data |= BIT(28);
-			writel_relaxed(reg_data,
-					 mdata->mdp_base + AHB_CLK_OFFSET);
-		}
-	}
 	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_IMG_SIZE, img_size);
 	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_SIZE, src_size);
 	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_XY, src_xy);
@@ -1048,14 +1026,14 @@ static int mdss_mdp_format_setup(struct mdss_mdp_pipe *pipe)
 
 	mdss_mdp_pipe_sspp_setup(pipe, &opmode);
 
+	if (pipe->scale.enable_pxl_ext)
+		opmode |= (1 << 31);
+
 	if (fmt->tile && mdata->highest_bank_bit) {
 		mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_FETCH_CONFIG,
 			MDSS_MDP_FETCH_CONFIG_RESET_VALUE |
 				 mdata->highest_bank_bit << 18);
 	}
-
-	if (pipe->scale.enable_pxl_ext)
-		opmode |= (1 << 31);
 	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_FORMAT, src_format);
 	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_UNPACK_PATTERN, unpack);
 	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_OP_MODE, opmode);
@@ -1081,7 +1059,7 @@ int mdss_mdp_pipe_addr_setup(struct mdss_data_type *mdata,
 		head[i].xin_id = xin_id[i];
 		head[i].num = i + num_base;
 		head[i].ndx = BIT(i + num_base);
-		head[i].base = mdata->mdss_base + offsets[i];
+		head[i].base = mdata->mdp_base + offsets[i];
 	}
 
 	return 0;

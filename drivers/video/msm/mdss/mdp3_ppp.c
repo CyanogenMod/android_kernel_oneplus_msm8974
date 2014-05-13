@@ -272,11 +272,11 @@ int mdp3_ppp_pipe_wait(void)
 	int ret = 1;
 
 	/*
-	 * wait 40 ms for ppp operation to complete before declaring
+	 * wait 200 ms for ppp operation to complete before declaring
 	 * the MDP hung
 	 */
 	ret = wait_for_completion_timeout(
-	  &ppp_stat->ppp_comp, msecs_to_jiffies(40));
+	  &ppp_stat->ppp_comp, msecs_to_jiffies(200));
 	if (!ret)
 		pr_err("%s: Timed out waiting for the MDP.\n",
 			__func__);
@@ -1061,12 +1061,6 @@ static void mdp3_ppp_blit_wq_handler(struct work_struct *work)
 	}
 
 	if (!ppp_stat->bw_on) {
-		rc = mdp3_iommu_enable(MDP3_CLIENT_PPP);
-		if (rc < 0) {
-			mutex_unlock(&ppp_stat->config_ppp_mutex);
-			pr_err("%s: mdp3_iommu_enable failed\n", __func__);
-			return;
-		}
 		ppp_stat->bw_optimal = mdp3_optimal_bw(req->count);
 		mdp3_ppp_turnon(mfd, 1);
 		if (rc < 0) {

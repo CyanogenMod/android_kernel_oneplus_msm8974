@@ -36,7 +36,6 @@
 #define MAX_MIXER_HEIGHT	0xFFFF
 #define MAX_IMG_WIDTH		0x3FFF
 #define MAX_IMG_HEIGHT		0x3FFF
-#define AHB_CLK_OFFSET		0x2B4
 #define MAX_DST_W		MAX_MIXER_WIDTH
 #define MAX_DST_H		MAX_MIXER_HEIGHT
 #define MAX_DOWNSCALE_RATIO	4
@@ -57,6 +56,26 @@
 #define OVERFETCH_DISABLE_BOTTOM	BIT(1)
 #define OVERFETCH_DISABLE_LEFT		BIT(2)
 #define OVERFETCH_DISABLE_RIGHT		BIT(3)
+
+#ifdef MDSS_MDP_DEBUG_REG
+static inline void mdss_mdp_reg_write(u32 addr, u32 val)
+{
+	pr_debug("0x%05X = 0x%08X\n", addr, val);
+	MDSS_REG_WRITE(addr, val);
+}
+#define MDSS_MDP_REG_WRITE(addr, val) mdss_mdp_reg_write((u32)addr, (u32)(val))
+static inline u32 mdss_mdp_reg_read(u32 addr)
+{
+	u32 val;
+	val = MDSS_REG_READ(addr);
+	pr_debug("0x%05X = 0x%08X\n", addr, val);
+	return val;
+}
+#define MDSS_MDP_REG_READ(addr) mdss_mdp_reg_read((u32)(addr))
+#else
+#define MDSS_MDP_REG_WRITE(addr, val)	MDSS_REG_WRITE((u32)(addr), (u32)(val))
+#define MDSS_MDP_REG_READ(addr)		MDSS_REG_READ((u32)(addr))
+#endif
 
 #define PERF_STATUS_DONE 0
 #define PERF_STATUS_BUSY 1
@@ -155,9 +174,7 @@ struct mdss_mdp_ctl {
 
 	u32 opmode;
 	u32 flush_bits;
-	u32 flush_reg_data;
 
-	bool split_flush_en;
 	bool is_video_mode;
 	u32 play_cnt;
 	u32 vsync_cnt;
@@ -458,6 +475,17 @@ enum mdss_screen_state {
 	MDSS_SCREEN_FORCE_BLANK,
 };
 
+#define is_vig_pipe(_pipe_id_) ((_pipe_id_) <= MDSS_MDP_SSPP_VIG2)
+
+static inline struct mdss_mdp_ctl *mdss_mdp_get_split_ctl(
+	struct mdss_mdp_ctl *ctl)
+{
+	if (ctl && ctl->mixer_right && (ctl->mixer_right->ctl != ctl))
+		return ctl->mixer_right->ctl;
+
+	return NULL;
+}
+
 static inline void mdss_mdp_ctl_write(struct mdss_mdp_ctl *ctl,
 				      u32 reg, u32 val)
 {
@@ -467,17 +495,6 @@ static inline void mdss_mdp_ctl_write(struct mdss_mdp_ctl *ctl,
 static inline u32 mdss_mdp_ctl_read(struct mdss_mdp_ctl *ctl, u32 reg)
 {
 	return readl_relaxed(ctl->base + reg);
-}
-
-static inline void mdp_mixer_write(struct mdss_mdp_mixer *mixer,
-	u32 reg, u32 val)
-{
-	writel_relaxed(val, mixer->base + reg);
-}
-
-static inline u32 mdp_mixer_read(struct mdss_mdp_mixer *mixer, u32 reg)
-{
-	return readl_relaxed(mixer->base + reg);
 }
 
 static inline void mdss_mdp_pingpong_write(struct mdss_mdp_mixer *mixer,
@@ -549,10 +566,9 @@ int mdss_mdp_ctl_intf_event(struct mdss_mdp_ctl *ctl, int event, void *arg);
 int mdss_mdp_perf_bw_check(struct mdss_mdp_ctl *ctl,
 		struct mdss_mdp_pipe **left_plist, int left_cnt,
 		struct mdss_mdp_pipe **right_plist, int right_cnt);
-int mdss_mdp_perf_bw_check_pipe(struct mdss_mdp_perf_params *perf,
-		struct mdss_mdp_pipe *pipe);
 int mdss_mdp_perf_calc_pipe(struct mdss_mdp_pipe *pipe,
-	struct mdss_mdp_perf_params *perf, struct mdss_mdp_img_rect *roi);
+	struct mdss_mdp_perf_params *perf, struct mdss_mdp_img_rect *roi,
+	bool apply_fudge);
 int mdss_mdp_ctl_notify(struct mdss_mdp_ctl *ctl, int event);
 void mdss_mdp_ctl_notifier_register(struct mdss_mdp_ctl *ctl,
 	struct notifier_block *notifier);
@@ -651,8 +667,6 @@ int mdss_mdp_pipe_fetch_halt(struct mdss_mdp_pipe *pipe);
 int mdss_mdp_pipe_destroy(struct mdss_mdp_pipe *pipe);
 int mdss_mdp_pipe_queue_data(struct mdss_mdp_pipe *pipe,
 			     struct mdss_mdp_data *src_data);
-int mdss_mdp_pipe_fetch_halt(struct mdss_mdp_pipe *pipe);
-int mdss_mdp_vbif_axi_halt(struct mdss_data_type *mdata);
 
 int mdss_mdp_data_check(struct mdss_mdp_data *data,
 			struct mdss_mdp_plane_sizes *ps);
