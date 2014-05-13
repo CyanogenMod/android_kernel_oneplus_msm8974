@@ -891,6 +891,11 @@ static int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 	struct mdss_mdp_ctl *ctl = mdp5_data->ctl;
 
 	if (ctl->power_on) {
+		if (mdp5_data->mdata->ulps) {
+			mdss_mdp_footswitch_ctrl_ulps(1, &mfd->pdev->dev);
+			mdss_mdp_ctl_restore(ctl);
+		}
+
 		if (!mdp5_data->mdata->batfet)
 			mdss_mdp_batfet_ctrl(mdp5_data->mdata, true);
 		if (!mfd->panel_info->cont_splash_enabled)
@@ -1060,7 +1065,7 @@ static int __overlay_queue_pipes(struct msm_fb_data_type *mfd)
 		}
 
 		/* ensure pipes are always reconfigured after power off/on */
-		if (pipe->play_cnt == 0)
+		if (ctl->play_cnt == 0)
 			pipe->params_changed++;
 
 		if (pipe->back_buf.num_planes) {
