@@ -169,8 +169,6 @@
 			05 01 00 00 10 00 02 29 00];
 		qcom,mdss-dsi-cabc-video-command = [15 01 00 00 10 00 02 55 03
 			05 01 00 00 10 00 02 29 00];
-		qcom,ulps-enabled;
-		qcom,partial-update-enabled;
 		qcom,cont-splash-enabled;
 	};
 
