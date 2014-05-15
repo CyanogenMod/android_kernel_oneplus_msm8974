@@ -2376,15 +2376,14 @@ static int mdss_fb_check_var(struct fb_var_screeninfo *var,
 		/* Figure out if the user meant RGBA or ARGB
 		   and verify the position of the RGB components */
 
-		if (var->transp.offset == 24) {
-			if ((var->blue.offset != 0) ||
-			    (var->green.offset != 8) ||
-			    (var->red.offset != 16))
-				return -EINVAL;
-		} else if (var->transp.offset == 0) {
-			if ((var->blue.offset != 8) ||
-			    (var->green.offset != 16) ||
-			    (var->red.offset != 24))
+		if (!((var->transp.offset == 24) &&
+			(var->blue.offset == 0) &&
+			(var->green.offset == 8) &&
+			(var->red.offset == 16)) &&
+		    !((var->transp.offset == 24) &&
+			(var->blue.offset == 16) &&
+			(var->green.offset == 8) &&
+			(var->red.offset == 0)))
 				return -EINVAL;
 		} else
 			return -EINVAL;
