@@ -160,6 +160,194 @@ static int set_cabc_resume_mode(struct mdss_panel_data *pdata, int mode)
 	}
 	return ret;
 }
+
+int mdss_dsi_panel_get_panel_calibration(
+	struct mdss_panel_data *pdata, char *buf)
+{
+	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
+	struct dsi_panel_cmds *ccmds = NULL;
+	ssize_t len = 0;
+	int i, j;
+
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+
+	// Make sure there's initialized calibration data to read
+	if (!ctrl->calibration_cmds.cmds)
+		return -ENODEV;
+
+	ccmds = &ctrl->calibration_cmds;
+	for (i = 1; i < ccmds->cmd_cnt - 1; i++) {
+		for (j = 0; j < ccmds->cmds[i].dchdr.dlen; j++)
+			len += sprintf(buf + len, "%02x ", ccmds->cmds[i].payload[j]);
+		sprintf(buf + len - 1, "\n");
+	}
+
+	return len;
+}
+
+
+static void mdss_dsi_panel_apply_panel_calibration(
+	struct mdss_panel_data *pdata,	struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	pr_debug("%s: Apply panel calibration\n", __func__);
+	if (pdata->panel_info.panel_power_on
+		&& ctrl->calibration_cmds.cmds
+		&& ctrl->calibration_cmds.cmd_cnt > 2)
+		mdss_dsi_panel_cmds_send(ctrl, &ctrl->calibration_cmds);
+}
+
+#define PANEL_CALIBRATION_MAX_CMDS 16
+#define PANEL_CALIBRATION_MAX_VALS 64
+#define PANEL_CALIBRATION_DELIM "\n,"
+static DEFINE_MUTEX(set_panel_calibration_mutex);
+int mdss_dsi_panel_set_panel_calibration(struct mdss_panel_data *pdata,
+					const char *buf)
+{
+	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
+	struct dsi_cmd_desc *cmds = NULL;
+	char *buf_cpy, *buf_cpy_ref, *token;
+	int i, cmd_no, new_cmd_cnt = 0;
+	unsigned char val = 0;
+
+	static char action_cmd[2] = { 0xb0, 0x04 };
+	static char end_cmd[2] = { 0x29, 0x00 };
+
+	// validate input length
+	if (strlen(buf) >
+		PANEL_CALIBRATION_MAX_CMDS * PANEL_CALIBRATION_MAX_VALS * 3) {
+		pr_err("%s: Invalid input, too long: %d, \n", __func__,
+			strlen(buf) );
+		return -EINVAL;
+	}
+
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+
+	// check if we're working on the right panel's framebuffer
+	if (!ctrl->calibration_cmds.cmds)
+		return -ENODEV;
+
+	pr_debug("%s: Set calibration string len: %d, content: %s\n",
+		__func__, strlen(buf), buf);
+
+	mutex_lock(&set_panel_calibration_mutex);
+
+	// identify if we receive an apply-only command
+	if (strlen(buf) <= 2 && *buf == '1') {
+		mdss_dsi_panel_apply_panel_calibration(pdata, ctrl);
+		mutex_unlock(&set_panel_calibration_mutex);
+		return 0;
+	}
+
+	// count the number of valid commands
+	buf_cpy = kstrdup(buf, GFP_KERNEL);
+	buf_cpy_ref = buf_cpy;
+	while ((token = strsep(&buf_cpy, PANEL_CALIBRATION_DELIM)) != NULL) {
+		if (token != NULL
+			&& sscanf(token, "%hhx %hhx", &val, &val) == 2)
+			new_cmd_cnt++;
+
+		if (new_cmd_cnt == PANEL_CALIBRATION_MAX_CMDS)
+			break;
+	}
+	kfree(buf_cpy_ref);
+
+	pr_debug("%s: Found %d command(s) on max: %d\n", __func__, new_cmd_cnt,
+			PANEL_CALIBRATION_MAX_VALS);
+
+	// allocate new command sequence
+	cmds = kzalloc((new_cmd_cnt + 2) * sizeof(struct dsi_cmd_desc),
+			GFP_KERNEL);
+
+	// fill sequence with commands
+	buf_cpy = kstrdup(buf, GFP_KERNEL);
+	buf_cpy_ref = buf_cpy;
+	cmd_no = 1;
+	i = 0;
+
+	while ((token = strsep(&buf_cpy, PANEL_CALIBRATION_DELIM)) != NULL) {
+		int read, pos = 0, len = 0;
+		char values[PANEL_CALIBRATION_MAX_VALS];
+		char *payload;
+		char *ref;
+
+		// validate token
+		if (token == NULL
+			|| sscanf(token, "%hhx %hhx", &val, &val) != 2)
+			continue;
+
+		ref = buf_cpy;
+		// read payload values
+		while (sscanf(token + pos, "%hhx%n", &val, &read) == 1) {
+			pos += read;
+			values[len] = val;
+			len++;
+
+			pr_debug("%s: calibration: [%d] value[%d]: %02x\n",
+				__func__, i, len, val);
+
+			if (len == PANEL_CALIBRATION_MAX_VALS)
+				break;
+		}
+		buf_cpy = ref;
+
+		payload = kmalloc(len, GFP_KERNEL);
+		memcpy(payload, values, len);
+
+		cmds[cmd_no].dchdr.dtype = DTYPE_GEN_LWRITE;
+		cmds[cmd_no].dchdr.last = 1;
+		cmds[cmd_no].dchdr.wait = 1;
+		cmds[cmd_no].dchdr.dlen = len;
+		cmds[cmd_no].payload = payload;
+		cmd_no++;
+		i++;
+	}
+	kfree(buf_cpy_ref);
+
+	// command sequence start
+	cmds[0].dchdr.dtype = DTYPE_GEN_WRITE2;
+	cmds[0].dchdr.last = 1;
+	cmds[0].dchdr.wait = 1;
+	cmds[0].dchdr.dlen = 2;
+	cmds[0].payload = kmalloc(2, GFP_KERNEL);
+	memcpy(cmds[0].payload, action_cmd, 2);
+
+	// command sequence end
+	cmds[cmd_no].dchdr.dtype = DTYPE_DCS_WRITE;
+	cmds[cmd_no].dchdr.last = 1;
+	cmds[cmd_no].dchdr.wait = 1;
+	cmds[cmd_no].dchdr.dlen = 2;
+	cmds[cmd_no].payload = kmalloc(2, GFP_KERNEL);
+	memcpy(cmds[cmd_no].payload, end_cmd, 2);
+
+	// free previous custom panel calibration sequence
+	for (i = 0; i < ctrl->calibration_cmds.cmd_cnt; i++)
+		if (!ctrl->calibration_cmds.blen)
+			kfree(ctrl->calibration_cmds.cmds[i].payload);
+	kfree(ctrl->calibration_cmds.cmds);
+
+	// set new commands
+	ctrl->calibration_cmds.cmd_cnt = new_cmd_cnt + 2;
+	ctrl->calibration_cmds.blen = 0;
+	ctrl->calibration_cmds.cmds = cmds;
+
+	// apply
+	mdss_dsi_panel_apply_panel_calibration(pdata, ctrl);
+	mutex_unlock(&set_panel_calibration_mutex);
+
+	return 0;
+}
 #endif
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
@@ -532,6 +720,11 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	if (pdata->panel_info.cabc_mode != CABC_HIGH_MODE) {
 		set_cabc_resume_mode(pdata, pdata->panel_info.cabc_mode);
 	}
+
+	mutex_lock(&set_panel_calibration_mutex);
+	if (ctrl->calibration_cmds.cmd_cnt)
+		mdss_dsi_panel_cmds_send(ctrl, &ctrl->calibration_cmds);
+	mutex_unlock(&set_panel_calibration_mutex);
 #endif
 
 	pr_debug("%s:-\n", __func__);
@@ -1201,6 +1394,10 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	mdss_dsi_parse_dcs_cmds(np, &cabc_video_image_sequence,
 		"qcom,mdss-dsi-cabc-video-command", "qcom,mdss-dsi-off-command-state");
+
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->calibration_cmds,
+		"qcom,mdss-dsi-calibration-command", "qcom,mdss-dsi-calibration-command-state");
+
 #endif
 
 	rc = mdss_dsi_parse_panel_features(np, ctrl_pdata);

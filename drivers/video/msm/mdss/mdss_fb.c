@@ -359,6 +359,40 @@ static ssize_t mdss_set_cabc(struct device *dev,
 }
 
 static DEVICE_ATTR(cabc, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_cabc, mdss_set_cabc);
+
+extern int mdss_dsi_panel_get_panel_calibration(
+	struct mdss_panel_data *pdata, char *buf);
+
+extern int mdss_dsi_panel_set_panel_calibration(
+	struct mdss_panel_data *panel_data, const char *buf);
+
+static ssize_t mdss_get_panel_calibration(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_panel_data *pdata = dev_get_platdata(&mfd->pdev->dev);
+
+	return mdss_dsi_panel_get_panel_calibration(pdata, buf);
+}
+
+static ssize_t mdss_set_panel_calibration(struct device *dev,
+					   struct device_attribute *attr,
+					   const char *buf, size_t count)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_panel_data *pdata = dev_get_platdata(&mfd->pdev->dev);
+	int ret;
+
+	ret = mdss_dsi_panel_set_panel_calibration(pdata, buf);
+	if (ret != 0)
+		return ret;
+
+	return count;
+}
+
+static DEVICE_ATTR(panel_calibration, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_panel_calibration, mdss_set_panel_calibration);
 #endif
 
 static ssize_t mdss_fb_get_split(struct device *dev,
@@ -457,6 +491,7 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_idle_notify.attr,
 #ifdef CONFIG_MACH_OPPO
     &dev_attr_cabc.attr,
+    &dev_attr_panel_calibration.attr,
 #endif
 	NULL,
 };
