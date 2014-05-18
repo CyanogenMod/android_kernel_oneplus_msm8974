@@ -74,6 +74,11 @@
 #include "f_ccid.c"
 #include "f_mtp.c"
 #include "f_accessory.c"
+#ifdef CONFIG_USB_G_HID
+#include "f_hid.h"
+#include "f_hid_android_keyboard.c"
+#include "f_hid_android_mouse.c"
+#endif
 #define USB_ETH_RNDIS y
 #include "f_rndis.c"
 #include "rndis.c"
@@ -2015,6 +2020,43 @@ static struct android_usb_function uasp_function = {
 	.bind_config	= uasp_function_bind_config,
 };
 
+#ifdef CONFIG_USB_G_HID
+static int hid_function_init(struct android_usb_function *f, struct usb_composite_dev *cdev)
+{
+	return ghid_setup(cdev->gadget, 2);
+}
+
+static void hid_function_cleanup(struct android_usb_function *f)
+{
+	ghid_cleanup();
+}
+
+static int hid_function_bind_config(struct android_usb_function *f, struct usb_configuration *c)
+{
+	int ret;
+	printk(KERN_INFO "HID keyboard\n");
+	ret = hidg_bind_config(c, &ghid_device_android_keyboard, 0);
+	if (ret) {
+		pr_info("%s: hid_function_bind_config keyboard failed: %d\n", __func__, ret);
+		return ret;
+	}
+	printk(KERN_INFO "HID mouse\n");
+	ret = hidg_bind_config(c, &ghid_device_android_mouse, 1);
+	if (ret) {
+		pr_info("%s: hid_function_bind_config mouse failed: %d\n", __func__, ret);
+		return ret;
+	}
+	return 0;
+}
+
+static struct android_usb_function hid_function = {
+	.name		= "hid",
+	.init		= hid_function_init,
+	.cleanup	= hid_function_cleanup,
+	.bind_config	= hid_function_bind_config,
+};
+#endif
+
 static struct android_usb_function *supported_functions[] = {
 	&mbim_function,
 	&ecm_qc_function,
@@ -2044,6 +2086,9 @@ static struct android_usb_function *supported_functions[] = {
 	&audio_source_function,
 #endif
 	&uasp_function,
+#ifdef CONFIG_USB_G_HID
+	&hid_function,
+#endif
 	NULL
 };
 
@@ -2371,6 +2416,10 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 						name);
 			}
 		}
+#ifdef CONFIG_USB_G_HID
+		/* TODO: Remove this */
+		android_enable_function(dev, conf, "hid");
+#endif
 	}
 
 	/* Free uneeded configurations if exists */
