@@ -115,25 +115,24 @@ EXPORT_SYMBOL(devfreq_get_freq_level);
  */
 static int devfreq_update_status(struct devfreq *devfreq, unsigned long freq)
 {
-	int lev, prev_lev, ret = 0;
+	int lev, prev_lev;
 	unsigned long cur_time;
 
+	lev = devfreq_get_freq_level(devfreq, freq);
+	if (lev < 0)
+		return lev;
+
 	cur_time = jiffies;
+	devfreq->time_in_state[lev] +=
+			 cur_time - devfreq->last_stat_updated;
+	devfreq->last_stat_updated = cur_time;
+
+	if (freq == devfreq->previous_freq)
+		return 0;
 
 	prev_lev = devfreq_get_freq_level(devfreq, devfreq->previous_freq);
-	if (prev_lev < 0) {
-		ret = prev_lev;
-		goto out;
-	}
-
-	devfreq->time_in_state[prev_lev] +=
-			 cur_time - devfreq->last_stat_updated;
-
-	lev = devfreq_get_freq_level(devfreq, freq);
-	if (lev < 0) {
-		ret = lev;
-		goto out;
-	}
+	if (prev_lev < 0)
+		return 0;
 
 	if (lev != prev_lev) {
 		devfreq->trans_table[(prev_lev *
@@ -141,9 +140,7 @@ static int devfreq_update_status(struct devfreq *devfreq, unsigned long freq)
 		devfreq->total_trans++;
 	}
 
-out:
-	devfreq->last_stat_updated = cur_time;
-	return ret;
+	return 0;
 }
 
 /**
@@ -940,26 +937,19 @@ static ssize_t show_available_freqs(struct device *d,
 	struct devfreq *df = to_devfreq(d);
 	struct device *dev = df->dev.parent;
 	struct opp *opp;
-	unsigned int i = 0, max_state = df->profile->max_state;
-	bool use_opp;
 	ssize_t count = 0;
 	unsigned long freq = 0;
 
 	rcu_read_lock();
-	use_opp = opp_get_opp_count(dev) > 0;
 	do {
-		if (use_opp) {
-			opp = opp_find_freq_ceil(dev, &freq);
-			if (IS_ERR(opp))
-				break;
-		} else {
-			freq = df->profile->freq_table[i++];
-		}
+		opp = opp_find_freq_ceil(dev, &freq);
+		if (IS_ERR(opp))
+			break;
 
 		count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
 				   "%lu ", freq);
 		freq++;
-	} while (use_opp || (!use_opp && i < max_state));
+	} while (1);
 	rcu_read_unlock();
 
 	/* Truncate the trailing space */
