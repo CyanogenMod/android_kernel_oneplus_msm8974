@@ -772,7 +772,7 @@ static void wcd9xxx_set_fclk_get_ncp(struct snd_soc_codec *codec,
 
 	/* enable NCP and wait until settles down */
 	if (snd_soc_update_bits(codec, WCD9XXX_A_NCP_EN, 0x01, 0x01))
-		usleep_range(NCP_SETTLE_TIME_US, NCP_SETTLE_TIME_US);
+		usleep_range(NCP_SETTLE_TIME_US, NCP_SETTLE_TIME_US + 50);
 	pr_debug("%s: leave\n", __func__);
 }
 
@@ -1116,6 +1116,7 @@ static void wcd9xxx_clsh_state_ear(struct snd_soc_codec *codec,
 		wcd9xxx_clsh_comp_req(codec, clsh_d, CLSH_COMPUTE_EAR, true);
 		wcd9xxx_chargepump_request(codec, false);
 		wcd9xxx_enable_clsh_block(codec, clsh_d, false);
+		clsh_d->state &= ~WCD9XXX_CLSH_STATE_EAR;
 	}
 }
 
@@ -1132,7 +1133,11 @@ static void wcd9xxx_clsh_state_hph_l(struct snd_soc_codec *codec,
 		wcd9xxx_chargepump_request(codec, true);
 		wcd9xxx_enable_anc_delay(codec, true);
 		wcd9xxx_clsh_comp_req(codec, clsh_d, CLSH_COMPUTE_HPH_L, true);
-		wcd9xxx_set_buck_mode(codec, BUCK_VREF_0P494V);
+		pr_debug("%s class state: %d\n", __func__, clsh_d->state);
+		if (clsh_d->state & WCD9XXX_CLSH_STATE_LO)
+			wcd9xxx_set_buck_mode(codec, BUCK_VREF_2V);
+		else
+			wcd9xxx_set_buck_mode(codec, BUCK_VREF_0P494V);
 		wcd9xxx_enable_buck(codec, clsh_d, true);
 		wcd9xxx_set_fclk_get_ncp(codec, clsh_d, NCP_FCLK_LEVEL_8);
 
@@ -1143,6 +1148,7 @@ static void wcd9xxx_clsh_state_hph_l(struct snd_soc_codec *codec,
 		wcd9xxx_clsh_comp_req(codec, clsh_d, CLSH_COMPUTE_HPH_L, false);
 		wcd9xxx_chargepump_request(codec, false);
 		wcd9xxx_enable_clsh_block(codec, clsh_d, false);
+		clsh_d->state &= ~WCD9XXX_CLSH_STATE_HPHL;
 	}
 }
 
@@ -1159,7 +1165,11 @@ static void wcd9xxx_clsh_state_hph_r(struct snd_soc_codec *codec,
 		wcd9xxx_chargepump_request(codec, true);
 		wcd9xxx_enable_anc_delay(codec, true);
 		wcd9xxx_clsh_comp_req(codec, clsh_d, CLSH_COMPUTE_HPH_R, true);
-		wcd9xxx_set_buck_mode(codec, BUCK_VREF_0P494V);
+		pr_debug("%s class state: %d\n", __func__, clsh_d->state);
+		if (clsh_d->state & WCD9XXX_CLSH_STATE_LO)
+			wcd9xxx_set_buck_mode(codec, BUCK_VREF_2V);
+		else
+			wcd9xxx_set_buck_mode(codec, BUCK_VREF_0P494V);
 		wcd9xxx_enable_buck(codec, clsh_d, true);
 		wcd9xxx_set_fclk_get_ncp(codec, clsh_d, NCP_FCLK_LEVEL_8);
 
@@ -1170,6 +1180,7 @@ static void wcd9xxx_clsh_state_hph_r(struct snd_soc_codec *codec,
 		wcd9xxx_clsh_comp_req(codec, clsh_d, CLSH_COMPUTE_HPH_R, false);
 		wcd9xxx_chargepump_request(codec, false);
 		wcd9xxx_enable_clsh_block(codec, clsh_d, false);
+		clsh_d->state &= ~WCD9XXX_CLSH_STATE_HPHR;
 	}
 }
 
@@ -1186,6 +1197,9 @@ static void wcd9xxx_clsh_state_hph_st(struct snd_soc_codec *codec,
 		if (req_state == WCD9XXX_CLSH_STATE_HPHR)
 			wcd9xxx_clsh_comp_req(codec, clsh_d,
 						CLSH_COMPUTE_HPH_R, true);
+		pr_debug("%s class state: %d\n", __func__, clsh_d->state);
+		if (clsh_d->state & WCD9XXX_CLSH_STATE_LO)
+			wcd9xxx_set_buck_mode(codec, BUCK_VREF_2V);
 	} else {
 		dev_dbg(codec->dev, "%s: stub fallback to hph_st\n", __func__);
 		if (req_state == WCD9XXX_CLSH_STATE_HPHL)
@@ -1194,6 +1208,7 @@ static void wcd9xxx_clsh_state_hph_st(struct snd_soc_codec *codec,
 		if (req_state == WCD9XXX_CLSH_STATE_HPHR)
 			wcd9xxx_clsh_comp_req(codec, clsh_d,
 						CLSH_COMPUTE_HPH_R, false);
+		clsh_d->state &= ~WCD9XXX_CLSH_STATE_HPH_ST;
 	}
 }
 
@@ -1204,8 +1219,12 @@ static void wcd9xxx_clsh_state_lo(struct snd_soc_codec *codec,
 	pr_debug("%s: enter %s, buck_mv %d\n", __func__,
 		 is_enable ? "enable" : "disable", clsh_d->buck_mv);
 
+	pr_debug("class state: %d\n", clsh_d->state);
 	if (is_enable) {
-		wcd9xxx_set_buck_mode(codec, BUCK_VREF_1P8V);
+		if (clsh_d->state & WCD9XXX_CLSH_STATE_HPH_ST)
+			wcd9xxx_set_buck_mode(codec, BUCK_VREF_2V);
+		else
+			wcd9xxx_set_buck_mode(codec, BUCK_VREF_1P8V);
 		wcd9xxx_enable_buck(codec, clsh_d, true);
 		wcd9xxx_set_fclk_get_ncp(codec, clsh_d, NCP_FCLK_LEVEL_5);
 
@@ -1231,6 +1250,7 @@ static void wcd9xxx_clsh_state_lo(struct snd_soc_codec *codec,
 		wcd9xxx_set_fclk_put_ncp(codec, clsh_d, NCP_FCLK_LEVEL_5);
 		if (clsh_d->buck_mv != WCD9XXX_CDC_BUCK_MV_1P8)
 			wcd9xxx_enable_buck(codec, clsh_d, false);
+		clsh_d->state &= ~WCD9XXX_CLSH_STATE_LO;
 	}
 }
 
