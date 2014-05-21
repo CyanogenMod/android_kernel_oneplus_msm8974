@@ -52,7 +52,7 @@
 			"Lineout_1 amp", "LINEOUT1",
 			"Lineout_3 amp", "LINEOUT3";
 
-		qcom,hpmic-switch-gpio = <&msmgpio 87 0>;
+		qcom,us-euro-gpios = <&msmgpio 87 0>;
 		qcom,yda145_ctr-gpio = <&msmgpio 77 0>;
 		qcom,yda145_boost-gpio = <&msmgpio 67 0>;
 		enable_spk-gpio = <&msmgpio 73 0>;

@@ -228,7 +228,6 @@ static int msm8974_oppo_ext_spk;
 static int oppo_enable_spk_gpio = -1;
 static int yda145_boost_gpio = -1;
 static int yda145_ctr_gpio = -1;
-static int hpmic_switch_gpio = -1;
 #endif
 
 static int msm8974_liquid_ext_spk_power_amp_init(void)
@@ -319,25 +318,6 @@ static int oppo_ext_spk_power_init(void)
 			return -EINVAL;
 		}
 		gpio_direction_output(yda145_boost_gpio, 0);
-	}
-
-	return 0;
-}
-
-static int oppo_hpmic_switch_power_init(void)
-{
-	int ret = 0;
-
-	hpmic_switch_gpio = of_get_named_gpio(spdev->dev.of_node,
-			"qcom,hpmic-switch-gpio", 0);
-	if (hpmic_switch_gpio >= 0) {
-		ret = gpio_request(hpmic_switch_gpio, "hpmic_switch_gpio");
-		if (ret) {
-			pr_err("%s: gpio_request failed for hpmic_switch_gpio.\n",
-				__func__);
-			return -EINVAL;
-		}
-		gpio_direction_output(hpmic_switch_gpio, 1);
 	}
 
 	return 0;
@@ -1724,13 +1704,6 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 			__func__, err);
 		return err;
 	}
-
-	err = oppo_hpmic_switch_power_init();
-	if (err) {
-		pr_err("%s: Oppo HPMIC switch power init failed (%d)\n",
-			__func__, err);
-		return err;
-	}
 #endif
 
 	err = msm8974_liquid_init_docking(dapm);
@@ -3007,6 +2980,10 @@ static int msm8974_prepare_us_euro(struct snd_soc_card *card)
 				__func__, pdata->us_euro_gpio, ret);
 			return ret;
 		}
+#ifdef CONFIG_MACH_OPPO
+		/* Set initial GPIO state, high -> US, low -> EU*/
+		gpio_direction_output(pdata->us_euro_gpio, 1);
+#endif
 	}
 
 	return 0;
@@ -3290,9 +3267,6 @@ static int __devexit msm8974_asoc_machine_remove(struct platform_device *pdev)
 
 	if (gpio_is_valid(yda145_boost_gpio))
 		gpio_free(yda145_boost_gpio);
-
-	if (gpio_is_valid(hpmic_switch_gpio))
-		gpio_free(hpmic_switch_gpio);
 #endif
 
 	gpio_free(pdata->mclk_gpio);
