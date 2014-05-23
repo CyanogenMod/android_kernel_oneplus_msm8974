@@ -241,6 +241,7 @@ struct wcd9xxx_mbhc_config {
 	unsigned int gpio_irq;
 #ifdef CONFIG_MACH_OPPO
 	int headset_type;
+	void (*set_gnd_mic_gpio) (struct snd_soc_codec *, int);
 #endif
 	int gpio_level_insert;
 	bool insert_detect; /* codec has own MBHC_INSERT_DETECT */
