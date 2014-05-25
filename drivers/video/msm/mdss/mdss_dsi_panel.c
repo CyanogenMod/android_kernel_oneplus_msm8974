@@ -161,6 +161,7 @@ static int set_cabc_resume_mode(struct mdss_panel_data *pdata, int mode)
 	return ret;
 }
 
+static DEFINE_MUTEX(panel_calibration_mutex);
 int mdss_dsi_panel_get_panel_calibration(
 	struct mdss_panel_data *pdata, char *buf)
 {
@@ -181,12 +182,17 @@ int mdss_dsi_panel_get_panel_calibration(
 	if (!ctrl->calibration_cmds.cmds)
 		return -ENODEV;
 
+
+	mutex_lock(&panel_calibration_mutex);
+
 	ccmds = &ctrl->calibration_cmds;
 	for (i = 1; i < ccmds->cmd_cnt - 1; i++) {
 		for (j = 0; j < ccmds->cmds[i].dchdr.dlen; j++)
 			len += sprintf(buf + len, "%02x ", ccmds->cmds[i].payload[j]);
 		sprintf(buf + len - 1, "\n");
 	}
+
+	mutex_unlock(&panel_calibration_mutex);
 
 	return len;
 }
@@ -205,7 +211,6 @@ static void mdss_dsi_panel_apply_panel_calibration(
 #define PANEL_CALIBRATION_MAX_CMDS 16
 #define PANEL_CALIBRATION_MAX_VALS 64
 #define PANEL_CALIBRATION_DELIM "\n,"
-static DEFINE_MUTEX(set_panel_calibration_mutex);
 int mdss_dsi_panel_set_panel_calibration(struct mdss_panel_data *pdata,
 					const char *buf)
 {
@@ -241,12 +246,12 @@ int mdss_dsi_panel_set_panel_calibration(struct mdss_panel_data *pdata,
 	pr_debug("%s: Set calibration string len: %d, content: %s\n",
 		__func__, strlen(buf), buf);
 
-	mutex_lock(&set_panel_calibration_mutex);
+	mutex_lock(&panel_calibration_mutex);
 
 	// identify if we receive an apply-only command
 	if (strlen(buf) <= 2 && *buf == '1') {
 		mdss_dsi_panel_apply_panel_calibration(pdata, ctrl);
-		mutex_unlock(&set_panel_calibration_mutex);
+		mutex_unlock(&panel_calibration_mutex);
 		return 0;
 	}
 
@@ -344,7 +349,7 @@ int mdss_dsi_panel_set_panel_calibration(struct mdss_panel_data *pdata,
 
 	// apply
 	mdss_dsi_panel_apply_panel_calibration(pdata, ctrl);
-	mutex_unlock(&set_panel_calibration_mutex);
+	mutex_unlock(&panel_calibration_mutex);
 
 	return 0;
 }
@@ -721,10 +726,10 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 		set_cabc_resume_mode(pdata, pdata->panel_info.cabc_mode);
 	}
 
-	mutex_lock(&set_panel_calibration_mutex);
+	mutex_lock(&panel_calibration_mutex);
 	if (ctrl->calibration_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->calibration_cmds);
-	mutex_unlock(&set_panel_calibration_mutex);
+	mutex_unlock(&panel_calibration_mutex);
 #endif
 
 	pr_debug("%s:-\n", __func__);
