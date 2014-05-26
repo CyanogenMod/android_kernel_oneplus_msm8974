@@ -179,7 +179,7 @@ int mdss_dsi_panel_get_panel_calibration(
 				panel_data);
 
 	// Make sure there's initialized calibration data to read
-	if (!ctrl->calibration_cmds.cmds)
+	if (!ctrl->calibration_available || !ctrl->calibration_cmds.cmds)
 		return -ENODEV;
 
 
@@ -203,6 +203,7 @@ static void mdss_dsi_panel_apply_panel_calibration(
 {
 	pr_debug("%s: Apply panel calibration\n", __func__);
 	if (pdata->panel_info.panel_power_on
+		&& ctrl->calibration_available
 		&& ctrl->calibration_cmds.cmds
 		&& ctrl->calibration_cmds.cmd_cnt > 2)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->calibration_cmds);
@@ -240,7 +241,7 @@ int mdss_dsi_panel_set_panel_calibration(struct mdss_panel_data *pdata,
 				panel_data);
 
 	// check if we're working on the right panel's framebuffer
-	if (!ctrl->calibration_cmds.cmds)
+	if (!ctrl->calibration_available || !ctrl->calibration_cmds.cmds)
 		return -ENODEV;
 
 	pr_debug("%s: Set calibration string len: %d, content: %s\n",
@@ -727,7 +728,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	}
 
 	mutex_lock(&panel_calibration_mutex);
-	if (ctrl->calibration_cmds.cmd_cnt)
+	if (ctrl->calibration_available && ctrl->calibration_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->calibration_cmds);
 	mutex_unlock(&panel_calibration_mutex);
 #endif
@@ -1400,8 +1401,9 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	mdss_dsi_parse_dcs_cmds(np, &cabc_video_image_sequence,
 		"qcom,mdss-dsi-cabc-video-command", "qcom,mdss-dsi-off-command-state");
 
-	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->calibration_cmds,
+	rc = mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->calibration_cmds,
 		"qcom,mdss-dsi-calibration-command", "qcom,mdss-dsi-calibration-command-state");
+	ctrl_pdata->calibration_available = rc == 0 ? 1 : 0;
 
 #endif
 
