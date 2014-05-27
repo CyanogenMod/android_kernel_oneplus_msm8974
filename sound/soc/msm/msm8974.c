@@ -229,8 +229,10 @@ static atomic_t sec_auxpcm_rsc_ref;
 #ifdef CONFIG_MACH_OPPO
 static int msm8974_oppo_ext_spk;
 static int oppo_enable_spk_gpio = -1;
-static int yda145_boost_gpio = -1;
 static int yda145_ctr_gpio = -1;
+#ifdef CONFIG_MACH_FIND7
+static int yda145_boost_gpio = -1;
+#endif
 #endif
 
 static int msm8974_liquid_ext_spk_power_amp_init(void)
@@ -309,6 +311,7 @@ static int oppo_ext_spk_power_init(void)
 		gpio_direction_output(yda145_ctr_gpio, 0);
 	}
 
+#ifdef CONFIG_MACH_FIND7
 	yda145_boost_gpio = of_get_named_gpio(spdev->dev.of_node,
 			"qcom,yda145_boost-gpio", 0);
 	if (yda145_boost_gpio >= 0) {
@@ -322,6 +325,7 @@ static int oppo_ext_spk_power_init(void)
 		}
 		gpio_direction_output(yda145_boost_gpio, 0);
 	}
+#endif
 
 	return 0;
 }
@@ -377,12 +381,16 @@ static void msm8974_oppo_ext_spk_power_amp_enable(bool enable)
 	if (enable) {
 		gpio_set_value(oppo_enable_spk_gpio, 1);
 
-		gpio_set_value(yda145_boost_gpio, 1);
-		usleep_range(15000, 25000);
 		gpio_set_value(yda145_ctr_gpio, 1);
+#ifdef CONFIG_MACH_FIND7
+		usleep_range(15000, 25000);
+		gpio_set_value(yda145_boost_gpio, 1);
+#endif
 	} else {
+#ifdef CONFIG_MACH_FIND7
 		gpio_set_value(yda145_boost_gpio, 0);
 		usleep_range(15000, 25000);
+#endif
 		gpio_set_value(yda145_ctr_gpio, 0);
 
 		gpio_set_value(oppo_enable_spk_gpio, 0);
@@ -571,8 +579,10 @@ static void msm8974_ext_spk_power_amp_on(u32 spk)
 		msm8974_fluid_ext_us_amp_on(spk);
 #ifdef CONFIG_MACH_OPPO
 	else if (gpio_is_valid(oppo_enable_spk_gpio) &&
-			gpio_is_valid(yda145_ctr_gpio) &&
-			gpio_is_valid(yda145_boost_gpio))
+#ifdef CONFIG_MACH_FIND7
+			gpio_is_valid(yda145_boost_gpio) &&
+#endif
+			gpio_is_valid(yda145_ctr_gpio))
 		msm8974_oppo_ext_spk_power_amp_on(spk);
 #endif
 }
@@ -623,8 +633,10 @@ static void msm8974_ext_spk_power_amp_off(u32 spk)
 		msm8974_fluid_ext_us_amp_off(spk);
 #ifdef CONFIG_MACH_OPPO
 	else if (gpio_is_valid(oppo_enable_spk_gpio) &&
-			gpio_is_valid(yda145_ctr_gpio) &&
-			gpio_is_valid(yda145_boost_gpio))
+#ifdef CONFIG_MACH_FIND7
+			gpio_is_valid(yda145_boost_gpio) &&
+#endif
+			gpio_is_valid(yda145_ctr_gpio))
 		msm8974_oppo_ext_spk_power_amp_off(spk);
 #endif
 }
@@ -3281,8 +3293,10 @@ static int __devexit msm8974_asoc_machine_remove(struct platform_device *pdev)
 	if (gpio_is_valid(yda145_ctr_gpio))
 		gpio_free(yda145_ctr_gpio);
 
+#ifdef CONFIG_MACH_FIND7
 	if (gpio_is_valid(yda145_boost_gpio))
 		gpio_free(yda145_boost_gpio);
+#endif
 #endif
 
 	gpio_free(pdata->mclk_gpio);
