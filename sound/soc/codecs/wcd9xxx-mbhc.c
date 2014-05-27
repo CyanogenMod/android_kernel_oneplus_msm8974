@@ -3295,29 +3295,41 @@ static void wcd9xxx_correct_swch_plug(struct work_struct *work)
 			if (!mbhc->mbhc_cfg->detect_extn_cable &&
 			    retry == NUM_ATTEMPTS_TO_REPORT &&
 			    mbhc->current_plug == PLUG_TYPE_NONE) {
+				WCD9XXX_BCL_LOCK(mbhc->resmgr);
 				wcd9xxx_report_plug(mbhc, 1,
 						    SND_JACK_HEADPHONE);
+				WCD9XXX_BCL_UNLOCK(mbhc->resmgr);
 			}
 		} else if (plug_type == PLUG_TYPE_HEADPHONE) {
 			pr_debug("Good headphone detected, continue polling\n");
 			if (mbhc->mbhc_cfg->detect_extn_cable) {
-				if (mbhc->current_plug != plug_type)
+				if (mbhc->current_plug != plug_type) {
+					WCD9XXX_BCL_LOCK(mbhc->resmgr);
 					wcd9xxx_report_plug(mbhc, 1,
 							    SND_JACK_HEADPHONE);
+					WCD9XXX_BCL_UNLOCK(mbhc->resmgr);
+				}
 			} else if (mbhc->current_plug == PLUG_TYPE_NONE) {
+				WCD9XXX_BCL_LOCK(mbhc->resmgr);
 				wcd9xxx_report_plug(mbhc, 1,
 						    SND_JACK_HEADPHONE);
+				WCD9XXX_BCL_UNLOCK(mbhc->resmgr);
 			}
 		} else if (plug_type == PLUG_TYPE_HIGH_HPH) {
 			pr_debug("%s: High HPH detected, continue polling\n",
 				  __func__);
 			if (mbhc->mbhc_cfg->detect_extn_cable) {
-				if (mbhc->current_plug != plug_type)
+				if (mbhc->current_plug != plug_type) {
+					WCD9XXX_BCL_LOCK(mbhc->resmgr);
 					wcd9xxx_report_plug(mbhc, 1,
 							    SND_JACK_LINEOUT);
+					WCD9XXX_BCL_UNLOCK(mbhc->resmgr);
+				}
 			} else if (mbhc->current_plug == PLUG_TYPE_NONE) {
+				WCD9XXX_BCL_LOCK(mbhc->resmgr);
 				wcd9xxx_report_plug(mbhc, 1,
 						    SND_JACK_HEADPHONE);
+				WCD9XXX_BCL_UNLOCK(mbhc->resmgr);
 			}
 		} else {
 			if (plug_type == PLUG_TYPE_GND_MIC_SWAP) {
