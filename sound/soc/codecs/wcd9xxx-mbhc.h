@@ -12,11 +12,6 @@
 #ifndef __WCD9XXX_MBHC_H__
 #define __WCD9XXX_MBHC_H__
 
-#ifdef CONFIG_MACH_OPPO
-//liuyan add 2013-3-1, headset report
-#include<linux/switch.h>
-//liuyan add end
-#endif
 #include "wcd9xxx-resmgr.h"
 
 #define WCD9XXX_CFILT_FAST_MODE 0x00
@@ -240,7 +235,6 @@ struct wcd9xxx_mbhc_config {
 	unsigned int gpio;
 	unsigned int gpio_irq;
 #ifdef CONFIG_MACH_OPPO
-	int headset_type;
 	void (*set_gnd_mic_gpio) (struct snd_soc_codec *, int);
 #endif
 	int gpio_level_insert;
@@ -372,7 +366,6 @@ struct wcd9xxx_mbhc {
 	/* Holds codec specific interrupt mapping */
 	const struct wcd9xxx_mbhc_intr *intr_ids;
 #ifdef CONFIG_MACH_OPPO
-	struct switch_dev wcd9xxx_sdev;
 	bool is_hs_inserted;
 #endif
 

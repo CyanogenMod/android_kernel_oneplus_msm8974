@@ -453,7 +453,6 @@ struct taiko_priv {
 
 /* OPPO 2013-11-12 xuzhaoan Add begin for American Headset Detect */
 #ifdef CONFIG_MACH_OPPO
-static struct taiko_priv *priv_headset_type;
 static struct regulator *cdc_hpmic_reg = NULL;
 static atomic_t cdc_hpmic_reg_ref;
 #endif
@@ -540,28 +539,6 @@ static unsigned short tx_digital_gain_reg[] = {
 };
 
 #ifdef CONFIG_MACH_OPPO
-enum {
-	NO_DEVICE = 0,
-	HS_WITH_MIC,
-	HS_WITHOUT_MIC,
-};
-
-static ssize_t wcd9xxx_print_name(struct switch_dev *sdev, char *buf)
-{
-	switch (switch_get_state(sdev)) {
-		case NO_DEVICE:
-			return sprintf(buf, "No Device\n");
-		case HS_WITH_MIC:
-			if (priv_headset_type->mbhc.mbhc_cfg->headset_type == 1)
-				return sprintf(buf, "American Headset\n");
-			else
-				return sprintf(buf, "Headset\n");
-		case HS_WITHOUT_MIC:
-			return sprintf(buf, "Handset\n");
-	}
-	return -EINVAL;
-}
-
 static void hph_regulator_control(bool enable)
 {
 	int ret = 0;
@@ -7263,12 +7240,6 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 		goto err_init;
 	}
 #ifdef CONFIG_MACH_OPPO
-	taiko->mbhc.wcd9xxx_sdev.name= "h2w";
-	taiko->mbhc.wcd9xxx_sdev.print_name = wcd9xxx_print_name;
-	ret = switch_dev_register(&taiko->mbhc.wcd9xxx_sdev);
-	if (ret)
-		goto err_switch_dev_register;
-
 	taiko_micbias_supply_init(codec->dev);
 #endif
 	taiko->codec = codec;
@@ -7385,12 +7356,6 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 
 	codec->ignore_pmdown_time = 1;
 
-/* OPPO 2013-11-12 xuzhaoan Add begin for America Headset Detect */
-#ifdef CONFIG_MACH_OPPO
-	priv_headset_type = taiko;
-#endif
-/* OPPO 2013-11-12 xuzhaoan Add end */
-
 	return ret;
 
 err_irq:
@@ -7398,12 +7363,6 @@ err_irq:
 err_pdata:
 	kfree(ptr);
 err_nomem_slimch:
-//luiyan 2013-3-13 add for headset detect
-#ifdef CONFIG_MACH_OPPO
-	switch_dev_unregister(&taiko->mbhc.wcd9xxx_sdev);
-err_switch_dev_register:
-#endif
-//liuyan add end
 	kfree(taiko);
 err_init:
 	return ret;
@@ -7423,7 +7382,6 @@ static int taiko_codec_remove(struct snd_soc_codec *codec)
 	taiko_cleanup_irqs(taiko);
 
 #ifdef CONFIG_MACH_OPPO
-	switch_dev_unregister(&taiko->mbhc.wcd9xxx_sdev);
 	taiko_micbias_supply_close();
 #endif
 

@@ -870,7 +870,6 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 			 jack_type, mbhc->hph_status);
 #ifdef CONFIG_MACH_OPPO
 		mbhc->is_hs_inserted = false;
-		switch_set_state(&mbhc->wcd9xxx_sdev, 0);
 		/* make sure to turn off micbias source */
 		if (mbhc->mbhc_cb && mbhc->mbhc_cb->enable_mb_source)
 			mbhc->mbhc_cb->enable_mb_source(mbhc->codec, false, true);
@@ -941,20 +940,6 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 			wcd9xxx_detect_impedance(mbhc, &mbhc->zl, &mbhc->zr);
 
 #ifdef CONFIG_MACH_OPPO
-		switch (mbhc->current_plug) {
-			case PLUG_TYPE_HEADPHONE:
-			case PLUG_TYPE_HIGH_HPH:
-				switch_set_state(&mbhc->wcd9xxx_sdev, 2);
-				break;
-			case PLUG_TYPE_GND_MIC_SWAP:
-			case PLUG_TYPE_HEADSET:
-			case PLUG_TYPE_ANC_HEADPHONE:
-				switch_set_state(&mbhc->wcd9xxx_sdev, 1);
-				break;
-			default:
-				switch_set_state(&mbhc->wcd9xxx_sdev, 0);
-				break;
-		}
 		mbhc->is_hs_inserted = true;
 #endif
 		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
@@ -1553,7 +1538,6 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 	if (dce_value1 > WCD9xxx_CS_THRESHED && dce_value1 < WCD9XXX_V_CS_HS_MAX) {
 		type = PLUG_TYPE_HEADSET;
 		/* American Headset */
-		mbhc->mbhc_cfg->headset_type = 1;
 		if (mbhc->mbhc_cfg->micbias_enable_flags &
 				(1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET)) {
 			mbhc->micbias_enable = true;
@@ -1566,7 +1550,6 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 			mbhc->mbhc_cfg->set_gnd_mic_gpio(mbhc->codec, 0);
 			type = PLUG_TYPE_HEADSET;
 			/* Chinese Headset */
-			mbhc->mbhc_cfg->headset_type = 0;
 		} else {
 			type = PLUG_TYPE_HIGH_HPH;
 		}
@@ -1595,7 +1578,6 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 					dce_value2 <= WCD9XXX_CS_IPHONE_HIG_THRD) {
 				type=PLUG_TYPE_HEADSET;
 				/* Chinese Headset */
-				mbhc->mbhc_cfg->headset_type = 0;
 			} else {
 				type = PLUG_TYPE_HIGH_HPH;
 			}
@@ -1603,12 +1585,10 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 			if (dce_value1 < dce_value2) {
 				type = PLUG_TYPE_HEADSET;
 				/* Chinese Headset */
-				mbhc->mbhc_cfg->headset_type = 0;
 			} else {
 				mbhc->mbhc_cfg->set_gnd_mic_gpio(mbhc->codec, 1);
 				type = PLUG_TYPE_HEADSET;
 				/* American Headset */
-				mbhc->mbhc_cfg->headset_type = 1;
 			}
 			if (mbhc->mbhc_cfg->micbias_enable_flags &
 					(1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET)) {
