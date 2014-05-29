@@ -1569,8 +1569,8 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		}
 		pr_debug("%s:dce_value1 %d\n", __func__, dce_value1);
 		pr_debug("%s:dce_value2 %d\n", __func__, dce_value2);
-		if (abs(dce_value1) < WCD9XXX_V_CS_NO_MIC &&
-					abs(dce_value2) < WCD9XXX_V_CS_NO_MIC) {
+		if (abs(dce_value1) <= WCD9XXX_V_CS_NO_MIC &&
+					abs(dce_value2) <= WCD9XXX_V_CS_NO_MIC) {
 			type = PLUG_TYPE_HEADPHONE;
 		} else if (dce_value2 >= WCD9XXX_V_CS_HS_MAX) {
 			/* iphone chinese headset */
