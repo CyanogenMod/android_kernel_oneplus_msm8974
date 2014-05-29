@@ -166,6 +166,7 @@ struct bq27541_device_info {
 	struct timer_list watchdog;
 	struct wake_lock fastchg_wake_lock;
 	bool fast_chg_allow;
+	bool fast_low_temp_full;
 /* jingchun.wang@Onlinerd.Driver, 2014/02/12  Add for retry when config fail */
 	int retry_count;
 /* jingchun.wang@Onlinerd.Driver, 2014/02/27  Add for get right soc when sleep long time */
@@ -604,6 +605,22 @@ static int bq27541_set_switch_to_noraml_false(void)
 	return 0;
 }
 
+static int bq27541_get_fast_low_temp_full(void)
+{
+	if(bq27541_di) {
+		return bq27541_di->fast_low_temp_full;
+	}
+	return false;
+}
+
+static int bq27541_set_fast_low_temp_full_false(void)
+{
+	if(bq27541_di) {
+		return bq27541_di->fast_low_temp_full = false;
+	}
+	return 0;
+}
+
 static int bq27541_fast_normal_to_warm(void)
 {
 	if (bq27541_di) {
@@ -665,6 +682,8 @@ static struct qpnp_battery_gauge bq27541_batt_gauge = {
 	.fast_normal_to_warm		= bq27541_fast_normal_to_warm,
 	.set_normal_to_warm_false	= bq27541_set_fast_normal_to_warm_false,
 	.get_fast_chg_ing		= bq27541_get_fast_chg_ing,
+	.get_fast_low_temp_full		= bq27541_get_fast_low_temp_full,
+	.set_low_temp_full_false	= bq27541_set_fast_low_temp_full_false,
 };
 #else
 static struct msm_battery_gauge bq27541_batt_gauge = {
@@ -1137,6 +1156,19 @@ static void fastcg_work_func(struct work_struct *work)
 		}
 		del_timer(&bq27541_di->watchdog);
 		ret_info = 0x2;
+	} else if(data == 0x53){
+		if (bq27541_di->battery_type == BATTERY_3000MA){	//13097 ATL battery
+			//if temp:10~20 decigec,vddmax = 4250mv
+			//switch off fast chg
+			pr_info("%s fastchg low temp full,switch off fastchg,set GPIO96 0\n", __func__);
+			gpio_set_value(96, 0);
+			retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
+			if (retval) {
+				pr_err("%s switch usb error %d\n", __func__, retval);
+			}
+		}
+		del_timer(&bq27541_di->watchdog);
+		ret_info = 0x2;
 	} else if(data == 0x59){
 		//usb bad connected,stop fastchg
 #if 0  //lfc modify for it(set fast_switch_to_normal ture) is earlier than usb_plugged_out irq(set it false)
@@ -1236,6 +1268,20 @@ out:
 		bq27541_di->fast_chg_ing = false;
 	}
 	//fastchg temp over( > 45 or < 20)
+
+	//lfc add to set fastchg vddmax = 4250mv during 10 ~ 20 decigec for ATL 3000mAH battery
+	if(data == 0x53){
+		if(bq27541_di->battery_type == BATTERY_3000MA){	//13097 ATL battery
+			usleep_range(180000,180000);
+			bq27541_di->fast_low_temp_full = true;
+			bq27541_di->alow_reading = true;
+			bq27541_di->fast_chg_started = false;
+			bq27541_di->fast_chg_allow = false;
+			bq27541_di->fast_chg_ing = false;
+		}
+	}
+	//lfc add to set fastchg vddmax = 4250mv end
+	
 	if(data == 0x5c){
 		usleep_range(180000,180000);
 		bq27541_di->fast_normal_to_warm = true;
@@ -1262,6 +1308,13 @@ out:
 		power_supply_changed(bq27541_di->batt_psy);
 	}
 
+	if(data == 0x53){
+		if(bq27541_di->battery_type == BATTERY_3000MA){
+			power_supply_changed(bq27541_di->batt_psy);
+			wake_unlock(&bq27541_di->fastchg_wake_lock);
+		}
+	}
+		
 	if((data == 0x54) || (data == 0x5a) || (data == 0x59) || (data == 0x5c)){
 		power_supply_changed(bq27541_di->batt_psy);
 		wake_unlock(&bq27541_di->fastchg_wake_lock);
@@ -1279,6 +1332,7 @@ void di_watchdog(unsigned long data)
 	di->alow_reading = true;
 	di->fast_chg_started = false;
 	di->fast_switch_to_normal = false;
+	di->fast_low_temp_full = false;
 	di->fast_chg_allow = false;
 	di->fast_normal_to_warm = false;
 	di->fast_chg_ing = false;
@@ -1353,6 +1407,7 @@ static int bq27541_battery_probe(struct i2c_client *client,
 	di->temp_pre = 0;
 	di->alow_reading = true;
 	di->fast_chg_ing = false;
+	di->fast_low_temp_full = false;
 	di->retry_count = MAX_RETRY_COUNT;
 	atomic_set(&di->suspended, 0);
 #endif

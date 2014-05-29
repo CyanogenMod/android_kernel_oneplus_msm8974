@@ -577,10 +577,18 @@ static void msm_vfe40_reg_update(struct vfe_device *vfe_dev)
 
 static long msm_vfe40_reset_hardware(struct vfe_device *vfe_dev)
 {
+	long time;
 	init_completion(&vfe_dev->reset_complete);
 	msm_camera_io_w_mb(0x1FF, vfe_dev->vfe_base + 0xC);
-	return wait_for_completion_interruptible_timeout(
-		&vfe_dev->reset_complete, msecs_to_jiffies(50));
+	time = wait_for_completion_interruptible_timeout(&vfe_dev->reset_complete, msecs_to_jiffies(50));
+	if(time <= 0) {
+	    pr_err("%s: timeout, will try again\n", __func__);
+        init_completion(&vfe_dev->reset_complete);
+		msm_camera_io_w_mb(0x1FF, vfe_dev->vfe_base + 0xC);
+		return wait_for_completion_interruptible_timeout(&vfe_dev->reset_complete, msecs_to_jiffies(50));
+	} else {
+		return time;
+	}
 }
 
 static void msm_vfe40_axi_reload_wm(

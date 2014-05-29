@@ -13,6 +13,7 @@
 ** <author>		                      <data> 	<version >  <desc>
 ** ------------------------------------------------------------------------------
 ** Yuyi@Driver.NFC  2014/04/03   1.1	    modify for debug spi
+** Yuyi@Driver.NFC  2014/04/23   1.2	    add irq ,interrupt function and delete log for p61.c
 ****************************************************************/
 
 #include <linux/kernel.h>
@@ -36,8 +37,10 @@
 #include <linux/poll.h>
 #include <linux/timer.h>
 
-#define DBG_MODULE 1
-#define TIMER_ENABLE 1
+#define DBG_MODULE 0
+//#define TIMER_ENABLE 
+#define TIMER_ENABLE 0
+#define IRQ_ENABLE 1
 #if DBG_MODULE
 #define NFC_DBG_MSG(msg...) printk(KERN_ERR "[NFC PN61] :  " msg);
 #else
@@ -158,7 +161,7 @@ static int timer_expired = 0;
 #ifdef TIMER_ENABLE
 static struct timer_list recovery_timer;
 static int timer_started = 0;
-
+static void p61_disable_irq(struct p61_dev *p61_dev);
 void my_timer_callback( unsigned long data )
 {
   timer_expired = 1;
@@ -334,12 +337,13 @@ Start:
 		send(filp,&wtx, C_TRANSMIT_NORMAL_SPI_OPERATION,len1);
 		udelay(1000);
 
-                gStRecvData->len = 5;
-                memcpy(gStRecvData->data, wtx, 5);;
+                //gStRecvData->len = 5;
+                //memcpy(gStRecvData->data, wtx, 5);;
 #ifdef TIMER_ENABLE
                 stat_timer = start_timer();
 #endif
-                return gStRecvData;
+                //return gStRecvData;
+		goto Start;
 	}
 
 	//check the header if retransmit is requested
@@ -543,11 +547,11 @@ static long  p61_dev_ioctl(struct file *filp, unsigned int cmd,
 
 	switch (cmd) {
 	case P61_SET_PWR:
-		if (arg == 2) 
-                {
-                printk("yuyi,p61_dev_ioctl   download firmware \n");
-			/* power on with firmware download (requires hw reset)
-			 */
+		NFC_DBG_MSG(KERN_ALERT "P61_SET_PWR-Enter P61_RST = 0x%x\n", P61_RST);
+		if (arg == 2)
+        {
+			printk("yuyi,p61_dev_ioctl   download firmware \n");
+			/* power on with firmware download (requires hw reset)*/
 			gpio_set_value(P61_RST, 1);
 			NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-1\n");
 			msleep(20);
@@ -561,15 +565,15 @@ static long  p61_dev_ioctl(struct file *filp, unsigned int cmd,
 			msleep(20);
 
 		} else if (arg == 1) {
-			//printk("yuyi,p61_dev_ioctl   power on \n");
+			printk("yuyi,p61_dev_ioctl   power on \n");
 			/* power on */
 			NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-1 (arg = 1)\n");
 			gpio_set_value(P61_RST, 1);
 
 		} else  if (arg == 0) {
-		printk("yuyi,p61_dev_ioctl   power off \n");
+			printk("yuyi,p61_dev_ioctl   power off \n");
 			/* power off */
-			//NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-0 (arg = 0)\n");
+			NFC_DBG_MSG(KERN_ALERT "p61_dev_ioctl-0 (arg = 0)\n");
 			gpio_set_value(P61_RST, 0);
 			udelay(100);
 		} else {
@@ -683,8 +687,8 @@ respData_t * receiveHeader(struct file *filp)
 #ifdef TIMER_ENABLE
 again:
 #endif
-        timer_expired = 0;
-	while(gRecvBuff[0] != sof && (timer_expired == 0))
+        
+	while(gRecvBuff[0] != sof)
 	{
 		NFC_DBG_MSG(KERN_ALERT "SOF not found\n");
 		// receive one byte and keep SS line low
@@ -830,8 +834,36 @@ static ssize_t p61_dev_read(struct file *filp, char  *buf,
     NFC_DBG_MSG(KERN_ALERT "p61_dev_read - Enter \n");
    	mutex_lock(&p61_dev->read_mutex);
 	NFC_DBG_MSG(KERN_ALERT "p61_dev_read - aquried mutex - calling spi_read \n");
-
+	NFC_DBG_MSG(KERN_ALERT "p61_dev_read - test1 count [0x%x] \n",count);
 	/** Read data */
+#ifdef IRQ_ENABLE
+    NFC_DBG_MSG(KERN_ALERT "************ Test11 *****************\n");
+    if (!gpio_get_value(p61_dev->irq_gpio))
+    {
+        while (1)
+        {
+		 NFC_DBG_MSG(KERN_ALERT "************ Test1 *****************\n");
+        	NFC_DBG_MSG(" %s inside while(1) \n", __FUNCTION__);
+            p61_dev->irq_enabled = true;
+            enable_irq(p61_dev->spi->irq);
+            ret = wait_event_interruptible(p61_dev->read_wq,!p61_dev->irq_enabled);
+            p61_disable_irq(p61_dev);
+            if (ret)
+            {
+            	NFC_DBG_MSG("p61_disable_irq() : Failed\n");
+                goto fails;
+            }
+	    NFC_DBG_MSG(KERN_ALERT "************ Test2 *****************\n");
+            if (gpio_get_value(p61_dev->irq_gpio))
+                break;
+
+            NFC_DBG_MSG("%s: spurious interrupt detected\n", __func__);
+        }
+    }
+
+    NFC_DBG_MSG(KERN_ALERT "************  gpio already high read data Test11 *****************\n");
+#endif
+	NFC_DBG_MSG(KERN_ALERT "************ Test3 *****************\n");
 	ret = spi_read (p61_dev -> spi,(void *) buf, count);
 	if(0>ret)
 	{
@@ -973,11 +1005,43 @@ int nativeSetBitrate(short bitrate)
 	return 0;
 }
 
+#ifdef IRQ_ENABLE
+static void p61_disable_irq(struct p61_dev *p61_dev)
+{
+	unsigned long flags;
+
+	NFC_DBG_MSG("Entry : %s\n", __FUNCTION__);
+	spin_lock_irqsave(&p61_dev->irq_enabled_lock, flags);
+	if (p61_dev->irq_enabled)
+	{
+		disable_irq_nosync(p61_dev->spi->irq);
+		p61_dev->irq_enabled = false;
+	}
+	spin_unlock_irqrestore(&p61_dev->irq_enabled_lock, flags);
+	NFC_DBG_MSG("Exit : %s\n", __FUNCTION__);
+}
+
+static irqreturn_t p61_dev_irq_handler(int irq, void *dev_id)
+{
+	struct p61_dev *p61_dev = dev_id;
+
+	NFC_DBG_MSG("Entry : %s\n", __FUNCTION__);
+	p61_disable_irq(p61_dev);
+
+	/* Wake up waiting readers */
+	wake_up(&p61_dev->read_wq);
+
+	NFC_DBG_MSG("Exit : %s\n", __FUNCTION__);
+	return IRQ_HANDLED;
+}
+#endif
+
+#if 0
 static int p61_enable_irq(struct p61_dev *p61_dev)
 {
 	int ret = -1;
-//	unsigned int irq_flags;
-    //NFC_DBG_MSG("p61_enable_irq Enter\n");
+	//unsigned int irq_flags;
+	//NFC_DBG_MSG("p61_enable_irq Enter\n");
 	NFC_DBG_MSG("Entry : %s\n", __FUNCTION__);
 	ret = gpio_request( P61_IRQ, "p61 irq");
 	if (ret < 0)
@@ -987,7 +1051,7 @@ static int p61_enable_irq(struct p61_dev *p61_dev)
 	}
 
 	//yuyi add begin 
-/*	ret = request_irq(p61_dev->spi->irq, p61_dev_irq_handler, IRQF_TRIGGER_HIGH, p61_dev -> p61_device.name, p61_dev);
+	/*ret = request_irq(p61_dev->spi->irq, p61_dev_irq_handler, IRQF_TRIGGER_HIGH, p61_dev -> p61_device.name, p61_dev);
 	NFC_DBG_MSG("%s  name: %s  irq: %d\n", __FUNCTION__,p61_dev -> p61_device.name,p61_dev->spi->irq);
 	if (ret) 
 	{
@@ -1003,21 +1067,7 @@ static int p61_enable_irq(struct p61_dev *p61_dev)
 		goto fail_irq;
 	}
 	
-	ret = gpio_request( P61_RST, "p61 reset");
-	if (ret < 0)
-	{
-		NFC_ERR_MSG("gpio reset request failed = 0x%x\n", P61_RST);
-		goto fail_gpio;
-	}
-
-	NFC_ERR_MSG("gpio_request returned = 0x%x\n", ret);
-	ret = gpio_direction_output(P61_RST,0);
-	if (ret < 0)
-	{
-		NFC_ERR_MSG("gpio rst request failed gpio = 0x%x\n", P61_RST);
-		goto fail_gpio;
-	}
-	NFC_ERR_MSG("gpio_direction_output returned = 0x%x\n", ret);
+	
 	p61_dev->spi->irq= gpio_to_irq(P61_IRQ);
 
 	if ( p61_dev->spi->irq < 0)
@@ -1027,8 +1077,7 @@ static int p61_enable_irq(struct p61_dev *p61_dev)
 	}
 
 	NFC_DBG_MSG("Exit : %s\n", __FUNCTION__);
-	gpio_set_value(P61_RST, 1);
-	msleep(20);
+
 	return ret;
         fail_gpio:
 	gpio_free(P61_RST);
@@ -1038,7 +1087,7 @@ static int p61_enable_irq(struct p61_dev *p61_dev)
 	NFC_DBG_MSG("irq initialisation failed\n");
 	return ret;
 }
-
+#endif
 static inline void p61_set_data(struct spi_device *spi, void *data)
 {
 	dev_set_drvdata(&spi->dev, data);
@@ -1058,8 +1107,8 @@ static int __devinit p61_probe(struct spi_device *spi)
 {
 	int ret = 0;
 	struct p61_dev *p61_dev=NULL;
-
-	NFC_DBG_MSG("Entry : %s\n", __FUNCTION__);
+	unsigned int irq_flags;
+	printk("P61 with irq without log Entry : %s\n", __FUNCTION__);
 
 	NFC_DBG_MSG("chip select : %d , bus number = %d \n", spi->chip_select, spi->master->bus_num);
 	p61_dev = kzalloc(sizeof(*p61_dev), GFP_KERNEL);
@@ -1069,7 +1118,39 @@ static int __devinit p61_probe(struct spi_device *spi)
 		ret = -ENOMEM;
 		goto err_exit;
 	}
+	
+	ret = gpio_request( P61_RST, "p61 reset");
+	if (ret < 0)
+	{
+		NFC_ERR_MSG("p61 gpio reset request failed = 0x%x\n", P61_RST);
+		goto fail_gpio;
+	}
 
+	NFC_ERR_MSG("gpio_request returned = 0x%x\n", ret);
+	ret = gpio_direction_output(P61_RST,0);
+	if (ret < 0)
+	{
+		NFC_ERR_MSG("p61 gpio rst request failed gpio = 0x%x\n", P61_RST);
+		goto fail_gpio;
+	}
+	NFC_ERR_MSG("gpio_direction_output returned = 0x%x\n", ret);
+
+	
+#ifdef IRQ_ENABLE
+    	ret = gpio_request( P61_IRQ, "p61 irq");
+    	if (ret < 0)
+    	{
+    		NFC_ERR_MSG("p61 gpio request failed gpio = 0x%x\n", P61_IRQ);
+    		goto err_exit0;
+    	}
+
+    	ret = gpio_direction_input(P61_IRQ);
+    	if (ret < 0)
+    	{
+    		NFC_ERR_MSG("p61 gpio request failed gpio = 0x%x\n", P61_IRQ);
+    		goto err_exit0;
+    	}
+#endif
 
 	spi->bits_per_word = 8;
 	spi->mode = SPI_MODE_0;
@@ -1088,12 +1169,23 @@ static int __devinit p61_probe(struct spi_device *spi)
 	p61_dev -> p61_device.fops = &p61_dev_fops;
 	p61_dev -> p61_device.parent = &spi->dev;
 
-	p61_dev->ven_gpio = P61_RST;
+	p61_dev -> ven_gpio = P61_RST;
+	
+	gpio_set_value(P61_RST, 1);
+	msleep(20);
+	printk("p61_dev->rst_gpio = %d\n ",P61_RST);
+#ifdef IRQ_ENABLE
+	p61_dev->irq_gpio = P61_IRQ;
+#endif
 	
 	p61_set_data(spi, p61_dev);
 	/* init mutex and queues */
 	init_waitqueue_head(&p61_dev->read_wq);
 	mutex_init(&p61_dev->read_mutex);
+	//spin_lock_init(&p61_dev->irq_enabled_lock);
+#ifdef IRQ_ENABLE
+	spin_lock_init(&p61_dev->irq_enabled_lock);
+#endif
 
 	ret = misc_register(&p61_dev->p61_device);
 	if (ret < 0)
@@ -1101,22 +1193,43 @@ static int __devinit p61_probe(struct spi_device *spi)
 		NFC_ERR_MSG("misc_register failed! %d\n", ret);
 		goto err_exit0;
 	}
-	ret = p61_enable_irq (p61_dev);
-	if (ret < 0)
-	{
-		NFC_ERR_MSG("Failed to p61_enable_irq\n");
-		goto err_exit1;
-	}
+#ifdef IRQ_ENABLE
+    p61_dev->spi->irq = gpio_to_irq(P61_IRQ);
+
+    if ( p61_dev->spi->irq < 0)
+    {
+    	NFC_ERR_MSG("gpio_to_irq request failed gpio = 0x%x\n", P61_IRQ);
+        goto err_exit0;
+    }
+    /* request irq.  the irq is set whenever the chip has data available
+         * for reading.  it is cleared when all data has been read.
+         */
+    p61_dev->irq_enabled = true;
+    irq_flags = IRQF_TRIGGER_RISING | IRQF_ONESHOT;
+
+    ret = request_irq(p61_dev->spi->irq, p61_dev_irq_handler,
+                          irq_flags, p61_dev -> p61_device.name, p61_dev);
+    if (ret)
+    {
+        NFC_ERR_MSG("request_irq failed\n");
+        goto err_exit0;
+    }
+    p61_disable_irq(p61_dev);
+
+#endif
+
 	NFC_DBG_MSG("Exit : %s\n", __FUNCTION__);
 
 	return ret;
 
-	err_exit1:
-	misc_deregister(&p61_dev->p61_device);
+//	err_exit1:
+//	misc_deregister(&p61_dev->p61_device);
 	err_exit0:
 	mutex_destroy(&p61_dev->read_mutex);
         if(p61_dev != NULL)
 	kfree(p61_dev);
+	fail_gpio:
+	gpio_free(P61_RST);
 	err_exit:
 	return ret;
 }
@@ -1136,8 +1249,8 @@ static int __devexit p61_remove(struct spi_device *spi)
 	misc_deregister(&p61_dev->p61_device);
 	gpio_free(P61_IRQ);
 	gpio_free(P61_RST);
-        if(p61_dev != NULL)
-	kfree(p61_dev);
+    if(p61_dev != NULL)
+		kfree(p61_dev);
 	NFC_DBG_MSG("Exit : %s\n", __FUNCTION__);
 	return 0;
 }
