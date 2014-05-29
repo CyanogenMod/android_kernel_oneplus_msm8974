@@ -236,6 +236,8 @@ struct synaptics_rmi4_data {
 	unsigned short f01_cmd_base_addr;
 	unsigned short f01_ctrl_base_addr;
 	unsigned short f01_data_base_addr;
+	unsigned short holster_mode_control_addr;
+	unsigned short holster_mode_open_or_close;
 	unsigned int firmware_id;
 	int irq;
 	int sensor_max_x;

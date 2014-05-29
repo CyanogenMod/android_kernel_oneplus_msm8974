@@ -569,6 +569,7 @@ static struct gpiomux_setting gpio_blsp6_spi2_config = {
 	.func = GPIOMUX_FUNC_2,
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_UP,
+	.dir = GPIOMUX_IN,
 };
 
 static struct gpiomux_setting gpio_blsp6_spi1_config = {

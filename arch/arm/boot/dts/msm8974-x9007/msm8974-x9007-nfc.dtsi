@@ -72,7 +72,7 @@
 		p61-nxp-nfc@0 {
 			compatible = "p61,nxp-nfc";
 			reg = <0>;
-			spi-max-frequency = <4800000>;
+			spi-max-frequency = <4000000>;
 			spi-cs-high;
 			interrupt-parent = <&msmgpio>;
 			interrupts = <34 0>;

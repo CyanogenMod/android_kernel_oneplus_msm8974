@@ -1427,6 +1427,7 @@ qpnp_chg_charge_en(struct qpnp_chg_chip *chip, int enable)
 	}
 }
 
+#ifdef CONFIG_PIC1503_FASTCG
 static int qpnp_chg_get_charge_en(void)
 {
 	if (qpnp_ext_charger && qpnp_ext_charger->chg_get_charge_en) {
@@ -1436,6 +1437,7 @@ static int qpnp_chg_get_charge_en(void)
 		return -ENODEV;
 	}
 }
+#endif
 #else
 static int
 qpnp_chg_charge_en(struct qpnp_chg_chip *chip, int enable)
@@ -1917,11 +1919,34 @@ get_prop_fast_switch_to_normal(struct qpnp_chg_chip *chip)
 		return false;
 	}
 }
+
 static int
 set_fast_switch_to_normal_false(struct qpnp_chg_chip *chip)
 {
 	if (qpnp_batt_gauge && qpnp_batt_gauge->set_switch_to_noraml_false)
 		return qpnp_batt_gauge->set_switch_to_noraml_false();
+	else {
+		pr_err("qpnp-charger no batt gauge assuming false\n");
+		return false;
+	}
+}
+
+static int
+qpnp_get_fast_low_temp_full(struct qpnp_chg_chip *chip)
+{
+	if (qpnp_batt_gauge && qpnp_batt_gauge->get_fast_low_temp_full)
+		return qpnp_batt_gauge->get_fast_low_temp_full();
+	else {
+		pr_err("qpnp-charger no batt gauge assuming false\n");
+		return false;
+	}
+}
+
+static int
+qpnp_set_fast_low_temp_full_false(struct qpnp_chg_chip *chip)
+{
+	if (qpnp_batt_gauge && qpnp_batt_gauge->set_low_temp_full_false)
+		return qpnp_batt_gauge->set_low_temp_full_false();
 	else {
 		pr_err("qpnp-charger no batt gauge assuming false\n");
 		return false;
@@ -1938,6 +1963,7 @@ get_prop_fast_normal_to_warm(struct qpnp_chg_chip *chip)
 		return false;
 	}
 }
+
 static int
 set_fast_normal_to_warm_false(struct qpnp_chg_chip *chip)
 {
@@ -1948,6 +1974,7 @@ set_fast_normal_to_warm_false(struct qpnp_chg_chip *chip)
 		return false;
 	}
 }
+
 static int
 qpnp_set_fast_chg_allow(struct qpnp_chg_chip *chip,int enable)
 {
@@ -1979,6 +2006,24 @@ qpnp_get_fast_chg_ing(struct qpnp_chg_chip *chip)
 		pr_err("qpnp-charger no batt gauge assuming false\n");
 		return false;
 	}
+}
+#else
+static int
+get_prop_fast_chg_started(struct qpnp_chg_chip *chip)
+{
+	return false;
+}
+
+static int
+get_prop_fast_switch_to_normal(struct qpnp_chg_chip *chip)
+{
+	return false;
+}
+
+static int
+get_prop_fast_normal_to_warm(struct qpnp_chg_chip *chip)
+{
+	return false;
 }
 #endif /* CONFIG_PIC1503_FASTCG */
 
@@ -3030,7 +3075,7 @@ get_prop_batt_health(struct qpnp_chg_chip *chip)
 	int temp;
 
 	temp = get_prop_batt_temp(chip);
-	if (temp <= AUTO_CHARGING_BATT_REMOVE_TEMP) {
+	if (temp == AUTO_CHARGING_BATT_REMOVE_TEMP) {
 		return POWER_SUPPLY_HEALTH_UNKNOWN;
 	} else if (qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__HOT) {
 		return POWER_SUPPLY_HEALTH_OVERHEAT;
@@ -3176,13 +3221,6 @@ get_prop_batt_status(struct qpnp_chg_chip *chip)
 	} else if ((status & 0x30) == 0x30) {
 		return POWER_SUPPLY_STATUS_CHARGING;
 	} else {
-		if (get_prop_fast_switch_to_normal(chip) == true) {
-			if (chip->time_out != true &&
-					(get_prop_batt_health(chip) == POWER_SUPPLY_HEALTH_GOOD ||
-					 get_prop_batt_health(chip) == POWER_SUPPLY_HEALTH_OVERVOLTAGE)) {
-				return POWER_SUPPLY_STATUS_CHARGING;
-			}
-		}
 		return POWER_SUPPLY_STATUS_DISCHARGING;
 	}
 }
@@ -4697,13 +4735,13 @@ qpnp_eoc_work(struct work_struct *work)
 				ibat_ma, vbat_mv, chip->term_current);
 
 		if (qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION_LITTLE__COLD) {
-			max_comp_volt = 4000 - 100;
+			max_comp_volt = 4000 - 50;
 		} else if (qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__COOL) {
-			max_comp_volt = chip->cool_bat_mv - 100;
+			max_comp_volt = chip->cool_bat_mv - 50;
 		} else if (qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__NORMAL) {
-			max_comp_volt = chip->max_voltage_mv - 100;
+			max_comp_volt = chip->max_voltage_mv - 50;
 		} else if (qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__WARM) {
-			max_comp_volt = chip->warm_bat_mv - 100;
+			max_comp_volt = chip->warm_bat_mv - 50;
 		}
 
 		if (vbat_mv < max_comp_volt) {
@@ -4719,7 +4757,7 @@ qpnp_eoc_work(struct work_struct *work)
 			if (count == CONSECUTIVE_COUNT_POSITIVE) {
 				if (qpnp_ext_charger && qpnp_ext_charger->chg_get_system_status)
 					bat_status = qpnp_ext_charger->chg_get_system_status();
-				if(((bat_status & 0x30) == 0x30) && (vbat_mv > max_comp_volt + 50)) {
+				if ((bat_status & 0x30) == 0x30) {
 					pr_info("End of Charging when ibat>=0\n");
 					chip->delta_vddmax_mv = 0;
 					qpnp_chg_set_appropriate_vddmax(chip);
@@ -6712,14 +6750,16 @@ static int handle_batt_temp_normal(struct qpnp_chg_chip *chip)
 		if(ret.intval / 1000 == 500) {
 			qpnp_chg_iusbmax_set(chip, ret.intval / 1000);
 		} else {
-		/* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
-			if(chip->aicl_current == 0) {
-				soft_aicl(chip);
-			} else {
-				if(chip->aicl_current == 2000) {
-					qpnp_chg_iusbmax_set(chip, 1500);
+			/* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
+			if(qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP) {
+				if(chip->aicl_current == 0) {
+					soft_aicl(chip);
 				} else {
-					qpnp_chg_iusbmax_set(chip, chip->aicl_current);
+					if(chip->aicl_current == 2000) {
+						qpnp_chg_iusbmax_set(chip, 1500);
+					} else {
+						qpnp_chg_iusbmax_set(chip, chip->aicl_current);
+					}
 				}
 			}
 		}
@@ -7088,12 +7128,15 @@ bool is_alow_fast_chg(struct qpnp_chg_chip *chip)
 	int temp = 0;
 	int cap = 0;
 	int chg_type = 0;
+	bool low_temp_full = 0;
 
 	auth = get_prop_authenticate(chip);
 	temp = get_prop_batt_temp(chip);
 	cap = get_prop_capacity(chip);
 	chg_type = qpnp_charger_type_get(chip);
-	pr_err("%s auth:%d,temp:%d,cap:%d,chg_type:%d\n",__func__,auth,temp,cap,chg_type);
+	low_temp_full = qpnp_get_fast_low_temp_full(chip);
+
+	pr_err("%s auth:%d,temp:%d,cap:%d,chg_type:%d,low_temp_full:%d\n",__func__,auth,temp,cap,chg_type,low_temp_full);
 	if(auth == false)
 		return false;
 	if(chg_type != POWER_SUPPLY_TYPE_USB_DCP)
@@ -7101,6 +7144,9 @@ bool is_alow_fast_chg(struct qpnp_chg_chip *chip)
 #ifndef CONFIG_MACH_FIND7OP
 	if(temp < 105)
 		return false;
+	if((temp < 155) && (low_temp_full == 1)){
+		return false;
+	}
 #else
 	if(temp < 205)
 		return false;
@@ -7236,6 +7282,7 @@ static void qpnp_stop_charge(struct work_struct *work)
 	set_fast_normal_to_warm_false(chip);
 	//whenever charger gone, mask allo fast chg.
 	qpnp_set_fast_chg_allow(chip,false);
+	qpnp_set_fast_low_temp_full_false(chip);
 	#endif
 	/* OPPO 2013-12-22 liaofuchun add end */
 	

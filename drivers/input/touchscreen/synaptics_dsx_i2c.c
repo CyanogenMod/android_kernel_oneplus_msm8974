@@ -117,6 +117,7 @@ static int synaptics_rmi4_free_fingers(struct synaptics_rmi4_data *rmi4_data);
 static int synaptics_rmi4_reinit_device(struct synaptics_rmi4_data *rmi4_data);
 static int synaptics_rmi4_reset_device(struct synaptics_rmi4_data *rmi4_data,
 		unsigned short f01_cmd_base_addr);
+static inline void wait_test_cmd_finished(void);
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static ssize_t synaptics_rmi4_full_pm_cycle_show(struct device *dev,
@@ -154,6 +155,12 @@ static ssize_t synaptics_rmi4_0dbutton_store(struct device *dev,
 
 static ssize_t synaptics_rmi4_suspend_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count);
+
+static ssize_t synaptics_rmi4_open_or_close_holster_mode_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count);
+
+static ssize_t synaptics_rmi4_open_or_close_holster_mode_show(struct device *dev,
+		struct device_attribute *attr, char *buf);
 
 struct synaptics_rmi4_f01_device_status {
 	union {
@@ -415,6 +422,9 @@ static struct device_attribute attrs[] = {
 	__ATTR(log_level, (S_IRUGO | S_IWUSR),
 			synaptics_attr_loglevel_show,
 			synaptics_attr_loglevel_store),
+	__ATTR(holster_open_or_close, (S_IRUGO | S_IWUSR),
+			synaptics_rmi4_open_or_close_holster_mode_show,
+			synaptics_rmi4_open_or_close_holster_mode_store),
 };
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -591,6 +601,45 @@ static ssize_t synaptics_rmi4_suspend_store(struct device *dev,
 		return -EINVAL;
 
 	return count;
+}
+
+static ssize_t synaptics_rmi4_open_or_close_holster_mode_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned int input;
+	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+	uint8_t databuf;
+
+	if (sscanf(buf, "%u", &input) != 1)
+		return -EINVAL;
+
+	if (input == 1) {
+		rmi4_data->holster_mode_open_or_close = 1;
+		synaptics_rmi4_i2c_write(rmi4_data,rmi4_data->holster_mode_control_addr,
+				(unsigned char *)&(rmi4_data->holster_mode_open_or_close), 1);
+	} else if (input == 0) {
+		rmi4_data->holster_mode_open_or_close = 0;
+		synaptics_rmi4_i2c_write(rmi4_data,rmi4_data->holster_mode_control_addr,
+				(unsigned char*)&(rmi4_data->holster_mode_open_or_close), 1);
+	} else
+		return -EINVAL;
+
+	synaptics_rmi4_i2c_read(rmi4_data, rmi4_data->holster_mode_control_addr, &databuf, 1);
+	printk("%s holster mode %s\n",input ? "open" : "close",
+			(databuf == (rmi4_data->holster_mode_open_or_close)) ?
+			"success" : "fail");
+
+	return count;
+}
+
+static ssize_t synaptics_rmi4_open_or_close_holster_mode_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+	uint8_t databuf;
+
+	synaptics_rmi4_i2c_read(rmi4_data, rmi4_data->holster_mode_control_addr, &databuf, 1);
+	return sprintf(buf, " holster mode is %s \n", databuf ? "open" : "close" );
 }
 
 /**
@@ -964,6 +1013,9 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define SYNA_ADDR_SMARTCOVER_EXT     0x41f  //smartcover mode
 #define SYNA_ADDR_PDOZE_FLAG         0x07  //pdoze status register
 #define SYNA_ADDR_TOUCH_FEATURE      0x1E  //ThreeD Touch Features
+#define SYNA_ADDR_F12_2D_CTRL23      0x1D
+#define SYNA_ADDR_F12_2D_CTRL10      0x16
+#define SYNA_ADDR_F54_ANALOG_CTRL113 0x136
 
 extern int rmi4_fw_module_init(bool insert);
 
@@ -1394,10 +1446,66 @@ static int synaptics_rmi4_proc_smartcover_read(char *page, char **start, off_t o
 }
 
 //smartcover proc write function
+static int synaptics_rmi4_open_smartcover(void)
+{
+	int retval;
+	unsigned char val[10];
+
+	retval = synaptics_rmi4_i2c_read(syna_rmi4_data, SYNA_ADDR_SMARTCOVER_EXT, val, 1);
+	val[0] = 1;
+	retval = synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_SMARTCOVER_EXT, val, 1);
+
+	retval = synaptics_rmi4_i2c_read(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG, val, 1);
+	val[0] |= 0x01;
+	retval = synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG, val, 1);
+
+	retval = synaptics_rmi4_i2c_read(syna_rmi4_data, SYNA_ADDR_F12_2D_CTRL10, val, 7);
+	val[6] &= ~(0x01);
+	retval = synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_F12_2D_CTRL10, val, 7);
+
+	retval = synaptics_rmi4_i2c_read(syna_rmi4_data, SYNA_ADDR_F54_ANALOG_CTRL113, val, 1);
+	val[0] &= ~(0x01 << 1);
+	retval = synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_F54_ANALOG_CTRL113, val, 1);
+
+	val[0] = 0x04;
+	synaptics_rmi4_i2c_write(syna_rmi4_data, F54_CMD_BASE_ADDR, val, 1);
+	wait_test_cmd_finished();
+	printk(KERN_ERR "open smartcover\n");
+	return retval;
+}
+
+static int synaptics_rmi4_close_smartcover(void)
+{
+	int retval;
+	unsigned char val[10];
+
+	retval = synaptics_rmi4_i2c_read(syna_rmi4_data, SYNA_ADDR_SMARTCOVER_EXT, val, 1);
+	val[0] = 0;
+	retval = synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_SMARTCOVER_EXT, val, 1);
+
+	retval = synaptics_rmi4_i2c_read(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG, val, 1);
+	val[0] &= ~(0x01);
+	retval = synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG, val, 1);
+
+	retval = synaptics_rmi4_i2c_read(syna_rmi4_data, SYNA_ADDR_F12_2D_CTRL10, val, 7);
+	val[6] |= 0x01;
+	retval = synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_F12_2D_CTRL10, val, 7);
+
+	retval = synaptics_rmi4_i2c_read(syna_rmi4_data, SYNA_ADDR_F54_ANALOG_CTRL113, val, 1);
+	val[0] |= 0x01 << 1;
+	retval = synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_F54_ANALOG_CTRL113, val, 1);
+
+	val[0] = 0x04;
+	synaptics_rmi4_i2c_write(syna_rmi4_data, F54_CMD_BASE_ADDR, val, 1);
+	wait_test_cmd_finished();
+	printk(KERN_ERR "close smartcover\n");
+	return retval;
+}
+
+//smartcover proc write function
 static int synaptics_rmi4_proc_smartcover_write(struct file *filp, const char __user *buff,
 		unsigned long len, void *data) {
 	int retval;
-	unsigned char val[1];
 	unsigned char bak;
 	unsigned int enable;
 	char buf[2];
@@ -1420,12 +1528,13 @@ static int synaptics_rmi4_proc_smartcover_write(struct file *filp, const char __
 
 	print_ts(TS_DEBUG, KERN_ERR "smartcover enable=0x%x\n", syna_rmi4_data->smartcover_enable);
 
-	retval = synaptics_rmi4_i2c_read(syna_rmi4_data,SYNA_ADDR_SMARTCOVER_EXT,val,sizeof(val));
+	if (enable) {
+		retval = synaptics_rmi4_open_smartcover();
+	} else {
+		retval = synaptics_rmi4_close_smartcover();
+	}
 
-	val[0] = syna_rmi4_data->smartcover_enable & 0xff;
-	retval = synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_SMARTCOVER_EXT,val,sizeof(val));
-
-	return (retval == sizeof(val))  ? len : 0;
+	return len;
 }
 
 //glove proc read function
@@ -1669,8 +1778,7 @@ static int synaptics_set_int_mask(struct synaptics_rmi4_data *ts, int enable)
 static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 {
 	int ret = 0;
-	int x, y, i, j;
-	uint8_t use_cbc = 0;
+	int x, y, i;
 	int16_t read_data;
 	uint8_t tmp_old = 0;
 	uint8_t tmp_old2 = 0;
@@ -1695,6 +1803,9 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 	uint8_t  data_buf[64];
 	mm_segment_t old_fs;
 
+	int iCbcDataGroup = 0;
+	int iCbcDataSize = 0;
+
 	if (isbaseline == true) {
 		return sprintf(&(buf[num_read_chars]), "-1 please wait to finish .\n");
 	}
@@ -1711,25 +1822,28 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 		rx2rx_lower_limit = DiagonalLowerLimit_TRULY;
 		rx2rx_upper_limit = DiagonalUpperLimit_TRULY;
 		raw_cap_data = (const int16_t *)raw_cap_data_truly_3035;
+		iCbcDataSize = sizeof(raw_cap_data_truly_3035);
 	} else if (syna_ts_data->vendor_id == TP_VENDOR_WINTEK) {
 		tx_num = TX_NUM_WINTEK;
 		rx_num = RX_NUM_WINTEK;
 		rx2rx_lower_limit = DiagonalLowerLimit_WINTEK;
 		rx2rx_upper_limit = DiagonalUpperLimit_WINTEK;
 		raw_cap_data = (const int16_t *)raw_cap_data_wintek_9093;
+		iCbcDataSize = sizeof(raw_cap_data_wintek_9093);
 	} else if (syna_ts_data->vendor_id == TP_VENDOR_TPK) {
 		tx_num = TX_NUM_TPK;
 		rx_num = RX_NUM_TPK;
 		rx2rx_lower_limit = DiagonalLowerLimit_TPK;
 		rx2rx_upper_limit = DiagonalUpperLimit_TPK;
 		raw_cap_data = (const int16_t *)raw_cap_data_tpk;
-		use_cbc = 1;
+		iCbcDataSize = sizeof(raw_cap_data_tpk);
 	} else if (syna_ts_data->vendor_id == TP_VENDOR_YOUNGFAST) {
 		tx_num = TX_NUM_YOUNGFAST;
 		rx_num = RX_NUM_YOUNGFAST;
 		rx2rx_lower_limit = DiagonalLowerLimit_YOUNGFAST;
 		rx2rx_upper_limit = DiagonalUpperLimit_YOUNGFAST;
 		raw_cap_data = (const int16_t *)raw_cap_data_youngfast;
+		iCbcDataSize = sizeof(raw_cap_data_youngfast);
 	}
 	if (tx_num == 0 || rx_num == 0 || raw_cap_data == NULL
 			|| rx2rx_lower_limit == 0 || rx2rx_upper_limit == 0 || tx_num > rx_num) {
@@ -1747,30 +1861,8 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 
 	synaptics_set_int_mask(syna_ts_data, 0);
 
-	//step 1:check raw capacitance
-	print_ts(TS_DEBUG, "Step 1 : Raw Capacitance Report \n");
-	//set report type
-	tmp_new = 0x03;//set report type 0x03
-	synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR,	&tmp_new,1);
-
-	// Forbid NoiseMitigation
-	tmp_new = 0x01;
-	synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR +7, &tmp_new,1);
-	tmp_new = 0x04;
-	synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new,1); // force update
-	wait_test_cmd_finished();
-	print_ts(TS_DEBUG, "Forbid NoiseMitigation oK\n");
-	tmp_new = 0x02;
-	synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new,1); // force cal
-	wait_test_cmd_finished();
-	print_ts(TS_DEBUG, "Force Cal oK\n");
-
-	word_value = 0;//set fifo 00
-	synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR+1,	(unsigned char*)&word_value,2);
-	tmp_new = 0x01;
-	synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new,1);
-	wait_test_cmd_finished();
-
+	// step1:check baseline capacitance
+	print_ts(TS_DEBUG, "-------------------Step 1: check baseline capacitance --------------------- \n");
 	if (savefile) {
 		getnstimeofday(&now_time);
 		rtc_time_to_tm(now_time.tv_sec, &rtc_now_time);
@@ -1788,56 +1880,78 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 		}
 	}
 
-	cdata = (int16_t *)raw_cap_data ;
-	for (j = 0; j < 2; j++) {
-		if ((!use_cbc && !j) || (use_cbc && j)) {
-			tmp_new = 20 ;//set report type 0x20, for disable cbc
-			synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR, &tmp_new, 1);
-
-			// forbid CBC
-			tmp_new = 1;
-			synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR+20, &tmp_new, 1);
-
-			synaptics_rmi4_i2c_read(syna_ts_data, F54_CTRL_BASE_ADDR+23, &tmp_old, 1);
-			tmp_new = tmp_old & 0xef;
-			synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR +23, &tmp_new, 1);
-
-			synaptics_rmi4_i2c_read(syna_ts_data, F54_CTRL_BASE_ADDR+25, &tmp_old2, 1);
-			tmp_new = tmp_old2 & 0xdf;
-			print_ts(TS_DEBUG, "tmp_old =0x%x ,tmp_new = 0x%x\n", tmp_old2, tmp_new);
-			synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR +25, &tmp_new, 1);
-
-			tmp_new = 0x04 ;
-			synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1); // force update
-			wait_test_cmd_finished();
-			print_ts(TS_DEBUG, "Forbid CBC oK\n");
+	for (iCbcDataGroup = 0; iCbcDataGroup < 2; iCbcDataGroup++) {
+		// enable cbc default, for enable cbc test
+		if (0 == iCbcDataGroup) {
+			cdata = (int16_t *)raw_cap_data;
+			//set report type
+			tmp_new = 0x03; //set report type 0x03, for enable cbc
+			synaptics_rmi4_i2c_write(syna_ts_data, F54_DATA_BASE_ADDR, &tmp_new, 1);
 
 			// Forbid NoiseMitigation
-			tmp_new = 0x01 ;
-			synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR +7, &tmp_new, 1);
-			tmp_new = 0x04 ;
+			tmp_new = 0x01;
+			synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR + 7, &tmp_new, 1);
+			tmp_new = 0x04;
 			synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1); // force update
 			wait_test_cmd_finished();
 			print_ts(TS_DEBUG, "Forbid NoiseMitigation oK\n");
-			tmp_new = 0x02 ;
+			tmp_new = 0x02;
 			synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1); // force cal
 			wait_test_cmd_finished();
 			print_ts(TS_DEBUG, "Force Cal oK\n");
 
-			word_value = 0 ;//set fifo 00
-			synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR+1, (unsigned char*)&word_value, 2);
-			tmp_new = 0x01 ;
+			word_value = 0; //set fifo 00 , first address
+			synaptics_rmi4_i2c_write(syna_ts_data, F54_DATA_BASE_ADDR + 1, (unsigned char*)&word_value, 2);
+			tmp_new = 0x01; //send get report command
 			synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1);
 			wait_test_cmd_finished();
+		} else if (1 == iCbcDataGroup) {
+			// disable cbc, for disable cbc test
+			if (iCbcDataSize < (tx_num * rx_num * 2)) {
+				print_ts(TS_DEBUG, "Only one group test data\n" );
+				break;
+			} else {
+				cdata = (int16_t *)raw_cap_data + tx_num * rx_num * 2 ;
 
-		} else if (!use_cbc && j) {
-			break;
+				tmp_new = 1; //disable cdm
+				synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR + 20, &tmp_new, 1);
+
+				synaptics_rmi4_i2c_read(syna_ts_data, F54_CTRL_BASE_ADDR + 23, &tmp_old, 1); //disable cbc
+				tmp_new = tmp_old & 0xef;
+				synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR + 23, &tmp_new, 1);
+
+				synaptics_rmi4_i2c_read(syna_ts_data, F54_CTRL_BASE_ADDR + 25, &tmp_old2, 1);
+				tmp_new = tmp_old2 & 0xdf;
+				print_ts(TS_DEBUG, "tmp_old =0x%x ,tmp_new = 0x%x\n", tmp_old2, tmp_new);
+				synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR + 25, &tmp_new, 1);
+
+				tmp_new = 0x04;
+				synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1); // force update
+				wait_test_cmd_finished();
+
+				// Forbid NoiseMitigation
+				tmp_new = 0x01;
+				synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR + 7, &tmp_new, 1);
+				tmp_new = 0x04;
+				synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1); // force update
+				wait_test_cmd_finished();
+				print_ts(TS_DEBUG, "Forbid NoiseMitigation oK\n");
+				tmp_new = 0x02;
+				synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1);// force cal
+				wait_test_cmd_finished();
+				print_ts(TS_DEBUG, "Force Cal oK\n");
+
+				word_value = 0; //set fifo 00
+				synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR + 1, (unsigned char*)&word_value, 2);
+				tmp_new = 0x01 ;
+				synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1);
+				wait_test_cmd_finished();
+			}
 		}
 
-		for (x = 0; x < tx_num; x++) {
-			i = 0;
+		for (x = 0;x < tx_num; x++) {
 			for (y = 0; y < rx_num; y++) {
-				ret = i2c_smbus_read_word_data(client,F54_DATA_BASE_ADDR+3);
+				ret = i2c_smbus_read_word_data(client, F54_DATA_BASE_ADDR + 3);
 				read_data = ret & 0xffff;
 
 				print_ts(TS_DEBUG, "Raw[%d][%d] = %d,  ", x, y, read_data);
@@ -1863,53 +1977,149 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 								++error_count,x,y,read_data,cdata[0],cdata[1]);
 					}
 				}
-				i += 2;
 				cdata += 2 ;
 			}
-
 			if (fd >= 0) {
 				sys_write(fd, "\n", 1);
 			}
-
-			print_ts(TS_DEBUG, "------------------------------\n");
-		}
-
-		if ((!use_cbc && !j) || (use_cbc && j)) {
-			synaptics_rmi4_i2c_write(syna_ts_data,F54_CTRL_BASE_ADDR+23, (unsigned char*)&tmp_old, 1);
-			synaptics_rmi4_i2c_write(syna_ts_data,F54_CTRL_BASE_ADDR+25, (unsigned char*)&tmp_old2, 1);
-			tmp_new = 0;
-			synaptics_rmi4_i2c_write(syna_ts_data,F54_CTRL_BASE_ADDR+20, &tmp_new, 1);
-			tmp_new = 4;
-			synaptics_rmi4_i2c_write(syna_ts_data,F54_CMD_BASE_ADDR, (unsigned char*)&tmp_new, 1); // force update
-			wait_test_cmd_finished();
 		}
 	}
 
-	print_ts(TS_DEBUG, "Step 2 : Check trx-to-trx  \n");
+	// step2   for  high impedance test
+	print_ts(TS_DEBUG, "-------------------Step 2 : high resistance test--------------------- \n");
+	print_ts(TS_DEBUG, "n");
+
+	tmp_new = 1; // software reset TP
+	synaptics_rmi4_i2c_write(syna_ts_data, syna_ts_data->f01_cmd_base_addr, (unsigned char*)&tmp_new, 1);
+	msleep(150);
+
+	tmp_new = 4; //set report type 0x4, for disable cbc
+	synaptics_rmi4_i2c_write(syna_ts_data, F54_DATA_BASE_ADDR, &tmp_new, 1);
+
+	tmp_new = 1 ;//disable cdm
+	synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR + 20, &tmp_new, 1);
+
+	synaptics_rmi4_i2c_read(syna_ts_data, F54_CTRL_BASE_ADDR + 23, &tmp_old, 1); //disable cbc
+	tmp_new = tmp_old & 0xef;
+	synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR + 23, &tmp_new, 1);
+
+	synaptics_rmi4_i2c_read(syna_ts_data, F54_CTRL_BASE_ADDR + 25, &tmp_old2, 1);
+	tmp_new = tmp_old2 & 0xdf;
+	print_ts(TS_DEBUG, "tmp_old =0x%x ,tmp_new = 0x%x\n", tmp_old2, tmp_new);
+	synaptics_rmi4_i2c_write(syna_ts_data, F54_CTRL_BASE_ADDR + 25, &tmp_new, 1);
+
+	tmp_new = 0x04;
+	synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1); // force update
+	wait_test_cmd_finished();
+
+	word_value = 0; //set fifo 00 ,first address
+	synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR + 1, (unsigned char*)&word_value, 2);
+	tmp_new = 0x01; //send get report command
+	synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1);
+	wait_test_cmd_finished();
+
+	//¿¿¿¿¿¿¿¿¿¿¿¿¿¿3¿WORD¿¿¿¿¿¿¿¿¿1000¿¿ Limit ¿¿¿¿¿-1,0.45¿¿¿-1,0.45¿¿¿-0.42,0.02¿
+	for (i = 0;i < 3; i++) {
+		int iTemp[2];
+		ret = i2c_smbus_read_word_data(client, F54_DATA_BASE_ADDR + 3); // is F54_DATA_BASE_ADDR+3   not F54_DATA_BASE_ADDR+i
+		read_data = ret & 0xffff;
+
+		if (fd >= 0) {
+			sprintf(data_buf, "%d,", read_data);
+			sys_write(fd, data_buf, strlen(data_buf));
+		}
+
+		//(-1000, 450), (-400, 20)
+		if (i == 0 || i == 1) {
+			iTemp[0] = -1 * 1000;
+			iTemp[1] = 0.45 * 1000;
+		} else if (i == 2) {
+			iTemp[0] = -0.42 * 1000;
+			iTemp[1] = 0.02 * 1000;
+		}
+		if (read_data >= iTemp[0] && read_data <= iTemp[1]) {
+			print_ts(TS_DEBUG, "pass.\n");
+		} else {
+			print_ts(TS_ERROR,"========= High Resistance Raw NOT in range, Raw[%d] = %d \n ", i, read_data);
+			num_read_chars += sprintf(&(buf[num_read_chars]), "=========== High Resistance Raw NOT in range, Raw[%d] = %d \n ", i, read_data);
+			error_count ++; // in app , pass ---> error_count = 0  , fail ---> error_count = not zero
+		}
+	}
+
+	//Step3 : Check trx-to-trx ,short test
+	print_ts(TS_DEBUG, "-------------------Step 3 : Check trx-to-trx--------------------- \n");
+
+	tmp_new = 1; // software reset TP
+	synaptics_rmi4_i2c_write(syna_ts_data, syna_ts_data->f01_cmd_base_addr, (unsigned char*)&tmp_new, 1);
+	msleep(150);
+
 	tmp_new = 26;
-	synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR, (unsigned char*)&tmp_new, 1); //select report type 0x05
+	synaptics_rmi4_i2c_write(syna_ts_data, F54_DATA_BASE_ADDR, (unsigned char*)&tmp_new, 1); //select report type 0x26
 
 	tmp_new = 0;
 	data_buf[0] = 0;
 	data_buf[1] = 0;
-	synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR+1, (unsigned char*)data_buf, 2);
+	synaptics_rmi4_i2c_write(syna_ts_data,F54_DATA_BASE_ADDR + 1, (unsigned char*)data_buf, 2);
 	tmp_new = 1;
 	synaptics_rmi4_i2c_write(syna_ts_data,F54_CMD_BASE_ADDR, (unsigned char*)&tmp_new, 1); //get report
 	wait_test_cmd_finished();
+
 	x = 0;
-	y = synaptics_rmi4_i2c_read(syna_ts_data, F54_DATA_BASE_ADDR+3, data_buf, 7) ;
+	y = synaptics_rmi4_i2c_read(syna_ts_data, F54_DATA_BASE_ADDR + 3, data_buf, 7) ;
 	for (i = 0; i < 7 && y >= 0; i++) {
 		if (data_buf[i]) {
-			print_ts(TS_DEBUG, "Not in range!! value=0x%x\n", data_buf[i]);
-			x++;
+			print_ts(TS_DEBUG, "Not in range!! value[%d]=0x%x\n", i, data_buf[i]);
+			x++ ;
 			error_count++;
 		} else {
 			print_ts(TS_DEBUG, "pass.\n");
 		}
 	}
 	if (x > 0) {
-		num_read_chars += sprintf(&(buf[num_read_chars]), " TRx To TRx Short Test Failed[%d]!\n",x);
+		num_read_chars += sprintf(&(buf[num_read_chars]), " TRx To TRx Short Test Failed[%d]!\n", x);
 		//goto END_TP_TEST;
+	}
+
+	//Step4 : Check trx-to-ground
+	print_ts(TS_DEBUG, "-------------------step 4 : Check trx-to-ground--------------------- \n");
+
+	tmp_new = 1; // software reset TP
+	synaptics_rmi4_i2c_write(syna_ts_data, syna_ts_data->f01_cmd_base_addr, (unsigned char*)&tmp_new, 1);
+	msleep(150);
+
+	tmp_new = 25;
+	synaptics_rmi4_i2c_write(syna_ts_data, F54_DATA_BASE_ADDR, (unsigned char*)&tmp_new, 1); //select report type 0x25
+
+	tmp_new = 0;
+	data_buf[0] = 0;
+	data_buf[1] = 0;
+	synaptics_rmi4_i2c_write(syna_ts_data, F54_DATA_BASE_ADDR + 1, (unsigned char*)data_buf, 2);
+	tmp_new = 1;
+	synaptics_rmi4_i2c_write(syna_ts_data,F54_CMD_BASE_ADDR, (unsigned char*)&tmp_new, 1); //get report
+	wait_test_cmd_finished();
+
+	y = synaptics_rmi4_i2c_read(syna_ts_data, F54_DATA_BASE_ADDR + 3, data_buf, 7);
+
+	for (i = 0; i < 7; i++) {
+		print_ts(TS_DEBUG, "========!! value[%d]=0x%x\n",i,data_buf[i]);
+	}
+	//mingqiang.guo@phone.bsp modify  only 13077 wintk and tpk use different channels,  tpk: data_buf[4]==0xff wintek :  data_buf[4]==0xfe
+	num_read_chars += sprintf(&(buf[num_read_chars]),  "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n",__LINE__, syna_ts_data->vendor_id, data_buf[4]);
+	if ((data_buf[0] == 0xff) && (data_buf[1] == 0xff) && (data_buf[2] == 0xff)
+			&&((data_buf[3]&0x0f) == 0x0f)  && ((data_buf[5]&0x7f) == 0x7f)) {
+		if ((syna_ts_data->vendor_id == TP_VENDOR_TPK) && (data_buf[4]==0xff))
+			print_ts(TS_DEBUG, "pass.\n");
+		else if ((syna_ts_data->vendor_id == TP_VENDOR_WINTEK) && ((data_buf[4]&0xfe) == 0xfe))
+			print_ts(TS_DEBUG, "pass.\n");
+		else {
+			print_ts(6, "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n",__LINE__, syna_ts_data->vendor_id, data_buf[4]);
+			num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-ground  Test Failed [%d]\n",__LINE__);
+			error_count++;
+		}
+	} else {
+		print_ts(6, "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n",__LINE__, syna_ts_data->vendor_id, data_buf[4]);
+		num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-ground Failed [%d]\n",__LINE__);
+		error_count++;
 	}
 
 	//step 5:reset touchpanel and reconfig the device
@@ -1925,10 +2135,10 @@ END_TP_TEST:
 	}
 	print_ts(TS_DEBUG, "Tp test finish!\n");
 
-	num_read_chars += sprintf(&(buf[num_read_chars]), "imageid=0x%x,deviceid=0x%x\n", syna_ts_data->image_cid,syna_ts_data->device_cid);
+	num_read_chars += sprintf(&(buf[num_read_chars]), "imageid=0x%x,deviceid=0x%x\n", syna_ts_data->image_cid, syna_ts_data->device_cid);
 
-	num_read_chars += sprintf(&(buf[num_read_chars]), "%d error(s). %s\n", error_count, error_count?"":"All test passed.");
-	synaptics_rmi4_reset_device(syna_ts_data,syna_ts_data->f01_cmd_base_addr);
+	num_read_chars += sprintf(&(buf[num_read_chars]), "%d error(s). %s\n", error_count, error_count ? "" : "All test passed.");
+	synaptics_rmi4_reset_device(syna_ts_data, syna_ts_data->f01_cmd_base_addr);
 
 	msleep(150);
 	synaptics_set_int_mask(syna_ts_data, 1);
@@ -2059,8 +2269,7 @@ int synaptics_regulator_configure(bool on)
 		vdd_regulator = regulator_get(NULL, "8941_l22");
 		if (IS_ERR(vdd_regulator)) {
 			rc = PTR_ERR(vdd_regulator);
-			printk(
-					"Regulator get failed vcc_ana rc=%d\n", rc);
+			printk("Regulator get failed vcc_ana rc=%d\n", rc);
 			return rc;
 		}
 	}
@@ -2085,8 +2294,7 @@ int synaptics_regulator_configure(bool on)
 		rc = regulator_set_voltage(vdd_regulator_i2c,
 				SYNA_I2C_VTG_MIN_UV, SYNA_I2C_VTG_MAX_UV);
 		if (rc) {
-			printk(
-					"regulator set_vtg failed rc=%d\n", rc);
+			printk("regulator set_vtg failed rc=%d\n", rc);
 			goto error_set_vtg_i2c;
 		}
 	}
@@ -2365,9 +2573,11 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				continue;
 			}
 
+#if 0
 			if ((y > SYNA_SMARTCOVER_MAN || y < SYNA_SMARTCOVER_MIN) && rmi4_data->smartcover_enable) {
 				continue;
 			}
+#endif
 
 			input_mt_slot(rmi4_data->input_dev, finger);
 			input_mt_report_slot_state(rmi4_data->input_dev,
@@ -4544,8 +4754,7 @@ static int synaptics_rmi4_suspend(struct device *dev)
 	rmi4_data->pwrrunning = true;
 
 	if (rmi4_data->smartcover_enable)
-		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_SMARTCOVER_EXT,
-				&val, sizeof(val));
+		synaptics_rmi4_close_smartcover();
 
 	if (rmi4_data->glove_enable)
 		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
@@ -4617,8 +4826,7 @@ static int synaptics_rmi4_resume(struct device *dev)
 	rmi4_data->pwrrunning = true;
 
 	if (rmi4_data->smartcover_enable)
-		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_SMARTCOVER_EXT,
-				&val, sizeof(val));
+		synaptics_rmi4_open_smartcover();
 
 	if (rmi4_data->glove_enable)
 		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
