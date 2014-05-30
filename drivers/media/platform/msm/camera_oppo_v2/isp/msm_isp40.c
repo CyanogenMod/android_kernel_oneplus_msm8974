@@ -577,22 +577,10 @@ static void msm_vfe40_reg_update(struct vfe_device *vfe_dev)
 
 static long msm_vfe40_reset_hardware(struct vfe_device *vfe_dev)
 {
-	long time;
-    uint32_t irq_status0;
 	init_completion(&vfe_dev->reset_complete);
 	msm_camera_io_w_mb(0x1FF, vfe_dev->vfe_base + 0xC);
-	time = wait_for_completion_interruptible_timeout(&vfe_dev->reset_complete, msecs_to_jiffies(50));
-	if(time <= 0) {
-        irq_status0 = msm_camera_io_r(vfe_dev->vfe_base + 0x38);
-        pr_err("%s: IRQ Status 0x%x\n",__func__, irq_status0);
-        if (irq_status0 & (1 << 31)) {
-            return 1;
-        } else {
-            return time;
-    	}
-	} else {
-	    return 1;
-	}
+	return wait_for_completion_timeout(
+		&vfe_dev->reset_complete, msecs_to_jiffies(50));
 }
 
 static void msm_vfe40_axi_reload_wm(

@@ -206,7 +206,7 @@ static uint32_t msm_isp_axi_get_plane_size(
 				plane_cfg[plane_idx].output_width;
 		else
 			size = plane_cfg[plane_idx].output_height *
-				plane_cfg[plane_idx].output_width / 2;
+				plane_cfg[plane_idx].output_width;
 		break;
 	case V4L2_PIX_FMT_NV14:
 	case V4L2_PIX_FMT_NV41:
@@ -215,7 +215,7 @@ static uint32_t msm_isp_axi_get_plane_size(
 				plane_cfg[plane_idx].output_width;
 		else
 			size = plane_cfg[plane_idx].output_height *
-				plane_cfg[plane_idx].output_width / 8;
+				plane_cfg[plane_idx].output_width;
 		break;
 	case V4L2_PIX_FMT_NV16:
 	case V4L2_PIX_FMT_NV61:
@@ -1017,7 +1017,7 @@ static int msm_isp_axi_wait_for_cfg_done(struct vfe_device *vfe_dev,
 	vfe_dev->axi_data.pipeline_update = camif_update;
 	vfe_dev->axi_data.stream_update = 2;
 	spin_unlock_irqrestore(&vfe_dev->shared_data_lock, flags);
-	rc = wait_for_completion_interruptible_timeout(
+	rc = wait_for_completion_timeout(
 		&vfe_dev->stream_config_complete,
 		msecs_to_jiffies(VFE_MAX_CFG_TIMEOUT));
 	if (rc == 0) {

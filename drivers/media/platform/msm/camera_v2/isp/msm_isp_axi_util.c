@@ -1069,8 +1069,8 @@ static int msm_isp_update_stream_bandwidth(struct vfe_device *vfe_dev)
 	if (num_pix_streams > 0)
 		total_pix_bandwidth = total_pix_bandwidth /
 			num_pix_streams * (num_pix_streams - 1) +
-			axi_data->src_info[VFE_PIX_0].pixel_clock *
-			ISP_DEFAULT_FORMAT_FACTOR / ISP_Q2;
+			((unsigned long)axi_data->src_info[VFE_PIX_0].
+			pixel_clock) * ISP_DEFAULT_FORMAT_FACTOR / ISP_Q2;
 	total_bandwidth = total_pix_bandwidth + total_rdi_bandwidth;
 	total_streams = num_pix_streams + num_rdi_streams;
 	if (total_streams == 1) {
@@ -1099,7 +1099,7 @@ static int msm_isp_axi_wait_for_cfg_done(struct vfe_device *vfe_dev,
 	vfe_dev->axi_data.pipeline_update = camif_update;
 	vfe_dev->axi_data.stream_update = 2;
 	spin_unlock_irqrestore(&vfe_dev->shared_data_lock, flags);
-	rc = wait_for_completion_interruptible_timeout(
+	rc = wait_for_completion_timeout(
 		&vfe_dev->stream_config_complete,
 		msecs_to_jiffies(VFE_MAX_CFG_TIMEOUT));
 	if (rc == 0) {
