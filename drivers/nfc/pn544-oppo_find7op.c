@@ -8,6 +8,11 @@
 ** Date : 2013/10/15	
 ** Author: yuyi@Dep.Group.Module
 ** 
+
+** --------------------------- Revision History: --------------------------------
+** <author>		                      <data> 	<version >  <desc>
+** ------------------------------------------------------------------------------
+** Yuyi@Driver.NFC  2014/05/24   1.1	    modify clk_name for nfc input clock 
 ****************************************************************/
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -488,7 +493,9 @@ static int pn544_probe(struct i2c_client *client, const struct i2c_device_id *id
 		}
 */		
 
-		p65T_clk  = clk_get(&client->dev, "core_clk");
+/*OPPO yuyi 2014-05-24 modify begin for rename clock name from core_clk to cxo_out_d1*/
+		p65T_clk  = clk_get(&client->dev, "cxo_out_d1");
+/*OPPO yuyi 2014-05-24 modify end for rename clock name from core_clk to cxo_out_d1*/
 		if (p65T_clk == NULL) {
 			printk("yuyi,pn65T clk error!");
 			goto err_exit;

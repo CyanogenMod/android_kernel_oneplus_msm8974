@@ -2034,7 +2034,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 			iTemp[0] = -1 * 1000;
 			iTemp[1] = 0.45 * 1000;
 		} else if (i == 2) {
-			iTemp[0] = -0.42 * 1000;
+			iTemp[0] = -0.43 * 1000;
 			iTemp[1] = 0.02 * 1000;
 		}
 		if (read_data >= iTemp[0] && read_data <= iTemp[1]) {
@@ -2106,10 +2106,10 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 	//mingqiang.guo@phone.bsp modify  only 13077 wintk and tpk use different channels,  tpk: data_buf[4]==0xff wintek :  data_buf[4]==0xfe
 	num_read_chars += sprintf(&(buf[num_read_chars]),  "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n",__LINE__, syna_ts_data->vendor_id, data_buf[4]);
 	if ((data_buf[0] == 0xff) && (data_buf[1] == 0xff) && (data_buf[2] == 0xff)
-			&&((data_buf[3]&0x0f) == 0x0f)  && ((data_buf[5]&0x7f) == 0x7f)) {
+			&& (data_buf[3] == 0x0f)  && (data_buf[5] == 0x7f) && (data_buf[6] == 0x0)) {
 		if ((syna_ts_data->vendor_id == TP_VENDOR_TPK) && (data_buf[4]==0xff))
 			print_ts(TS_DEBUG, "pass.\n");
-		else if ((syna_ts_data->vendor_id == TP_VENDOR_WINTEK) && ((data_buf[4]&0xfe) == 0xfe))
+		else if ((syna_ts_data->vendor_id == TP_VENDOR_WINTEK) && (data_buf[4] == 0xfe))
 			print_ts(TS_DEBUG, "pass.\n");
 		else {
 			print_ts(6, "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n",__LINE__, syna_ts_data->vendor_id, data_buf[4]);
