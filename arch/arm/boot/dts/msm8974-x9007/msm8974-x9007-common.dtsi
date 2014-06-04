@@ -559,6 +559,8 @@
 	gpio@df00 { /* GPIO 32 */
 		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
 		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,vin-sel = <2>;
+		qcom,src-sel = <0>;	/* QPNP_PIN_SEL_FUNC_CONSTANT */
 		qcom,master-en = <1>;
 	};
 

@@ -38,6 +38,7 @@
 #include <linux/fb.h>
 #include <linux/gpio.h>
 #include <linux/notifier.h>
+#include <linux/pcb_version.h>
 #include <linux/qpnp-charger.h>
 #endif
 
@@ -5723,13 +5724,21 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	for(i = 0; i < MAX_COUNT; i++) {
 		chg_vol = get_prop_charger_voltage_now(chip);
 		if(chg_vol < SOFT_AICL_VOL) {
-			qpnp_chg_iusbmax_set(chip, 1500);
-			chip->aicl_current = 1500;
+			if (get_pcb_version() >= HW_VERSION__20) { /* sjc2014-05-09 for Find7s to avoid temp high */
+				qpnp_chg_iusbmax_set(chip, 900);
+			} else {
+				qpnp_chg_iusbmax_set(chip, 1500);
+			}
+				chip->aicl_current = 1500;
 			qpnp_chg_vinmin_set(chip, chip->min_voltage_mv + 280);///4.68V sjc0401 add for improving current noise (bq24196 hardware bug)
 			return 0;
 		}
 	}
-	qpnp_chg_iusbmax_set(chip, 1500);
+	if (get_pcb_version() >= HW_VERSION__20) { /* sjc2014-05-09 for Find7s to avoid temp high */
+		qpnp_chg_iusbmax_set(chip, 900);
+	} else {
+		qpnp_chg_iusbmax_set(chip, 1500);
+	}
 	chip->aicl_current = 2000;
 	return 0;
 }
@@ -6467,7 +6476,7 @@ bool is_alow_fast_chg(struct qpnp_chg_chip *chip)
 #ifndef CONFIG_MACH_FIND7OP
 	if(temp < 105)
 		return false;
-	if((temp < 155) && (low_temp_full == 1)){
+	if((temp < 145) && (low_temp_full == 1)){
 		return false;
 	}
 #else
@@ -6730,9 +6739,15 @@ static int fb_notifier_callback(struct notifier_block *self,
 					/* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
 					if(chip->aicl_current != 0) {
 						if(chip->aicl_current == 2000) {
-							qpnp_chg_iusbmax_set(chip, 1500);
+							if (get_pcb_version() >= HW_VERSION__20) /* sjc2014-05-09 for Find7s to avoid temp high */
+								qpnp_chg_iusbmax_set(chip, 900);
+							else
+								qpnp_chg_iusbmax_set(chip, 1500);
 						} else {
-							qpnp_chg_iusbmax_set(chip, chip->aicl_current);
+							if (get_pcb_version() >= HW_VERSION__20 && chip->aicl_current >= 1500) /* sjc2014-05-09 for Find7s to avoid temp high */
+								qpnp_chg_iusbmax_set(chip, 900);
+							else
+								qpnp_chg_iusbmax_set(chip, chip->aicl_current);
 						}
 					}
 					qpnp_chg_ibatmax_set(chip, chip->max_bat_chg_current);
