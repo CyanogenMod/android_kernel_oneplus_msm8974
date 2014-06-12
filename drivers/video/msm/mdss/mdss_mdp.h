@@ -500,7 +500,13 @@ enum mdss_screen_state {
 	MDSS_SCREEN_FORCE_BLANK,
 };
 
-#define is_vig_pipe(_pipe_id_) ((_pipe_id_) <= MDSS_MDP_SSPP_VIG2)
+#define mfd_to_mdp5_data(mfd) (mfd->mdp.private1)
+#define mfd_to_mdata(mfd) (((struct mdss_overlay_private *)\
+				(mfd->mdp.private1))->mdata)
+#define mfd_to_ctl(mfd) (((struct mdss_overlay_private *)\
+				(mfd->mdp.private1))->ctl)
+#define mfd_to_wb(mfd) (((struct mdss_overlay_private *)\
+				(mfd->mdp.private1))->wb)
 
 static inline struct mdss_mdp_ctl *mdss_mdp_get_split_ctl(
 	struct mdss_mdp_ctl *ctl)
@@ -509,6 +515,31 @@ static inline struct mdss_mdp_ctl *mdss_mdp_get_split_ctl(
 		return ctl->mixer_right->ctl;
 
 	return NULL;
+}
+
+static inline struct mdss_mdp_ctl *mdss_mdp_get_main_ctl(
+	struct mdss_mdp_ctl *sctl)
+{
+	if (sctl && sctl->mfd && sctl->mixer_left &&
+		sctl->mixer_right)
+		return mfd_to_ctl(sctl->mfd);
+
+	return NULL;
+}
+
+static inline bool mdss_mdp_pipe_is_yuv(struct mdss_mdp_pipe *pipe)
+{
+	return pipe && (pipe->type == MDSS_MDP_PIPE_TYPE_VIG);
+}
+
+static inline bool mdss_mdp_pipe_is_rgb(struct mdss_mdp_pipe *pipe)
+{
+	return pipe && (pipe->type == MDSS_MDP_PIPE_TYPE_RGB);
+}
+
+static inline bool mdss_mdp_pipe_is_dma(struct mdss_mdp_pipe *pipe)
+{
+	return pipe && (pipe->type == MDSS_MDP_PIPE_TYPE_DMA);
 }
 
 static inline void mdss_mdp_ctl_write(struct mdss_mdp_ctl *ctl,
@@ -520,6 +551,17 @@ static inline void mdss_mdp_ctl_write(struct mdss_mdp_ctl *ctl,
 static inline u32 mdss_mdp_ctl_read(struct mdss_mdp_ctl *ctl, u32 reg)
 {
 	return readl_relaxed(ctl->base + reg);
+}
+
+static inline void mdp_mixer_write(struct mdss_mdp_mixer *mixer,
+	u32 reg, u32 val)
+{
+	writel_relaxed(val, mixer->base + reg);
+}
+
+static inline u32 mdp_mixer_read(struct mdss_mdp_mixer *mixer, u32 reg)
+{
+	return readl_relaxed(mixer->base + reg);
 }
 
 static inline void mdss_mdp_pingpong_write(char __iomem *pingpong_base,
@@ -759,19 +801,10 @@ int mdss_mdp_wb_set_format(struct msm_fb_data_type *mfd, u32 dst_format);
 int mdss_mdp_wb_get_format(struct msm_fb_data_type *mfd,
 					struct mdp_mixer_cfg *mixer_cfg);
 
+int mdss_mdp_pipe_program_pixel_extn(struct mdss_mdp_pipe *pipe);
 int mdss_mdp_wb_set_secure(struct msm_fb_data_type *mfd, int enable);
 int mdss_mdp_wb_get_secure(struct msm_fb_data_type *mfd, uint8_t *enable);
 void mdss_mdp_ctl_restore(struct mdss_mdp_ctl *ctl);
 int mdss_mdp_footswitch_ctrl_idle_pc(int on, struct device *dev);
-
-int mdss_mdp_pipe_program_pixel_extn(struct mdss_mdp_pipe *pipe);
-#define mfd_to_mdp5_data(mfd) (mfd->mdp.private1)
-#define mfd_to_mdata(mfd) (((struct mdss_overlay_private *)\
-				(mfd->mdp.private1))->mdata)
-#define mfd_to_ctl(mfd) (((struct mdss_overlay_private *)\
-				(mfd->mdp.private1))->ctl)
-#define mfd_to_wb(mfd) (((struct mdss_overlay_private *)\
-				(mfd->mdp.private1))->wb)
-
 int  mdss_mdp_ctl_reset(struct mdss_mdp_ctl *ctl);
 #endif /* MDSS_MDP_H */

@@ -186,8 +186,10 @@ struct mdss_data_type {
 	struct mdss_mdp_mixer *mixer_wb;
 	u32 nmixers_intf;
 	u32 nmixers_wb;
+
 	struct mdss_mdp_ctl *ctl_off;
 	u32 nctl;
+
 	struct mdss_mdp_dp_intf *dp_off;
 	u32 ndp;
 	void *video_intf;
