@@ -399,6 +399,9 @@ static void cpufreq_interactive_timer(unsigned long data)
 		}
 	} else {
 		new_freq = choose_freq(pcpu, loadadjfreq);
+		if (new_freq > this_hispeed_freq &&
+				pcpu->target_freq < this_hispeed_freq)
+			new_freq = this_hispeed_freq;
 	}
 
 	if (pcpu->policy->cur >= this_hispeed_freq &&
