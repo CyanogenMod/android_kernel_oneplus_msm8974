@@ -202,15 +202,14 @@ static inline void mdss_mdp_cmd_clk_on(struct mdss_mdp_cmd_ctx *ctx)
 		if (cancel_delayed_work_sync(&ctx->ulps_work))
 			pr_debug("deleted pending ulps work\n");
 
+		rc = mdss_iommu_ctrl(1);
+		if (IS_ERR_VALUE(rc))
+			pr_err("IOMMU attach failed\n");
+
 		if (ctx->ulps) {
 			mdss_mdp_ctl_intf_event(ctx->ctl,
 				MDSS_EVENT_DSI_ULPS_CTRL, (void *)0);
-			rc = mdss_iommu_ctrl(1);
-			if (IS_ERR_VALUE(rc)) {
-				pr_err("IOMMU attach failed\n");
-				mutex_unlock(&ctx->clk_mtx);
-				return;
-			}
+			mdss_mdp_ctl_restore(ctx->ctl);
 			mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 
             if (mdss_mdp_cmd_tearcheck_setup(ctx->ctl))
