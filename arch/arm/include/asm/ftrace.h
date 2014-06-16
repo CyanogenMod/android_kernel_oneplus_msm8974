@@ -52,7 +52,7 @@ static inline void *return_address(unsigned int level)
 
 #endif
 
-#define ftrace_return_addr(n) return_address(n)
+#define ftrace_return_address(n) return_address(n)
 
 #endif /* ifndef __ASSEMBLY__ */
 
