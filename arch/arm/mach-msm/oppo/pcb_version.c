@@ -96,7 +96,7 @@ int __init board_rf_version_init(char *s)
 
 	return 0;
 }
-__setup("oppo.rf_version", board_rf_version_init);
+__setup("oppo.rf_version=", board_rf_version_init);
 
 static int lcd_id = 0;
 int __init board_lcd_id_init(char *s)
