@@ -1670,49 +1670,49 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 	struct proc_dir_entry *procdir = proc_mkdir( "touchpanel", NULL );
 
 	//glove mode inteface
-	proc_entry = create_proc_entry("glove_mode_enable", 0666, procdir);
+	proc_entry = create_proc_entry("glove_mode_enable", 0664, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_glove_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_glove_read;
 	}
 
 	// double tap to wake
-	proc_entry = create_proc_entry("double_tap_enable", 0666, procdir);
+	proc_entry = create_proc_entry("double_tap_enable", 0664, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_double_tap_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_double_tap_read;
 	}
 
 	// wake to camera
-	proc_entry = create_proc_entry("camera_enable", 0666, procdir);
+	proc_entry = create_proc_entry("camera_enable", 0664, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_camera_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_camera_read;
 	}
 
 	// wake to music
-	proc_entry = create_proc_entry("music_enable", 0666, procdir);
+	proc_entry = create_proc_entry("music_enable", 0664, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_music_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_music_read;
 	}
 
 	// wake to flashlight
-	proc_entry = create_proc_entry("flashlight_enable", 0666, procdir);
+	proc_entry = create_proc_entry("flashlight_enable", 0664, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_flashlight_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_flashlight_read;
 	}
 
 	//for pdoze enable/disable interface
-	proc_entry = create_proc_entry("pdoze_mode_enable", 0666, procdir);
+	proc_entry = create_proc_entry("pdoze_mode_enable", 0664, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_pdoze_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_pdoze_read;
 	}
 
 	//for smartcover
-	proc_entry = create_proc_entry("smartcover_mode_enable", 0666, procdir);
+	proc_entry = create_proc_entry("smartcover_mode_enable", 0664, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_smartcover_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_smartcover_read;
@@ -1730,7 +1730,7 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 		proc_entry->read_proc = synaptics_rmi4_crood_read;
 	}
 
-	proc_entry = create_proc_entry("keypad_enable", 0666, procdir);
+	proc_entry = create_proc_entry("keypad_enable", 0664, procdir);
 	if (proc_entry) {
 		proc_entry->write_proc = keypad_enable_proc_write;
 		proc_entry->read_proc = keypad_enable_proc_read;

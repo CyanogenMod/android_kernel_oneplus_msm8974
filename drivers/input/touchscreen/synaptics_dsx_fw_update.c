@@ -2034,7 +2034,7 @@ static int init_synaptics_proc(void)
 {
 	int ret=0;
 
-	struct proc_dir_entry *proc_entry = create_proc_entry( "syna_write", 0666, NULL );
+	struct proc_dir_entry *proc_entry = create_proc_entry( "syna_write", 0664, NULL );
 
 	if (proc_entry == NULL)
 	{
