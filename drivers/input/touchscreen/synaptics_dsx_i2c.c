@@ -2064,21 +2064,54 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 	synaptics_rmi4_i2c_write(syna_ts_data,F54_CMD_BASE_ADDR, (unsigned char*)&tmp_new, 1); //get report
 	wait_test_cmd_finished();
 
-	x = 0;
 	y = synaptics_rmi4_i2c_read(syna_ts_data, F54_DATA_BASE_ADDR + 3, data_buf, 7) ;
-	for (i = 0; i < 7 && y >= 0; i++) {
-		if (data_buf[i]) {
-			print_ts(TS_DEBUG, "Not in range!! value[%d]=0x%x\n", i, data_buf[i]);
-			x++ ;
-			error_count++;
+	print_ts(TS_DEBUG," trx-to-trx raw readback: %x  %x  %x  %x  %x  %x \n", data_buf[0], data_buf[1], data_buf[2], data_buf[3], data_buf[4], data_buf[5]);
+	num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-trx raw readback: %x  %x  %x  %x  %x  %x \n", data_buf[0], data_buf[1], data_buf[2], data_buf[3], data_buf[4], data_buf[5]);
+#if defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7WX)
+	//mingqiang.guo@phone.bsp 2014-5-30  modify  must clear not use channel , other it will wrong
+	if (get_pcb_version() <= HW_VERSION__20) { //find7
+		if ((data_buf[0] == 0) && (data_buf[1] == 0) && (data_buf[2] == 0)
+			&& ((data_buf[3] & 0x0f) == 0) && ((data_buf[5] & 0x7f) == 0)) {
+			if ((syna_ts_data->vendor_id == TP_VENDOR_TPK) && (data_buf[4] == 0))
+				print_ts(TS_DEBUG, "tpk trx-to-trx test  tpk pass.\n");
+			else if ((syna_ts_data->vendor_id == TP_VENDOR_WINTEK) && ((data_buf[4] & 0xfe) == 0))
+				print_ts(TS_DEBUG, "wintek trx-to-trx test wintek pass.\n");
+			else {
+				if (syna_ts_data->vendor_id == TP_VENDOR_TPK) {
+					print_ts(TS_DEBUG, " tpk trx-to-trx test error: data_buf[4] = %x   error \n", data_buf[4]);
+					num_read_chars += sprintf(&(buf[num_read_chars]), "tpk  trx-to-trx test error: data_buf[4] = %x   error \n", data_buf[4]);
+					error_count++;
+				} else {
+					print_ts(TS_DEBUG, " wintek trx-to-trx test error: data_buf[4] & 0xfe  = %x   error \n", data_buf[4]&0xfe);
+					num_read_chars += sprintf(&(buf[num_read_chars]), "wintek  trx-to-trx test error: data_buf[4] & 0xfe  = %x   error \n", data_buf[4]&0xfe);
+					error_count++;
+				}
+			}
 		} else {
-			print_ts(TS_DEBUG, "pass.\n");
+			print_ts(TS_DEBUG," trx-to-trx test error: data_buf[3]&0x0f =%x data_buf[5]&0x7f=%x \n", data_buf[3] & 0x0f, data_buf[5] & 0x7f) ;
+			num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-trx test error: data_buf[3]&0x0f =%x data_buf[5]&0x7f=%x \n", data_buf[3] & 0x0f, data_buf[5] & 0x7f);
+			error_count++;
+		}
+	} else { //find7s
+		if ((data_buf[0] == 0) && (data_buf[1] == 0) && (data_buf[2] == 0)
+				&& ((data_buf[3] & 0x07) == 0) && (data_buf[4] == 0) && ((data_buf[5] & 0x3f) == 0)) {
+			print_ts(TS_DEBUG, " trx-to-trx test pass.\n");
+		} else {
+			print_ts(TS_DEBUG, " trx-to-trx test error: data_buf[3]&0x07 =%x data_buf[5]&0x3f=%x \n", data_buf[3] & 0x07, data_buf[5] & 0x3f);
+			num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-trx test error: data_buf[3]&0x07 =%x data_buf[5]&0x3f=%x \n", data_buf[3] & 0x07, data_buf[5] & 0x3f);
+			error_count++;
 		}
 	}
-	if (x > 0) {
-		num_read_chars += sprintf(&(buf[num_read_chars]), " TRx To TRx Short Test Failed[%d]!\n", x);
-		//goto END_TP_TEST;
+#else /* defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7WX) */
+	if ((data_buf[0] == 0) && (data_buf[1] == 0) && (data_buf[2] == 0)
+		&& ((data_buf[3] & 0x07) == 0) && (data_buf[4] == 0) && ((data_buf[5] & 0x3f) == 0)) {
+		print_ts(TS_DEBUG, " trx-to-trx test pass.\n");
+	} else {
+		print_ts(TS_DEBUG, " trx-to-trx test error: data_buf[3]&0x07 =%x data_buf[5]&0x3f=%x \n", data_buf[3] & 0x07, data_buf[5] & 0x3f);
+		num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-trx test error: data_buf[3]&0x07 =%x data_buf[5]&0x3f=%x \n", data_buf[3] &0x07, data_buf[5] & 0x3f);
+		error_count++;
 	}
+#endif /* defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7WX) */
 
 	//Step4 : Check trx-to-ground
 	print_ts(TS_DEBUG, "-------------------step 4 : Check trx-to-ground--------------------- \n");
@@ -2103,24 +2136,49 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 	for (i = 0; i < 7; i++) {
 		print_ts(TS_DEBUG, "========!! value[%d]=0x%x\n",i,data_buf[i]);
 	}
+//qiao.hu @EXP.Basic.drv,2014/5/20 modified for touchscreen 
+#if defined (CONFIG_OPPO_DEVICE_FIND7) || defined (CONFIG_OPPO_DEVICE_FIND7WX) 
+
 	//mingqiang.guo@phone.bsp modify  only 13077 wintk and tpk use different channels,  tpk: data_buf[4]==0xff wintek :  data_buf[4]==0xfe
-	num_read_chars += sprintf(&(buf[num_read_chars]),  "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n",__LINE__, syna_ts_data->vendor_id, data_buf[4]);
-	if ((data_buf[0] == 0xff) && (data_buf[1] == 0xff) && (data_buf[2] == 0xff)
-			&& (data_buf[3] == 0x0f)  && (data_buf[5] == 0x7f) && (data_buf[6] == 0x0)) {
-		if ((syna_ts_data->vendor_id == TP_VENDOR_TPK) && (data_buf[4]==0xff))
-			print_ts(TS_DEBUG, "pass.\n");
-		else if ((syna_ts_data->vendor_id == TP_VENDOR_WINTEK) && (data_buf[4] == 0xfe))
-			print_ts(TS_DEBUG, "pass.\n");
-		else {
-			print_ts(6, "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n",__LINE__, syna_ts_data->vendor_id, data_buf[4]);
-			num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-ground  Test Failed [%d]\n",__LINE__);
+	print_ts(TS_DEBUG, "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n", __LINE__, syna_ts_data->vendor_id, data_buf[4]);
+
+	if (get_pcb_version() <= HW_VERSION__20) { //find7
+		if ((data_buf[0] == 0xff) && (data_buf[1] == 0xff) && (data_buf[2] == 0xff)
+			&& ((data_buf[3] & 0x0f) == 0x0f)  && ((data_buf[5] & 0x7f) == 0x7f)) {
+			if ((syna_ts_data->vendor_id == TP_VENDOR_TPK) && (data_buf[4] == 0xff))
+				print_ts(TS_DEBUG, "pass.\n");
+			else if ((syna_ts_data->vendor_id == TP_VENDOR_WINTEK) && ((data_buf[4] & 0xfe) == 0xfe))
+				print_ts(TS_DEBUG, "pass.\n");
+			else {
+				print_ts(6, "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n", __LINE__, syna_ts_data->vendor_id, data_buf[4]);
+				num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-ground  Test Failed [%d]\n", __LINE__);
+				error_count++;
+			}
+		} else {
+			print_ts(6, "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n", __LINE__, syna_ts_data->vendor_id, data_buf[4]);
+			num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-ground Failed [%d]\n",__LINE__);
 			error_count++;
 		}
+	} else { //find7s
+		if ((data_buf[0] == 0xff) && (data_buf[1] == 0xff) && (data_buf[2] == 0xff)
+			&& ((data_buf[3] & 0x07) == 0x7)&& (data_buf[4] == 0xff) && ((data_buf[5] & 0x3f) == 0x3f)) {
+				print_ts(TS_DEBUG, "pass.\n");
+		} else {
+			print_ts(6, "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n", __LINE__, syna_ts_data->vendor_id, data_buf[4]);
+			num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-ground test Failed[%d]\n", __LINE__);
+			error_count++;
+		}
+	}
+#else /* defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7WX) */
+	if ((data_buf[0] == 0xff) && (data_buf[1] == 0xff) && (data_buf[2] == 0xff)
+			&& ((data_buf[3] & 0x07) == 0x7)  && (data_buf[4] == 0xff) && ((data_buf[5] & 0x3f) == 0x3f)) {
+		print_ts(TS_DEBUG, "pass.\n");
 	} else {
-		print_ts(6, "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n",__LINE__, syna_ts_data->vendor_id, data_buf[4]);
-		num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-ground Failed [%d]\n",__LINE__);
+		print_ts(6, "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n", __LINE__, syna_ts_data->vendor_id, data_buf[4]);
+		num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-ground test Failed[%d]\n", __LINE__);
 		error_count++;
 	}
+#endif /* defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7WX) */
 
 	//step 5:reset touchpanel and reconfig the device
 END_TP_TEST:

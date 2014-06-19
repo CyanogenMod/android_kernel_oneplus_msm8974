@@ -104,6 +104,11 @@ static int lm3630_chip_init(struct lm3630_chip_data *pchip)
 
 #ifdef CONGIF_OPPO_CMCC_OPTR
     reg_val = 0x12; /* For 13077 CMCC */
+    if (get_pcb_version() >= 20) {
+        reg_val = 0x0F; /* For 13097 cmcctest */
+    } else {
+        reg_val = 0x12; /* For 13097 cmcc test */
+    }
 #else
     if (get_pcb_version() >= 20) {
         reg_val = 0x12; /* For 13097 low power version */
@@ -799,6 +804,21 @@ static int lm3630_resume(struct i2c_client *client)
 //	}
 
 	return 0;
+}
+
+/* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/05/22  Add for reduce current when charge */
+void lm3630_reduce_max_current(void)
+{
+	if(lm3630_pchip == NULL) return;
+	regmap_write(lm3630_pchip->regmap, REG_MAXCU_A, 0x0D);
+	regmap_write(lm3630_pchip->regmap, REG_MAXCU_B, 0x0D);
+}
+
+void lm3630_recover_max_current(void)
+{
+	if(lm3630_pchip == NULL) return;
+	regmap_write(lm3630_pchip->regmap, REG_MAXCU_A, 0x12);
+	regmap_write(lm3630_pchip->regmap, REG_MAXCU_B, 0x12);
 }
 
 /* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/02/17  Add for set cabc */

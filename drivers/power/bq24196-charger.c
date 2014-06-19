@@ -124,6 +124,11 @@ bq24196_ibatmax_set(struct bq24196_device_info *di, int chg_current)
 		value <<= 2;
 		value |= 1;
 		return bq24196_chg_masked_write(di,CHARGE_CURRENT_CTRL,BQ24196_IBATMAX_BITS,value,1);
+	} else if(chg_current == 500) {
+		value = (2496 - BQ24196_CHG_IBATMAX_MIN)/64;
+		value <<= 2;
+		value |= 1;
+		return bq24196_chg_masked_write(di,CHARGE_CURRENT_CTRL,BQ24196_IBATMAX_BITS,value,1);
 	} else {
 		if ( (chg_current < BQ24196_CHG_IBATMAX_MIN)
 				|| (chg_current > BQ24196_CHG_IBATMAX_MAX) ) {

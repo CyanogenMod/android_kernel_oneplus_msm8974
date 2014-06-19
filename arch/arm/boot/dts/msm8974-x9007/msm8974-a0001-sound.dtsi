@@ -53,7 +53,6 @@
 		qcom,cdc-vdd-spkdrv-voltage = <4500000 4500000>;
 		qcom,cdc-vdd-spkdrv-current = <1250000>;
 		qcom,cdc-on-demand-supplies = "cdc-vdd-spkdrv";
-		qcom,cdc-micbias-cfilt2-mv = <2700>;
 		qcom,cdc-micbias2-ext-cap;
 	};
 };
