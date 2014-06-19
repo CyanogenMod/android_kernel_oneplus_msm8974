@@ -38,6 +38,7 @@ enum {
 	RF_VERSION__67,
 	RF_VERSION__76,
 	RF_VERSION__77,
+	RF_VERSION__88,
 };
 
 int get_pcb_version(void);
