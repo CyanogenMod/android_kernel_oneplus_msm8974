@@ -32,12 +32,14 @@
 #include "synaptics_firmware_wintek_14001.h"
 #else
 #include "synaptics_firmware_tpk.h"
+#include "synaptics_firmware_tpk_find7s.h"
 #include "synaptics_firmware_wintek.h"
 #endif
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
+#include <linux/pcb_version.h>
 
 #define FW_IMAGE_NAME "synaptics/startup_fw_update.img"
 #define DO_STARTUP_FW_UPDATE
@@ -1440,7 +1442,12 @@ int synaptics_rmi4_get_firmware_version(int vendor_id) {
 		return FIRMWARE_YOUNGFAST_VERSION ;
 	}
 	else if(vendor_id == TP_VENDOR_TPK) {
-		return FIRMWARE_TPK_VERSION;
+#ifndef CONFIG_MACH_FIND7OP
+		if (get_pcb_version() >= HW_VERSION__21)
+			return FIRMWARE_TPK_FIND7S_VERSION;
+		else
+#endif
+			return FIRMWARE_TPK_VERSION;
 	}
 	else if(vendor_id == TP_VENDOR_TRULY) {
 		return 0;
@@ -1538,9 +1545,14 @@ static unsigned char* fwu_rmi4_get_firmware_data(void) {
 		firmwaredata = synaptics_get_fw_from_file();
 	else if(vendor_id == TP_VENDOR_YOUNGFAST)
 		firmwaredata = (unsigned char*)Syna_Firmware_Data_youngfast ;
-	else if(vendor_id == TP_VENDOR_TPK)
-		firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk ;
-	else if(vendor_id == TP_VENDOR_WINTEK)
+	else if(vendor_id == TP_VENDOR_TPK) {
+#ifndef CONFIG_MACH_FIND7OP
+		if (get_pcb_version() >= HW_VERSION__21)
+			firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk_find7s;
+		else
+#endif
+			firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk ;
+	} else if(vendor_id == TP_VENDOR_WINTEK)
 		firmwaredata = (unsigned char*)Syna_Firmware_Data_Wintek;
 	
 
