@@ -13,7 +13,7 @@
 /dts-v1/;
 
 /include/ "msm8974pro-ac-pm8941.dtsi"
-/include/ "msm8974-x9007/msm8974-a0001.dtsi"
+/include/ "msm8974-oppo/msm8974-a0001.dtsi"
 
 / {
 	model = "Qualcomm MSM 8974Pro-AC One+ A0001";
