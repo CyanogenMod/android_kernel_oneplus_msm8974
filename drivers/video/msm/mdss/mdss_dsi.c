@@ -1524,6 +1524,33 @@ int dsi_panel_device_register(struct device_node *pan_node,
 		ctrl_pdata->mode_gpio = -EINVAL;
 	}
 
+#ifdef CONFIG_MACH_OPPO
+	ctrl_pdata->lcd_5v_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+			  "qcom,platform-lcd-5v-en-gpio", 0);
+	if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio)) {
+		rc = gpio_request(ctrl_pdata->lcd_5v_en_gpio, "lcd_5v_en");
+		if (rc) {
+			pr_err("request LCD 5V EN gpio failed, rc=%d\n", rc);
+			return -ENODEV;
+		}
+		rc = gpio_tlmm_config(GPIO_CFG(
+					ctrl_pdata->lcd_5v_en_gpio, 0,
+					GPIO_CFG_OUTPUT,
+					GPIO_CFG_NO_PULL,
+					GPIO_CFG_8MA),
+				GPIO_CFG_DISABLE);
+		if (rc) {
+			pr_err("%s: unable to config tlmm = %d\n",
+					__func__, ctrl_pdata->lcd_5v_en_gpio);
+			gpio_free(ctrl_pdata->lcd_5v_en_gpio);
+			return -ENODEV;
+		}
+	} else {
+		pr_err("%s:%d, lcd 5v en gpio not specified\n",
+						__func__, __LINE__);
+	}
+#endif
+
 	if (mdss_dsi_clk_init(ctrl_pdev, ctrl_pdata)) {
 		pr_err("%s: unable to initialize Dsi ctrl clks\n", __func__);
 		return -EPERM;
