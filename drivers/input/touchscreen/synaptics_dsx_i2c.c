@@ -1831,12 +1831,21 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 		raw_cap_data = (const int16_t *)raw_cap_data_wintek_9093;
 		iCbcDataSize = sizeof(raw_cap_data_wintek_9093);
 	} else if (syna_ts_data->vendor_id == TP_VENDOR_TPK) {
-		tx_num = TX_NUM_TPK;
-		rx_num = RX_NUM_TPK;
-		rx2rx_lower_limit = DiagonalLowerLimit_TPK;
-		rx2rx_upper_limit = DiagonalUpperLimit_TPK;
-		raw_cap_data = (const int16_t *)raw_cap_data_tpk;
-		iCbcDataSize = sizeof(raw_cap_data_tpk);
+		if (get_pcb_version() >= HW_VERSION__20) {
+			tx_num = TX_NUM_TPK_FIND7S;
+			rx_num = RX_NUM_TPK_FIND7S;
+			rx2rx_lower_limit = DiagonalLowerLimit_TPK;
+			rx2rx_upper_limit = DiagonalUpperLimit_TPK;
+			raw_cap_data = (const int16_t *)raw_cap_data_tpk_find7s;
+			iCbcDataSize = sizeof(raw_cap_data_tpk_find7s);
+		} else {
+			tx_num = TX_NUM_TPK;
+			rx_num = RX_NUM_TPK;
+			rx2rx_lower_limit = DiagonalLowerLimit_TPK;
+			rx2rx_upper_limit = DiagonalUpperLimit_TPK;
+			raw_cap_data = (const int16_t *)raw_cap_data_tpk;
+			iCbcDataSize = sizeof(raw_cap_data_tpk);
+		}
 	} else if (syna_ts_data->vendor_id == TP_VENDOR_YOUNGFAST) {
 		tx_num = TX_NUM_YOUNGFAST;
 		rx_num = RX_NUM_YOUNGFAST;
