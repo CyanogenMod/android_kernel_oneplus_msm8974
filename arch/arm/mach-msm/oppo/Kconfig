@@ -15,7 +15,7 @@ config MACH_FIND7
 	select MACH_OPPO_MSM8974
 	bool "Find7"
 	help
-	  Support for the Find7 variant
+	  Support for the Find7/Find7S variant
 
 config MACH_FIND7OP
 	select MACH_OPPO_MSM8974
