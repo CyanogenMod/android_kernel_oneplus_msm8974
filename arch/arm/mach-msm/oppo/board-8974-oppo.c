@@ -52,6 +52,8 @@
 #include <linux/persistent_ram.h>
 #include <linux/gpio.h>
 
+#include <linux/pcb_version.h>
+
 static struct platform_device *ram_console_dev;
 
 static struct persistent_ram_descriptor msm_prd[] __initdata = {
@@ -99,6 +101,7 @@ void __init msm8974_add_drivers(void)
 }
 
 #define DISP_ESD_GPIO 28
+#define DISP_LCD_UNK_GPIO 62
 static void __init oppo_config_display(void)
 {
 	int rc;
@@ -107,7 +110,7 @@ static void __init oppo_config_display(void)
 	if (rc) {
 		pr_err("%s: request DISP_ESD GPIO failed, rc: %d",
 				__func__, rc);
-		goto cfg_disp_err;
+		return;
 	}
 
 	rc = gpio_tlmm_config(GPIO_CFG(DISP_ESD_GPIO, 0,
@@ -118,20 +121,34 @@ static void __init oppo_config_display(void)
 	if (rc) {
 		pr_err("%s: unable to configure DISP_ESD GPIO, rc: %d",
 				__func__, rc);
-		goto cfg_disp_err;
+		gpio_free(DISP_ESD_GPIO);
+		return;
 	}
 
 	rc = gpio_direction_input(DISP_ESD_GPIO);
 	if (rc) {
 		pr_err("%s: set direction for DISP_ESD GPIO failed, rc: %d",
 				__func__, rc);
-		goto cfg_disp_err;
+		gpio_free(DISP_ESD_GPIO);
+		return;
 	}
 
-	return;
+	if (get_pcb_version() >= HW_VERSION__20) {
+		rc = gpio_request(DISP_LCD_UNK_GPIO, "lcd_unk");
+		if (rc) {
+			pr_err("%s: request DISP_UNK GPIO failed, rc: %d",
+					__func__, rc);
+			return;
+		}
 
-cfg_disp_err:
-	gpio_free(DISP_ESD_GPIO);
+		rc = gpio_direction_output(DISP_LCD_UNK_GPIO, 0);
+		if (rc) {
+			pr_err("%s: set direction for DISP_LCD_UNK GPIO failed, rc: %d",
+					__func__, rc);
+			gpio_free(DISP_LCD_UNK_GPIO);
+			return;
+		}
+	}
 }
 
 static void __init oppo_config_ramconsole(void)

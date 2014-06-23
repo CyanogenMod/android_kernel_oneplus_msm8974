@@ -551,6 +551,10 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 	pinfo = &(ctrl_pdata->panel_data.panel_info);
 
 	if (enable) {
+#ifdef CONFIG_MACH_OPPO
+		if (gpio_is_valid(ctrl_pdata->disp_en_gpio) &&
+				gpio_is_valid(ctrl_pdata->rst_gpio)) {
+#endif
 		rc = mdss_dsi_request_gpios(ctrl_pdata);
 		if (rc) {
 			pr_err("gpio request failed\n");
@@ -566,6 +570,15 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 				if (pdata->panel_info.rst_seq[++i])
 					usleep(pinfo->rst_seq[i] * 1000);
 			}
+#ifdef CONFIG_MACH_OPPO
+			for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) {
+				/* Use reset sequence timing for LCD 5V EN */
+				gpio_direction_output((ctrl_pdata->lcd_5v_en_gpio),
+					pdata->panel_info.rst_seq[i]);
+				if (pdata->panel_info.rst_seq[i])
+					usleep(pinfo->rst_seq[i] * 1000);
+			}
+#endif
 		}
 
 		if (gpio_is_valid(ctrl_pdata->mode_gpio)) {
@@ -574,6 +587,9 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			else if (pinfo->mode_gpio_state == MODE_GPIO_LOW)
 				gpio_set_value((ctrl_pdata->mode_gpio), 0);
 		}
+#ifdef CONFIG_MACH_OPPO
+		}
+#endif
 		if (ctrl_pdata->ctrl_state & CTRL_STATE_PANEL_INIT) {
 			pr_debug("%s: Panel Not properly turned OFF\n",
 						__func__);
