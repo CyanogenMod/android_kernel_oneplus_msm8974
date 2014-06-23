@@ -10,8 +10,8 @@
  * GNU General Public License for more details.
  */
 
-/include/ "msm8974-x9007-panel.dtsi"
-/include/ "msm8974-x9007-camera-sensor.dtsi"
+/include/ "msm8974-oppo-panel.dtsi"
+/include/ "msm8974-oppo-camera-sensor.dtsi"
 /include/ "../msm8974-leds.dtsi"
 
 / {

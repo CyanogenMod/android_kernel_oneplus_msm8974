@@ -359,7 +359,7 @@ CONFIG_MSM_MPM_OF=y
 # MSM Board Selection
 #
 CONFIG_MACH_OPPO=y
-CONFIG_MACH_X9007=y
+CONFIG_MACH_OPPO_MSM8974=y
 
 #
 # Oppo board selection
