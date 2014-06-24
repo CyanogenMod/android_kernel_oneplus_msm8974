@@ -2023,6 +2023,8 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 		if (!usb_present) {
 			power_supply_set_online(chip->usb_psy, 0);
 			power_supply_set_current_limit(chip->usb_psy, 0);
+			power_supply_set_online(&chip->dc_psy, 0);
+			power_supply_set_current_limit(&chip->dc_psy, 0);
 		}
 #endif
 #ifdef CONFIG_BQ24196_CHARGER
@@ -2522,6 +2524,10 @@ qpnp_power_get_property_mains(struct power_supply *psy,
 			return 0;
 
 #ifdef CONFIG_MACH_OPPO
+		if (!qpnp_chg_is_usb_chg_plugged_in(chip))
+			/* Return offline if USB is not present */
+			return 0;
+
 #ifndef CONFIG_BATTERY_BQ27541
 		if (qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP)
 			val->intval = 1;
@@ -4162,6 +4168,8 @@ qpnp_eoc_work(struct work_struct *work)
 			if (!chip->usb_present) {
 				power_supply_set_online(chip->usb_psy, 0);
 				power_supply_set_current_limit(chip->usb_psy, 0);
+				power_supply_set_online(&chip->dc_psy, 0);
+				power_supply_set_current_limit(&chip->dc_psy, 0);
 			}
 		}
 		pm_relax(chip->dev);
@@ -4784,6 +4792,9 @@ qpnp_dc_power_set_property(struct power_supply *psy,
 	int rc = 0;
 
 	switch (psp) {
+	case POWER_SUPPLY_PROP_PRESENT:
+	case POWER_SUPPLY_PROP_ONLINE:
+		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		if (!val->intval)
 			break;
@@ -4800,10 +4811,8 @@ qpnp_dc_power_set_property(struct power_supply *psy,
 		return -EINVAL;
 	}
 
-#ifndef CONFIG_MACH_OPPO
 	pr_debug("psy changed dc_psy\n");
 	power_supply_changed(&chip->dc_psy);
-#endif
 	return rc;
 }
 
@@ -6303,6 +6312,8 @@ static void qpnp_check_charger_uovp(struct qpnp_chg_chip *chip)
 			if(!chip->usb_present) {
 				power_supply_set_online(chip->usb_psy, 0);
 				power_supply_set_current_limit(chip->usb_psy, 0);
+				power_supply_set_online(&chip->dc_psy, 0);
+				power_supply_set_current_limit(&chip->dc_psy, 0);
 			}
 		}
 #endif /*CONFIG_MACH_OPPO*/
