@@ -1410,22 +1410,18 @@ qpnp_chg_vbatdet_lo_irq_handler(int irq, void *_chip)
 	}
 	qpnp_chg_disable_irq(&chip->chg_vbatdet_lo);
 
-	pr_debug("psy changed usb_psy\n");
 #ifndef CONFIG_MACH_OPPO
 	power_supply_changed(chip->usb_psy);
-#endif
+	pr_debug("psy changed usb_psy\n");
 	if (chip->dc_chgpth_base) {
 		pr_debug("psy changed dc_psy\n");
-#ifndef CONFIG_MACH_OPPO
 		power_supply_changed(&chip->dc_psy);
-#endif
 	}
 	if (chip->bat_if_base) {
 		pr_debug("psy changed batt_psy\n");
-#ifndef CONFIG_MACH_OPPO
 		power_supply_changed(&chip->batt_psy);
-#endif
 	}
+#endif
 	return IRQ_HANDLED;
 }
 
@@ -2071,8 +2067,8 @@ qpnp_chg_bat_if_batt_temp_irq_handler(int irq, void *_chip)
 		return rc;
 	}
 
-	pr_debug("psy changed batt_psy\n");
 #ifndef CONFIG_MACH_OPPO
+	pr_debug("psy changed batt_psy\n");
 	power_supply_changed(&chip->batt_psy);
 #endif
 	return IRQ_HANDLED;
@@ -4402,8 +4398,8 @@ qpnp_chg_insertion_ocv_work(struct work_struct *work)
 	pr_debug("batfet sts = %02x, charge_en = %02x ocv = %d\n",
 			bat_if_sts, charge_en, chip->insertion_ocv_uv);
 	qpnp_chg_charge_en(chip, !chip->charging_disabled);
-	pr_debug("psy changed batt_psy\n");
 #ifndef CONFIG_MACH_OPPO
+	pr_debug("psy changed batt_psy\n");
 	power_supply_changed(&chip->batt_psy);
 #endif
 }
@@ -4804,8 +4800,8 @@ qpnp_dc_power_set_property(struct power_supply *psy,
 		return -EINVAL;
 	}
 
-	pr_debug("psy changed dc_psy\n");
 #ifndef CONFIG_MACH_OPPO
+	pr_debug("psy changed dc_psy\n");
 	power_supply_changed(&chip->dc_psy);
 #endif
 	return rc;
@@ -4869,8 +4865,8 @@ qpnp_batt_power_set_property(struct power_supply *psy,
 		return -EINVAL;
 	}
 
-	pr_debug("psy changed batt_psy\n");
 #ifndef CONFIG_MACH_OPPO
+	pr_debug("psy changed batt_psy\n");
 	power_supply_changed(&chip->batt_psy);
 #endif
 	return rc;
