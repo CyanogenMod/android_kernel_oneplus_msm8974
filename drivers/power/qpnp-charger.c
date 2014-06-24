@@ -1731,6 +1731,17 @@ qpnp_set_fast_low_temp_full_false(struct qpnp_chg_chip *chip)
 }
 
 static int
+get_prop_fast_normal_to_warm(struct qpnp_chg_chip *chip)
+{
+	if (qpnp_batt_gauge && qpnp_batt_gauge->fast_normal_to_warm)
+		return qpnp_batt_gauge->fast_normal_to_warm();
+	else {
+		pr_err("qpnp-charger no batt gauge assuming false\n");
+		return false;
+	}
+}
+
+static int
 set_fast_normal_to_warm_false(struct qpnp_chg_chip *chip)
 {
 	if (qpnp_batt_gauge && qpnp_batt_gauge->set_normal_to_warm_false)
@@ -1782,6 +1793,12 @@ get_prop_fast_chg_started(struct qpnp_chg_chip *chip)
 
 static int
 get_prop_fast_switch_to_normal(struct qpnp_chg_chip *chip)
+{
+	return false;
+}
+
+static int
+get_prop_fast_normal_to_warm(struct qpnp_chg_chip *chip)
 {
 	return false;
 }
@@ -2519,7 +2536,28 @@ qpnp_power_get_property_mains(struct power_supply *psy,
 		val->intval = 0;
 		if (chip->charging_disabled)
 			return 0;
+
+#ifdef CONFIG_MACH_OPPO
+#ifndef CONFIG_BATTERY_BQ27541
+		if (qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP)
+			val->intval = 1;
+		else
+			val->intval = 0;
+#else
+		if ((get_prop_fast_chg_started(chip) == true)
+			|| (get_prop_fast_switch_to_normal(chip) == true)
+			|| (get_prop_fast_normal_to_warm(chip) == true)) {
+			val->intval = 1;
+		} else {
+			if (qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP)
+				val->intval = 1;
+			else
+				val->intval = 0;
+		}
+#endif /* CONFIG_BATTERY_BQ27541 */
+#else
 		val->intval = qpnp_chg_is_dc_chg_plugged_in(chip);
+#endif
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		val->intval = chip->maxinput_dc_ma * 1000;
