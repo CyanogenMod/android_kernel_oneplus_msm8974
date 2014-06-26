@@ -538,14 +538,13 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 				panel_data);
 
 	if (!gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
-		pr_debug("%s:%d, reset line not configured\n",
+		pr_debug("%s:%d, display enable line not configured\n",
 			   __func__, __LINE__);
 	}
 
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio)) {
 		pr_debug("%s:%d, reset line not configured\n",
 			   __func__, __LINE__);
-		return rc;
 	}
 
 	pr_debug("%s: enable = %d\n", __func__, enable);
@@ -586,8 +585,10 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
 			gpio_free(ctrl_pdata->disp_en_gpio);
 		}
-		gpio_set_value((ctrl_pdata->rst_gpio), 0);
-		gpio_free(ctrl_pdata->rst_gpio);
+		if (gpio_is_valid(ctrl_pdata->rst_gpio)) {
+			gpio_set_value((ctrl_pdata->rst_gpio), 0);
+			gpio_free(ctrl_pdata->rst_gpio);
+		}
 		if (gpio_is_valid(ctrl_pdata->mode_gpio))
 			gpio_free(ctrl_pdata->mode_gpio);
 	}
