@@ -152,6 +152,29 @@ static void __init oppo_config_ramconsole(void)
 	}
 }
 
+static void __init oppo_config_sns_power(void)
+{
+	int ret;
+	int i;
+	struct rpm_regulator *reg;
+	char *regs[] = {
+		"8941_lvs1",
+		"8941_l18"
+	};
+
+	for (i=0; i < ARRAY_SIZE(regs); i++) {
+		reg = rpm_regulator_get(NULL, regs[i]);
+		if (IS_ERR_OR_NULL(reg)) {
+			pr_err("Could not get rpm regulator: %s\n", regs[i]);
+		} else {
+			ret = rpm_regulator_enable(reg);
+			if (ret)
+				pr_err("Could not enable rpm regulator: %s\n", regs[i]);
+			rpm_regulator_put(reg);
+		}
+	}
+}
+
 static struct of_dev_auxdata msm_hsic_host_adata[] = {
 	OF_DEV_AUXDATA("qcom,hsic-host", 0xF9A00000, "msm_hsic_host", NULL),
 	{}
@@ -218,6 +241,7 @@ void __init msm8974_init(void)
 	msm8974_add_drivers();
 	oppo_config_display();
 	oppo_config_ramconsole();
+	oppo_config_sns_power();
 }
 
 static const char *msm8974_dt_match[] __initconst = {
