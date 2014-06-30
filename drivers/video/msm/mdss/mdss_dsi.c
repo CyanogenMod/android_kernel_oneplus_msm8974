@@ -689,7 +689,7 @@ static int mdss_dsi_blank(struct mdss_panel_data *pdata)
 			ret = ctrl_pdata->off(pdata);
 			if (ret) {
 				pr_err("%s: Panel OFF failed\n", __func__);
-				return ret;
+				goto error;
 			}
 		}
 		ctrl_pdata->ctrl_state &= ~CTRL_STATE_PANEL_INIT;
