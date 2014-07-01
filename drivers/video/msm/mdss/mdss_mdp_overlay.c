@@ -1150,7 +1150,7 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 	struct mdss_mdp_pipe *pipe;
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
-        struct mdp_display_commit *temp_data = data;
+	struct mdp_display_commit temp_data;
 	int ret = 0;
 	int sd_in_pipe = 0;
 	bool need_cleanup = false;
@@ -1192,22 +1192,17 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 
 	__vsync_set_vsync_handler(mfd);
 
-	if (!temp_data) {
-		temp_data = (struct mdp_display_commit*)kmalloc(
-				sizeof(struct mdp_display_commit), GFP_KERNEL);
-		temp_data->l_roi = (struct mdp_rect)
-		{0, 0, ctl->mixer_left->width,
-			ctl->mixer_left->height};
-
+	if (data) {
+		mdss_mdp_set_roi(ctl, data);
+	} else {
+		temp_data.l_roi = (struct mdp_rect){0, 0,
+			ctl->mixer_left->width, ctl->mixer_left->height};
 		if (ctl->mixer_right) {
-			temp_data->r_roi = (struct mdp_rect)
-			{0, 0, ctl->mixer_right->width,
-				ctl->mixer_right->height};
+			temp_data.r_roi = (struct mdp_rect) {0, 0,
+			ctl->mixer_right->width, ctl->mixer_right->height};
 		}
-
+		mdss_mdp_set_roi(ctl, &temp_data);
 	}
-
-	mdss_mdp_set_roi(ctl, temp_data);
 
 
 	/*

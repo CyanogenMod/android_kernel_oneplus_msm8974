@@ -2038,19 +2038,17 @@ void mdss_mdp_set_roi(struct mdss_mdp_ctl *ctl,
 	r_roi.w = data->r_roi.w;
 	r_roi.h = data->r_roi.h;
 
-
 	/* Reset ROI when we have (1) invalid ROI (2) feature disabled */
 	if ((!l_roi.w && l_roi.h) || (l_roi.w && !l_roi.h) ||
 		(!r_roi.w && r_roi.h) || (r_roi.w && !r_roi.h) ||
 		(!l_roi.w && !l_roi.h && !r_roi.w && !r_roi.h) ||
 		!ctl->panel_data->panel_info.partial_update_enabled) {
 		l_roi = (struct mdss_rect)
-		{0, 0, ctl->mixer_left->width,
-			ctl->mixer_left->height};
+		{0, 0, ctl->mixer_left->width, ctl->mixer_left->height};
 
 		if (ctl->mixer_right) {
 			r_roi = (struct mdss_rect)
-			{0, 0, ctl->mixer_right->width,
+				{0, 0, ctl->mixer_right->width,
 				ctl->mixer_right->height};
 		}
 	}
