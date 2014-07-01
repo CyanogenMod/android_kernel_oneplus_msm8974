@@ -169,6 +169,41 @@ static void __init oppo_config_ramconsole(void)
 	}
 }
 
+static struct rpm_regulator* sns_reg = 0;
+static struct delayed_work sns_dwork;
+
+static void oppo_config_sns_reg_release(struct work_struct *work)
+{
+	int ret;
+	pr_info("Releasing sensor regulator\n");
+	if (sns_reg) {
+		ret = rpm_regulator_disable(sns_reg);
+		if (ret)
+			pr_err("8941_l18 rpm_regulator_disable failed (%d)\n", ret);
+		rpm_regulator_put(sns_reg);
+		sns_reg = 0;
+	}
+}
+
+static void __init oppo_config_sns_power(void)
+{
+	int ret;
+
+	sns_reg = rpm_regulator_get(NULL, "8941_l18");
+	if (IS_ERR_OR_NULL(sns_reg)) {
+		ret = PTR_ERR(sns_reg);
+		pr_err("8941_l18 rpm_regulator_get failed (%d)\n", ret);
+		sns_reg = 0;
+	} else {
+		ret = rpm_regulator_enable(sns_reg);
+		if (ret)
+			pr_err("8941_l18 rpm_regulator_enable failed (%d)\n", ret);
+
+		INIT_DELAYED_WORK(&sns_dwork, oppo_config_sns_reg_release);
+		schedule_delayed_work(&sns_dwork, msecs_to_jiffies(30000));
+	}
+}
+
 static struct of_dev_auxdata msm_hsic_host_adata[] = {
 	OF_DEV_AUXDATA("qcom,hsic-host", 0xF9A00000, "msm_hsic_host", NULL),
 	{}
@@ -235,6 +270,7 @@ void __init msm8974_init(void)
 	msm8974_add_drivers();
 	oppo_config_display();
 	oppo_config_ramconsole();
+	oppo_config_sns_power();
 }
 
 static const char *msm8974_dt_match[] __initconst = {
