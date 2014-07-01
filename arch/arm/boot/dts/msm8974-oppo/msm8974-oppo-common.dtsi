@@ -10,8 +10,8 @@
  * GNU General Public License for more details.
  */
 
-/include/ "msm8974-x9007-panel.dtsi"
-/include/ "msm8974-x9007-camera-sensor.dtsi"
+/include/ "msm8974-oppo-panel.dtsi"
+/include/ "msm8974-oppo-camera-sensor.dtsi"
 /include/ "../msm8974-leds.dtsi"
 
 / {
@@ -23,12 +23,6 @@
 &soc {
 	serial@f991e000 {
 		status = "ok";
-	};
-
-	qcom,mdss_dsi@fd922800 {
-		qcom,dsi-pref-jdi-video-pan = <&dsi_jdi_1080_vid>;
-		qcom,dsi-pref-jdi-cmd-pan = <&dsi_jdi_1080_cmd>;
-		qcom,dsi-pref-truly-pan = <&dsi_truly_1080_vid>;
 	};
 
 	qcom,mdss_mdp@fd900000 {
@@ -559,6 +553,8 @@
 	gpio@df00 { /* GPIO 32 */
 		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
 		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,vin-sel = <2>;
+		qcom,src-sel = <0>;	/* QPNP_PIN_SEL_FUNC_CONSTANT */
 		qcom,master-en = <1>;
 	};
 

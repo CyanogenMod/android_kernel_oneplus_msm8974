@@ -71,7 +71,6 @@ struct kgsl_device_iommu_data {
 struct kgsl_pwrlevel {
 	unsigned int gpu_freq;
 	unsigned int bus_freq;
-	unsigned int io_fraction;
 };
 
 struct kgsl_device_platform_data {

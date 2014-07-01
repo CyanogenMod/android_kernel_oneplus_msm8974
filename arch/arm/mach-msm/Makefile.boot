@@ -49,10 +49,9 @@ endif
    zreladdr-$(CONFIG_ARCH_MSM8974)	:= 0x00008000
         ifeq ($(CONFIG_MACH_FIND7),y)
         dtb-$(CONFIG_ARCH_MSM8974)	+= msm8974pro-ab-pm8941-x9007.dtb
-        dtb-$(CONFIG_ARCH_MSM8974)	+= msm8974pro-ac-pm8941-x9007.dtb
+        dtb-$(CONFIG_ARCH_MSM8974)	+= msm8974pro-ac-pm8941-x9076.dtb
         endif
         ifeq ($(CONFIG_MACH_FIND7OP),y)
-        dtb-$(CONFIG_ARCH_MSM8974)	+= msm8974pro-ab-pm8941-a0001.dtb
         dtb-$(CONFIG_ARCH_MSM8974)	+= msm8974pro-ac-pm8941-a0001.dtb
         endif
         ifneq ($(CONFIG_MACH_OPPO),y)

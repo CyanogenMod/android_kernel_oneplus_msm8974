@@ -516,78 +516,6 @@ int mdss_mdp_rotator_setup(struct msm_fb_data_type *mfd,
 	if (rot->flags & MDP_ROT_90)
 		swap(rot->dst.w, rot->dst.h);
 
-	if (rot->src_rect.w > MAX_MIXER_WIDTH) {
-		struct mdss_mdp_rotator_session *tmp;
-		u32 width;
-
-		if (rot->bwc_mode) {
-			pr_err("Unable to do split rotation with bwc set\n");
-			ret = -EINVAL;
-			goto rot_err;
-		}
-
-		width = rot->src_rect.w;
-
-		pr_debug("setting up split rotation src=%dx%d\n",
-			rot->src_rect.w, rot->src_rect.h);
-
-		if (width > (MAX_MIXER_WIDTH * 2)) {
-			pr_err("unsupported source width %d\n", width);
-			ret = -EOVERFLOW;
-			goto rot_err;
-		}
-
-		if (!rot->next) {
-			tmp = mdss_mdp_rotator_session_alloc();
-			if (!tmp) {
-				pr_err("unable to allocate rot dual session\n");
-				ret = -ENOMEM;
-				goto rot_err;
-			}
-			rot->next = tmp;
-		}
-		tmp = rot->next;
-
-		tmp->session_id = rot->session_id & ~MDSS_MDP_ROT_SESSION_MASK;
-		tmp->flags = rot->flags;
-		tmp->format = rot->format;
-		tmp->img_width = rot->img_width;
-		tmp->img_height = rot->img_height;
-		tmp->src_rect = rot->src_rect;
-
-		tmp->src_rect.w = width / 2;
-		width -= tmp->src_rect.w;
-		tmp->src_rect.x += width;
-
-		tmp->dst = rot->dst;
-		rot->src_rect.w = width;
-
-		if (rot->flags & MDP_ROT_90) {
-			/*
-			 * If rotated by 90 first half should be on top.
-			 * But if horizontally flipped should be on bottom.
-			 */
-			if (rot->flags & MDP_FLIP_LR)
-				rot->dst.y = tmp->src_rect.w;
-			else
-				tmp->dst.y = rot->src_rect.w;
-		} else {
-			/*
-			 * If not rotated, first half should be the left part
-			 * of the frame, unless horizontally flipped
-			 */
-			if (rot->flags & MDP_FLIP_LR)
-				rot->dst.x = tmp->src_rect.w;
-			else
-				tmp->dst.x = rot->src_rect.w;
-		}
-
-		tmp->params_changed++;
-	} else if (rot->next) {
-		mdss_mdp_rotator_finish(rot->next);
-		rot->next = NULL;
-	}
-
 	rot->params_changed++;
 
 	ret = __mdss_mdp_rotator_pipe_reserve(rot);
@@ -690,7 +618,6 @@ int mdss_mdp_rotator_play(struct msm_fb_data_type *mfd,
 			    struct msmfb_overlay_data *req)
 {
 	struct mdss_mdp_rotator_session *rot;
-	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 	int ret;
 	u32 flgs;
 
@@ -709,9 +636,6 @@ int mdss_mdp_rotator_play(struct msm_fb_data_type *mfd,
 		pr_err("rotator busy wait error\n");
 		goto dst_buf_fail;
 	}
-
-	if (!mfd->panel_info->cont_splash_enabled)
-		mdss_iommu_attach(mdp5_data->mdata);
 
 	mdss_mdp_overlay_free_buf(&rot->src_buf);
 	ret = mdss_mdp_overlay_get_buf(mfd, &rot->src_buf, &req->data, 1, flgs);

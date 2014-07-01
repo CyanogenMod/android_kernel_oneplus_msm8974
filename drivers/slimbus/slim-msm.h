@@ -17,6 +17,7 @@
 #include <linux/kthread.h>
 #include <mach/msm_qmi_interface.h>
 #include <mach/subsystem_notif.h>
+#include <mach/msm_ipc_logging.h>
 
 /* Per spec.max 40 bytes per received message */
 #define SLIM_MSGQ_BUF_LEN	40
@@ -36,6 +37,10 @@
 #define SLIM_USR_MC_CONNECT_SRC		0x2C
 #define SLIM_USR_MC_CONNECT_SINK	0x2D
 #define SLIM_USR_MC_DISCONNECT_PORT	0x2E
+
+#define SLIM_USR_MC_REPEAT_CHANGE_VALUE	0x0
+#define MSM_SLIM_VE_MAX_MAP_ADDR	0xFFF
+#define SLIM_MAX_VE_SLC_BYTES		16
 
 #define MSM_SLIM_AUTOSUSPEND		MSEC_PER_SEC
 
@@ -211,6 +216,7 @@ struct msm_slim_qmi {
 struct msm_slim_mdm {
 	struct notifier_block nb;
 	void *ssr;
+	enum msm_ctrl_state state;
 };
 
 struct msm_slim_pdata {
@@ -261,6 +267,10 @@ struct msm_slim_ctrl {
 	struct msm_slim_qmi	qmi;
 	struct msm_slim_pdata	pdata;
 	struct msm_slim_mdm	mdm;
+	int			default_ipc_log_mask;
+	int			ipc_log_mask;
+	bool			sysfs_created;
+	void			*ipc_slimbus_log;
 };
 
 struct msm_sat_chan {
@@ -294,6 +304,57 @@ enum rsc_grp {
 };
 
 
+/* IPC logging stuff */
+#define IPC_SLIMBUS_LOG_PAGES 5
+
+/* Log levels */
+enum {
+	FATAL_LEV = 0U,
+	ERR_LEV = 1U,
+	WARN_LEV = 2U,
+	INFO_LEV = 3U,
+	DBG_LEV = 4U,
+};
+
+/* Default IPC log level INFO */
+#define SLIM_DBG(dev, x...) do { \
+	pr_debug(x); \
+	if (dev->ipc_slimbus_log && dev->ipc_log_mask >= DBG_LEV) { \
+		ipc_log_string(dev->ipc_slimbus_log, x); \
+	} \
+} while (0)
+
+#define SLIM_INFO(dev, x...) do { \
+	pr_debug(x); \
+	if (dev->ipc_slimbus_log && dev->ipc_log_mask >= INFO_LEV) {\
+		ipc_log_string(dev->ipc_slimbus_log, x); \
+	} \
+} while (0)
+
+/* warnings and errors show up on console always */
+#define SLIM_WARN(dev, x...) do { \
+	pr_warn(x); \
+	if (dev->ipc_slimbus_log && dev->ipc_log_mask >= WARN_LEV) \
+		ipc_log_string(dev->ipc_slimbus_log, x); \
+} while (0)
+
+/* ERROR condition in the driver sets the hs_serial_debug_mask
+ * to ERR_FATAL level, so that this message can be seen
+ * in IPC logging. Further errors continue to log on the console
+ */
+#define SLIM_ERR(dev, x...) do { \
+	pr_err(x); \
+	if (dev->ipc_slimbus_log && dev->ipc_log_mask >= ERR_LEV) { \
+		ipc_log_string(dev->ipc_slimbus_log, x); \
+		dev->default_ipc_log_mask = dev->ipc_log_mask; \
+		dev->ipc_log_mask = FATAL_LEV; \
+	} \
+} while (0)
+
+#define SLIM_RST_LOGLVL(dev) { \
+	dev->ipc_log_mask = dev->default_ipc_log_mask; \
+}
+
 int msm_slim_rx_enqueue(struct msm_slim_ctrl *dev, u32 *buf, u8 len);
 int msm_slim_rx_dequeue(struct msm_slim_ctrl *dev, u8 *buf);
 int msm_slim_get_ctrl(struct msm_slim_ctrl *dev);
@@ -306,8 +367,8 @@ int msm_alloc_port(struct slim_controller *ctrl, u8 pn);
 void msm_dealloc_port(struct slim_controller *ctrl, u8 pn);
 int msm_slim_connect_pipe_port(struct msm_slim_ctrl *dev, u8 pn);
 enum slim_port_err msm_slim_port_xfer_status(struct slim_controller *ctr,
-				u8 pn, u8 **done_buf, u32 *done_len);
-int msm_slim_port_xfer(struct slim_controller *ctrl, u8 pn, u8 *iobuf,
+				u8 pn, phys_addr_t *done_buf, u32 *done_len);
+int msm_slim_port_xfer(struct slim_controller *ctrl, u8 pn, phys_addr_t iobuf,
 			u32 len, struct completion *comp);
 int msm_send_msg_buf(struct msm_slim_ctrl *dev, u32 *buf, u8 len, u32 tx_reg);
 u32 *msm_get_msg_buf(struct msm_slim_ctrl *dev, int len);

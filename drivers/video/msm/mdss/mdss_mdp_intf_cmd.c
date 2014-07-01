@@ -16,6 +16,7 @@
 #include "mdss_mdp.h"
 #include "mdss_panel.h"
 #include "mdss_debug.h"
+#include <trace/mdss_mdp_trace.h>
 
 #define VSYNC_EXPIRE_TICK 4
 
@@ -188,6 +189,7 @@ static inline void mdss_mdp_cmd_clk_on(struct mdss_mdp_cmd_ctx *ctx)
 {
 	unsigned long flags;
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
+	int rc;
 
 	if (!ctx->panel_on)
 		return;
@@ -200,14 +202,27 @@ static inline void mdss_mdp_cmd_clk_on(struct mdss_mdp_cmd_ctx *ctx)
 		if (cancel_delayed_work_sync(&ctx->ulps_work))
 			pr_debug("deleted pending ulps work\n");
 
-		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
+		rc = mdss_iommu_ctrl(1);
+		if (IS_ERR_VALUE(rc))
+			pr_err("IOMMU attach failed\n");
 
 		if (ctx->ulps) {
-			if (mdss_mdp_cmd_tearcheck_setup(ctx->ctl))
-				pr_warn("tearcheck setup failed\n");
 			mdss_mdp_ctl_intf_event(ctx->ctl,
 				MDSS_EVENT_DSI_ULPS_CTRL, (void *)0);
+			mdss_mdp_ctl_restore(ctx->ctl);
+			mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
+
+            if (mdss_mdp_cmd_tearcheck_setup(ctx->ctl))
+				pr_warn("tearcheck setup failed\n");
 			ctx->ulps = false;
+		} else {
+			rc = mdss_iommu_ctrl(1);
+			if (IS_ERR_VALUE(rc)) {
+				pr_err("IOMMU attach failed\n");
+				mutex_unlock(&ctx->clk_mtx);
+				return;
+			}
+			mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 		}
 
 		mdss_mdp_ctl_intf_event
@@ -242,6 +257,7 @@ static inline void mdss_mdp_cmd_clk_off(struct mdss_mdp_cmd_ctx *ctx)
 		mdss_mdp_hist_intr_setup(&mdata->hist_intr, MDSS_IRQ_SUSPEND);
 		mdss_mdp_ctl_intf_event
 			(ctx->ctl, MDSS_EVENT_PANEL_CLK_CTRL, (void *)0);
+		mdss_iommu_ctrl(0);
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 		if (ctx->panel_on)
 			schedule_delayed_work(&ctx->ulps_work, ULPS_ENTER_TIME);
@@ -354,6 +370,7 @@ static void mdss_mdp_cmd_pingpong_done(void *arg)
 	} else
 		pr_err("%s: should not have pingpong interrupt!\n", __func__);
 
+	trace_mdp_cmd_pingpong_done(ctl, ctx->pp_num, ctx->koff_cnt);
 	pr_debug("%s: ctl_num=%d intf_num=%d ctx=%d kcnt=%d\n", __func__,
 		ctl->num, ctl->intf_num, ctx->pp_num, ctx->koff_cnt);
 
@@ -523,6 +540,8 @@ static int mdss_mdp_cmd_wait4pingpong(struct mdss_mdp_ctl *ctl, void *arg)
 		rc = wait_for_completion_timeout(
 				&ctx->pp_comp, KOFF_TIMEOUT);
 
+		trace_mdp_cmd_wait_pingpong(ctl->num, ctx->koff_cnt);
+
 		if (rc <= 0) {
 			WARN(1, "cmd kickoff timed out (%d) ctl=%d\n",
 						rc, ctl->num);
@@ -588,6 +607,7 @@ int mdss_mdp_cmd_kickoff(struct mdss_mdp_ctl *ctl, void *arg)
 	spin_lock_irqsave(&ctx->clk_lock, flags);
 	ctx->koff_cnt++;
 	spin_unlock_irqrestore(&ctx->clk_lock, flags);
+	trace_mdp_cmd_kickoff(ctl->num, ctx->koff_cnt);
 
 	mdss_mdp_cmd_clk_on(ctx);
 
@@ -680,11 +700,13 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl)
 	memset(ctx, 0, sizeof(*ctx));
 	ctl->priv_data = NULL;
 
-	ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_BLANK, NULL);
-	WARN(ret, "intf %d unblank error (%d)\n", ctl->intf_num, ret);
+	if (ctl->num == 0) {
+		ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_BLANK, NULL);
+		WARN(ret, "intf %d unblank error (%d)\n", ctl->intf_num, ret);
 
-	ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_PANEL_OFF, NULL);
-	WARN(ret, "intf %d unblank error (%d)\n", ctl->intf_num, ret);
+		ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_PANEL_OFF, NULL);
+		WARN(ret, "intf %d unblank error (%d)\n", ctl->intf_num, ret);
+	}
 
 	ctl->stop_fnc = NULL;
 	ctl->display_fnc = NULL;

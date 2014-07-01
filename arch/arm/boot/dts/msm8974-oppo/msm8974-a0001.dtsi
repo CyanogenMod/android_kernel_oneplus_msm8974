@@ -1,0 +1,52 @@
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/include/ "msm8974-oppo-common.dtsi"
+/include/ "msm8974-oppo-camera.dtsi"
+/include/ "msm8974-a0001-camera-sensor.dtsi"
+/include/ "msm8974-oppo-input.dtsi"
+/include/ "msm8974-oppo-usb.dtsi"
+/include/ "msm8974-oppo-misc.dtsi"
+/include/ "msm8974-oppo-pm.dtsi"
+/include/ "msm8974-oppo-nfc.dtsi"
+/include/ "msm8974-oppo-regulator.dtsi"
+/include/ "msm8974-oppo-sound.dtsi"
+/include/ "msm8974-a0001-sound.dtsi"
+/include/ "msm8974-oppo-leds.dtsi"
+
+&i2c_1 {
+	status = "ok";
+};
+
+&spi_0 {
+	compatible;
+	reg-names;
+	reg = <>;
+	interrupt-names;
+	interrupts;
+	spi-max-frequency;
+	qcom,gpio-mosi;
+	qcom,gpio-miso;
+	qcom,gpio-clk;
+	qcom,gpio-cs0;
+	qcom,infinite-mode;
+	qcom,use-bam;
+	qcom,ver-reg-exists;
+	qcom,bam-consumer-pipe-index;
+	qcom,bam-producer-pipe-index;
+	qcom,master-id;
+};
+
+&pm8941_boost {
+	regulator-min-microvolt = <4500000>;
+	regulator-max-microvolt = <4500000>;
+};

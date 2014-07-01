@@ -13,10 +13,10 @@
 /dts-v1/;
 
 /include/ "msm8974pro-ac-pm8941.dtsi"
-/include/ "msm8974-x9007/msm8974-x9007.dtsi"
+/include/ "msm8974-oppo/msm8974-x9076.dtsi"
 
 / {
-	model = "Qualcomm MSM 8974Pro-AC Oppo X9007";
+	model = "Qualcomm MSM 8974Pro-AC Find7S X9076";
 	compatible = "qcom,msm8974-mtp", "qcom,msm8974", "qcom,mtp";
 	qcom,board-id = <8 0>;
 };

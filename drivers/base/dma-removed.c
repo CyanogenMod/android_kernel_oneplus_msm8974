@@ -44,14 +44,17 @@ void *removed_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 
 	if (pfn) {
 		addr = ioremap(__pfn_to_phys(pfn), size);
-		memset(addr, 0, size);
-		if (no_kernel_mapping) {
-			iounmap(addr);
-			addr = (void *)NO_KERNEL_MAPPING_DUMMY;
-		}
-		if (addr)
+		if (WARN_ON(!addr)) {
+			dma_release_from_contiguous(dev, pfn, order);
+		} else {
+			if (!dma_get_attr(DMA_ATTR_SKIP_ZEROING, attrs))
+				memset(addr, 0, size);
+			if (no_kernel_mapping) {
+				iounmap(addr);
+				addr = (void *)NO_KERNEL_MAPPING_DUMMY;
+			}
 			*handle = __pfn_to_phys(pfn);
-
+		}
 	}
 
 	return addr;
