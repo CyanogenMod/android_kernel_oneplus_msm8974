@@ -1201,8 +1201,10 @@ struct mdss_mdp_mixer *mdss_mdp_wb_mixer_alloc(int rotator)
 {
 	struct mdss_mdp_ctl *ctl = NULL;
 	struct mdss_mdp_mixer *mixer = NULL;
+	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
+	u32 offset = mdss_mdp_get_wb_ctl_support(mdata, true);
 
-	ctl = mdss_mdp_ctl_alloc(mdss_res, mdss_res->nmixers_intf);
+	ctl = mdss_mdp_ctl_alloc(mdss_res, offset);
 	if (!ctl) {
 		pr_debug("unable to allocate wb ctl\n");
 		return NULL;
@@ -1490,12 +1492,17 @@ static int mdss_mdp_ctl_setup_wfd(struct mdss_mdp_ctl *ctl)
 struct mdss_mdp_ctl *mdss_mdp_ctl_init(struct mdss_panel_data *pdata,
 				       struct msm_fb_data_type *mfd)
 {
-	int ret = 0;
+	int ret = 0, offset;
 	struct mdss_mdp_ctl *ctl;
 	struct mdss_data_type *mdata = mfd_to_mdata(mfd);
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 
-	ctl = mdss_mdp_ctl_alloc(mdata, MDSS_MDP_CTL0);
+	if (pdata->panel_info.type == WRITEBACK_PANEL)
+		offset = mdss_mdp_get_wb_ctl_support(mdata, false);
+	else
+		offset = MDSS_MDP_CTL0;
+
+	ctl = mdss_mdp_ctl_alloc(mdata, offset);
 	if (!ctl) {
 		pr_err("unable to allocate ctl\n");
 		return ERR_PTR(-ENOMEM);
@@ -2238,9 +2245,11 @@ int mdss_mdp_mixer_addr_setup(struct mdss_data_type *mdata,
 		head[i].ref_cnt = 0;
 		head[i].num = i;
 		if (type == MDSS_MDP_MIXER_TYPE_INTF) {
-			head[i].dspp_base = mdata->mdp_base + dspp_offsets[i];
+			if (mdata->ndspp > i)
+				head[i].dspp_base = mdata->mdp_base +
+						dspp_offsets[i];
 			head[i].pingpong_base = mdata->mdp_base +
-				pingpong_offsets[i];
+					pingpong_offsets[i];
 		}
 	}
 
@@ -2277,6 +2286,7 @@ int mdss_mdp_ctl_addr_setup(struct mdss_data_type *mdata,
 	struct mutex *shared_lock = NULL;
 	u32 i;
 	u32 size = len;
+	u32 offset = mdss_mdp_get_wb_ctl_support(mdata, false);
 
 	if (!mdata->has_wfd_blk) {
 		size++;
@@ -2301,7 +2311,8 @@ int mdss_mdp_ctl_addr_setup(struct mdss_data_type *mdata,
 	for (i = 0; i < len; i++) {
 		head[i].num = i;
 		head[i].base = (mdata->mdp_base) + ctl_offsets[i];
-		head[i].wb_base = (mdata->mdp_base) + wb_offsets[i];
+		if (i >= offset && wb_offsets[i - offset])
+			head[i].wb_base = (mdata->mdp_base) + wb_offsets[i];
 		head[i].ref_cnt = 0;
 	}
 

@@ -586,6 +586,18 @@ static inline int mdss_mdp_line_buffer_width(void)
 	return MAX_LINE_BUFFER_WIDTH;
 }
 
+static inline int mdss_mdp_get_wb_ctl_support(struct mdss_data_type *mdata,
+							bool rotator_session)
+{
+	/*
+	 * Initial control paths are used for primary and external
+	 * interfaces and remaining control paths are used for WB
+	 * interfaces.
+	 */
+	return rotator_session ? (mdata->nctl - mdata->nmixers_wb) :
+				(mdata->nctl - mdata->nwb);
+}
+
 irqreturn_t mdss_mdp_isr(int irq, void *ptr);
 int mdss_iommu_attach(struct mdss_data_type *mdata);
 int mdss_iommu_dettach(struct mdss_data_type *mdata);
