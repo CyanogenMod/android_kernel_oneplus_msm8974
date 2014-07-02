@@ -50,7 +50,7 @@ int pft_inode_set_xattr(struct dentry *dentry, const char *name);
 
 
 #else
-static inline int pft_get_key_index(struct inode *inode, u32 *key_index,
+static inline int pft_get_key_index(struct bio *bio, u32 *key_index,
 				    bool *is_encrypted, bool *is_inplace)
 { return -ENODEV; }
 
