@@ -339,6 +339,8 @@ struct mdss_panel_info {
 	u32 panel_power_on;
 
 	uint32_t panel_dead;
+	bool is_split_display;
+
 	struct mdss_mdp_pp_tear_check te;
 
 	struct lcd_panel_info lcdc;
