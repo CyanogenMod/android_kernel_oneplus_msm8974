@@ -1009,8 +1009,6 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 	int domain = MDSS_IOMMU_DOMAIN_UNSECURE;
 	char *bp;
 	struct mdss_dsi_ctrl_pdata *mctrl = NULL;
-	unsigned long size;
-	dma_addr_t addr;
 
 	bp = tp->data;
 
