@@ -48,3 +48,9 @@
 	qcom,bam-producer-pipe-index;
 	qcom,master-id;
 };
+
+&pm8941_lsid1 {
+        qcom,leds@d000 {
+                status = "okay";
+        }
+}

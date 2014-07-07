@@ -12,6 +12,7 @@
 
 &pm8941_lsid1 {
 	qcom,leds@d000 {
+		status = "disabled";
 		qcom,rgb_0 {
 			qcom,duty-ms = <200>;
 			qcom,start-idx = <1>;
