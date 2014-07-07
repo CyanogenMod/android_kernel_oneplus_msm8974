@@ -136,7 +136,7 @@
 			05 01 00 00 78 00 02 10 00];
 		qcom,mdss-dsi-calibration-command = [
 			23 01 00 00 01 00 02 b0 04
-			29 01 00 00 01 00 14 c8 01 06 ff 02 0e fe ec 0a f8 f9 fe b7 ee 04 fb fc fe af ec
+			29 01 00 00 01 00 14 c8 01 0A FD 03 01 E8 00 00 03 FC F5 A1 00 00 01 FD 06 FC 00
 			29 01 00 00 01 00 02 ca 00
 			05 01 00 00 01 00 02 29 00];
 		qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
