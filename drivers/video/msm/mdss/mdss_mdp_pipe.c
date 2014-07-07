@@ -684,19 +684,22 @@ static void mdss_mdp_pipe_free(struct kref *kref)
 
 	pr_debug("ndx=%x pnum=%d\n", pipe->ndx, pipe->num);
 
+	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
+
 	if (pipe->play_cnt) {
-		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
 		mdss_mdp_pipe_fetch_halt(pipe);
 		mdss_mdp_pipe_sspp_term(pipe);
 		mdss_mdp_smp_free(pipe);
-		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 	} else {
 		mdss_mdp_smp_unreserve(pipe);
 	}
 
+	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
+
 	pipe->flags = 0;
 	pipe->bwc_mode = 0;
 	pipe->mfd = NULL;
+	pipe->mixer = NULL;
 	memset(&pipe->scale, 0, sizeof(struct mdp_scale_data));
 	memset(&pipe->req_data, 0, sizeof(pipe->req_data));
 }

@@ -571,6 +571,13 @@ int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 
 		pipe = mdss_mdp_pipe_alloc(mixer, pipe_type);
 
+		/* RGB pipes can be used instead of DMA */
+		if ((req->pipe_type == PIPE_TYPE_AUTO) && !pipe &&
+			(pipe_type == MDSS_MDP_PIPE_TYPE_DMA)) {
+			pipe_type = MDSS_MDP_PIPE_TYPE_RGB;
+			pipe = mdss_mdp_pipe_alloc(mixer, pipe_type);
+		}
+
 		/* VIG pipes can also support RGB format */
 		if ((req->pipe_type == PIPE_TYPE_AUTO) && !pipe &&
 			(pipe_type == MDSS_MDP_PIPE_TYPE_RGB)) {
@@ -1740,7 +1747,6 @@ static int mdss_mdp_overlay_queue(struct msm_fb_data_type *mfd,
 		pr_warn("Unexpected buffer queue to a solid fill pipe\n");
 
 	flags = (pipe->flags & MDP_SECURE_OVERLAY_SESSION);
-	flags |= (pipe->flags & MDP_SECURE_DISPLAY_OVERLAY_SESSION);
 
 	mutex_lock(&mdp5_data->list_lock);
 	src_data = __mdp_overlay_buf_alloc(mfd, pipe);
