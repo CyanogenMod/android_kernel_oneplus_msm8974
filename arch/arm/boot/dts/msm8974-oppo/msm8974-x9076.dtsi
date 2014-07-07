@@ -52,5 +52,5 @@
 &pm8941_lsid1 {
         qcom,leds@d000 {
                 status = "okay";
-        }
-}
+        };
+};
