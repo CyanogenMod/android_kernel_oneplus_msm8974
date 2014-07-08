@@ -222,6 +222,7 @@ struct mdss_data_type {
 	struct mdss_perf_tune perf_tune;
 	atomic_t active_intf_cnt;
 	int iommu_ref_cnt;
+	u32 latency_buff_per;
 
 	u64 ab[MDSS_MAX_HW_BLK];
 	u64 ib[MDSS_MAX_HW_BLK];
