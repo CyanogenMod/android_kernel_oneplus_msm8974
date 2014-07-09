@@ -12,6 +12,7 @@
 
 &pm8941_lsid1 {
 	qcom,leds@d000 {
+		status = "disabled";
 		qcom,rgb_0 {
 			qcom,duty-ms = <200>;
 			qcom,start-idx = <1>;
@@ -26,7 +27,7 @@
 			qcom,pause-lo = <0>;
 			qcom,pause-hi = <0>;
 			qcom,ramp-step-ms = <50>;
-			linux,default-trigger;
+			linux,default-trigger = "none";
 			qcom,use-blink;
 		};
 
@@ -44,7 +45,7 @@
 			qcom,pause-lo = <0>;
 			qcom,pause-hi = <0>;
 			qcom,ramp-step-ms = <50>;
-			linux,default-trigger;
+			linux,default-trigger = "none";
 			qcom,use-blink;
 		};
 
@@ -62,7 +63,7 @@
 			qcom,pause-lo = <0>;
 			qcom,pause-hi = <0>;
 			qcom,ramp-step-ms = <50>;
-			linux,default-trigger;
+			linux,default-trigger = "none";
 			qcom,use-blink;
 		};
 	};

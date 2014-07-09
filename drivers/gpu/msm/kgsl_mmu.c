@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2002,2007-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -90,6 +90,7 @@ static void kgsl_destroy_pagetable(struct kref *kref)
 {
 	struct kgsl_pagetable *pagetable = container_of(kref,
 		struct kgsl_pagetable, refcount);
+
 	unsigned long flags;
 
 	spin_lock_irqsave(&kgsl_driver.ptlock, flags);
@@ -124,12 +125,9 @@ kgsl_get_pagetable(unsigned long name)
 
 	spin_lock_irqsave(&kgsl_driver.ptlock, flags);
 	list_for_each_entry(pt, &kgsl_driver.pagetable_list, list) {
-		if (kref_get_unless_zero(&pt->refcount)) {
-			if (pt->name == name) {
-				ret = pt;
-				break;
-			}
-			kref_put(&pt->refcount, kgsl_destroy_pagetable);
+		if (name == pt->name && kref_get_unless_zero(&pt->refcount)) {
+			ret = pt;
+			break;
 		}
 	}
 
@@ -326,13 +324,9 @@ kgsl_mmu_get_ptname_from_ptbase(struct kgsl_mmu *mmu, phys_addr_t pt_base)
 		return KGSL_MMU_GLOBAL_PT;
 	spin_lock(&kgsl_driver.ptlock);
 	list_for_each_entry(pt, &kgsl_driver.pagetable_list, list) {
-		if (kref_get_unless_zero(&pt->refcount)) {
-			if (mmu->mmu_ops->mmu_pt_equal(mmu, pt, pt_base)) {
-				ptid = (int) pt->name;
-				kref_put(&pt->refcount, kgsl_destroy_pagetable);
-				break;
-			}
-			kref_put(&pt->refcount, kgsl_destroy_pagetable);
+		if (mmu->mmu_ops->mmu_pt_equal(mmu, pt, pt_base)) {
+			ptid = (int) pt->name;
+			break;
 		}
 	}
 	spin_unlock(&kgsl_driver.ptlock);
@@ -352,23 +346,16 @@ kgsl_mmu_log_fault_addr(struct kgsl_mmu *mmu, phys_addr_t pt_base,
 		return 0;
 	spin_lock(&kgsl_driver.ptlock);
 	list_for_each_entry(pt, &kgsl_driver.pagetable_list, list) {
-		if (kref_get_unless_zero(&pt->refcount)) {
-			if (mmu->mmu_ops->mmu_pt_equal(mmu, pt, pt_base)) {
-				if ((addr & ~(PAGE_SIZE-1)) == pt->fault_addr) {
-					ret = 1;
-					kref_put(&pt->refcount,
-						kgsl_destroy_pagetable);
-					break;
-				} else {
-					pt->fault_addr =
-						(addr & ~(PAGE_SIZE-1));
-					ret = 0;
-					kref_put(&pt->refcount,
-						kgsl_destroy_pagetable);
-					break;
-				}
+		if (mmu->mmu_ops->mmu_pt_equal(mmu, pt, pt_base)) {
+			if ((addr & ~(PAGE_SIZE-1)) == pt->fault_addr) {
+				ret = 1;
+				break;
+			} else {
+				pt->fault_addr =
+					(addr & ~(PAGE_SIZE-1));
+				ret = 0;
+				break;
 			}
-			kref_put(&pt->refcount, kgsl_destroy_pagetable);
 		}
 	}
 	spin_unlock(&kgsl_driver.ptlock);

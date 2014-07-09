@@ -90,6 +90,8 @@ static int mdss_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			 unsigned long arg);
 static int mdss_fb_fbmem_ion_mmap(struct fb_info *info,
 		struct vm_area_struct *vma);
+static int mdss_fb_alloc_fb_ion_memory(struct msm_fb_data_type *mfd,
+		size_t size);
 static void mdss_fb_release_fences(struct msm_fb_data_type *mfd);
 static int __mdss_fb_sync_buf_done_callback(struct notifier_block *p,
 		unsigned long val, void *data);
@@ -441,12 +443,30 @@ static ssize_t mdss_fb_get_idle_notify(struct device *dev,
 	return ret;
 }
 
+static ssize_t mdss_fb_get_panel_info(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = fbi->par;
+	struct mdss_panel_info *pinfo = mfd->panel_info;
+	int ret;
+
+	ret = scnprintf(buf, PAGE_SIZE,
+			"pu_en=%d\nxstart=%d\nwalign=%d\nystart=%d\nhalign=%d",
+			pinfo->partial_update_enabled, pinfo->xstart_pix_align,
+			pinfo->width_pix_align, pinfo->ystart_pix_align,
+			pinfo->height_pix_align);
+
+	return ret;
+}
+
 static DEVICE_ATTR(msm_fb_type, S_IRUGO, mdss_fb_get_type, NULL);
 static DEVICE_ATTR(msm_fb_split, S_IRUGO, mdss_fb_get_split, NULL);
 static DEVICE_ATTR(show_blank_event, S_IRUGO, mdss_mdp_show_blank_event, NULL);
 static DEVICE_ATTR(idle_time, S_IRUGO | S_IWUSR | S_IWGRP,
 	mdss_fb_get_idle_time, mdss_fb_set_idle_time);
 static DEVICE_ATTR(idle_notify, S_IRUGO, mdss_fb_get_idle_notify, NULL);
+static DEVICE_ATTR(msm_fb_panel_info, S_IRUGO, mdss_fb_get_panel_info, NULL);
 
 static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_msm_fb_type.attr,
@@ -458,6 +478,7 @@ static struct attribute *mdss_fb_attrs[] = {
     &dev_attr_cabc.attr,
     &dev_attr_panel_calibration.attr,
 #endif
+	&dev_attr_msm_fb_panel_info.attr,
 	NULL,
 };
 
@@ -997,27 +1018,6 @@ static int mdss_fb_blank(int blank_mode, struct fb_info *info)
 	return mdss_fb_blank_sub(blank_mode, info, mfd->op_enable);
 }
 
-/* Set VM page protection */
-static inline void __mdss_fb_set_page_protection(struct vm_area_struct *vma,
-		struct msm_fb_data_type *mfd)
-{
-	if (mfd->mdp_fb_page_protection == MDP_FB_PAGE_PROTECTION_WRITECOMBINE)
-		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-	else if (mfd->mdp_fb_page_protection ==
-			MDP_FB_PAGE_PROTECTION_WRITETHROUGHCACHE)
-		vma->vm_page_prot = pgprot_writethroughcache(vma->vm_page_prot);
-	else if (mfd->mdp_fb_page_protection ==
-			MDP_FB_PAGE_PROTECTION_WRITEBACKCACHE)
-		vma->vm_page_prot = pgprot_writebackcache(vma->vm_page_prot);
-	else if (mfd->mdp_fb_page_protection ==
-			MDP_FB_PAGE_PROTECTION_WRITEBACKWACACHE)
-		vma->vm_page_prot = pgprot_writebackwacache(vma->vm_page_prot);
-	else
-		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-
-
-}
-
 static inline int mdss_fb_create_ion_client(struct msm_fb_data_type *mfd)
 {
 	mfd->fb_ion_client  = msm_ion_client_create(-1 , "mdss_fb_iclient");
@@ -1046,7 +1046,7 @@ void mdss_fb_free_fb_ion_memory(struct msm_fb_data_type *mfd)
 	}
 
 	mfd->fbi->screen_base = NULL;
-	mfd->fbi->fix.smem_len = 0;
+	mfd->fbi->fix.smem_start = 0;
 
 	ion_unmap_kernel(mfd->fb_ion_client, mfd->fb_ion_handle);
 
@@ -1056,11 +1056,11 @@ void mdss_fb_free_fb_ion_memory(struct msm_fb_data_type *mfd)
 	}
 
 	ion_free(mfd->fb_ion_client, mfd->fb_ion_handle);
+	mfd->fb_ion_handle = NULL;
 }
 
-int mdss_fb_alloc_fb_ion_memory(struct msm_fb_data_type *mfd)
+int mdss_fb_alloc_fb_ion_memory(struct msm_fb_data_type *mfd, size_t fb_size)
 {
-	size_t size;
 	unsigned long buf_size;
 	int rc;
 	void *vaddr;
@@ -1078,10 +1078,8 @@ int mdss_fb_alloc_fb_ion_memory(struct msm_fb_data_type *mfd)
 		}
 	}
 
-	size = mfd->fbi->fix.line_length * mfd->fbi->var.yres * MDSS_FB_NUM;
-	pr_debug("size for mmap = %d", (int) size);
-
-	mfd->fb_ion_handle = ion_alloc(mfd->fb_ion_client, size, SZ_4K,
+	pr_debug("size for mmap = %zu", fb_size);
+	mfd->fb_ion_handle = ion_alloc(mfd->fb_ion_client, fb_size, SZ_4K,
 			ION_HEAP(ION_SYSTEM_HEAP_ID), 0);
 	if (IS_ERR_OR_NULL(mfd->fb_ion_handle)) {
 		pr_err("unable to alloc fbmem from ion - %ld\n",
@@ -1114,11 +1112,12 @@ int mdss_fb_alloc_fb_ion_memory(struct msm_fb_data_type *mfd)
 		goto fb_mmap_failed;
 	}
 
-	pr_debug("alloc 0x%xB vaddr = %p (%pa iova) for fb%d\n", size, vaddr,
+	pr_debug("alloc 0x%xB vaddr = %p (%pa iova) for fb%d\n", fb_size, vaddr,
 			&mfd->iova, mfd->index);
 
 	mfd->fbi->screen_base = (char *) vaddr;
-	mfd->fbi->fix.smem_len = size;
+	mfd->fbi->fix.smem_start = (unsigned int) mfd->iova;
+	mfd->fbi->fix.smem_len = fb_size;
 
 	return rc;
 
@@ -1165,7 +1164,7 @@ static int mdss_fb_fbmem_ion_mmap(struct fb_info *info,
 	}
 
 	if (!mfd->fbi->screen_base) {
-		rc = mdss_fb_alloc_fb_ion_memory(mfd);
+		rc = mdss_fb_alloc_fb_ion_memory(mfd, fb_size);
 		if (rc < 0) {
 			pr_err("fb mmap failed!!!!");
 			return rc;
@@ -1203,7 +1202,10 @@ static int mdss_fb_fbmem_ion_mmap(struct fb_info *info,
 			}
 			len = min(len, remainder);
 
-			__mdss_fb_set_page_protection(vma, mfd);
+			if (mfd->mdp_fb_page_protection ==
+					MDP_FB_PAGE_PROTECTION_WRITECOMBINE)
+				vma->vm_page_prot =
+					pgprot_writecombine(vma->vm_page_prot);
 
 			pr_debug("vma=%p, addr=%x len=%ld",
 					vma, (unsigned int)addr, len);
@@ -1227,6 +1229,73 @@ static int mdss_fb_fbmem_ion_mmap(struct fb_info *info,
 	return rc;
 }
 
+/*
+ * mdss_fb_physical_mmap() - Custom fb mmap() function for MSM driver.
+ *
+ * @info -  Framebuffer info.
+ * @vma  -  VM area which is part of the process virtual memory.
+ *
+ * This framebuffer mmap function differs from standard mmap() function as
+ * map to framebuffer memory from the CMA memory which is allocated during
+ * bootup.
+ *
+ * Return: virtual address is returned through vma
+ */
+static int mdss_fb_physical_mmap(struct fb_info *info,
+		struct vm_area_struct *vma)
+{
+	/* Get frame buffer memory range. */
+	unsigned long start = info->fix.smem_start;
+	u32 len = PAGE_ALIGN((start & ~PAGE_MASK) + info->fix.smem_len);
+	unsigned long off = vma->vm_pgoff << PAGE_SHIFT;
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
+
+	if (!start) {
+		pr_warn("No framebuffer memory is allocated\n");
+		return -ENOMEM;
+	}
+
+	/* Set VM flags. */
+	start &= PAGE_MASK;
+	if ((vma->vm_end <= vma->vm_start) ||
+			(off >= len) ||
+			((vma->vm_end - vma->vm_start) > (len - off)))
+		return -EINVAL;
+	off += start;
+	if (off < start)
+		return -EINVAL;
+	vma->vm_pgoff = off >> PAGE_SHIFT;
+	/* This is an IO map - tell maydump to skip this VMA */
+	vma->vm_flags |= VM_IO;
+
+	if (mfd->mdp_fb_page_protection == MDP_FB_PAGE_PROTECTION_WRITECOMBINE)
+		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+
+	/* Remap the frame buffer I/O range */
+	if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
+				vma->vm_end - vma->vm_start,
+				vma->vm_page_prot))
+		return -EAGAIN;
+
+	return 0;
+}
+
+static int mdss_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
+{
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
+	int rc = 0;
+
+	if (!info->fix.smem_start && !mfd->fb_ion_handle)
+		rc = mdss_fb_fbmem_ion_mmap(info, vma);
+	else
+		rc = mdss_fb_physical_mmap(info, vma);
+
+	if (rc < 0)
+		pr_err("fb mmap failed with rc = %d", rc);
+
+	return rc;
+}
+
 static struct fb_ops mdss_fb_ops = {
 	.owner = THIS_MODULE,
 	.fb_open = mdss_fb_open,
@@ -1236,14 +1305,91 @@ static struct fb_ops mdss_fb_ops = {
 	.fb_blank = mdss_fb_blank,	/* blank display */
 	.fb_pan_display = mdss_fb_pan_display,	/* pan display */
 	.fb_ioctl = mdss_fb_ioctl,	/* perform fb specific ioctl */
-	.fb_mmap = mdss_fb_fbmem_ion_mmap,
+	.fb_mmap = mdss_fb_mmap,
 };
+
+static int mdss_fb_alloc_fbmem_iommu(struct msm_fb_data_type *mfd, int dom)
+{
+	void *virt = NULL;
+	phys_addr_t phys = 0;
+	size_t size = 0;
+	struct platform_device *pdev = mfd->pdev;
+	int rc = 0;
+	struct device_node *fbmem_pnode = NULL;
+
+	if (!pdev || !pdev->dev.of_node) {
+		pr_err("Invalid device node\n");
+		return -ENODEV;
+	}
+
+	fbmem_pnode = of_parse_phandle(pdev->dev.of_node,
+		"linux,contiguous-region", 0);
+	if (!fbmem_pnode) {
+		pr_debug("fbmem is not reserved for %s\n", pdev->name);
+		mfd->fbi->screen_base = NULL;
+		mfd->fbi->fix.smem_start = 0;
+		mfd->fbi->fix.smem_len = 0;
+		return 0;
+	} else {
+		const u32 *addr;
+		u64 len;
+
+		addr = of_get_address(fbmem_pnode, 0, &len, NULL);
+		if (!addr) {
+			pr_err("fbmem size is not specified\n");
+			of_node_put(fbmem_pnode);
+			return -EINVAL;
+		}
+		size = (size_t)len;
+		of_node_put(fbmem_pnode);
+	}
+
+	pr_debug("%s frame buffer reserve_size=0x%zx\n", __func__, size);
+
+	if (size < PAGE_ALIGN(mfd->fbi->fix.line_length *
+			      mfd->fbi->var.yres_virtual))
+		pr_warn("reserve size is smaller than framebuffer size\n");
+
+	virt = dma_alloc_coherent(&pdev->dev, size, &phys, GFP_KERNEL);
+	if (!virt) {
+		pr_err("unable to alloc fbmem size=%zx\n", size);
+		return -ENOMEM;
+	}
+
+    /*
+	if (MDSS_LPAE_CHECK(phys)) {
+		pr_warn("fb mem phys %pa > 4GB is not supported.\n", &phys);
+		dma_free_coherent(&pdev->dev, size, &virt, GFP_KERNEL);
+		return -ERANGE;
+	}
+    */
+
+	rc = msm_iommu_map_contig_buffer(phys, dom, 0, size, SZ_4K, 0,
+					    &mfd->iova);
+	if (rc)
+		pr_warn("Cannot map fb_mem %pa to IOMMU. rc=%d\n", &phys, rc);
+
+	pr_debug("alloc 0x%zxB @ (%pa phys) (0x%p virt) (%pa iova) for fb%d\n",
+		 size, &phys, virt, &mfd->iova, mfd->index);
+
+	mfd->fbi->screen_base = virt;
+	mfd->fbi->fix.smem_start = phys;
+	mfd->fbi->fix.smem_len = size;
+
+	return 0;
+}
 
 static int mdss_fb_alloc_fbmem(struct msm_fb_data_type *mfd)
 {
 
 	if (mfd->mdp.fb_mem_alloc_fnc) {
 		return mfd->mdp.fb_mem_alloc_fnc(mfd);
+	} else if (mfd->mdp.fb_mem_get_iommu_domain) {
+		int dom = mfd->mdp.fb_mem_get_iommu_domain();
+		if (dom >= 0)
+			return mdss_fb_alloc_fbmem_iommu(mfd, dom);
+		else
+			return -ENOMEM;
 	} else {
 		pr_err("no fb memory allocator function defined\n");
 		return -ENOMEM;
@@ -1334,16 +1480,16 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 		fix->xpanstep = 1;
 		fix->ypanstep = 1;
 		var->vmode = FB_VMODE_NONINTERLACED;
-		var->blue.offset = 0;
-		var->green.offset = 8;
-		var->red.offset = 16;
+		var->blue.offset = 24;
+		var->green.offset = 16;
+		var->red.offset = 8;
 		var->blue.length = 8;
 		var->green.length = 8;
 		var->red.length = 8;
 		var->blue.msb_right = 0;
 		var->green.msb_right = 0;
 		var->red.msb_right = 0;
-		var->transp.offset = 24;
+		var->transp.offset = 0;
 		var->transp.length = 8;
 		bpp = 4;
 		break;
@@ -1353,16 +1499,16 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 		fix->xpanstep = 1;
 		fix->ypanstep = 1;
 		var->vmode = FB_VMODE_NONINTERLACED;
-		var->blue.offset = 8;
-		var->green.offset = 16;
-		var->red.offset = 24;
+		var->blue.offset = 16;
+		var->green.offset = 8;
+		var->red.offset = 0;
 		var->blue.length = 8;
 		var->green.length = 8;
 		var->red.length = 8;
 		var->blue.msb_right = 0;
 		var->green.msb_right = 0;
 		var->red.msb_right = 0;
-		var->transp.offset = 0;
+		var->transp.offset = 24;
 		var->transp.length = 8;
 		bpp = 4;
 		break;
@@ -1421,8 +1567,14 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 	var->hsync_len = panel_info->lcdc.h_pulse_width;
 	var->pixclock = panel_info->clk_rate / 1000;
 
-	/* id field for fb app  */
+	/*
+	 * Populate smem length here for uspace to get the
+	 * Franebuffer size when FBIO_FSCREENINFO ioctl is
+	 * called.
+	 */
+	fix->smem_len = fix->line_length * var->yres_virtual;
 
+	/* id field for fb app  */
 	id = (int *)&mfd->panel;
 
 	snprintf(fix->id, sizeof(fix->id), "mdssfb_%x", (u32) *id);
@@ -1752,7 +1904,8 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 					mfd->index, task->comm, pid);
 		}
 
-		mdss_fb_free_fb_ion_memory(mfd);
+		if (mfd->fb_ion_handle)
+			mdss_fb_free_fb_ion_memory(mfd);
 
 		ret = mdss_fb_blank_sub(FB_BLANK_POWERDOWN, info,
 			mfd->op_enable);
@@ -2222,21 +2375,18 @@ static int mdss_fb_check_var(struct fb_var_screeninfo *var,
 		break;
 
 	case 32:
-		/* Figure out if the user meant RGBA or ARGB
+		/* Check user specified color format BGRA/ARGB/RGBA
 		   and verify the position of the RGB components */
 
-		if (var->transp.offset == 24) {
-			if ((var->blue.offset != 0) ||
-			    (var->green.offset != 8) ||
-			    (var->red.offset != 16))
+		if (!((var->transp.offset == 24) &&
+			(var->blue.offset == 0) &&
+			(var->green.offset == 8) &&
+			(var->red.offset == 16)) &&
+		    !((var->transp.offset == 24) &&
+			(var->blue.offset == 16) &&
+			(var->green.offset == 8) &&
+			(var->red.offset == 0)))
 				return -EINVAL;
-		} else if (var->transp.offset == 0) {
-			if ((var->blue.offset != 8) ||
-			    (var->green.offset != 16) ||
-			    (var->red.offset != 24))
-				return -EINVAL;
-		} else
-			return -EINVAL;
 
 		/* Check the common values for both RGBA and ARGB */
 
@@ -2323,10 +2473,23 @@ static int mdss_fb_set_par(struct fb_info *info)
 		break;
 
 	case 32:
-		if (var->transp.offset == 24)
+		if ((var->red.offset == 0) &&
+		    (var->green.offset == 8) &&
+		    (var->blue.offset == 16) &&
+		    (var->transp.offset == 24))
+			mfd->fb_imgType = MDP_RGBA_8888;
+		else if ((var->red.offset == 16) &&
+		    (var->green.offset == 8) &&
+		    (var->blue.offset == 0) &&
+		    (var->transp.offset == 24))
+			mfd->fb_imgType = MDP_BGRA_8888;
+		else if ((var->red.offset == 8) &&
+		    (var->green.offset == 16) &&
+		    (var->blue.offset == 24) &&
+		    (var->transp.offset == 0))
 			mfd->fb_imgType = MDP_ARGB_8888;
 		else
-			mfd->fb_imgType	= MDP_RGBA_8888;
+			mfd->fb_imgType = MDP_RGBA_8888;
 		break;
 
 	default:

@@ -50,9 +50,6 @@ struct ion_heap *ion_cp_heap_create(struct ion_platform_heap *);
 void ion_cp_heap_destroy(struct ion_heap *);
 
 #ifdef CONFIG_CMA
-struct ion_heap *ion_cma_heap_create(struct ion_platform_heap *);
-void ion_cma_heap_destroy(struct ion_heap *);
-
 struct ion_heap *ion_secure_cma_heap_create(struct ion_platform_heap *);
 void ion_secure_cma_heap_destroy(struct ion_heap *);
 

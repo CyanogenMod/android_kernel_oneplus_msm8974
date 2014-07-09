@@ -1255,9 +1255,17 @@ static void handle_fbd(enum command_response cmd, void *data)
 			time_usec = fill_buf_done->timestamp_hi;
 			time_usec = (time_usec << 32) |
 				fill_buf_done->timestamp_lo;
-			vb->v4l2_buf.timestamp =
-				ns_to_timeval(time_usec * NSEC_PER_USEC);
+		} else {
+			time_usec = 0;
+			dprintk(VIDC_DBG,
+					"Set zero timestamp for buffer 0x%pa, filled: %d, (hi:%u, lo:%u)\n",
+					&fill_buf_done->packet_buffer1,
+					fill_buf_done->filled_len1,
+					fill_buf_done->timestamp_hi,
+					fill_buf_done->timestamp_lo);
 		}
+		vb->v4l2_buf.timestamp =
+			ns_to_timeval(time_usec * NSEC_PER_USEC);
 		vb->v4l2_buf.flags = 0;
 		extra_idx =
 			EXTRADATA_IDX(inst->fmts[CAPTURE_PORT]->num_planes);
@@ -1520,7 +1528,7 @@ void msm_comm_scale_clocks_and_bus(struct msm_vidc_inst *inst)
 		dprintk(VIDC_WARN,
 				"Failed to scale DDR bus. Performance might be impacted\n");
 	}
-	if (core->resources.has_ocmem) {
+	if (core->resources.ocmem_size) {
 		if (msm_comm_scale_bus(core, inst->session_type,
 					OCMEM_MEM))
 			dprintk(VIDC_WARN,
@@ -1690,7 +1698,7 @@ static int msm_vidc_deinit_core(struct msm_vidc_inst *inst)
 	mutex_lock(&core->lock);
 	if (list_empty(&core->instances)) {
 		if (core->state > VIDC_CORE_INIT) {
-			if (core->resources.has_ocmem) {
+			if (core->resources.ocmem_size) {
 				if (inst->state != MSM_VIDC_CORE_INVALID)
 					msm_comm_unset_ocmem(core);
 				call_hfi_op(hdev, free_ocmem,
@@ -1710,7 +1718,7 @@ static int msm_vidc_deinit_core(struct msm_vidc_inst *inst)
 		core->state = VIDC_CORE_UNINIT;
 
 		call_hfi_op(hdev, unload_fw, hdev->hfi_device_data);
-		if (core->resources.has_ocmem)
+		if (core->resources.ocmem_size)
 			msm_comm_unvote_buses(core, DDR_MEM|OCMEM_MEM);
 		else
 			msm_comm_unvote_buses(core, DDR_MEM);
@@ -1908,7 +1916,7 @@ static int msm_vidc_load_resources(int flipped_state,
 						inst, inst->state);
 		goto exit;
 	}
-	if (inst->core->resources.has_ocmem) {
+	if (inst->core->resources.ocmem_size) {
 		height = max(inst->prop.height[CAPTURE_PORT],
 			inst->prop.height[OUTPUT_PORT]);
 		width = max(inst->prop.width[CAPTURE_PORT],
@@ -1919,7 +1927,7 @@ static int msm_vidc_load_resources(int flipped_state,
 			mutex_lock(&inst->core->lock);
 			rc = call_hfi_op(hdev, alloc_ocmem,
 					hdev->hfi_device_data,
-					inst->core->resources.has_ocmem);
+					inst->core->resources.ocmem_size);
 			mutex_unlock(&inst->core->lock);
 			if (rc) {
 				dprintk(VIDC_WARN,

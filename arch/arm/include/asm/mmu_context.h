@@ -24,66 +24,39 @@ void __check_kvm_seq(struct mm_struct *mm);
 
 #ifdef CONFIG_CPU_HAS_ASID
 
-/*
- * On ARMv6, we have the following structure in the Context ID:
- *
- * 31                         7          0
- * +-------------------------+-----------+
- * |      process ID         |   ASID    |
- * +-------------------------+-----------+
- * |              context ID             |
- * +-------------------------------------+
- *
- * The ASID is used to tag entries in the CPU caches and TLBs.
- * The context ID is used by debuggers and trace logic, and
- * should be unique within all running processes.
- */
-#define ASID_BITS		8
-#define ASID_MASK		((~0) << ASID_BITS)
-#define ASID_FIRST_VERSION	(1 << ASID_BITS)
+void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk);
+#define init_new_context(tsk,mm)	({ atomic64_set(&mm->context.id, 0); 0; })
 
-extern unsigned int cpu_last_asid;
-#ifdef CONFIG_SMP
-DECLARE_PER_CPU(struct mm_struct *, current_mm);
-#endif
-
-void __init_new_context(struct task_struct *tsk, struct mm_struct *mm);
-void __new_context(struct mm_struct *mm);
-
-static inline void check_context(struct mm_struct *mm)
+#ifdef CONFIG_ARM_ERRATA_798181
+void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
+			     cpumask_t *mask);
+#else  /* !CONFIG_ARM_ERRATA_798181 */
+static inline void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
+					   cpumask_t *mask)
 {
-	/*
-	 * This code is executed with interrupts enabled. Therefore,
-	 * mm->context.id cannot be updated to the latest ASID version
-	 * on a different CPU (and condition below not triggered)
-	 * without first getting an IPI to reset the context. The
-	 * alternative is to take a read_lock on mm->context.id_lock
-	 * (after changing its type to rwlock_t).
-	 */
-	if (unlikely((mm->context.id ^ cpu_last_asid) >> ASID_BITS))
-		__new_context(mm);
-
-	if (unlikely(mm->context.kvm_seq != init_mm.context.kvm_seq))
-		__check_kvm_seq(mm);
 }
+#endif /* CONFIG_ARM_ERRATA_798181 */
 
-#define init_new_context(tsk,mm)	(__init_new_context(tsk,mm),0)
+#else	/* !CONFIG_CPU_HAS_ASID */
 
-#else
-
-static inline void check_context(struct mm_struct *mm)
+static inline void check_and_switch_context(struct mm_struct *mm,
+					    struct task_struct *tsk)
 {
 #ifdef CONFIG_MMU
 	if (unlikely(mm->context.kvm_seq != init_mm.context.kvm_seq))
 		__check_kvm_seq(mm);
+	cpu_switch_mm(mm->pgd, mm);
 #endif
 }
 
 #define init_new_context(tsk,mm)	0
 
-#endif
+#define finish_arch_post_lock_switch()	do { } while (0)
+
+#endif	/* CONFIG_CPU_HAS_ASID */
 
 #define destroy_context(mm)		do { } while(0)
+#define activate_mm(prev,next)		switch_mm(prev, next, NULL)
 
 /*
  * This is called when "tsk" is about to enter lazy TLB mode.
@@ -119,12 +92,7 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		__flush_icache_all();
 #endif
 	if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next) {
-#ifdef CONFIG_SMP
-		struct mm_struct **crt_mm = &per_cpu(current_mm, cpu);
-		*crt_mm = next;
-#endif
-		check_context(next);
-		cpu_switch_mm(next->pgd, next);
+		check_and_switch_context(next, tsk);
 		if (cache_is_vivt())
 			cpumask_clear_cpu(cpu, mm_cpumask(prev));
 	}
@@ -132,6 +100,5 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 }
 
 #define deactivate_mm(tsk,mm)	do { } while (0)
-#define activate_mm(prev,next)	switch_mm(prev, next, NULL)
 
 #endif

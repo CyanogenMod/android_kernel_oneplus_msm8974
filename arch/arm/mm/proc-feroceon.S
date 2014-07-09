@@ -232,6 +232,7 @@ ENTRY(feroceon_coherent_user_range)
 	cmp	r0, r1
 	blo	1b
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+	mov	r0, #0
 	mov	pc, lr
 
 /*
@@ -433,6 +434,7 @@ ENDPROC(feroceon_dma_unmap_area)
 	range_alias flush_icache_all
 	range_alias flush_user_cache_all
 	range_alias flush_kern_cache_all
+	range_alias flush_kern_cache_louis
 	range_alias flush_user_cache_range
 	range_alias coherent_kern_range
 	range_alias coherent_user_range

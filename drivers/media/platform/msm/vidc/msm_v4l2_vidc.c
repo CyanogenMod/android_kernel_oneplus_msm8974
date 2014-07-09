@@ -405,7 +405,7 @@ static int __devinit msm_vidc_probe(struct platform_device *pdev)
 		goto err_core_init;
 	}
 	if (core->hfi_type == VIDC_HFI_Q6) {
-		dprintk(VIDC_ERR, "Q6 hfi device probe called\n");
+		dprintk(VIDC_DBG, "Q6 hfi device probe called\n");
 		nr += MSM_VIDC_MAX_DEVICES;
 		core->id = MSM_VIDC_CORE_Q6;
 	} else {
@@ -568,7 +568,7 @@ static int __init msm_vidc_init(void)
 
 	INIT_LIST_HEAD(&vidc_driver->cores);
 	mutex_init(&vidc_driver->lock);
-	vidc_driver->debugfs_root = debugfs_create_dir("msm_vidc", NULL);
+	vidc_driver->debugfs_root = msm_vidc_debugfs_init_drv();
 	if (!vidc_driver->debugfs_root)
 		dprintk(VIDC_ERR,
 			"Failed to create debugfs for msm_vidc\n");
