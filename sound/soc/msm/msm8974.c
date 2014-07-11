@@ -1867,7 +1867,7 @@ void *def_taiko_mbhc_cal(void)
 	S(n_btn_meas, 1);
 	S(n_btn_con, 2);
 	S(num_btn, WCD9XXX_MBHC_DEF_BUTTONS);
-	S(v_btn_press_delta_sta, 100);
+	S(v_btn_press_delta_sta, 0);
 	S(v_btn_press_delta_cic, 50);
 #undef S
 	btn_cfg = WCD9XXX_MBHC_CAL_BTN_DET_PTR(taiko_cal);
