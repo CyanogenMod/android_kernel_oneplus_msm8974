@@ -836,6 +836,12 @@ socinfo_show_hw_rf_version(struct sys_device *dev,
 		case RF_VERSION__88:
 			rf_version = "88";
 			break;
+		case RF_VERSION__98:
+			rf_version = "98";
+			break;
+		case RF_VERSION__99:
+			rf_version = "99";
+			break;
 		default:
 			rf_version = "UNKNOWN";
 	}

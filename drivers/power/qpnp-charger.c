@@ -3126,7 +3126,9 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 			if (ret.intval ==  2)
 				qpnp_chg_usb_suspend_enable(chip, 1);
 #endif
+#ifndef CONFIG_MACH_OPPO
 			qpnp_chg_iusbmax_set(chip, QPNP_CHG_I_MAX_MIN_100);
+#endif
 #ifdef CONFIG_MACH_OPPO
 			qpnp_battery_temp_region_set(chip, CV_BATTERY_TEMP_REGION__INVALID);
 			chip->charger_status = CHARGER_STATUS_GOOD;
