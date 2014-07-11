@@ -30,6 +30,10 @@
 		batfet-supply = <&pm8941_chg_batif>;
 	};
 
+	qcom,mdss_dsi@fd922800 {
+		/delete-property/ qcom,platform-supply-entry1;
+	};
+
 	qcom,hdmi_tx@fd922100 {
 		status = "disabled";
 	};
