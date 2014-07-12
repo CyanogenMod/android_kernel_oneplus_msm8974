@@ -1119,6 +1119,9 @@ enum {
 	MDP_WRITEBACK_MIRROR_RESUME,
 };
 
+/* let users know that we have the new struct formats */
+#define DUAL_DSI
+
 #ifdef __KERNEL__
 int msm_fb_get_iommu_domain(struct fb_info *info, int domain);
 /* get the framebuffer physical address information */
