@@ -1294,12 +1294,13 @@ static int mdss_mdp_commit_cb(enum mdp_commit_stage_type commit_stage,
 	struct mdss_mdp_ctl *ctl;
 
 	switch (commit_stage) {
-	case MDP_COMMIT_STAGE_WAIT_FOR_PINGPONG:
+	case MDP_COMMIT_STAGE_SETUP_DONE:
 		ctl = mfd_to_ctl(mfd);
-		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_START);
+		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_CTX_DONE);
+		mdp5_data->kickoff_released = true;
 		mutex_unlock(&mdp5_data->ov_lock);
 		break;
-	case MDP_COMMIT_STAGE_PINGPONG_DONE:
+	case MDP_COMMIT_STAGE_READY_FOR_KICKOFF:
 		mutex_lock(&mdp5_data->ov_lock);
 		break;
 	default:
@@ -1402,6 +1403,9 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 	ATRACE_END("sspp_programming");
 
 	mutex_unlock(&mdp5_data->list_lock);
+
+	mdp5_data->kickoff_released = false;
+
 	if (mfd->panel.type == WRITEBACK_PANEL) {
 		ATRACE_BEGIN("wb_kickoff");
 		if (!need_cleanup) {
@@ -1426,9 +1430,8 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 		ATRACE_END("display_commit");
 	}
 
-	/* MDP_NOTIFY_FRAME_START is sent in cb for command panel */
-	if ((!need_cleanup) && (!mdp5_data->ctl->wait_pingpong))
-		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_START);
+	if ((!need_cleanup) && (!mdp5_data->kickoff_released))
+		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_CTX_DONE);
 
 	if (IS_ERR_VALUE(ret))
 		goto commit_fail;
@@ -1459,8 +1462,8 @@ commit_fail:
 	ATRACE_END("overlay_cleanup");
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 	mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_FLUSHED);
-	if (need_cleanup)
-		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_START);
+	if (!mdp5_data->kickoff_released)
+		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_CTX_DONE);
 
 	mutex_unlock(&mdp5_data->ov_lock);
 	if (ctl->shared_lock) {

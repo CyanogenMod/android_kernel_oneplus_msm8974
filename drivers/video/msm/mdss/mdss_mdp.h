@@ -141,8 +141,8 @@ struct splash_pipe_cfg {
  *			buffer is ready.
  */
 enum mdp_commit_stage_type {
-	MDP_COMMIT_STAGE_WAIT_FOR_PINGPONG,
-	MDP_COMMIT_STAGE_PINGPONG_DONE,
+	MDP_COMMIT_STAGE_SETUP_DONE,
+	MDP_COMMIT_STAGE_READY_FOR_KICKOFF,
 };
 
 struct mdss_mdp_ctl;
@@ -496,6 +496,7 @@ struct mdss_overlay_private {
 	struct mdss_mdp_vsync_handler vsync_retire_handler;
 	struct work_struct retire_work;
 	int retire_cnt;
+	bool kickoff_released;
 };
 
 struct mdss_mdp_commit_cb {

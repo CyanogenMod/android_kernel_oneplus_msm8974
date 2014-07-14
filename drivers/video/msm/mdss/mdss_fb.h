@@ -52,8 +52,11 @@
  *
  * @MDP_NOTIFY_FRAME_BEGIN:	Frame update has started, the frame is about to
  *				be programmed into hardware.
+ * @MDP_NOTIFY_FRAME_CFG_DONE:	Frame configuration is done.
+ * @MDP_NOTIFY_FRAME_CTX_DONE:	Frame has finished accessing sw context.
+ *				Next frame can start preparing.
  * @MDP_NOTIFY_FRAME_READY:	Frame ready to be kicked off, this can be used
- *				as the last point in time to synchronized with
+ *				as the last point in time to synchronize with
  *				source buffers before kickoff.
  * @MDP_NOTIFY_FRAME_FLUSHED:	Configuration of frame has been flushed and
  *				DMA transfer has started.
@@ -67,11 +70,12 @@
  */
 enum mdp_notify_event {
 	MDP_NOTIFY_FRAME_BEGIN = 1,
+	MDP_NOTIFY_FRAME_CFG_DONE,
+	MDP_NOTIFY_FRAME_CTX_DONE,
 	MDP_NOTIFY_FRAME_READY,
 	MDP_NOTIFY_FRAME_FLUSHED,
 	MDP_NOTIFY_FRAME_DONE,
 	MDP_NOTIFY_FRAME_TIMEOUT,
-	MDP_NOTIFY_FRAME_START,
 };
 
 struct disp_info_type_suspend {
@@ -94,6 +98,8 @@ struct msm_sync_pt_data {
 	char *fence_name;
 	u32 acq_fen_cnt;
 	struct sync_fence *acq_fen[MDP_MAX_FENCE_FD];
+	u32 temp_fen_cnt;
+	struct sync_fence *temp_fen[MDP_MAX_FENCE_FD];
 
 	struct sw_sync_timeline *timeline;
 	int timeline_value;
@@ -292,7 +298,7 @@ static inline bool mdss_fb_is_power_on_lp(struct msm_fb_data_type *mfd)
 int mdss_fb_get_phys_info(dma_addr_t *start, unsigned long *len, int fb_num);
 void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl);
 void mdss_fb_update_backlight(struct msm_fb_data_type *mfd);
-void mdss_fb_wait_for_fence(struct msm_sync_pt_data *sync_pt_data);
+int mdss_fb_wait_for_fence(struct msm_sync_pt_data *sync_pt_data);
 void mdss_fb_signal_timeline(struct msm_sync_pt_data *sync_pt_data);
 struct sync_fence *mdss_fb_sync_get_fence(struct sw_sync_timeline *timeline,
 				const char *fence_name, int val);
