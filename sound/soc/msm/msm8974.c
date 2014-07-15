@@ -1823,8 +1823,6 @@ static int msm8974_snd_startup(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-//liuyan 2013-3-13 change no_mic form 30 to 100,hs_max from 2400 to 2000
-//liuyan 2013-7-22 change button0 threshold form -50 to -70
 void *def_taiko_mbhc_cal(void)
 {
 	void *taiko_cal;
@@ -1867,7 +1865,11 @@ void *def_taiko_mbhc_cal(void)
 	S(n_btn_meas, 1);
 	S(n_btn_con, 2);
 	S(num_btn, WCD9XXX_MBHC_DEF_BUTTONS);
+#ifdef CONFIG_MACH_OPPO
 	S(v_btn_press_delta_sta, 0);
+#else
+	S(v_btn_press_delta_sta, 100);
+#endif
 	S(v_btn_press_delta_cic, 50);
 #undef S
 	btn_cfg = WCD9XXX_MBHC_CAL_BTN_DET_PTR(taiko_cal);
