@@ -1263,6 +1263,7 @@ static int __devinit mdss_dsi_ctrl_probe(struct platform_device *pdev)
 
 error_pan_node:
 	of_node_put(dsi_pan_node);
+	i--;
 error_vreg:
 	for (; i >= 0; i--)
 		mdss_dsi_put_dt_vreg_data(&pdev->dev,
