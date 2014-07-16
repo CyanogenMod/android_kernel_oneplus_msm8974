@@ -186,6 +186,10 @@ enum wcd9xxx_current_v_idx {
 	WCD9XXX_CURRENT_V_BR_H,
 };
 
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+int msm_compr_limit_volume(bool enable, uint32_t level);
+#endif
+
 static int wcd9xxx_detect_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 				    uint32_t *zr);
 static s16 wcd9xxx_get_current_v(struct wcd9xxx_mbhc *mbhc,
@@ -2967,6 +2971,10 @@ static void wcd9xxx_correct_swch_plug(struct work_struct *work)
 
 	pr_debug("%s: enter\n", __func__);
 
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+	msm_compr_limit_volume(true, 1200);
+#endif
+
 	mbhc = container_of(work, struct wcd9xxx_mbhc, correct_plug_swch);
 	codec = mbhc->codec;
 
@@ -3135,6 +3143,10 @@ static void wcd9xxx_correct_swch_plug(struct work_struct *work)
 		}
 		WCD9XXX_BCL_UNLOCK(mbhc->resmgr);
 	}
+
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+	msm_compr_limit_volume(false, 1200);
+#endif
 	pr_debug("%s: leave current_plug(%d)\n", __func__, mbhc->current_plug);
 	/* unlock sleep */
 	wcd9xxx_unlock_sleep(mbhc->resmgr->core_res);

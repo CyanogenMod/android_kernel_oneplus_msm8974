@@ -88,6 +88,19 @@ struct msm_compr_gapless_state {
 	bool use_dsp_gapless_mode;
 };
 
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+struct msm_compr_limit {
+	struct semaphore mutex;
+	struct delayed_work delayed_work;
+	bool enabled;
+	bool ongoing;
+	uint32_t limit;
+	uint32_t end[2];
+	int step;
+	bool needs_fade[2];
+};
+#endif
+
 struct msm_compr_pdata {
 	atomic_t audio_ocmem_req;
 	struct snd_compr_stream *cstream[MSM_FRONTEND_DAI_MAX];
@@ -95,6 +108,9 @@ struct msm_compr_pdata {
 	struct msm_compr_audio_effects *audio_effects[MSM_FRONTEND_DAI_MAX];
 	bool use_dsp_gapless_mode;
 	struct msm_compr_dec_params *dec_params[MSM_FRONTEND_DAI_MAX];
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+	struct msm_compr_limit limit;
+#endif
 };
 
 struct msm_compr_audio {
@@ -772,6 +788,12 @@ static int msm_compr_open(struct snd_compr_stream *cstream)
 		return -ENOMEM;
 	}
 
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+	if (down_interruptible(&pdata->limit.mutex)) {
+		return -ERESTARTSYS;
+	}
+#endif
+
 	runtime->private_data = NULL;
 	prtd->cstream = cstream;
 	pdata->cstream[rtd->dai_link->be_id] = cstream;
@@ -858,6 +880,10 @@ static int msm_compr_open(struct snd_compr_stream *cstream)
 		pr_err("%s: Unsupported stream type", __func__);
 	}
 
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+	up(&pdata->limit.mutex);
+#endif
+
 	return 0;
 }
 
@@ -895,6 +921,13 @@ static int msm_compr_free(struct snd_compr_stream *cstream)
 		pr_err("%s pdata or ac is null\n", __func__);
 		return 0;
 	}
+
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+	if (down_interruptible(&pdata->limit.mutex)) {
+		return -ERESTARTSYS;
+	}
+#endif
+
 	if (atomic_read(&prtd->eos)) {
 		ret = wait_event_timeout(prtd->eos_wait,
 					 prtd->cmd_ack, 5 * HZ);
@@ -943,6 +976,10 @@ static int msm_compr_free(struct snd_compr_stream *cstream)
 		msm_pcm_routing_dereg_phy_stream(soc_prtd->dai_link->be_id,
 						SNDRV_PCM_STREAM_PLAYBACK);
 	}
+
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+	up(&pdata->limit.mutex);
+#endif
 
 	pr_debug("%s: ocmem_req: %d\n", __func__,
 		atomic_read(&pdata->audio_ocmem_req));
@@ -1801,6 +1838,112 @@ static int msm_compr_set_metadata(struct snd_compr_stream *cstream,
 	return 0;
 }
 
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+#define FADE_NUM_STEPS 20
+#define FADE_DELAY_MS 50
+
+static struct msm_compr_pdata *compr_pdata;
+
+static void msm_compr_reset_limit(void)
+{
+	compr_pdata->limit.enabled = false;
+	compr_pdata->limit.ongoing = false;
+	compr_pdata->limit.step = 0;
+	compr_pdata->limit.needs_fade[0] = false;
+	compr_pdata->limit.needs_fade[1] = false;
+}
+
+int msm_compr_limit_volume(bool enable, uint32_t level)
+{
+	uint32_t *volume = compr_pdata->volume[MSM_FRONTEND_DAI_MULTIMEDIA4];
+	struct snd_compr_stream *cstream;
+	struct msm_compr_limit *limit = &compr_pdata->limit;
+	int i;
+	if (down_interruptible(&limit->mutex)) {
+		return -ERESTARTSYS;
+	}
+
+	pr_debug("%s: enable=%d, level=%d\n", __func__, enable, level);
+	cstream = compr_pdata->cstream[MSM_FRONTEND_DAI_MULTIMEDIA4];
+	if (!cstream) {
+		up(&limit->mutex);
+		pr_info("%s: no stream\n", __func__);
+		return 0;
+	}
+	if (enable) {
+		limit->enabled = true;
+		limit->limit = level;
+		for(i = 0; i < 2; i++) {
+			if (volume[i] > level) {
+				pr_debug("%s: limiting volume %d to %d\n",
+					__func__, i, level);
+				limit->needs_fade[i] = true;
+				limit->end[i] = volume[i];
+				volume[i] = level;
+			}
+		}
+		msm_compr_set_volume(cstream, volume[0], volume[1]);
+	} else {
+		if (limit->needs_fade[0] || limit->needs_fade[1]) {
+			limit->ongoing = true;
+			pr_debug("%s: scheduling fade\n", __func__);
+			schedule_delayed_work(&limit->delayed_work,
+				msecs_to_jiffies(0));
+		} else {
+			msm_compr_reset_limit();
+		}
+	}
+	up(&limit->mutex);
+
+	return 0;
+}
+
+static void msm_compr_fade_in(struct work_struct *work)
+{
+	uint32_t step;
+	uint32_t *volume = compr_pdata->volume[MSM_FRONTEND_DAI_MULTIMEDIA4];
+	struct msm_compr_limit *limit = &compr_pdata->limit;
+	struct snd_compr_stream *cstream;
+	int i;
+	if (down_interruptible(&limit->mutex)) {
+		return;
+	}
+
+	cstream = compr_pdata->cstream[MSM_FRONTEND_DAI_MULTIMEDIA4];
+
+	if (!limit->ongoing || !cstream) {
+		pr_debug("%s: Aborting fade\n", __func__);
+		msm_compr_reset_limit();
+		up(&limit->mutex);
+		return;
+	}
+
+	limit->step++;
+	for (i = 0; i < 2; i++) {
+		if (limit->needs_fade[i]) {
+			if (limit->step == FADE_NUM_STEPS) {
+				volume[i] = limit->end[i];
+			} else {
+				step = (limit->end[i] - limit->limit) / FADE_NUM_STEPS;
+				volume[i] = limit->limit + step * (limit->step);
+			}
+		}
+	}
+	pr_debug("%s: Setting volume to %d,%d\n",
+		__func__, volume[0], volume[1]);
+	msm_compr_set_volume(cstream, volume[0], volume[1]);
+	if (limit->step < FADE_NUM_STEPS) {
+		pr_debug("%s: scheduling fade\n", __func__);
+		schedule_delayed_work(&limit->delayed_work,
+			msecs_to_jiffies(FADE_DELAY_MS));
+	} else {
+		pr_debug("%s: fade done!\n", __func__);
+		msm_compr_reset_limit();
+	}
+	up(&limit->mutex);
+}
+#endif
+
 static int msm_compr_volume_put(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
@@ -1810,12 +1953,24 @@ static int msm_compr_volume_put(struct snd_kcontrol *kcontrol,
 			snd_soc_platform_get_drvdata(platform);
 	struct snd_compr_stream *cstream = NULL;
 	uint32_t *volume = NULL;
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+	struct msm_compr_limit *limit = &compr_pdata->limit;
+	int i;
+#endif
 
 	if (fe_id >= MSM_FRONTEND_DAI_MAX) {
 		pr_err("%s Received out of bounds fe_id %lu\n",
 			__func__, fe_id);
 		return -EINVAL;
 	}
+
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+	if (fe_id == MSM_FRONTEND_DAI_MULTIMEDIA4) {
+		if (down_interruptible(&limit->mutex)) {
+			return -ERESTARTSYS;
+		}
+	}
+#endif
 
 	cstream = pdata->cstream[fe_id];
 	volume = pdata->volume[fe_id];
@@ -1824,8 +1979,40 @@ static int msm_compr_volume_put(struct snd_kcontrol *kcontrol,
 	volume[1] = ucontrol->value.integer.value[1];
 	pr_debug("%s: fe_id %lu left_vol %d right_vol %d\n",
 		 __func__, fe_id, volume[0], volume[1]);
-	if (cstream)
+	if (cstream) {
+
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+		if (fe_id == MSM_FRONTEND_DAI_MULTIMEDIA4 &&
+				limit->enabled) {
+			pr_debug("%s: volume limit enabled\n", __func__);
+			if (limit->ongoing) {
+				pr_info("%s: signalling fade abort!\n", __func__);
+				msm_compr_reset_limit();
+				cancel_delayed_work(&limit->delayed_work);
+			} else {
+				for(i = 0; i < 2; i++) {
+					if (volume[i] > limit->limit) {
+						pr_debug("%s: enabling fade when disable limit\n",
+							__func__);
+						limit->needs_fade[i] = true;
+						limit->end[i] = volume[i];
+						volume[i] = limit->limit;
+					} else {
+						limit->needs_fade[i] = false;
+					}
+				}
+			}
+		}
+#endif
+
 		msm_compr_set_volume(cstream, volume[0], volume[1]);
+	}
+
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+	if (fe_id == MSM_FRONTEND_DAI_MULTIMEDIA4) {
+		up(&limit->mutex);
+	}
+#endif
 	return 0;
 }
 
@@ -2005,6 +2192,13 @@ static int msm_compr_probe(struct snd_soc_platform *platform)
 	snd_soc_platform_set_drvdata(platform, pdata);
 
 	atomic_set(&pdata->audio_ocmem_req, 0);
+
+#ifdef CONFIG_SND_SOC_WCD9320_MBHC_HACK
+	INIT_DELAYED_WORK(&pdata->limit.delayed_work, msm_compr_fade_in);
+	sema_init(&pdata->limit.mutex, 1);
+	compr_pdata = pdata;
+	msm_compr_reset_limit();
+#endif
 
 	for (i = 0; i < MSM_FRONTEND_DAI_MAX; i++) {
 		pdata->volume[i][0] = COMPRESSED_LR_VOL_MAX_STEPS;
