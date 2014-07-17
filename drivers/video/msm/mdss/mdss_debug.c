@@ -442,7 +442,7 @@ static ssize_t mdss_debug_perf_mode_read(struct file *file,
 {
 	struct mdss_perf_tune *perf_tune = file->private_data;
 	int len = 0;
-	char buf[40];
+	char buf[80];
 
 	if (!perf_tune)
 		return -ENODEV;
@@ -518,9 +518,6 @@ static int mdss_debugfs_perf_init(struct mdss_debug_data *mdd,
 
 	debugfs_create_u32("threshold_high", 0644, mdd->perf,
 		(u32 *)&mdata->max_bw_high);
-
-	debugfs_create_file("perf_mode", 0644, mdd->perf,
-		(u32 *)&mdata->perf_tune, &mdss_perf_mode_fops);
 
 	debugfs_create_file("perf_mode", 0644, mdd->perf,
 		(u32 *)&mdata->perf_tune, &mdss_perf_mode_fops);
