@@ -2064,13 +2064,20 @@ static int mdss_mdp_mixer_setup(struct mdss_mdp_ctl *ctl,
 	int outsize = 0;
 	u32 op_mode;
 
-	screen_state = ctl->force_screen_state;
-
 	if (!mixer)
 		return -ENODEV;
 
+	mixer->params_changed = 0;
+	/* check if mixer setup for rotator is needed */
+	if (mixer->rotator_mode) {
+		off = __mdss_mdp_ctl_get_mixer_off(mixer);
+		mdss_mdp_ctl_write(mixer->ctl, off, 0);
+		return 0;
+	}
+
 	trace_mdp_mixer_update(mixer->num);
 	pr_debug("setup mixer=%d\n", mixer->num);
+	screen_state = ctl->force_screen_state;
 
 	outsize = (mixer->roi.h << 16) | mixer->roi.w;
 	mdp_mixer_write(mixer, MDSS_MDP_REG_LM_OUT_SIZE, outsize);
