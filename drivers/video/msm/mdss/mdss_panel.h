@@ -362,6 +362,8 @@ struct mdss_panel_info {
 #ifdef CONFIG_MACH_OPPO
     int cabc_available;
     int cabc_mode;
+	int gamma_index;
+	int gamma_count;
 #endif
 };
 

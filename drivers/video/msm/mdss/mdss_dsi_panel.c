@@ -37,6 +37,11 @@ static struct dsi_panel_cmds cabc_user_interface_image_sequence;
 static struct dsi_panel_cmds cabc_still_image_sequence;
 static struct dsi_panel_cmds cabc_video_image_sequence;
 
+static struct dsi_panel_cmds gamma1;
+static struct dsi_panel_cmds gamma2;
+static struct dsi_panel_cmds gamma3;
+static struct dsi_panel_cmds gamma4;
+
 static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 			struct dsi_panel_cmds *pcmds);
 
@@ -51,7 +56,50 @@ enum
 
 };
 
-static DEFINE_MUTEX(cabc_mutex);
+static DEFINE_MUTEX(config_mutex);
+static int mdss_dsi_update_cabc_level(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
+{
+	int ret = 0;
+	struct mdss_panel_info *pinfo = NULL;
+
+    if (ctrl_pdata == NULL) {
+	    pr_err("%s: Invalid input data\n", __func__);
+	    return -EINVAL;
+    }
+
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+    if (!pinfo->cabc_available)
+        return 0;
+
+	pr_info("%s: update cabc level=%d", __func__, pinfo->cabc_mode);
+
+	switch (pinfo->cabc_mode)
+	{
+		case 0:
+			set_backlight_pwm(0);
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
+			break;
+		case 1:
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
+			set_backlight_pwm(1);
+			break;
+		case 2:
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_still_image_sequence);
+			set_backlight_pwm(1);
+			break;
+		case 3:
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_video_image_sequence);
+			set_backlight_pwm(1);
+			break;
+		default:
+			pr_err("%s: cabc level %d is not supported!\n",__func__, pinfo->cabc_mode);
+			ret = -EINVAL;
+			break;
+	}
+	return ret;
+}
+
 int mdss_dsi_panel_set_cabc(struct mdss_panel_data *pdata, int level)
 {
 	int ret = 0;
@@ -69,99 +117,112 @@ int mdss_dsi_panel_set_cabc(struct mdss_panel_data *pdata, int level)
     if (!pinfo->cabc_available)
         return 0;
 
-	pr_info("%s : %d \n", __func__, level);
+	mutex_lock(&config_mutex);
 
-	mutex_lock(&cabc_mutex);
-
-	if (!pinfo->panel_power_on)
-	{
-		pr_info("%s: lcd is off,don't allow to set cabc\n", __func__);
-		pinfo->cabc_mode = level;
-		mutex_unlock(&cabc_mutex);
-		return 0;
+	if (level < 0 || level > 3) {
+		pr_err("%s: valid cabc values are 0-4\n", __func__);
+		goto out;
 	}
 
-	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 1);
+	pinfo->cabc_mode = level;
 
-	switch(level)
-	{
-		case 0:
-			set_backlight_pwm(0);
-			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
-			pinfo->cabc_mode = CABC_CLOSE;
-			break;
-		case 1:
-			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
-			pinfo->cabc_mode = CABC_LOW_MODE;
-			set_backlight_pwm(1);
-			break;
-		case 2:
-			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_still_image_sequence);
-			pinfo->cabc_mode = CABC_MIDDLE_MODE;
-			set_backlight_pwm(1);
-			break;
-		case 3:
-			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_video_image_sequence);
-			pinfo->cabc_mode = CABC_HIGH_MODE;
-			set_backlight_pwm(1);
-			break;
-		default:
-			pr_err("%s Level %d is not supported!\n",__func__,level);
-			ret = -1;
-			break;
+	if (!pinfo->panel_power_on) {
+		pr_info("%s: lcd is off, queued cabc change\n", __func__);
+		goto out;
 	}
-	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 0);
-	mutex_unlock(&cabc_mutex);
+
+	ret = mdss_dsi_update_cabc_level(ctrl_pdata);
+
+out:
+	mutex_unlock(&config_mutex);
 	return ret;
 
 }
 
-static int set_cabc_resume_mode(struct mdss_panel_data *pdata, int mode)
+static int mdss_dsi_update_gamma_index(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
-	int ret;
+	int ret = 0;
+	struct mdss_panel_info *pinfo = NULL;
+
+	if (ctrl_pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+	if (!pinfo->gamma_count)
+		return -EINVAL;
+
+
+	if (pinfo->gamma_index < 0 || pinfo->gamma_index >= pinfo->gamma_count) {
+		return -EINVAL;
+	}
+
+	pr_info("%s: update gamma index=%d", __func__, pinfo->gamma_index);
+
+	switch (pinfo->gamma_index)
+	{
+		case 0:
+			 mdss_dsi_panel_cmds_send(ctrl_pdata, &gamma1);
+			 break;
+		case 1:
+			 mdss_dsi_panel_cmds_send(ctrl_pdata, &gamma2);
+			 break;
+		case 2:
+			 mdss_dsi_panel_cmds_send(ctrl_pdata, &gamma3);
+			 break;
+		case 3:
+			 mdss_dsi_panel_cmds_send(ctrl_pdata, &gamma4);
+			 break;
+		default:
+			pr_err("%s : invalid gamma index %d yxr \n",__func__, pinfo->gamma_index);
+			ret = -EINVAL;
+			break;
+	}
+
+	return ret;
+}
+
+int mdss_dsi_panel_set_gamma_index(struct mdss_panel_data *pdata, int index)
+{
+	int ret = 0;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct mdss_panel_info *pinfo = NULL;
 
-    if (pdata == NULL) {
-	    pr_err("%s: Invalid input data\n", __func__);
-	    return -EINVAL;
-    }
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata, panel_data);
 	pinfo = &(ctrl_pdata->panel_data.panel_info);
 
-    if (!pinfo->cabc_available)
-        return 0;
+	if (!pinfo->gamma_count)
+		return -EINVAL;
 
-	pr_info("%s : %d yxr \n", __func__, mode);
+    mutex_lock(&config_mutex);
 
-	switch (mode)
-	{
-		case 0:
-			set_backlight_pwm(0);
-			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
-			break;
-		case 1:
-			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
-			set_backlight_pwm(1);
-			break;
-		case 2:
-			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_still_image_sequence);
-			set_backlight_pwm(1);
-			break;
-		case 3:
-			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_video_image_sequence);
-			set_backlight_pwm(1);
-			break;
-		default:
-			pr_err("%s  %d is not supported!\n",__func__,mode);
-			ret = -1;
-			break;
+    if(index < 0 || index >= pinfo->gamma_count) {
+		pr_err("%s: valid gamma indexes are 0-%d\n", __func__,
+				(pinfo->gamma_count - 1));
+        goto out;
+    }
+
+	pinfo->gamma_index = index;
+
+	if (!pinfo->panel_power_on) {
+		pr_info("%s: lcd is off, queued gamma change\n", __func__);
+		goto out;
 	}
+
+	ret = mdss_dsi_update_gamma_index(ctrl_pdata);
+
+out:
+    mutex_unlock(&config_mutex);
 	return ret;
 }
 
-static DEFINE_MUTEX(panel_calibration_mutex);
 int mdss_dsi_panel_get_panel_calibration(
 	struct mdss_panel_data *pdata, char *buf)
 {
@@ -183,7 +244,7 @@ int mdss_dsi_panel_get_panel_calibration(
 		return -ENODEV;
 
 
-	mutex_lock(&panel_calibration_mutex);
+	mutex_lock(&config_mutex);
 
 	ccmds = &ctrl->calibration_cmds;
 	for (i = 1; i < ccmds->cmd_cnt - 1; i++) {
@@ -192,7 +253,7 @@ int mdss_dsi_panel_get_panel_calibration(
 		sprintf(buf + len - 1, "\n");
 	}
 
-	mutex_unlock(&panel_calibration_mutex);
+	mutex_unlock(&config_mutex);
 
 	return len;
 }
@@ -247,12 +308,12 @@ int mdss_dsi_panel_set_panel_calibration(struct mdss_panel_data *pdata,
 	pr_debug("%s: Set calibration string len: %d, content: %s\n",
 		__func__, strlen(buf), buf);
 
-	mutex_lock(&panel_calibration_mutex);
+	mutex_lock(&config_mutex);
 
 	// identify if we receive an apply-only command
 	if (strlen(buf) <= 2 && *buf == '1') {
 		mdss_dsi_panel_apply_panel_calibration(pdata, ctrl);
-		mutex_unlock(&panel_calibration_mutex);
+		mutex_unlock(&config_mutex);
 		return 0;
 	}
 
@@ -350,7 +411,7 @@ int mdss_dsi_panel_set_panel_calibration(struct mdss_panel_data *pdata,
 
 	// apply
 	mdss_dsi_panel_apply_panel_calibration(pdata, ctrl);
-	mutex_unlock(&panel_calibration_mutex);
+	mutex_unlock(&config_mutex);
 
 	return 0;
 }
@@ -874,16 +935,13 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
 
 #ifdef CONFIG_MACH_OPPO
-/* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/02/17  Add for set cabc */
 	set_backlight_pwm(1);
-	if (pdata->panel_info.cabc_mode != CABC_HIGH_MODE) {
-		set_cabc_resume_mode(pdata, pdata->panel_info.cabc_mode);
-	}
 
-	mutex_lock(&panel_calibration_mutex);
+	mdss_dsi_update_cabc_level(ctrl);
+    mdss_dsi_update_gamma_index(ctrl);
+
 	if (ctrl->calibration_available && ctrl->calibration_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->calibration_cmds);
-	mutex_unlock(&panel_calibration_mutex);
 #endif
 
 	pr_debug("%s:-\n", __func__);
@@ -1679,6 +1737,25 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	rc = mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->calibration_cmds,
 		"qcom,mdss-dsi-calibration-command", "qcom,mdss-dsi-calibration-command-state");
 	ctrl_pdata->calibration_available = rc == 0 ? 1 : 0;
+
+	/* Predefined gamma */
+	pinfo->gamma_count = 0;
+
+	rc = mdss_dsi_parse_dcs_cmds(np, &gamma1,
+		"qcom,mdss-dsi-gamma1", "qcom,mdss-dsi-off-command-state");
+	pinfo->gamma_count += rc == 0 ? 1 : 0;
+
+	rc = mdss_dsi_parse_dcs_cmds(np, &gamma2,
+		"qcom,mdss-dsi-gamma2", "qcom,mdss-dsi-off-command-state");
+	pinfo->gamma_count += rc == 0 ? 1 : 0;
+
+	rc = mdss_dsi_parse_dcs_cmds(np, &gamma3,
+		"qcom,mdss-dsi-gamma3", "qcom,mdss-dsi-off-command-state");
+	pinfo->gamma_count += rc == 0 ? 1 : 0;
+
+	rc = mdss_dsi_parse_dcs_cmds(np, &gamma4,
+		"qcom,mdss-dsi-gamma4", "qcom,mdss-dsi-off-command-state");
+	pinfo->gamma_count += rc == 0 ? 1 : 0;
 
 #endif
 
