@@ -2204,7 +2204,6 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.codec_dai_name = "msm-stub-rx",
 		.platform_name  = "msm-pcm-afe",
 		.ignore_suspend = 1,
-		.async_ops = ASYNC_DPCM_SND_SOC_PREPARE,
 		/* this dainlink has playback support */
 		.ignore_pmdown_time = 1,
 	},
