@@ -136,9 +136,6 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 #endif
 	.insert_detect = true,
 	.swap_gnd_mic = NULL,
-#ifdef CONFIG_MACH_OPPO
-	.set_gnd_mic_gpio = NULL,
-#endif
 	.cs_enable_flags = (1 << MBHC_CS_ENABLE_POLLING |
 			    1 << MBHC_CS_ENABLE_INSERTION |
 			    1 << MBHC_CS_ENABLE_REMOVAL),
@@ -1571,14 +1568,6 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 			hdmi_rx_sample_rate_get, hdmi_rx_sample_rate_put),
 };
 
-#ifdef CONFIG_MACH_OPPO
-static void msm8974_set_gnd_mic_gpio(struct snd_soc_codec *codec, int value)
-{
-	struct snd_soc_card *card = codec->card;
-	struct msm8974_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
-	gpio_set_value_cansleep(pdata->us_euro_gpio, value);
-}
-#else
 static bool msm8974_swap_gnd_mic(struct snd_soc_codec *codec)
 {
 	struct snd_soc_card *card = codec->card;
@@ -1588,7 +1577,6 @@ static bool msm8974_swap_gnd_mic(struct snd_soc_codec *codec)
 	gpio_set_value_cansleep(pdata->us_euro_gpio, !value);
 	return true;
 }
-#endif
 
 static int msm_afe_set_config(struct snd_soc_codec *codec)
 {
@@ -3249,11 +3237,7 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 	} else {
 		dev_dbg(&pdev->dev, "%s detected %d",
 			"qcom,us-euro-gpios", pdata->us_euro_gpio);
-#ifdef CONFIG_MACH_OPPO
-		mbhc_cfg.set_gnd_mic_gpio = msm8974_set_gnd_mic_gpio;
-#else
 		mbhc_cfg.swap_gnd_mic = msm8974_swap_gnd_mic;
-#endif
 	}
 
 	ret = msm8974_prepare_us_euro(card);
