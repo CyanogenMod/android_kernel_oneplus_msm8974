@@ -657,27 +657,24 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			return rc;
 		}
 		if (!pinfo->panel_power_on) {
-			if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
-				gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
-
+			gpio_direction_output(62, 0);
 			for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) {
 				gpio_set_value((ctrl_pdata->rst_gpio),
 					pdata->panel_info.rst_seq[i]);
-#ifdef CONFIG_MACH_OPPO
-				if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio))
-					gpio_direction_output((ctrl_pdata->lcd_5v_en_gpio),
-							pdata->panel_info.rst_seq[i]);
-#endif
 				if (pdata->panel_info.rst_seq[++i])
 					usleep(pinfo->rst_seq[i] * 1000);
 			}
-		}
-
-		if (gpio_is_valid(ctrl_pdata->mode_gpio)) {
-			if (pinfo->mode_gpio_state == MODE_GPIO_HIGH)
-				gpio_set_value((ctrl_pdata->mode_gpio), 1);
-			else if (pinfo->mode_gpio_state == MODE_GPIO_LOW)
-				gpio_set_value((ctrl_pdata->mode_gpio), 0);
+			gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
+			gpio_direction_output((ctrl_pdata->disp_en_gpio), 1);
+			mdelay(2);
+#ifdef CONFIG_MACH_OPPO
+			if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio)) {
+				gpio_direction_output(ctrl_pdata->lcd_5v_en_gpio, 1);
+				mdelay(10);
+			}
+#endif
+			gpio_direction_output((ctrl_pdata->disp_en_gpio), 1);
+			mdelay(2);
 		}
 #ifdef CONFIG_MACH_OPPO
 		}
@@ -689,14 +686,20 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			pr_debug("%s: Reset panel done\n", __func__);
 		}
 	} else {
-		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
-			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
-			gpio_free(ctrl_pdata->disp_en_gpio);
-		}
 		if (gpio_is_valid(ctrl_pdata->rst_gpio)) {
 			gpio_set_value((ctrl_pdata->rst_gpio), 0);
 			gpio_free(ctrl_pdata->rst_gpio);
 		}
+#ifdef CONFIG_MACH_OPPO
+		if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio))
+			gpio_direction_output(ctrl_pdata->lcd_5v_en_gpio, 0);
+#endif
+		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
+			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
+			gpio_direction_output((ctrl_pdata->disp_en_gpio), 0);
+			gpio_free(ctrl_pdata->disp_en_gpio);
+		}
+		gpio_direction_output(62, 0);
 		if (gpio_is_valid(ctrl_pdata->mode_gpio))
 			gpio_free(ctrl_pdata->mode_gpio);
 	}
