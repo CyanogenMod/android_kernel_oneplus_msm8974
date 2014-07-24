@@ -572,7 +572,7 @@
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-		qcom,mdss-dsi-reset-sequence = <1 15>, <0 75>, <1 15>;
+		qcom,mdss-dsi-reset-sequence = <1 10>, <0 10>, <1 15>;
 		qcom,mdss-dsi-cabc-off-command = [
 			05 01 00 00 10 00 02 29 00
 			15 01 00 00 10 00 02 55 80];
@@ -748,7 +748,7 @@
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-		qcom,mdss-dsi-reset-sequence = <1 15>, <0 75>, <1 15>;
+		qcom,mdss-dsi-reset-sequence = <1 10>, <0 10>, <1 15>;
 		qcom,mdss-dsi-pan-enable-dynamic-fps;
 		qcom,mdss-dsi-pan-fps-update = "dfps_suspend_resume_mode";
 	};
