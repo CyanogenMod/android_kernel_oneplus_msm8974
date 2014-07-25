@@ -1455,7 +1455,7 @@ static void msm_bus_bimc_set_qos_mode(struct msm_bus_bimc_info *binfo,
 	switch (qmode_sel) {
 	case BIMC_QOS_MODE_FIXED:
 		reg_val = readl_relaxed(M_BKE_EN_ADDR(binfo->base,
-			mas_index)) & M_BKE_EN_RMSK;
+			mas_index));
 		writel_relaxed((reg_val & (~M_BKE_EN_EN_BMSK)),
 			M_BKE_EN_ADDR(binfo->base, mas_index));
 		/* Ensure that the book-keeping register writes
@@ -1469,7 +1469,7 @@ static void msm_bus_bimc_set_qos_mode(struct msm_bus_bimc_info *binfo,
 
 	case BIMC_QOS_MODE_BYPASS:
 		reg_val = readl_relaxed(M_BKE_EN_ADDR(binfo->base,
-			mas_index)) & M_BKE_EN_RMSK;
+			mas_index));
 		writel_relaxed((reg_val & (~M_BKE_EN_EN_BMSK)),
 			M_BKE_EN_ADDR(binfo->base, mas_index));
 		/* Ensure that the book-keeping register writes
@@ -1485,7 +1485,7 @@ static void msm_bus_bimc_set_qos_mode(struct msm_bus_bimc_info *binfo,
 	case BIMC_QOS_MODE_LIMITER:
 		set_qos_mode(binfo->base, mas_index, 0, 0, 0);
 		reg_val = readl_relaxed(M_BKE_EN_ADDR(binfo->base,
-			mas_index)) & M_BKE_EN_RMSK;
+			mas_index));
 		val = 1 << M_BKE_EN_EN_SHFT;
 		/* Ensure that the book-keeping register writes
 		 * go through before setting QoS mode.
