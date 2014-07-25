@@ -219,6 +219,7 @@ struct mdss_data_type {
 	struct mdss_prefill_data prefill_data;
 	bool idle_pc;
 	struct mdss_perf_tune perf_tune;
+	atomic_t ov_active_panels;
 	int iommu_ref_cnt;
 
 	u64 ab[MDSS_MAX_HW_BLK];
