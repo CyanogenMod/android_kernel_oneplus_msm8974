@@ -210,6 +210,7 @@ struct mdss_data_type {
 	struct mdss_prefill_data prefill_data;
 	bool idle_pc;
 	int iommu_ref_cnt;
+	atomic_t active_intf_cnt;
 
 	u64 ab[MDSS_MAX_HW_BLK];
 	u64 ib[MDSS_MAX_HW_BLK];
