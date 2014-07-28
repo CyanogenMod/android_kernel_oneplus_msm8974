@@ -50,7 +50,7 @@ struct mdss_mdp_writeback_ctx {
 	struct mdss_mdp_format_params *dst_fmt;
 	u16 width;
 	u16 height;
-	struct mdss_mdp_img_rect dst_rect;
+	struct mdss_rect dst_rect;
 
 	u8 rot90;
 	u32 bwc_mode;
@@ -111,7 +111,7 @@ static int mdss_mdp_writeback_addr_setup(struct mdss_mdp_writeback_ctx *ctx,
 		return -EINVAL;
 	data = *in_data;
 
-	pr_debug("wb_num=%d addr=0x%x\n", ctx->wb_num, data.p[0].addr);
+	pr_debug("wb_num=%d addr=0x%pa\n", ctx->wb_num, &data.p[0].addr);
 
 	if (ctx->bwc_mode)
 		data.bwc_enabled = 1;
@@ -602,5 +602,5 @@ int mdss_mdp_writeback_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 			ctl->mixer_right->params_changed++;
 	}
 
-	return mdss_mdp_display_commit(ctl, arg);
+	return mdss_mdp_display_commit(ctl, arg, NULL);
 }

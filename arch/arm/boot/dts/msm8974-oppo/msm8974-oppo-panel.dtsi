@@ -172,6 +172,22 @@
 			05 01 00 00 10 00 02 29 00];
 		qcom,mdss-dsi-cabc-video-command = [15 01 00 00 10 00 02 55 03
 			05 01 00 00 10 00 02 29 00];
+		qcom,mdss-dsi-gamma1 = [23 01 00 00 01 00 02 b0 04
+			29 01 00 00 01 00 14 c8 01 0A FD 03 01 E8 00 00 03 FC F5 A1 00 00 01 FD 06 FC 00
+			23 01 00 00 00 00 02 d6 01
+			23 01 00 00 01 00 02 b0 03];
+		qcom,mdss-dsi-gamma2 = [23 01 00 00 01 00 02 b0 04
+			29 01 00 00 01 00 14 c8 01 00 F0 F4 00 D5 00 00 E8 E6 02 BA 00 00 00 00 00 00 00
+			23 01 00 00 00 00 02 d6 01
+			23 01 00 00 01 00 02 b0 03];
+		qcom,mdss-dsi-gamma3 = [23 01 00 00 01 00 02 b0 04
+			29 01 00 00 01 00 14 c8 01 00 F0 F4 00 D5 00 00 00 00 00 00 00 00 F0 F0 00 FC 00
+			23 01 00 00 00 00 02 d6 01
+			23 01 00 00 01 00 02 b0 03];
+		qcom,mdss-dsi-gamma4 = [23 01 00 00 01 00 02 b0 04
+			29 01 00 00 01 00 14 c8 01 00 00 00 00 00 00 00 E8 E6 02 BA 00 00 F0 F0 00 FC 00
+			23 01 00 00 00 00 02 d6 01
+			23 01 00 00 01 00 02 b0 03];
 		qcom,cont-splash-enabled;
 	};
 
@@ -466,7 +482,7 @@
 		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
 		qcom,mdss-dsi-panel-type = "dsi_video_mode";
 		qcom,mdss-dsi-panel-destination = "display_1";
-		qcom,mdss-dsi-panel-framerate = <55>;
+		qcom,mdss-dsi-panel-framerate = <60>;
 		qcom,mdss-dsi-virtual-channel-id = <0>;
 		qcom,mdss-dsi-stream = <0>;
 		qcom,mdss-dsi-panel-width = <720>;
@@ -542,7 +558,7 @@
 		qcom,mdss-dsi-bllp-eof-power-mode;
 		qcom,mdss-dsi-bllp-power-mode;
 		qcom,mdss-dsi-hfp-power-mode;
-		/* qcom,mdss-dsi-panel-broadcast-mode; */
+		/*qcom,mdss-dsi-panel-broadcast-mode;*/
 		qcom,mdss-dsi-lane-0-state;
 		qcom,mdss-dsi-lane-1-state;
 		qcom,mdss-dsi-lane-2-state;
@@ -569,6 +585,70 @@
 		qcom,mdss-dsi-cabc-video-command = [
 			05 01 00 00 10 00 02 29 00
 			15 01 00 00 10 00 02 55 83];
+		qcom,mdss-dsi-gamma1 = [29 01 00 00 00 00 06 F0 55 AA 52 08 00
+								29 01 00 00 00 00 11 D1 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+								29 01 00 00 00 00 06 F0 55 AA 52 08 02
+								29 01 00 00 00 00 0F B0 03 29 2F 36 41 4C 55 3A 38 37 37 44 50 48
+								29 01 00 00 00 00 10 B1 41 59 6B 6C 7D 87 98 A4 A5 B3 C3 D4 E5 F6 FF
+								29 01 00 00 00 00 0F B2 7C 81 82 87 89 90 91 75 6D 65 5B 65 6C 5F
+								29 01 00 00 00 00 10 B3 50 65 74 75 89 97 AD B6 D4 FC FD FD FD FE FF
+								29 01 00 00 00 00 0F B4 04 07 08 09 25 2D 41 24 26 2E 2D 3D 4C 49
+								29 01 00 00 00 00 10 B5 41 55 6B 6C 7D 87 9B AB AC B5 CC DA E8 F7 FF
+								29 01 00 00 00 00 0F B6 03 29 2F 36 41 4C 55 3A 38 37 37 44 50 48
+								29 01 00 00 00 00 10 B7 41 59 6B 6C 7D 87 98 A4 A5 B3 C3 D4 E5 F6 FF
+								29 01 00 00 00 00 0F B8 7C 81 82 87 89 90 91 75 6D 65 5B 65 6C 5F
+								29 01 00 00 00 00 10 B9 50 65 74 75 89 97 AD B6 D4 FC FD FD FD FE FF
+								29 01 00 00 00 00 0F BA 04 07 08 09 25 2D 41 24 26 2E 2D 3D 4C 49
+								29 01 00 00 00 00 10 BB 41 55 6B 6C 7D 87 9B AB AC B5 CC DA E8 F7 FF
+								];
+		qcom,mdss-dsi-gamma2 = [29 01 00 00 00 00 06 F0 55 AA 52 08 00
+								29 01 00 00 00 00 11 D1 00 03 06 09 0C 0F 12 15 18 15 12 0F 0C 09 06 03
+								29 01 00 00 00 00 06 F0 55 AA 52 08 02
+								29 01 00 00 00 00 0F B0 00 0A 1D 2A 36 3F 47 31 2E 31 30 44 52 4F
+								29 01 00 00 00 00 10 B1 48 5A 71 73 86 90 A2 A5 AF BB C7 D4 E4 F6 FF
+								29 01 00 00 00 00 0F B2 5D 60 65 6A 6F 73 78 5E 59 54 4D 59 64 5C
+								29 01 00 00 00 00 10 B3 51 62 79 7B 8E 96 A4 A6 B0 BA C5 D2 E2 F5 FF
+								29 01 00 00 00 00 0F B4 3B 3F 47 4E 55 5B 61 49 44 42 3E 4E 59 54
+								29 01 00 00 00 00 10 B5 4B 5C 73 75 88 8E 99 9A A3 AE B9 C7 DA F2 FF
+								29 01 00 00 00 00 0F B6 00 0A 1D 2A 36 3F 47 31 2E 31 30 44 52 4F
+								29 01 00 00 00 00 10 B7 48 5A 71 73 86 90 A2 A5 AF BB C7 D4 E4 F6 FF
+								29 01 00 00 00 00 0F B8 5D 60 65 6A 6F 73 78 5E 59 54 4D 59 64 5C
+								29 01 00 00 00 00 10 B9 51 62 79 7B 8E 96 A4 A6 B0 BA C5 D2 E2 F5 FF
+								29 01 00 00 00 00 0F BA 3B 3F 47 4E 55 5B 61 49 44 42 3E 4E 59 54
+								29 01 00 00 00 00 10 BB 4B 5C 73 75 88 8E 99 9A A3 AE B9 C7 DA F2 FF
+								];
+		qcom,mdss-dsi-gamma3 = [29 01 00 00 00 00 06 F0 55 AA 52 08 00
+								29 01 00 00 00 00 11 D1 00 03 06 09 0C 0F 12 15 18 15 12 0F 0C 09 06 03
+								29 01 00 00 00 00 06 F0 55 AA 52 08 02
+								29 01 00 00 00 00 0F B0 3A 3E 47 4E 55 5B 61 48 44 42 3E 4E 5A 55
+								29 01 00 00 00 00 10 B1 4B 5C 73 75 88 92 A5 A8 B2 BD C9 D7 E6 F7 FF
+								29 01 00 00 00 00 0F B2 8F 91 94 97 9A 9D A0 84 7D 73 69 70 76 69
+								29 01 00 00 00 00 10 B3 5A 6A 80 82 94 9B A8 AA B3 BD C7 D4 E3 F5 FF
+								29 01 00 00 00 00 0F B4 00 0A 1E 2B 38 41 49 33 30 32 31 45 52 50
+								29 01 00 00 00 00 10 B5 48 5A 72 73 87 8E 98 9A A3 AD B7 C5 D8 F1 FF
+								29 01 00 00 00 00 0F B6 3A 3E 47 4E 55 5B 61 48 44 42 3E 4E 5A 55
+								29 01 00 00 00 00 10 B7 4B 5C 73 75 88 92 A5 A8 B2 BD C9 D7 E6 F7 FF
+								29 01 00 00 00 00 0F B8 8F 91 94 97 9A 9D A0 84 7D 73 69 70 76 69
+								29 01 00 00 00 00 10 B9 5A 6A 80 82 94 9B A8 AA B3 BD C7 D4 E3 F5 FF
+								29 01 00 00 00 00 0F BA 00 0A 1E 2B 38 41 49 33 30 32 31 45 52 50
+								29 01 00 00 00 00 10 BB 48 5A 72 73 87 8E 98 9A A3 AD B7 C5 D8 F1 FF
+								];
+		qcom,mdss-dsi-gamma4 = [29 01 00 00 00 00 06 F0 55 AA 52 08 02
+								29 01 00 00 00 00 0F B0 00 09 1C 29 36 3F 47 31 2E 31 30 44 52 4F
+								29 01 00 00 00 00 10 B1 47 5A 71 73 86 90 A3 A6 B0 BB C8 D5 E5 F6 FF
+								29 01 00 00 00 00 0F B2 7C 7E 82 85 89 8C 90 75 6E 66 5D 67 6E 63
+								29 01 00 00 00 00 10 B3 57 67 7D 7F 91 98 A6 A8 B1 BB C6 D3 E2 F5 FF
+								29 01 00 00 00 00 0F B4 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+								29 01 00 00 00 00 10 B5 4C 5D 74 76 8A 90 9A 9B A4 AE B8 C5 D8 F1 FF
+								29 01 00 00 00 00 0F B6 00 09 1C 29 36 3F 47 31 2E 31 30 44 52 4F
+								29 01 00 00 00 00 10 B7 47 5A 71 73 86 90 A3 A6 B0 BB C8 D5 E5 F6 FF
+								29 01 00 00 00 00 0F B8 7C 7E 82 85 89 8C 90 75 6E 66 5D 67 6E 63
+								29 01 00 00 00 00 10 B9 57 67 7D 7F 91 98 A6 A8 B1 BB C6 D3 E2 F5 FF
+								29 01 00 00 00 00 0F BA 44 48 4F 56 5C 62 67 4E 49 47 41 50 5C 56
+								29 01 00 00 00 00 10 BB 4C 5D 74 76 8A 90 9A 9B A4 AE B8 C5 D8 F1 FF
+								];
+		qcom,mdss-dsi-pan-enable-dynamic-fps;
+		qcom,mdss-dsi-pan-fps-update = "dfps_suspend_resume_mode";
 	};
 
 	dsi_jdi_1440_vid2: qcom,dsi_jdi_1440p_video_1 {
@@ -580,7 +660,7 @@
 		qcom,mdss-dsi-panel-controller = <&mdss_dsi1>;
 		qcom,mdss-dsi-panel-type = "dsi_video_mode";
 		qcom,mdss-dsi-panel-destination = "display_2";
-		qcom,mdss-dsi-panel-framerate = <55>;
+		qcom,mdss-dsi-panel-framerate = <60>;
 		qcom,mdss-dsi-virtual-channel-id = <0>;
 		qcom,mdss-dsi-stream = <0>;
 		qcom,mdss-dsi-panel-width = <720>;
@@ -654,7 +734,7 @@
 		qcom,mdss-dsi-bllp-eof-power-mode;
 		qcom,mdss-dsi-bllp-power-mode;
 		qcom,mdss-dsi-hfp-power-mode;
-		/* qcom,mdss-dsi-panel-broadcast-mode; */
+		/*qcom,mdss-dsi-panel-broadcast-mode;*/
 		qcom,mdss-dsi-lane-0-state;
 		qcom,mdss-dsi-lane-1-state;
 		qcom,mdss-dsi-lane-2-state;
@@ -669,5 +749,7 @@
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 15>, <0 75>, <1 15>;
+		qcom,mdss-dsi-pan-enable-dynamic-fps;
+		qcom,mdss-dsi-pan-fps-update = "dfps_suspend_resume_mode";
 	};
 };

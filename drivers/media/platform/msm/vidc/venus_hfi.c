@@ -1658,7 +1658,7 @@ static int venus_hfi_get_qdss_iommu_virtual_addr(struct hfi_mem_map *mem_map,
 {
 	int i;
 	int rc = 0;
-	unsigned long iova = 0;
+	dma_addr_t iova = 0;
 	int num_entries = sizeof(venus_qdss_entries)/(2 * sizeof(u32));
 
 	for (i = 0; i < num_entries; i++) {
@@ -1672,7 +1672,7 @@ static int venus_hfi_get_qdss_iommu_virtual_addr(struct hfi_mem_map *mem_map,
 			rc = -ENOMEM;
 			break;
 		}
-		mem_map[i].virtual_addr = (u32) iova;
+		mem_map[i].virtual_addr = iova;
 		mem_map[i].physical_addr = venus_qdss_entries[i][0];
 		mem_map[i].size = venus_qdss_entries[i][1];
 		mem_map[i].attr = 0x0;
@@ -1730,19 +1730,22 @@ static int venus_hfi_interface_queues_init(struct venus_hfi_device *dev)
 				dev->iface_q_table.align_virtual_addr, i);
 		venus_hfi_set_queue_hdr_defaults(iface_q->q_hdr);
 	}
-
-	rc = venus_hfi_alloc(dev, (void *) mem_addr,
-			QDSS_SIZE, 1, 0,
-			HAL_BUFFER_INTERNAL_CMD_QUEUE);
-	if (rc) {
-		dprintk(VIDC_WARN,
-			"qdss_alloc_fail: QDSS messages logging will not work");
-		dev->qdss.align_device_addr = NULL;
-	} else {
-		dev->qdss.align_device_addr = mem_addr->align_device_addr;
-		dev->qdss.align_virtual_addr = mem_addr->align_virtual_addr;
-		dev->qdss.mem_size = QDSS_SIZE;
-		dev->qdss.mem_data = mem_addr->mem_data;
+	if (msm_fw_debug_mode & HFI_DEBUG_MODE_QDSS) {
+		rc = venus_hfi_alloc(dev, (void *) mem_addr,
+				QDSS_SIZE, 1, 0,
+				HAL_BUFFER_INTERNAL_CMD_QUEUE);
+		if (rc) {
+			dprintk(VIDC_WARN,
+				"qdss_alloc_fail: QDSS messages logging will not work\n");
+			dev->qdss.align_device_addr = NULL;
+		} else {
+			dev->qdss.align_device_addr =
+				mem_addr->align_device_addr;
+			dev->qdss.align_virtual_addr =
+				mem_addr->align_virtual_addr;
+			dev->qdss.mem_size = QDSS_SIZE;
+			dev->qdss.mem_data = mem_addr->mem_data;
+		}
 	}
 	rc = venus_hfi_alloc(dev, (void *) mem_addr,
 			SFR_SIZE, 1, 0,
@@ -1798,26 +1801,29 @@ static int venus_hfi_interface_queues_init(struct venus_hfi_device *dev)
 		VIDC_CPU_CS_SCIACMDARG1, 0x01,
 		dev->iface_q_table.align_virtual_addr);
 
-	qdss = (struct hfi_mem_map_table *) dev->qdss.align_virtual_addr;
-	qdss->mem_map_num_entries = num_entries;
-	qdss->mem_map_table_base_addr =
-		(u32 *)	((u32)dev->qdss.align_device_addr +
-		sizeof(struct hfi_mem_map_table));
-	mem_map = (struct hfi_mem_map *)(qdss + 1);
-	msm_smem_get_domain_partition(dev->hal_client, 0,
-		HAL_BUFFER_INTERNAL_CMD_QUEUE, &domain, &partition);
-	rc = venus_hfi_get_qdss_iommu_virtual_addr(mem_map, domain, partition);
-	if (rc) {
-		dprintk(VIDC_ERR,
-			"IOMMU mapping failed, Freeing qdss memdata");
-		venus_hfi_free(dev, dev->qdss.mem_data);
-		dev->qdss.mem_data = NULL;
+	if (dev->qdss.mem_data) {
+		qdss = (struct hfi_mem_map_table *)
+			dev->qdss.align_virtual_addr;
+		qdss->mem_map_num_entries = num_entries;
+		qdss->mem_map_table_base_addr =
+			(u32 *)	((u32)dev->qdss.align_device_addr +
+			sizeof(struct hfi_mem_map_table));
+		mem_map = (struct hfi_mem_map *)(qdss + 1);
+		msm_smem_get_domain_partition(dev->hal_client, 0,
+			HAL_BUFFER_INTERNAL_CMD_QUEUE, &domain, &partition);
+		rc = venus_hfi_get_qdss_iommu_virtual_addr(mem_map,
+			domain, partition);
+		if (rc) {
+			dprintk(VIDC_ERR,
+				"IOMMU mapping failed, Freeing qdss memdata\n");
+			venus_hfi_free(dev, dev->qdss.mem_data);
+			dev->qdss.mem_data = NULL;
+		}
+		if (!IS_ERR_OR_NULL(dev->qdss.align_device_addr))
+			venus_hfi_write_register(dev,
+				VIDC_MMAP_ADDR,
+				(u32) dev->qdss.align_device_addr, 0);
 	}
-	if (!IS_ERR_OR_NULL(dev->qdss.align_device_addr))
-		venus_hfi_write_register(dev,
-			VIDC_MMAP_ADDR,
-			(u32) dev->qdss.align_device_addr, 0);
-
 	vsfr = (struct hfi_sfr_struct *) dev->sfr.align_virtual_addr;
 	vsfr->bufSize = SFR_SIZE;
 	if (!IS_ERR_OR_NULL(dev->sfr.align_device_addr))

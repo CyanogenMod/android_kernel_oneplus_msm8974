@@ -37,7 +37,7 @@ static inline u64 fudge_factor(u64 val, u32 numer, u32 denom)
 static inline u64 apply_fudge_factor(u64 val,
 	struct mdss_fudge_factor *factor)
 {
-		return fudge_factor(val, factor->numer, factor->denom);
+	return fudge_factor(val, factor->numer, factor->denom);
 }
 
 static DEFINE_MUTEX(mdss_mdp_ctl_lock);
@@ -317,13 +317,13 @@ static u32 mdss_mdp_perf_calc_pipe_prefill_cmd(struct mdss_mdp_prefill_params
  * (MDP clock requirement) based on frame size and scaling requirements.
  */
 int mdss_mdp_perf_calc_pipe(struct mdss_mdp_pipe *pipe,
-	struct mdss_mdp_perf_params *perf, struct mdss_mdp_img_rect *roi,
+	struct mdss_mdp_perf_params *perf, struct mdss_rect *roi,
 	bool apply_fudge)
 {
 	struct mdss_mdp_mixer *mixer;
 	int fps = DEFAULT_FRAME_RATE;
 	u32 quota, rate, v_total, src_h, xres = 0, h_total = 0;
-	struct mdss_mdp_img_rect src, dst;
+	struct mdss_rect src, dst;
 	bool is_fbc = false;
 	struct mdss_mdp_prefill_params prefill_params;
 
@@ -865,8 +865,8 @@ static inline void mdss_mdp_ctl_perf_update_bus(struct mdss_mdp_ctl *ctl)
 				ctl->cur_perf.bw_ctl);
 		}
 	}
-	bus_ib_quota = bw_sum_of_intfs;
-	bus_ab_quota = apply_fudge_factor(bw_sum_of_intfs,
+	bus_ib_quota = max(bw_sum_of_intfs, mdata->perf_tune.min_bus_vote);
+	bus_ab_quota = apply_fudge_factor(bus_ib_quota,
 		&mdss_res->ab_factor);
 	trace_mdp_perf_update_bus(bus_ab_quota, bus_ib_quota);
 	ATRACE_INT("bus_quota", bus_ib_quota);
@@ -1347,11 +1347,12 @@ static int mdss_mdp_ctl_fbc_enable(int enable,
 			((fbc->lossy_rgb_thd) << 4) | fbc->lossy_mode_idx;
 	}
 
-	mdss_mdp_pingpong_write(mixer, MDSS_MDP_REG_PP_FBC_MODE, mode);
-	mdss_mdp_pingpong_write(mixer, MDSS_MDP_REG_PP_FBC_BUDGET_CTL,
-			budget_ctl);
-	mdss_mdp_pingpong_write(mixer, MDSS_MDP_REG_PP_FBC_LOSSY_MODE,
-			lossy_mode);
+	mdss_mdp_pingpong_write(mixer->pingpong_base,
+		MDSS_MDP_REG_PP_FBC_MODE, mode);
+	mdss_mdp_pingpong_write(mixer->pingpong_base,
+		MDSS_MDP_REG_PP_FBC_BUDGET_CTL, budget_ctl);
+	mdss_mdp_pingpong_write(mixer->pingpong_base,
+		MDSS_MDP_REG_PP_FBC_LOSSY_MODE, lossy_mode);
 
 	return 0;
 }
@@ -1387,7 +1388,7 @@ int mdss_mdp_ctl_setup(struct mdss_mdp_ctl *ctl)
 
 	ctl->width = width;
 	ctl->height = height;
-	ctl->roi = (struct mdss_mdp_img_rect) {0, 0, width, height};
+	ctl->roi = (struct mdss_rect) {0, 0, width, height};
 
 	if (!ctl->mixer_left) {
 		ctl->mixer_left =
@@ -1406,7 +1407,7 @@ int mdss_mdp_ctl_setup(struct mdss_mdp_ctl *ctl)
 
 	ctl->mixer_left->width = width;
 	ctl->mixer_left->height = height;
-	ctl->mixer_left->roi = (struct mdss_mdp_img_rect) {0, 0, width, height};
+	ctl->mixer_left->roi = (struct mdss_rect) {0, 0, width, height};
 
 	if (split_ctl) {
 		pr_debug("split display detected\n");
@@ -1429,7 +1430,7 @@ int mdss_mdp_ctl_setup(struct mdss_mdp_ctl *ctl)
 		}
 		ctl->mixer_right->width = width;
 		ctl->mixer_right->height = height;
-		ctl->mixer_right->roi = (struct mdss_mdp_img_rect)
+		ctl->mixer_right->roi = (struct mdss_rect)
 						{0, 0, width, height};
 	} else if (ctl->mixer_right) {
 		mdss_mdp_mixer_free(ctl->mixer_right);
@@ -1626,6 +1627,7 @@ int mdss_mdp_ctl_split_display_setup(struct mdss_mdp_ctl *ctl,
 
 	sctl->width = pdata->panel_info.xres;
 	sctl->height = pdata->panel_info.yres;
+	sctl->roi = (struct mdss_rect){0, 0, sctl->width, sctl->height};
 
 	ctl->mixer_left = mdss_mdp_mixer_alloc(ctl, MDSS_MDP_MIXER_TYPE_INTF,
 			false);
@@ -1644,7 +1646,7 @@ int mdss_mdp_ctl_split_display_setup(struct mdss_mdp_ctl *ctl,
 
 	mixer->width = sctl->width;
 	mixer->height = sctl->height;
-	mixer->roi = (struct mdss_mdp_img_rect)
+	mixer->roi = (struct mdss_rect)
 				{0, 0, mixer->width, mixer->height};
 	sctl->mixer_left = mixer;
 
@@ -1731,15 +1733,7 @@ int mdss_mdp_ctl_intf_event(struct mdss_mdp_ctl *ctl, int event, void *arg)
 	return rc;
 }
 
-/*
- * mdss_mdp_ctl_restore() - restore mdp ctl path
- * @ctl: mdp controller.
- *
- * This function is called whenever MDP comes out of a power collapse as
- * a result of a screen update when DSI ULPS mode is enabled. It restores
- * the MDP controller's software state to the hardware registers.
- */
-void mdss_mdp_ctl_restore(struct mdss_mdp_ctl *ctl)
+static void mdss_mdp_ctl_restore_sub(struct mdss_mdp_ctl *ctl)
 {
 	u32 temp;
 
@@ -1750,6 +1744,26 @@ void mdss_mdp_ctl_restore(struct mdss_mdp_ctl *ctl)
 	writel_relaxed(temp, ctl->mdata->mdp_base +
 		MDSS_MDP_REG_DISP_INTF_SEL);
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
+}
+
+/*
+ * mdss_mdp_ctl_restore() - restore mdp ctl path
+ * @ctl: mdp controller.
+ *
+ * This function is called whenever MDP comes out of a power collapse as
+ * a result of a screen update when DSI ULPS mode is enabled. It restores
+ * the MDP controller's software state to the hardware registers.
+ */
+void mdss_mdp_ctl_restore(struct mdss_mdp_ctl *ctl)
+{
+	struct mdss_mdp_ctl *sctl;
+
+	sctl = mdss_mdp_get_split_ctl(ctl);
+	mdss_mdp_ctl_restore_sub(ctl);
+	if (sctl) {
+		mdss_mdp_ctl_restore_sub(sctl);
+		mdss_mdp_ctl_split_display_enable(1, ctl, sctl);
+	}
 }
 
 static int mdss_mdp_ctl_start_sub(struct mdss_mdp_ctl *ctl, bool handoff)
@@ -1823,6 +1837,12 @@ int mdss_mdp_ctl_start(struct mdss_mdp_ctl *ctl, bool handoff)
 
 	sctl = mdss_mdp_get_split_ctl(ctl);
 
+	if (sctl) {
+		/* split display */
+		ctl->panel_data->panel_info.is_split_display = true;
+		sctl->panel_data->panel_info.is_split_display = true;
+	}
+
 	mutex_lock(&ctl->lock);
 
 	/*
@@ -1891,14 +1911,20 @@ int mdss_mdp_ctl_stop(struct mdss_mdp_ctl *ctl)
 
 	mdss_mdp_hist_intr_setup(&mdata->hist_intr, MDSS_IRQ_SUSPEND);
 
-	if (ctl->stop_fnc)
+	if (ctl->stop_fnc) {
 		ret = ctl->stop_fnc(ctl);
-	else
+		if (ctl->panel_data->panel_info.fbc.enabled)
+			mdss_mdp_ctl_fbc_enable(0, ctl->mixer_left,
+				&ctl->panel_data->panel_info);
+	} else {
 		pr_warn("no stop func for ctl=%d\n", ctl->num);
+	}
 
 	if (sctl && sctl->stop_fnc) {
 		ret = sctl->stop_fnc(sctl);
-
+		if (ctl->panel_data->panel_info.fbc.enabled)
+			mdss_mdp_ctl_fbc_enable(0, sctl->mixer_left,
+				&sctl->panel_data->panel_info);
 		mdss_mdp_ctl_split_display_enable(0, ctl, sctl);
 	}
 
@@ -1929,48 +1955,6 @@ int mdss_mdp_ctl_stop(struct mdss_mdp_ctl *ctl)
 	mutex_unlock(&ctl->lock);
 
 	return ret;
-}
-
-void mdss_mdp_set_roi(struct mdss_mdp_ctl *ctl,
-		struct mdp_display_commit *data)
-{
-	struct mdss_mdp_img_rect temp_roi, mixer_roi;
-
-	temp_roi.x = data->roi.x;
-	temp_roi.y = data->roi.y;
-	temp_roi.w = data->roi.w;
-	temp_roi.h = data->roi.h;
-
-	/*
-	 * No Partial Update for:
-	 * 1) dual DSI panels
-	 * 2) non-cmd mode panels
-	*/
-	if (!temp_roi.w || !temp_roi.h || ctl->mixer_right ||
-			(ctl->panel_data->panel_info.type != MIPI_CMD_PANEL) ||
-			!ctl->panel_data->panel_info.partial_update_enabled) {
-		temp_roi = (struct mdss_mdp_img_rect)
-				{0, 0, ctl->mixer_left->width,
-					ctl->mixer_left->height};
-	}
-
-	ctl->roi_changed = 0;
-	if (((temp_roi.x != ctl->roi.x) ||
-			(temp_roi.y != ctl->roi.y)) ||
-			((temp_roi.w != ctl->roi.w) ||
-			 (temp_roi.h != ctl->roi.h))) {
-		ctl->roi = temp_roi;
-		ctl->roi_changed++;
-
-		mixer_roi = ctl->mixer_left->roi;
-		if ((mixer_roi.w != temp_roi.w) ||
-			(mixer_roi.h != temp_roi.h)) {
-			ctl->mixer_left->roi = temp_roi;
-			ctl->mixer_left->params_changed++;
-		}
-	}
-	pr_debug("ROI requested: [%d, %d, %d, %d]\n",
-			ctl->roi.x, ctl->roi.y, ctl->roi.w, ctl->roi.h);
 }
 
 /*
@@ -2008,6 +1992,66 @@ int mdss_mdp_ctl_reset(struct mdss_mdp_ctl *ctl)
 	return 0;
 }
 
+void mdss_mdp_set_mixer_roi(struct mdss_mdp_ctl *ctl, struct mdss_rect *roi)
+{
+	struct mdss_rect mixer_roi;
+
+	ctl->valid_roi = (roi->w && roi->h);
+	ctl->roi_changed = 0;
+	if (!mdss_rect_cmp(roi, &ctl->roi)) {
+		ctl->roi = *roi;
+		ctl->roi_changed++;
+
+		mixer_roi = ctl->mixer_left->roi;
+		if ((mixer_roi.w != roi->w) ||
+			(mixer_roi.h != roi->h)) {
+			ctl->mixer_left->roi = *roi;
+			ctl->mixer_left->params_changed++;
+		}
+	}
+
+	pr_debug("ROI requested: [%d]: [%d, %d, %d, %d]\n",
+		ctl->num, ctl->roi.x, ctl->roi.y, ctl->roi.w, ctl->roi.h);
+}
+
+void mdss_mdp_set_roi(struct mdss_mdp_ctl *ctl,
+		struct mdp_display_commit *data)
+{
+	struct mdss_rect l_roi, r_roi;
+
+	l_roi.x = data->l_roi.x;
+	l_roi.y = data->l_roi.y;
+	l_roi.w = data->l_roi.w;
+	l_roi.h = data->l_roi.h;
+
+	r_roi.x = data->r_roi.x;
+	r_roi.y = data->r_roi.y;
+	r_roi.w = data->r_roi.w;
+	r_roi.h = data->r_roi.h;
+
+
+	/* Reset ROI when we have (1) invalid ROI (2) feature disabled */
+	if ((!l_roi.w && l_roi.h) || (l_roi.w && !l_roi.h) ||
+		(!r_roi.w && r_roi.h) || (r_roi.w && !r_roi.h) ||
+		(!l_roi.w && !l_roi.h && !r_roi.w && !r_roi.h) ||
+		!ctl->panel_data->panel_info.partial_update_enabled) {
+		l_roi = (struct mdss_rect)
+		{0, 0, ctl->mixer_left->width,
+			ctl->mixer_left->height};
+
+		if (ctl->mixer_right) {
+			r_roi = (struct mdss_rect)
+			{0, 0, ctl->mixer_right->width,
+				ctl->mixer_right->height};
+		}
+	}
+
+	mdss_mdp_set_mixer_roi(ctl, &l_roi);
+
+	if (ctl->mixer_right)
+		mdss_mdp_set_mixer_roi(ctl->mixer_right->ctl, &r_roi);
+}
+
 static int mdss_mdp_mixer_setup(struct mdss_mdp_ctl *ctl,
 				struct mdss_mdp_mixer *mixer)
 {
@@ -2020,13 +2064,20 @@ static int mdss_mdp_mixer_setup(struct mdss_mdp_ctl *ctl,
 	int outsize = 0;
 	u32 op_mode;
 
-	screen_state = ctl->force_screen_state;
-
 	if (!mixer)
 		return -ENODEV;
 
+	mixer->params_changed = 0;
+	/* check if mixer setup for rotator is needed */
+	if (mixer->rotator_mode) {
+		off = __mdss_mdp_ctl_get_mixer_off(mixer);
+		mdss_mdp_ctl_write(mixer->ctl, off, 0);
+		return 0;
+	}
+
 	trace_mdp_mixer_update(mixer->num);
 	pr_debug("setup mixer=%d\n", mixer->num);
+	screen_state = ctl->force_screen_state;
 
 	outsize = (mixer->roi.h << 16) | mixer->roi.w;
 	mdp_mixer_write(mixer, MDSS_MDP_REG_LM_OUT_SIZE, outsize);
@@ -2564,12 +2615,14 @@ int mdss_mdp_display_wait4pingpong(struct mdss_mdp_ctl *ctl)
 	return ret;
 }
 
-int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
+int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg,
+	struct mdss_mdp_commit_cb *commit_cb)
 {
 	struct mdss_mdp_ctl *sctl = NULL;
 	int mixer1_changed, mixer2_changed;
 	int ret = 0;
 	bool is_bw_released;
+	int split_enable;
 
 	if (!ctl) {
 		pr_err("display function not set\n");
@@ -2596,8 +2649,20 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 	 * pending, so we want to re-calculate the bandwidth in this situation
 	 */
 	is_bw_released = !mdss_mdp_ctl_perf_get_transaction_status(ctl);
-	mdss_mdp_ctl_perf_set_transaction_status(ctl, PERF_SW_COMMIT_STATE,
-		PERF_STATUS_BUSY);
+	if (is_bw_released) {
+		if (sctl)
+			is_bw_released =
+				!mdss_mdp_ctl_perf_get_transaction_status(sctl);
+	}
+
+	mdss_mdp_ctl_perf_set_transaction_status(ctl,
+			PERF_SW_COMMIT_STATE, PERF_STATUS_BUSY);
+
+	if (sctl && sctl->roi.w && sctl->roi.h) {
+		/* left + right*/
+		mdss_mdp_ctl_perf_set_transaction_status(sctl,
+			PERF_SW_COMMIT_STATE, PERF_STATUS_BUSY);
+	}
 
 	if (is_bw_released || mixer1_changed || mixer2_changed
 			|| ctl->force_screen_state) {
@@ -2634,13 +2699,17 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_READY);
 	ATRACE_END("frame_ready");
 
-	ATRACE_BEGIN("wait_pingpong");
-	if (ctl->wait_pingpong)
-		ctl->wait_pingpong(ctl, NULL);
-	ATRACE_END("wait_pingpong");
-
 	ctl->roi_bkup.w = ctl->roi.w;
 	ctl->roi_bkup.h = ctl->roi.h;
+
+	/*
+	 * With partial frame update, enable split display bit only
+	 * when validity of ROI's on both the DSI's are identical
+	 */
+	if (sctl) {
+		split_enable = (ctl->valid_roi == sctl->valid_roi);
+		mdss_mdp_ctl_split_display_enable(split_enable, ctl, sctl);
+	}
 
 	ATRACE_BEGIN("postproc_programming");
 	if (ctl->mfd && ctl->mfd->dcm_state != DTM_ENTER)
@@ -2660,8 +2729,55 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 
 	mdss_mdp_xlog_mixer_reg(ctl);
 
-	if (ctl->display_fnc)
-		ret = ctl->display_fnc(ctl, arg); /* kickoff */
+	if (ctl->panel_data &&
+			ctl->panel_data->panel_info.partial_update_enabled) {
+		/*
+		 * update roi of panel_info which will be
+		 * used by dsi to set col_page addr of panel
+		 */
+		ctl->panel_data->panel_info.roi = ctl->roi;
+		if (sctl && sctl->panel_data)
+			sctl->panel_data->panel_info.roi = sctl->roi;
+	}
+
+	if (ctl->wait_pingpong) {
+		if (commit_cb)
+			commit_cb->commit_cb_fnc(
+				MDP_COMMIT_STAGE_WAIT_FOR_PINGPONG,
+				commit_cb->data);
+
+		ATRACE_BEGIN("wait_pingpong");
+		ctl->wait_pingpong(ctl, NULL);
+		ATRACE_END("wait_pingpong");
+
+		if (sctl && sctl->wait_pingpong) {
+			ATRACE_BEGIN("wait_pingpong sctl");
+			sctl->wait_pingpong(sctl, NULL);
+			ATRACE_END("wait_pingpong sctl");
+		}
+
+		if (commit_cb)
+			commit_cb->commit_cb_fnc(MDP_COMMIT_STAGE_PINGPONG_DONE,
+				commit_cb->data);
+	}
+
+	if (sctl && !ctl->valid_roi && sctl->valid_roi) {
+		/*
+		 * Seperate kickoff on DSI1 is needed only when we have
+		 * ONLY right half updating on a dual DSI panel
+		 */
+		if (sctl->display_fnc)
+			ret = sctl->display_fnc(sctl, arg); /* DSI1 kickoff */
+	} else {
+		if (ctl->display_fnc)
+			ret = ctl->display_fnc(ctl, arg); /* DSI0 kickoff */
+	}
+
+	if (sctl)
+		sctl->valid_roi = 0;
+
+	ctl->valid_roi = 0;
+
 	if (ret)
 		pr_warn("error displaying frame\n");
 
@@ -2679,13 +2795,26 @@ done:
 void mdss_mdp_ctl_notifier_register(struct mdss_mdp_ctl *ctl,
 	struct notifier_block *notifier)
 {
+	struct mdss_mdp_ctl *sctl;
+
 	blocking_notifier_chain_register(&ctl->notifier_head, notifier);
+
+	sctl = mdss_mdp_get_split_ctl(ctl);
+	if (sctl)
+		blocking_notifier_chain_register(&sctl->notifier_head,
+						notifier);
 }
 
 void mdss_mdp_ctl_notifier_unregister(struct mdss_mdp_ctl *ctl,
 	struct notifier_block *notifier)
 {
+	struct mdss_mdp_ctl *sctl;
 	blocking_notifier_chain_unregister(&ctl->notifier_head, notifier);
+
+	sctl = mdss_mdp_get_split_ctl(ctl);
+	if (sctl)
+		blocking_notifier_chain_unregister(&sctl->notifier_head,
+						notifier);
 }
 
 int mdss_mdp_ctl_notify(struct mdss_mdp_ctl *ctl, int event)

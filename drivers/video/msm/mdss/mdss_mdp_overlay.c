@@ -947,8 +947,9 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 	struct mdss_mdp_ctl *ctl = mdp5_data->ctl;
 
 	if (ctl->power_on) {
-		if (mdp5_data->mdata->ulps) {
-			rc = mdss_mdp_footswitch_ctrl_ulps(1, &mfd->pdev->dev);
+		if (mdp5_data->mdata->idle_pc) {
+			rc = mdss_mdp_footswitch_ctrl_idle_pc(1,
+				&mfd->pdev->dev);
 			if (rc) {
 				pr_err("footswtich control power on failed rc=%d\n",
 									rc);
@@ -1099,15 +1100,40 @@ static void __overlay_kickoff_requeue(struct msm_fb_data_type *mfd)
 {
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
 
-	mdss_mdp_display_commit(ctl, NULL);
+	mdss_mdp_display_commit(ctl, NULL, NULL);
 	mdss_mdp_display_wait4comp(ctl);
 
 	ATRACE_BEGIN("sspp_programming");
 	__overlay_queue_pipes(mfd);
 	ATRACE_END("sspp_programming");
 
-	mdss_mdp_display_commit(ctl, NULL);
+	mdss_mdp_display_commit(ctl, NULL,  NULL);
 	mdss_mdp_display_wait4comp(ctl);
+}
+
+static int mdss_mdp_commit_cb(enum mdp_commit_stage_type commit_stage,
+	void *data)
+{
+	int ret = 0;
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)data;
+	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
+	struct mdss_mdp_ctl *ctl;
+
+	switch (commit_stage) {
+	case MDP_COMMIT_STAGE_WAIT_FOR_PINGPONG:
+		ctl = mfd_to_ctl(mfd);
+		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_START);
+		mutex_unlock(&mdp5_data->ov_lock);
+		break;
+	case MDP_COMMIT_STAGE_PINGPONG_DONE:
+		mutex_lock(&mdp5_data->ov_lock);
+		break;
+	default:
+		pr_err("Invalid commit stage %x", commit_stage);
+		break;
+	}
+
+	return ret;
 }
 
 int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
@@ -1116,9 +1142,11 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 	struct mdss_mdp_pipe *pipe;
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
+        struct mdp_display_commit *temp_data = data;
 	int ret = 0;
 	int sd_in_pipe = 0;
 	bool need_cleanup = false;
+	struct mdss_mdp_commit_cb commit_cb;
 
 	ATRACE_BEGIN(__func__);
 	if (ctl->shared_lock) {
@@ -1154,8 +1182,24 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 
-	if (data)
-		mdss_mdp_set_roi(ctl, data);
+        
+	if (!temp_data) {
+		temp_data = (struct mdp_display_commit*)kmalloc(
+				sizeof(struct mdp_display_commit), GFP_KERNEL);
+		temp_data->l_roi = (struct mdp_rect)
+		{0, 0, ctl->mixer_left->width,
+			ctl->mixer_left->height};
+
+		if (ctl->mixer_right) {
+			temp_data->r_roi = (struct mdp_rect)
+			{0, 0, ctl->mixer_right->width,
+				ctl->mixer_right->height};
+		}
+
+	}
+
+	mdss_mdp_set_roi(ctl, temp_data);
+
 
 	/*
 	 * Setup pipe in solid fill before unstaging,
@@ -1176,13 +1220,22 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 		ATRACE_BEGIN("wb_kickoff");
 		ret = mdss_mdp_wb_kickoff(mfd);
 		ATRACE_END("wb_kickoff");
+	} else if (!need_cleanup) {
+		ATRACE_BEGIN("display_commit");
+		commit_cb.commit_cb_fnc = mdss_mdp_commit_cb;
+		commit_cb.data = mfd;
+		ret = mdss_mdp_display_commit(mdp5_data->ctl, NULL,
+			&commit_cb);
+		ATRACE_END("display_commit");
 	} else {
 		ATRACE_BEGIN("display_commit");
-		ret = mdss_mdp_display_commit(mdp5_data->ctl, NULL);
+		ret = mdss_mdp_display_commit(mdp5_data->ctl, NULL,
+			NULL);
 		ATRACE_END("display_commit");
 	}
 
-	if (!need_cleanup)
+	/* MDP_NOTIFY_FRAME_START is sent in cb for command panel */
+	if ((!need_cleanup) && (!mdp5_data->ctl->wait_pingpong))
 		mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_START);
 
 	if (IS_ERR_VALUE(ret))
@@ -1415,8 +1468,8 @@ static int mdss_mdp_overlay_queue(struct msm_fb_data_type *mfd,
 
 	src_data = &pipe->back_buf;
 	if (src_data->num_planes) {
-		pr_warn("dropped buffer pnum=%d play=%d addr=0x%x\n",
-			pipe->num, pipe->play_cnt, src_data->p[0].addr);
+		pr_warn("dropped buffer pnum=%d play=%d addr=0x%pa\n",
+			pipe->num, pipe->play_cnt, &src_data->p[0].addr);
 		mdss_mdp_overlay_free_buf(src_data);
 	}
 
@@ -2117,6 +2170,11 @@ static int mdss_mdp_pp_ioctl(struct msm_fb_data_type *mfd,
 	u32 copyback = 0;
 	u32 copy_from_kernel = 0;
 
+	if (mfd->panel_info->partial_update_enabled) {
+		pr_err("Partical update feature is enabled.");
+		return -EPERM;
+	}
+
 	ret = copy_from_user(&mdp_pp, argp, sizeof(mdp_pp));
 	if (ret)
 		return ret;
@@ -2229,6 +2287,11 @@ static int mdss_mdp_histo_ioctl(struct msm_fb_data_type *mfd, u32 cmd,
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
 	u32 block;
 	static int req = -1;
+
+	if (mfd->panel_info->partial_update_enabled) {
+		pr_err("Partical update feature is enabled.");
+		return -EPERM;
+	}
 
 	switch (cmd) {
 	case MSMFB_HISTOGRAM_START:
@@ -3088,6 +3151,27 @@ static int __vsync_retire_setup(struct msm_fb_data_type *mfd)
 	return 0;
 }
 
+static int mdss_mdp_update_panel_info(struct msm_fb_data_type *mfd, int mode)
+{
+	int ret = 0;
+	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
+	struct mdss_mdp_ctl *ctl = mdp5_data->ctl;
+
+	ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_DSI_DYNAMIC_SWITCH,
+						(void *)(unsigned long)mode);
+	if (ret)
+		pr_err("Dynamic switch to %s mode failed!\n",
+					mode ? "command" : "video");
+	/*
+	 * Destroy current ctrl sturcture as this is
+	 * going to be re-initialized with the requested mode.
+	 */
+	mdss_mdp_ctl_destroy(mdp5_data->ctl);
+	mdp5_data->ctl = NULL;
+
+	return 0;
+}
+
 int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 {
 	struct device *dev = mfd->fbi->dev;
@@ -3106,6 +3190,7 @@ int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 	mdp5_interface->kickoff_fnc = mdss_mdp_overlay_kickoff;
 	mdp5_interface->get_sync_fnc = mdss_mdp_rotator_sync_pt_get;
 	mdp5_interface->splash_init_fnc = mdss_mdp_splash_init;
+	mdp5_interface->configure_panel = mdss_mdp_update_panel_info;
 
 	mdp5_data = kmalloc(sizeof(struct mdss_overlay_private), GFP_KERNEL);
 	if (!mdp5_data) {
@@ -3167,7 +3252,10 @@ int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 			pr_err("Error dfps sysfs creation ret=%d\n", rc);
 			goto init_fail;
 		}
-	} else if (mfd->panel_info->type == MIPI_CMD_PANEL) {
+	}
+
+	if (mfd->panel_info->mipi.dynamic_switch_enabled ||
+			mfd->panel_info->type == MIPI_CMD_PANEL) {
 		rc = __vsync_retire_setup(mfd);
 		if (IS_ERR_VALUE(rc)) {
 			pr_err("unable to create vsync timeline\n");

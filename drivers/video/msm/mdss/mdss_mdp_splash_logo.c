@@ -56,8 +56,8 @@ static int mdss_mdp_splash_alloc_memory(struct msm_fb_data_type *mfd,
 
 	rc = ion_map_iommu(mdata->iclient, sinfo->ion_handle,
 			mdss_get_iommu_domain(MDSS_IOMMU_DOMAIN_UNSECURE),
-			0, SZ_4K, 0, (unsigned long *)&sinfo->iova,
-				(unsigned long *)&buf_size, 0, 0);
+			0, SZ_4K, 0, &sinfo->iova,
+				&buf_size, 0, 0);
 	if (rc) {
 		pr_err("ion memory map failed\n");
 		goto imap_err;
@@ -214,7 +214,7 @@ int mdss_mdp_splash_cleanup(struct msm_fb_data_type *mfd,
 		 * out on the dsi lanes.
 		 */
 		if (mdp5_data->handoff && ctl && ctl->is_video_mode) {
-			rc = mdss_mdp_display_commit(ctl, NULL);
+			rc = mdss_mdp_display_commit(ctl, NULL, NULL);
 			if (!IS_ERR_VALUE(rc)) {
 				mdss_mdp_display_wait4comp(ctl);
 			} else {
@@ -282,8 +282,8 @@ static struct mdss_mdp_pipe *mdss_mdp_splash_get_pipe(
 }
 
 static int mdss_mdp_splash_kickoff(struct msm_fb_data_type *mfd,
-				struct mdss_mdp_img_rect *src_rect,
-				struct mdss_mdp_img_rect *dest_rect)
+				struct mdss_rect *src_rect,
+				struct mdss_rect *dest_rect)
 {
 	struct mdss_mdp_pipe *pipe;
 	struct fb_info *fbi;
@@ -396,7 +396,7 @@ static int mdss_mdp_display_splash_image(struct msm_fb_data_type *mfd)
 	struct fb_info *fbi;
 	uint32_t image_len = SPLASH_IMAGE_WIDTH * SPLASH_IMAGE_HEIGHT
 						* SPLASH_IMAGE_BPP;
-	struct mdss_mdp_img_rect src_rect, dest_rect;
+	struct mdss_rect src_rect, dest_rect;
 	struct msm_fb_splash_info *sinfo;
 
 	if (!mfd || !mfd->fbi) {

@@ -299,7 +299,13 @@ static int ngd_xfer_msg(struct slim_controller *ctrl, struct slim_msg_txn *txn)
 		 * If the state was DOWN, SSR UP notification will take
 		 * care of putting the device in active state.
 		 */
-		ngd_slim_runtime_resume(dev->dev);
+		ret = ngd_slim_runtime_resume(dev->dev);
+
+		if (ret) {
+			SLIM_ERR(dev, "slim resume failed ret:%d, state:%d",
+					ret, dev->state);
+			return -EREMOTEIO;
+		}
 	}
 
 	else if (txn->mc & SLIM_MSG_CLK_PAUSE_SEQ_FLG)
@@ -364,23 +370,18 @@ static int ngd_xfer_msg(struct slim_controller *ctrl, struct slim_msg_txn *txn)
 		 * Setting runtime status to suspended clears the error
 		 * It also makes HW status cosistent with what SW has it here
 		 */
-		if (ret == -ENETRESET && dev->state == MSM_CTRL_DOWN) {
+		if (ret < 0) {
+			SLIM_ERR(dev, "slim ctrl vote failed ret:%d, state:%d",
+					ret, dev->state);
 			pm_runtime_set_suspended(dev->dev);
 			msm_slim_put_ctrl(dev);
 			return -EREMOTEIO;
-		} else if (ret >= 0) {
+		} else {
 			dev->state = MSM_CTRL_AWAKE;
 		}
 	}
 	mutex_lock(&dev->tx_lock);
 
-	if (report_sat == false && dev->state != MSM_CTRL_AWAKE) {
-		SLIM_ERR(dev, "controller not ready\n");
-		mutex_unlock(&dev->tx_lock);
-		pm_runtime_set_suspended(dev->dev);
-		msm_slim_put_ctrl(dev);
-		return -EREMOTEIO;
-	}
 	if (txn->mt == SLIM_MSG_MT_CORE &&
 		(txn->mc == SLIM_MSG_MC_CONNECT_SOURCE ||
 		txn->mc == SLIM_MSG_MC_CONNECT_SINK ||
@@ -1154,6 +1155,13 @@ static int ngd_notify_slaves(void *data)
 	struct slim_device *sbdev;
 	struct list_head *pos, *next;
 	int ret, i = 0;
+	ret = qmi_svc_event_notifier_register(SLIMBUS_QMI_SVC_ID,
+				SLIMBUS_QMI_INS_ID, &dev->qmi.nb);
+	if (ret) {
+		pr_err("Slimbus QMI service registration failed:%d", ret);
+		return ret;
+	}
+
 	while (!kthread_should_stop()) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		wait_for_completion(&dev->qmi.slave_notify);
@@ -1423,13 +1431,6 @@ static int __devinit ngd_slim_probe(struct platform_device *pdev)
 	INIT_WORK(&dev->qmi.ssr_up, ngd_adsp_up);
 	dev->qmi.nb.notifier_call = ngd_qmi_available;
 	pm_runtime_get_noresume(dev->dev);
-	ret = qmi_svc_event_notifier_register(SLIMBUS_QMI_SVC_ID,
-				SLIMBUS_QMI_INS_ID, &dev->qmi.nb);
-	if (ret) {
-		pr_err("Slimbus QMI service registration failed:%d", ret);
-		goto qmi_register_failed;
-	}
-
 
 	/* Fire up the Rx message queue thread */
 	dev->rx_msgq_thread = kthread_run(ngd_slim_rx_msgq_thread, dev,
@@ -1454,9 +1455,6 @@ static int __devinit ngd_slim_probe(struct platform_device *pdev)
 err_notify_thread_create_failed:
 	kthread_stop(dev->rx_msgq_thread);
 err_rx_thread_create_failed:
-	qmi_svc_event_notifier_unregister(SLIMBUS_QMI_SVC_ID,
-				SLIMBUS_QMI_INS_ID, &dev->qmi.nb);
-qmi_register_failed:
 	free_irq(dev->irq, dev);
 err_request_irq_failed:
 	slim_del_controller(&dev->ctrl);
