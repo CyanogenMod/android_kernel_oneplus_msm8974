@@ -725,10 +725,15 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
 	flush_work(&ctx->pp_done_work);
 	ctx->panel_power_state = panel_power_state;
 
-	mdss_mdp_set_intr_callback(MDSS_MDP_IRQ_PING_PONG_RD_PTR, ctx->pp_num,
-				   NULL, NULL);
-	mdss_mdp_set_intr_callback(MDSS_MDP_IRQ_PING_PONG_COMP, ctx->pp_num,
-				   NULL, NULL);
+        if (panel_power_state != MDSS_PANEL_POWER_OFF) {
+            pr_debug("%s: panel always on\n", __func__);
+        }
+        else {
+    	    mdss_mdp_set_intr_callback(MDSS_MDP_IRQ_PING_PONG_RD_PTR, ctx->pp_num,
+	    	                        NULL, NULL);
+	    mdss_mdp_set_intr_callback(MDSS_MDP_IRQ_PING_PONG_COMP, ctx->pp_num,
+				        NULL, NULL);
+        }
 
 	ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_BLANK,
                                       (void *) (long int) panel_power_state);
@@ -739,6 +744,12 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
 	WARN(ret, "intf %d unblank error (%d)\n", ctl->intf_num, ret);
 
 		mdss_mdp_cmd_tearcheck_setup(ctl, false);
+
+         if (panel_power_state != MDSS_PANEL_POWER_OFF) {
+             pr_debug("%s: panel always on\n", __func__);
+             goto end;
+         }
+
 	
 
 	memset(ctx, 0, sizeof(*ctx));
@@ -750,6 +761,7 @@ int mdss_mdp_cmd_stop(struct mdss_mdp_ctl *ctl, int panel_power_state)
 	ctl->add_vsync_handler = NULL;
 	ctl->remove_vsync_handler = NULL;
 
+end:
 	MDSS_XLOG(ctl->num, ctx->koff_cnt, ctx->clk_enabled,
 				ctx->rdptr_enabled, XLOG_FUNC_EXIT);
 	pr_debug("%s:-\n", __func__);
@@ -781,13 +793,23 @@ int mdss_mdp_cmd_start(struct mdss_mdp_ctl *ctl)
 		return -ENODEV;
 	}
 
-	for (i = 0; i < MAX_SESSIONS; i++) {
-		ctx = &mdss_mdp_cmd_ctx_list[i];
-		if (ctx->ref_cnt == 0) {
-			ctx->ref_cnt++;
-			break;
-		}
-	}
+        for (i = 0; i < MAX_SESSIONS; i++) {
+            ctx = &mdss_mdp_cmd_ctx_list[i];
+            if (ctx->ref_cnt == 0) {
+                ctx->ref_cnt++;
+                break;
+            } else {
+                if (ctx->panel_power_state != MDSS_PANEL_POWER_OFF) {
+                    pr_debug("%s: ctl_start with panel always on\n",
+                             __func__);
+                    mdss_mdp_cmd_restore(ctl);
+                    return 0;
+                } else {
+                    pr_err("Intf %d already in use\n", i);
+                    return -EBUSY;
+                }
+            }
+        }
 	if (i == MAX_SESSIONS) {
 		pr_err("too many sessions\n");
 		return -ENOMEM;
