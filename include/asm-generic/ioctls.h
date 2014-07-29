@@ -74,6 +74,9 @@
 #define TCSETXW		0x5435
 #define TIOCSIG		_IOW('T', 0x36, int)  /* pty: generate signal */
 #define TIOCVHANGUP	0x5437
+#define TIOCPMGET	0x5441	/* PM get */
+#define TIOCPMPUT	0x5442	/* PM put */
+#define TIOCPMACT	0x5443	/* PM is active */
 
 #define FIONCLEX	0x5450
 #define FIOCLEX		0x5451
