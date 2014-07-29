@@ -609,7 +609,12 @@ int mdss_mdp_wb_kickoff(struct msm_fb_data_type *mfd)
 	int ret = 0;
 	struct mdss_mdp_writeback_arg wb_args;
 
-	if (!ctl->power_on)
+	if (!ctl) {
+		pr_err("no ctl attached to fb=%d devicet\n", mfd->index);
+		return -ENODEV;
+	}
+
+	if (!mdss_mdp_ctl_is_power_on(ctl))
 		return 0;
 
 	memset(&wb_args, 0, sizeof(wb_args));

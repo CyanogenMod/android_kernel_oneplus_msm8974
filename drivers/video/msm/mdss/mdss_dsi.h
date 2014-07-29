@@ -251,6 +251,7 @@ struct mdss_dsi_ctrl_pdata {
 	int ndx;	/* panel_num */
 	int (*on) (struct mdss_panel_data *pdata);
 	int (*off) (struct mdss_panel_data *pdata);
+	int (*low_power_config) (struct mdss_panel_data *pdata, int enable);
 	int (*set_col_page_addr) (struct mdss_panel_data *pdata);
 	int (*check_status) (struct mdss_dsi_ctrl_pdata *pdata);
 	int (*cmdlist_commit)(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp);
@@ -467,6 +468,28 @@ static inline struct mdss_dsi_ctrl_pdata *mdss_dsi_get_ctrl_by_index(int ndx)
 		return NULL;
 
 	return ctrl_list[ndx];
+}
+
+static inline bool mdss_dsi_is_panel_off(struct mdss_panel_data *pdata)
+{
+	return mdss_panel_is_power_off(pdata->panel_info.panel_power_state);
+}
+
+static inline bool mdss_dsi_is_panel_on(struct mdss_panel_data *pdata)
+{
+	return mdss_panel_is_power_on(pdata->panel_info.panel_power_state);
+}
+
+static inline bool mdss_dsi_is_panel_on_interactive(
+	struct mdss_panel_data *pdata)
+{
+	return mdss_panel_is_power_on_interactive(
+		pdata->panel_info.panel_power_state);
+}
+
+static inline bool mdss_dsi_is_panel_on_lp(struct mdss_panel_data *pdata)
+{
+	return mdss_panel_is_power_on_lp(pdata->panel_info.panel_power_state);
 }
 
 static inline bool mdss_dsi_ulps_feature_enabled(

@@ -137,7 +137,7 @@ int mdss_dsi_panel_set_cabc(struct mdss_panel_data *pdata, int level)
 
 	pinfo->cabc_mode = level;
 
-	if (!pinfo->panel_power_on) {
+	if (pinfo->panel_power_state != MDSS_PANEL_POWER_ON) {
 		pr_info("%s: lcd is off, queued cabc change\n", __func__);
 		goto out;
 	}
@@ -254,7 +254,7 @@ int mdss_dsi_panel_set_color_enhance(struct mdss_panel_data *pdata, bool enabled
 
 	pinfo->color_enhance_enabled = enabled;
 
-	if (!pinfo->panel_power_on) {
+	if (pinfo->panel_power_state != MDSS_PANEL_POWER_ON) {
 		pr_info("%s: lcd is off, queued color enhance change\n", __func__);
 		goto out;
 	}
@@ -338,7 +338,7 @@ int mdss_dsi_panel_set_gamma_index(struct mdss_panel_data *pdata, int index)
 
 	pinfo->gamma_index = index;
 
-	if (!pinfo->panel_power_on) {
+	if (pinfo->panel_power_state != MDSS_PANEL_POWER_ON) {
 		pr_info("%s: lcd is off, queued gamma change\n", __func__);
 		goto out;
 	}
@@ -390,7 +390,7 @@ static void mdss_dsi_panel_apply_panel_calibration(
 	struct mdss_panel_data *pdata,	struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	pr_debug("%s: Apply panel calibration\n", __func__);
-	if (pdata->panel_info.panel_power_on
+	if (pdata->panel_info.panel_power_state == MDSS_PANEL_POWER_ON
 		&& ctrl->calibration_available
 		&& ctrl->calibration_cmds.cmds
 		&& ctrl->calibration_cmds.cmd_cnt > 2)
@@ -783,7 +783,7 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			pr_err("gpio request failed\n");
 			return rc;
 		}
-		if (!pinfo->panel_power_on) {
+		if (!pinfo->cont_splash_enabled) {
 			if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
 				gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
 
@@ -1075,7 +1075,6 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
-	struct mipi_panel_info *mipi;
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
 	struct mdss_panel_info *pinfo;
 
@@ -1085,18 +1084,15 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	}
 
 	pinfo = &pdata->panel_info;
-
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
-	mipi  = &pdata->panel_info.mipi;
-
-	if (pinfo->partial_update_dcs_cmd_by_left) {
-		if (ctrl->ndx != DSI_CTRL_LEFT)
-			return 0;
-	}
 
 	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
+	if (pinfo->partial_update_dcs_cmd_by_left) {
+		if (ctrl->ndx != DSI_CTRL_LEFT)
+			goto end;
+	}
 
 	if (ctrl->on_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
@@ -1111,13 +1107,14 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	mdss_dsi_update_cabc_level(ctrl);
 #endif
 
+end:
+	pinfo->blank_state = MDSS_PANEL_BLANK_UNBLANK;
 	pr_debug("%s:-\n", __func__);
 	return 0;
 }
 
 static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 {
-	struct mipi_panel_info *mipi;
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
 	struct mdss_panel_info *pinfo;
 
@@ -1127,21 +1124,48 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 	}
 
 	pinfo = &pdata->panel_info;
-
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	if (pinfo->partial_update_dcs_cmd_by_left) {
-		if (ctrl->ndx != DSI_CTRL_LEFT)
-			return 0;
-	}
-
 	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
-	mipi  = &pdata->panel_info.mipi;
+	if (pinfo->partial_update_dcs_cmd_by_left) {
+		if (ctrl->ndx != DSI_CTRL_LEFT)
+			goto end;
+	}
 
 	if (ctrl->off_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->off_cmds);
+
+end:
+	pinfo->blank_state = MDSS_PANEL_BLANK_BLANK;
+	pr_debug("%s:-\n", __func__);
+	return 0;
+}
+
+static int mdss_dsi_panel_low_power_config(struct mdss_panel_data *pdata,
+	int enable)
+{
+	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
+	struct mdss_panel_info *pinfo;
+
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	pinfo = &pdata->panel_info;
+	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+
+	pr_debug("%s: ctrl=%p ndx=%d enable=%d\n", __func__, ctrl, ctrl->ndx,
+		enable);
+
+	/* Any panel specific low power commands/config */
+	if (enable)
+		pinfo->blank_state = MDSS_PANEL_BLANK_LOW_POWER;
+	else
+		pinfo->blank_state = MDSS_PANEL_BLANK_UNBLANK;
 
 	pr_debug("%s:-\n", __func__);
 	return 0;
@@ -1994,6 +2018,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 
 	ctrl_pdata->on = mdss_dsi_panel_on;
 	ctrl_pdata->off = mdss_dsi_panel_off;
+	ctrl_pdata->low_power_config = mdss_dsi_panel_low_power_config;
 	ctrl_pdata->panel_data.set_backlight = mdss_dsi_panel_bl_ctrl;
 	ctrl_pdata->switch_mode = mdss_dsi_panel_switch_mode;
 
