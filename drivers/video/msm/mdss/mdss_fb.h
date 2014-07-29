@@ -75,7 +75,7 @@ enum mdp_notify_event {
 
 struct disp_info_type_suspend {
 	int op_enable;
-	int panel_power_on;
+	int panel_power_state;
 };
 
 struct disp_info_notify {
@@ -131,6 +131,8 @@ struct msm_mdp_interface {
 	int (*do_histogram)(struct msm_fb_data_type *mfd,
 				struct mdp_histogram *hist);
 	int (*update_ad_input)(struct msm_fb_data_type *mfd);
+	int (*ad_attenuate_bl)(u32 bl, u32 *bl_out,
+			struct msm_fb_data_type *mfd);
 	int (*panel_register_done)(struct mdss_panel_data *pdata);
 	u32 (*fb_stride)(u32 fb_index, u32 xres, int bpp);
 	int (*splash_init_fnc)(struct msm_fb_data_type *mfd);
@@ -187,7 +189,7 @@ struct msm_fb_data_type {
 	int panel_reconfig;
 
 	u32 dst_format;
-	int panel_power_on;
+	int panel_power_state;
 	struct disp_info_type_suspend suspend;
 
 	struct ion_handle *ihdl;
@@ -205,6 +207,7 @@ struct msm_fb_data_type {
 	u32 unset_bl_level;
 	u32 bl_updated;
 	u32 bl_level_scaled;
+	u32 bl_level_prev_scaled;
 	struct mutex bl_lock;
 
 	struct platform_device *pdev;
@@ -247,6 +250,7 @@ struct msm_fb_data_type {
 	bool mdss_fb_split_stored;
 
 	u32 wait_for_kickoff;
+	int doze_mode;
 };
 
 static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)
@@ -266,6 +270,27 @@ static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)
 		add_timer(&mfd->no_update.timer);
 		mutex_unlock(&mfd->no_update.lock);
 	}
+}
+
+static inline bool mdss_fb_is_power_off(struct msm_fb_data_type *mfd)
+{
+	return mdss_panel_is_power_off(mfd->panel_power_state);
+}
+
+static inline bool mdss_fb_is_power_on_interactive(
+	struct msm_fb_data_type *mfd)
+{
+	return mdss_panel_is_power_on_interactive(mfd->panel_power_state);
+}
+
+static inline bool mdss_fb_is_power_on(struct msm_fb_data_type *mfd)
+{
+	return mdss_panel_is_power_on(mfd->panel_power_state);
+}
+
+static inline bool mdss_fb_is_power_on_lp(struct msm_fb_data_type *mfd)
+{
+	return mdss_panel_is_power_on_lp(mfd->panel_power_state);
 }
 
 int mdss_fb_get_phys_info(dma_addr_t *start, unsigned long *len, int fb_num);
