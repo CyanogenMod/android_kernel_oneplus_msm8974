@@ -12,6 +12,9 @@
  * GNU General Public License for more details.
  *
  */
+
+#include <linux/types.h>
+#include <linux/workqueue.h>
 #include <linux/debugfs.h>
 #include <linux/list.h>
 #include <linux/ctype.h>
