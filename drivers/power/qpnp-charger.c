@@ -36,6 +36,10 @@
 #include <linux/of_gpio.h>
 #include <linux/qpnp/pin.h>
 
+#ifdef CONFIG_FORCE_FAST_CHARGE
+#include <linux/fastchg.h>
+#endif
+
 /* Interrupt offsets */
 #define INT_RT_STS(base)			(base + 0x10)
 #define INT_SET_TYPE(base)			(base + 0x11)
@@ -933,7 +937,14 @@ qpnp_chg_idcmax_set(struct qpnp_chg_chip *chip, int mA)
 			chip->dc_chgpth_base + CHGR_I_MAX_REG, 1);
 	}
 
+#ifdef CONFIG_FORCE_FAST_CHARGE
+	if (force_fast_charge >= 1)
+		dc = fast_charge_level / QPNP_CHG_I_MAXSTEP_MA;
+	else
+		dc = mA / QPNP_CHG_I_MAXSTEP_MA;
+#else
 	dc = mA / QPNP_CHG_I_MAXSTEP_MA;
+#endif
 
 	pr_debug("current=%d setting 0x%x\n", mA, dc);
 	rc = qpnp_chg_write(chip, &dc,
@@ -1009,8 +1020,20 @@ qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 	}
 
 	/* Impose input current limit */
+#ifdef CONFIG_FORCE_FAST_CHARGE
+	if (force_fast_charge >= 1)
+		mA = fast_charge_level;
+		if (mA > FAST_CHARGE_900)
+			mA = FAST_CHARGE_900;
+	else {
+		if (chip->maxinput_usb_ma)
+			mA = (chip->maxinput_usb_ma) <=
+				mA ? chip->maxinput_usb_ma : mA;
+	}
+#else
 	if (chip->maxinput_usb_ma)
 		mA = (chip->maxinput_usb_ma) <= mA ? chip->maxinput_usb_ma : mA;
+#endif
 
 	usb_reg = mA / QPNP_CHG_I_MAXSTEP_MA;
 
@@ -4173,8 +4196,24 @@ qpnp_chg_reduce_power_stage(struct qpnp_chg_chip *chip)
 	bool vchg_loop = get_prop_vchg_loop(chip);
 	bool ichg_loop = qpnp_chg_is_ichg_loop_active(chip);
 	bool usb_present = qpnp_chg_is_usb_chg_plugged_in(chip);
+#ifdef CONFIG_FORCE_FAST_CHARGE
+	bool usb_ma_above_wall;
+#else
 	bool usb_ma_above_wall =
 		(qpnp_chg_usb_iusbmax_get(chip) > USB_WALL_THRESHOLD_MA);
+#endif
+
+#ifdef CONFIG_FORCE_FAST_CHARGE
+	if (force_fast_charge >= 1) {
+		if (fast_charge_level <= FAST_CHARGE_900)
+			usb_ma_above_wall = false;
+		else
+			usb_ma_above_wall = true;
+	} else {
+		usb_ma_above_wall =
+			(qpnp_chg_usb_iusbmax_get(chip) > USB_WALL_THRESHOLD_MA);
+	}
+#endif
 
 	if (fast_chg
 		&& usb_present
