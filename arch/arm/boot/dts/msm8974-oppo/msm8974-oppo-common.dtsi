@@ -630,13 +630,6 @@
 	};
 };
 
-&slim_msm {
-	taiko_codec {
-		qcom,cdc-micbias1-ext-cap;
-		qcom,cdc-micbias4-ext-cap;
-	};
-};
-
 &spi_epm {
 	epm-adc@0 {
 		compatible = "cy,epm-adc-cy8c5568lti-114";
