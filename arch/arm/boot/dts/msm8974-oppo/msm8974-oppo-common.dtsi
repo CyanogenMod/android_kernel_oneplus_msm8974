@@ -128,7 +128,6 @@
 
 	sound {
 		qcom,model = "msm8974-taiko-mtp-snd-card";
-		qcom,cdc-micbias2-headset-only;
 	};
 };
 
@@ -627,13 +626,6 @@
 		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
 		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
 		qcom,master-en = <1>;
-	};
-};
-
-&slim_msm {
-	taiko_codec {
-		qcom,cdc-micbias1-ext-cap;
-		qcom,cdc-micbias4-ext-cap;
 	};
 };
 
