@@ -532,9 +532,25 @@ static inline void mdss_update_sd_client(struct mdss_data_type *mdata,
 		atomic_add_unless(&mdss_res->sd_client_count, -1, 0);
 }
 
+static inline bool mdss_mdp_ctl_is_power_off(struct mdss_mdp_ctl *ctl)
+{
+	return mdss_panel_is_power_off(ctl->power_state);
+}
+
+static inline bool mdss_mdp_ctl_is_power_on_interactive(
+	struct mdss_mdp_ctl *ctl)
+{
+	return mdss_panel_is_power_on_interactive(ctl->power_state);
+}
+
 static inline bool mdss_mdp_ctl_is_power_on(struct mdss_mdp_ctl *ctl)
 {
-	return (ctl->power_state != MDSS_PANEL_POWER_OFF);
+	return mdss_panel_is_power_on(ctl->power_state);
+}
+
+static inline bool mdss_mdp_ctl_is_power_on_lp(struct mdss_mdp_ctl *ctl)
+{
+	return mdss_panel_is_power_on_lp(ctl->power_state);
 }
 
 irqreturn_t mdss_mdp_isr(int irq, void *ptr);
