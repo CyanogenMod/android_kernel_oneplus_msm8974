@@ -100,13 +100,8 @@
  * Invalid voltage range for the detection
  * of plug type with current source
  */
-#ifdef CONFIG_MACH_OPPO
-#define WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV 80
-#define WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV 165
-#else
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV 160
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV 265
-#endif
 
 /*
  * Threshold used to detect euro headset
@@ -128,11 +123,7 @@
 #define WCD9XXX_V_CS_HS_MAX 500
 #define WCD9XXX_V_CS_NO_MIC 5
 #define WCD9XXX_MB_MEAS_DELTA_MAX_MV 80
-#ifdef CONFIG_MACH_OPPO
-#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 90
-#else
-#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 12
-#endif
+#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 10
 
 static int impedance_detect_en;
 module_param(impedance_detect_en, int,
