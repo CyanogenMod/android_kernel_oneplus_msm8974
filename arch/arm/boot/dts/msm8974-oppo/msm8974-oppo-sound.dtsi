@@ -13,7 +13,11 @@
 &soc {
 	slim@fe12f000 {
 		taiko_codec {
-			cdc-hpmic_switch-1-supply = <&pm8941_l24>;
+			cdc-vdd-mic-bias-supply = <&pm8941_l24>;
+			qcom,cdc-vdd-mic-bias-voltage = <3075000 3075000>;
+			qcom,cdc-vdd-mic-bias-current = <25000>;
+			qcom,cdc-on-demand-supplies = "cdc-vdd-mic-bias";
+
 			qcom,cdc-micbias1-ext-cap;
 			qcom,cdc-micbias2-ext-cap;
 			qcom,cdc-micbias3-ext-cap;
