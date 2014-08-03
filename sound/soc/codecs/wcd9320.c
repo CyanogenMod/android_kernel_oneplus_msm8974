@@ -451,6 +451,9 @@ struct taiko_priv {
 	int (*machine_codec_event_cb)(struct snd_soc_codec *codec,
 			enum wcd9xxx_codec_event);
 
+	struct regulator *ext_micbias_reg;
+	atomic_t ext_micbias_ref;
+
 	/*
 	 * list used to save/restore registers at start and
 	 * end of impedance measurement
@@ -458,13 +461,6 @@ struct taiko_priv {
 	struct list_head reg_save_restore;
 	struct pm_qos_request pm_qos_req;
 };
-
-/* OPPO 2013-11-12 xuzhaoan Add begin for American Headset Detect */
-#ifdef CONFIG_MACH_OPPO
-static struct regulator *cdc_hpmic_reg = NULL;
-static atomic_t cdc_hpmic_reg_ref;
-#endif
-/* OPPO 2013-11-12 xuzhaoan Add end */
 
 static const u32 comp_shift[] = {
 	4, /* Compander 0's clock source is on interpolator 7 */
@@ -547,51 +543,57 @@ static unsigned short tx_digital_gain_reg[] = {
 };
 
 #ifdef CONFIG_MACH_OPPO
-static void hph_regulator_control(bool enable)
+static int ext_micbias_regulator_control(struct snd_soc_codec *codec,
+		bool enable)
 {
 	int ret = 0;
+	struct taiko_priv *taiko = snd_soc_codec_get_drvdata(codec);
 
-	if (!cdc_hpmic_reg)
-		return;
+	if (!taiko->ext_micbias_reg)
+		return 0;
 
 	pr_debug("%s() enable: %d, ref count: %d",
-			__func__, enable, atomic_read(&cdc_hpmic_reg_ref));
+			__func__, enable, atomic_read(&taiko->ext_micbias_ref));
 
 	if (enable) {
-		if (atomic_inc_return(&cdc_hpmic_reg_ref) == 1) {
-			ret = regulator_enable(cdc_hpmic_reg);
+		if (atomic_inc_return(&taiko->ext_micbias_ref) == 1) {
+			ret = regulator_enable(taiko->ext_micbias_reg);
 			if (ret) {
-				pr_err("%s: Failed to enable cdc_hpmic\n",
-						__func__);
+				pr_err("%s: Failed to enable ext micbias %d\n",
+						__func__, ret);
 			}
 		}
 	} else {
-		if (atomic_read(&cdc_hpmic_reg_ref) == 0)
-			return;
+		if (atomic_read(&taiko->ext_micbias_ref) == 0)
+			return 0;
 
-		if (atomic_dec_return(&cdc_hpmic_reg_ref) == 0) {
-			ret = regulator_disable(cdc_hpmic_reg);
+		if (atomic_dec_return(&taiko->ext_micbias_ref) == 0) {
+			ret = regulator_disable(taiko->ext_micbias_reg);
 			if (ret) {
-				pr_err("%s: Failed to disable cdc_hpmic\n",
-						__func__);
+				pr_err("%s: Failed to disable ext micbias %d\n",
+						__func__, ret);
 			}
 		}
 	}
+
+	return ret;
 }
 
-static int taiko_codec_enable_hph_supply(struct snd_soc_dapm_widget *w,
+static int taiko_codec_enable_ext_mb_supply(struct snd_soc_dapm_widget *w,
 				       struct snd_kcontrol *kcontrol,
 				       int event)
 {
+	struct snd_soc_codec *codec = w->codec;
+
 	pr_debug("%s() %s: event: %d\n", __func__, w->name, event);
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
-		hph_regulator_control(true);
-		break;
+		return ext_micbias_regulator_control(codec, true);
+
 	case SND_SOC_DAPM_POST_PMD:
-		hph_regulator_control(false);
-		break;
+		return ext_micbias_regulator_control(codec, false);
+
 	default:
 		break;
 	}
@@ -619,7 +621,7 @@ static int taiko_enable_ext_mb_source(struct snd_soc_codec *codec,
 
 		snd_soc_dapm_sync(&codec->dapm);
 	} else {
-		hph_regulator_control(turn_on);
+		ret = ext_micbias_regulator_control(codec, turn_on);
 	}
 
 	if (ret)
@@ -630,32 +632,6 @@ static int taiko_enable_ext_mb_source(struct snd_soc_codec *codec,
 			__func__, turn_on ? "enable" : "disable");
 
 	return ret;
-}
-
-static int taiko_micbias_supply_init(struct device *dev)
-{
-	atomic_set(&cdc_hpmic_reg_ref, 0);
-
-	if (cdc_hpmic_reg == NULL) {
-		cdc_hpmic_reg = regulator_get(dev->parent, "cdc-hpmic_switch-1");
-		if (IS_ERR(cdc_hpmic_reg)) {
-			pr_err("%s: Cannot get regulator %s.\n",
-					__func__, "cdc-hpmic_switch-1");
-			return PTR_ERR(cdc_hpmic_reg);
-		}
-	}
-
-	return 0;
-}
-
-static int taiko_micbias_supply_close(void)
-{
-	atomic_set(&cdc_hpmic_reg_ref, 0);
-
-	if (cdc_hpmic_reg)
-		regulator_put(cdc_hpmic_reg);
-
-	return 0;
 }
 #endif
 
@@ -5970,7 +5946,7 @@ static const struct snd_soc_dapm_widget taiko_dapm_widgets[] = {
 
 #ifdef CONFIG_MACH_OPPO
 	SND_SOC_DAPM_SUPPLY("MICBIAS_REGULATOR", SND_SOC_NOPM, 0, 0,
-		taiko_codec_enable_hph_supply, SND_SOC_DAPM_PRE_PMU |
+		taiko_codec_enable_ext_mb_supply, SND_SOC_DAPM_PRE_PMU |
 		SND_SOC_DAPM_POST_PMD),
 #endif
 
@@ -6875,11 +6851,6 @@ static const struct wcd9xxx_reg_mask_val taiko_codec_reg_init_val[] = {
 	/* set MAD input MIC to DMIC1 */
 	{TAIKO_A_CDC_CONN_MAD, 0x0F, 0x08},
 
-#ifdef CONFIG_MACH_OPPO
-/* liuyan@Onlinerd.driver, 2014/01/15  Add for micbias pull down */
-	{TAIKO_A_MICB_1_CTL,0x01,0x01},
-#endif /*CONFIG_MACH_OPPO*/
-
 	/* set DMIC CLK drive strength to 4mA */
 	{TAIKO_A_HDRIVE_OVERRIDE, 0x07, 0x01},
 };
@@ -7463,9 +7434,6 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 		pr_err("%s: mbhc init failed %d\n", __func__, ret);
 		goto err_init;
 	}
-#ifdef CONFIG_MACH_OPPO
-	taiko_micbias_supply_init(codec->dev);
-#endif
 	taiko->codec = codec;
 	for (i = 0; i < COMPANDER_MAX; i++) {
 		taiko->comp_enabled[i] = 0;
@@ -7489,6 +7457,10 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 		pr_err("%s: bad pdata\n", __func__);
 		goto err_pdata;
 	}
+
+	atomic_set(&taiko->ext_micbias_ref, 0);
+	taiko->ext_micbias_reg = taiko_codec_find_regulator(codec,
+							   WCD9XXX_VDD_MICBIAS_NAME);
 
 	taiko->spkdrv_reg = taiko_codec_find_regulator(codec,
 						       WCD9XXX_VDD_SPKDRV_NAME);
@@ -7605,15 +7577,12 @@ static int taiko_codec_remove(struct snd_soc_codec *codec)
 
 	taiko_cleanup_irqs(taiko);
 
-#ifdef CONFIG_MACH_OPPO
-	taiko_micbias_supply_close();
-#endif
-
 	/* cleanup MBHC */
 	wcd9xxx_mbhc_deinit(&taiko->mbhc);
 	/* cleanup resmgr */
 	wcd9xxx_resmgr_deinit(&taiko->resmgr);
 
+	taiko->ext_micbias_reg = NULL;
 	taiko->spkdrv_reg = NULL;
 
 	kfree(taiko);
