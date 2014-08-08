@@ -138,12 +138,11 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.swap_gnd_mic = NULL,
 	.cs_enable_flags = (1 << MBHC_CS_ENABLE_POLLING |
 			    1 << MBHC_CS_ENABLE_INSERTION |
-			    1 << MBHC_CS_ENABLE_REMOVAL |
-			    1 << MBHC_CS_ENABLE_DET_ANC),
-	.do_recalibration = true,
+			    1 << MBHC_CS_ENABLE_REMOVAL),
+	.do_recalibration = false,
 	.use_vddio_meas = true,
 	.enable_anc_mic_detect = false,
-	.hw_jack_type = SIX_POLE_JACK,
+	.hw_jack_type = FOUR_POLE_JACK,
 };
 
 struct msm_auxpcm_gpio {
