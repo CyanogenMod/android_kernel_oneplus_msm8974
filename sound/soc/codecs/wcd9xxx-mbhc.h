@@ -288,7 +288,7 @@ struct wcd9xxx_mbhc_cb {
 	void (*pull_mb_to_vddio) (struct snd_soc_codec *, bool);
 	struct firmware_cal * (*get_hwdep_fw_cal) (struct snd_soc_codec *,
 				enum wcd_cal_type);
-
+	int (*enable_hpmic_switch) (struct snd_soc_codec *, bool);
 };
 
 struct wcd9xxx_mbhc {
@@ -368,9 +368,6 @@ struct wcd9xxx_mbhc {
 	u8   scaling_mux_in;
 	/* Holds codec specific interrupt mapping */
 	const struct wcd9xxx_mbhc_intr *intr_ids;
-#ifdef CONFIG_MACH_OPPO
-	bool is_hs_inserted;
-#endif
 
 	/* Indicates status of current source switch */
 	bool is_cs_enabled;

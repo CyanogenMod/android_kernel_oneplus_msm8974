@@ -53,6 +53,6 @@
 		cdc-vdd-spkdrv-supply = <&pm8941_boost>;
 		qcom,cdc-vdd-spkdrv-voltage = <4500000 4500000>;
 		qcom,cdc-vdd-spkdrv-current = <1250000>;
-		qcom,cdc-on-demand-supplies = "cdc-vdd-spkdrv", "cdc-vdd-mic-bias";
+		qcom,cdc-on-demand-supplies = "cdc-vdd-spkdrv", "cdc-vdd-hpmic-switch";
 	};
 };
