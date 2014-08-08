@@ -2122,8 +2122,6 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 			break;
 	} while (1);
 
-	dwc->gadget.xfer_isr_count++;
-
 	if (usb_endpoint_xfer_isoc(dep->endpoint.desc) &&
 			list_empty(&dep->req_queued)) {
 		if (list_empty(&dep->request_list))
@@ -2287,7 +2285,6 @@ static void dwc3_disconnect_gadget(struct dwc3 *dwc)
 		dwc->gadget_driver->disconnect(&dwc->gadget);
 		spin_lock(&dwc->lock);
 	}
-	dwc->gadget.xfer_isr_count = 0;
 }
 
 static void dwc3_stop_active_transfer(struct dwc3 *dwc, u32 epnum)
@@ -2409,9 +2406,6 @@ static void dwc3_gadget_usb2_phy_suspend(struct dwc3 *dwc, int suspend)
 {
 	u32			reg;
 
-	if (dwc->hsphy_auto_suspend_disable)
-		return;
-
 	reg = dwc3_readl(dwc->regs, DWC3_GUSB2PHYCFG(0));
 
 	if (suspend)
@@ -2470,9 +2464,6 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 		dwc3_gadget_usb2_phy_suspend(dwc, false);
 		dwc3_gadget_usb3_phy_suspend(dwc, false);
 	}
-
-	if (dwc->ssphy_clear_auto_suspend_on_disconnect)
-		dwc3_gadget_usb3_phy_suspend(dwc, false);
 
 	if (dotg && dotg->otg.phy)
 		usb_phy_set_power(dotg->otg.phy, 0);
@@ -2994,8 +2985,7 @@ int __devinit dwc3_gadget_init(struct dwc3 *dwc)
 		 * enabled before setting run/stop bit.
 		 */
 		dwc3_gadget_usb2_phy_suspend(dwc, false);
-		if (!dwc->ssphy_clear_auto_suspend_on_disconnect)
-			dwc3_gadget_usb3_phy_suspend(dwc, true);
+		dwc3_gadget_usb3_phy_suspend(dwc, true);
 	}
 
 	ret = device_register(&dwc->gadget.dev);

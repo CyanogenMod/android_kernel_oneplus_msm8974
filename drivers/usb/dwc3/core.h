@@ -707,9 +707,6 @@ struct dwc3_scratchpad_array {
  * @hwparams: copy of hwparams registers
  * @root: debugfs root folder pointer
  * @tx_fifo_size: Available RAM size for TX fifo allocation
- * @ssphy_clear_auto_suspend_on_disconnect: if true, clear ssphy autosuspend bit
- *	during disconnect and set it after device is configured.
- * @usb3_u1u2_disable: if true, disable U1U2 low power modes in Superspeed mode.
  */
 struct dwc3 {
 	struct usb_ctrlrequest	*ctrl_req;
@@ -798,10 +795,6 @@ struct dwc3 {
 	void (*notify_event) (struct dwc3 *, unsigned);
 	int			tx_fifo_size;
 	bool			tx_fifo_reduced;
-
-	bool			hsphy_auto_suspend_disable;
-	bool			ssphy_clear_auto_suspend_on_disconnect;
-	bool			usb3_u1u2_disable;
 };
 
 /* -------------------------------------------------------------------------- */
