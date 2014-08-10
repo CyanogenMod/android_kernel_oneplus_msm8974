@@ -10,6 +10,15 @@
  * GNU General Public License for more details.
  */
 
+&pm8941_boost {
+	regulator-min-microvolt = <4500000>;
+	regulator-max-microvolt = <4500000>;
+};
+
+&pm8841_s1_so {
+	regulator-max-microvolt = <1100000>;
+};
+
 &pm8941_l3 {
 	regulator-min-microvolt = <1000000>;
 	qcom,init-voltage = <1000000>;

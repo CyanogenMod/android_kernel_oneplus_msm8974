@@ -18,6 +18,13 @@
 	aliases {
 		serial0 = &blsp1_uart1;
 	};
+
+	oem_data_mem: oem_data_region@5900000 {
+		linux,reserve-contiguous-region;
+		linux,reserve-region;
+		linux,remove-completely;
+		reg = <0x5900000 0x100000>;
+	};
 };
 
 &soc {
