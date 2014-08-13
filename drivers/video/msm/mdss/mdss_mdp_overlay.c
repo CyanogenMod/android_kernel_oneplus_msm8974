@@ -1628,6 +1628,7 @@ static void mdss_mdp_overlay_pan_display(struct msm_fb_data_type *mfd)
 	struct mdss_overlay_private *mdp5_data;
 	u32 offset;
 	int bpp, ret;
+	bool iommu_attached = false;
 
 	if (!mfd)
 		return;
@@ -1655,10 +1656,13 @@ static void mdss_mdp_overlay_pan_display(struct msm_fb_data_type *mfd)
 
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 
-	ret = mdss_iommu_ctrl(1);
-	if (IS_ERR_VALUE(ret)) {
-		pr_err("IOMMU attach failed\n");
-		goto pan_display_error;
+	if (!mfd->panel_info->cont_splash_enabled) {
+		ret = mdss_iommu_ctrl(1);
+		iommu_attached = true;
+		if (IS_ERR_VALUE(ret)) {
+			pr_err("IOMMU attach failed\n");
+			goto pan_display_error;
+		}
 	}
 
 	bpp = fbi->var.bits_per_pixel / 8;
@@ -1728,12 +1732,14 @@ static void mdss_mdp_overlay_pan_display(struct msm_fb_data_type *mfd)
 	    (fbi->var.activate & FB_ACTIVATE_FORCE))
 		mfd->mdp.kickoff_fnc(mfd, NULL);
 
-	mdss_iommu_ctrl(0);
+	if (iommu_attached)
+		mdss_iommu_ctrl(0);
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 	return;
 
 pan_display_error:
-	mdss_iommu_ctrl(0);
+	if (iommu_attached)
+		mdss_iommu_ctrl(0);
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 	mutex_unlock(&mdp5_data->ov_lock);
 }
