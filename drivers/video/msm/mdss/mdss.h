@@ -192,8 +192,6 @@ struct mdss_data_type {
 
 	struct mdss_mdp_ctl *ctl_off;
 	u32 nctl;
-	u32 nwb;
-	u32 ndspp;
 
 	struct mdss_mdp_dp_intf *dp_off;
 	u32 ndp;
@@ -221,7 +219,6 @@ struct mdss_data_type {
 	struct mdss_prefill_data prefill_data;
 	bool idle_pc;
 	struct mdss_perf_tune perf_tune;
-	atomic_t ov_active_panels;
 	int iommu_ref_cnt;
 
 	u64 ab[MDSS_MAX_HW_BLK];
