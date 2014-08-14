@@ -19,6 +19,7 @@
 			qcom,cdc-on-demand-supplies = "cdc-vdd-hpmic-switch";
 
 			qcom,cdc-micbias1-ext-cap;
+			qcom,cdc-micbias2-ext-cap;
 			qcom,cdc-micbias3-ext-cap;
 			qcom,cdc-micbias4-ext-cap;
 		};
