@@ -1314,6 +1314,11 @@ unsigned int msm_hs_tx_empty(struct uart_port *uport)
 	unsigned int ret = 0;
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 
+	if (msm_uport->clk_state == MSM_HS_CLK_PORT_OFF) {
+		MSM_HS_ERR("%s:UART port is closed\n", __func__);
+		return -EPERM;
+	}
+
 	msm_hs_clock_vote(msm_uport);
 	data = msm_hs_read(uport, UART_DM_SR);
 	msm_hs_clock_unvote(msm_uport);
@@ -2010,6 +2015,10 @@ void msm_hs_set_mctrl(struct uart_port *uport,
 {
 	unsigned long flags;
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
+	if (msm_uport->clk_state == MSM_HS_CLK_PORT_OFF) {
+		MSM_HS_ERR("%s:UART port is closed\n", __func__);
+		return ;
+	}
 
 	msm_hs_clock_vote(msm_uport);
 	spin_lock_irqsave(&uport->lock, flags);
@@ -2342,6 +2351,10 @@ void msm_hs_request_clock_off(struct uart_port *uport) {
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 	int data;
 
+	if (msm_uport->clk_state == MSM_HS_CLK_PORT_OFF) {
+		MSM_HS_ERR("%s:UART port is closed\n", __func__);
+		return ;
+	}
 	spin_lock_irqsave(&uport->lock, flags);
 	if (msm_uport->clk_state == MSM_HS_CLK_ON) {
 		msm_uport->clk_state = MSM_HS_CLK_REQUEST_OFF;
@@ -2370,6 +2383,11 @@ void msm_hs_request_clock_on(struct uart_port *uport)
 	unsigned long flags;
 	unsigned int data;
 	int ret = 0;
+
+	if (msm_uport->clk_state == MSM_HS_CLK_PORT_OFF) {
+		MSM_HS_ERR("%s:UART port is closed\n", __func__);
+		return ;
+	}
 
 	mutex_lock(&msm_uport->clk_mutex);
 	spin_lock_irqsave(&uport->lock, flags);
