@@ -792,6 +792,7 @@ static int lm3630_resume(struct i2c_client *client)
 
 	pr_debug("%s: backlight resume.\n", __func__);
     rc = regmap_write(lm3630_pchip->regmap, REG_BRT_A, 0);
+	regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x40, 0x00);
 	rc  = regmap_update_bits(lm3630_pchip->regmap, REG_CTRL, 0x80, 0x00);
 	if (rc  < 0)
 	{
