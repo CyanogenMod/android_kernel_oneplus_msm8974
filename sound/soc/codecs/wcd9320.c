@@ -606,6 +606,8 @@ static int taiko_enable_hpmic_switch(struct snd_soc_codec *codec, bool enable)
 				pr_err("%s: Failed to enable hpmic switch %d\n",
 						__func__, ret);
 			}
+			if (taiko->mbhc.mbhc_cfg->reset_gnd_mic)
+				taiko->mbhc.mbhc_cfg->reset_gnd_mic(codec->card);
 		}
 	} else {
 		if (atomic_read(&taiko->hpmic_ref) == 0)
