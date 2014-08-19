@@ -10,6 +10,8 @@
  * GNU General Public License for more details.
  */
 
+#define DEBUG
+
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
@@ -129,13 +131,10 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.gpio_level_insert = 0,
 #endif
 	.detect_extn_cable = true,
-#ifdef CONFIG_MACH_OPPO //luyan modify micbias to dc
-	.micbias_enable_flags = 1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET | 1<<MBHC_MICBIAS_ENABLE_REGULAR_HEADSET,
-#else
 	.micbias_enable_flags = 1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET,
-#endif
 	.insert_detect = true,
 	.swap_gnd_mic = NULL,
+	.reset_gnd_mic = NULL,
 	.cs_enable_flags = (1 << MBHC_CS_ENABLE_POLLING |
 			    1 << MBHC_CS_ENABLE_INSERTION |
 			    1 << MBHC_CS_ENABLE_REMOVAL),
@@ -1575,7 +1574,7 @@ static bool msm8974_swap_gnd_mic(struct snd_soc_codec *codec)
 	int value = gpio_get_value_cansleep(pdata->us_euro_gpio);
 	pr_debug("%s: swap select switch %d to %d\n", __func__, value, !value);
 	gpio_set_value_cansleep(pdata->us_euro_gpio, !value);
-	msleep(50);
+	msleep(150);
 	return true;
 }
 
@@ -3027,6 +3026,16 @@ static int msm8974_prepare_codec_mclk(struct snd_soc_card *card)
 	return 0;
 }
 
+static bool msm8974_reset_gnd_mic(struct snd_soc_card *card)
+{
+	struct msm8974_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+
+	/* Set initial GPIO state, high -> US, low -> EU*/
+	gpio_direction_output(pdata->us_euro_gpio, 1);
+	msleep(50);
+	return true;
+}
+
 static int msm8974_prepare_us_euro(struct snd_soc_card *card)
 {
 	struct msm8974_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
@@ -3041,10 +3050,7 @@ static int msm8974_prepare_us_euro(struct snd_soc_card *card)
 				__func__, pdata->us_euro_gpio, ret);
 			return ret;
 		}
-#ifdef CONFIG_MACH_OPPO
-		/* Set initial GPIO state, high -> US, low -> EU*/
-		gpio_direction_output(pdata->us_euro_gpio, 1);
-#endif
+		msm8974_reset_gnd_mic(card);
 	}
 
 	return 0;
@@ -3224,6 +3230,7 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "%s detected %d",
 			"qcom,us-euro-gpios", pdata->us_euro_gpio);
 		mbhc_cfg.swap_gnd_mic = msm8974_swap_gnd_mic;
+		mbhc_cfg.reset_gnd_mic = msm8974_reset_gnd_mic;
 	}
 
 	ret = msm8974_prepare_us_euro(card);
