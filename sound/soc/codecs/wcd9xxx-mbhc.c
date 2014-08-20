@@ -41,6 +41,8 @@
 #include "wcd9xxx-resmgr.h"
 #include "wcd9xxx-common.h"
 
+#define DEBUG
+
 #define WCD9XXX_JACK_MASK (SND_JACK_HEADSET | SND_JACK_OC_HPHL | \
 			   SND_JACK_OC_HPHR | SND_JACK_LINEOUT | \
 			   SND_JACK_UNSUPPORTED | SND_JACK_MICROPHONE2)
