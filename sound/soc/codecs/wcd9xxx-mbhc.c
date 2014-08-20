@@ -9,8 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-#define DEBUG
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/firmware.h>
@@ -1429,6 +1427,11 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 		} else
 			d->_type = PLUG_TYPE_HEADSET;
 
+		pr_debug("%s: DCE #%d, %04x, V %04d(%04d), HPHL %d TYPE %d GND %d MICBIAS %d\n",
+			 __func__, i, d->dce, vdce, d->_vdces,
+			 d->hphl_status & 0x01,
+			 d->_type, d->swap_gnd, d->mic_bias);
+
 		ch += d->hphl_status & 0x01;
 		if (!d->swap_gnd && !d->mic_bias) {
 			if (maxv < d->_vdces)
@@ -1436,11 +1439,6 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 			if (!minv || minv > d->_vdces)
 				minv = d->_vdces;
 		}
-		pr_debug("%s: DCE #%d, %04x, V %04d(%04d), HPHL %d TYPE %d GND %d MICBIAS %d\n",
-			 __func__, i, d->dce, vdce, d->_vdces,
-			 d->hphl_status & 0x01,
-			 d->_type, d->swap_gnd, d->mic_bias);
-
 		if ((!d->mic_bias &&
 		    (d->_vdces >= WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV &&
 		     d->_vdces <= WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV)) ||
@@ -1451,7 +1449,6 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 			type = PLUG_TYPE_INVALID;
 			goto exit;
 		}
-
 	}
 
 	delta_thr = ((highhph_cnt == sz) || highhph) ?
@@ -1832,7 +1829,6 @@ wcd9xxx_codec_cs_get_plug_type(struct wcd9xxx_mbhc *mbhc, bool highhph)
 		rt[i].mic_bias = ((i == NUM_DCE_PLUG_INS_DETECT - 4) &&
 				   highhph);
 		rt[i].hphl_status = wcd9xxx_hphl_status(mbhc);
-
 		if (rt[i].swap_gnd)
 			wcd9xxx_codec_hphr_gnd_switch(codec, true);
 
@@ -1842,11 +1838,6 @@ wcd9xxx_codec_cs_get_plug_type(struct wcd9xxx_mbhc *mbhc, bool highhph)
 							  false, false);
 
 		rt[i].dce = __wcd9xxx_codec_sta_dce(mbhc, 1, !highhph, true);
-
-		pr_debug("%s: iter=%d GND %d BIAS %d HPHL %d DCE %d", __func__, i, rt[i].swap_gnd,
-				rt[i].mic_bias, rt[i].hphl_status, rt[i].dce);
-
-
 		if (rt[i].mic_bias)
 			wcd9xxx_turn_onoff_current_source(mbhc,
 							  &mbhc->mbhc_bias_regs,
@@ -3096,7 +3087,6 @@ static void wcd9xxx_correct_swch_plug(struct work_struct *work)
 					(highhph_cnt + 1) :
 					0;
 		highhph = wcd9xxx_mbhc_enable_mb_decision(highhph_cnt);
-		pr_debug("%s: highhph_cnt=%d highhph=%d", __func__, highhph_cnt, highhph);
 		if (plug_type == PLUG_TYPE_INVALID) {
 			pr_debug("Invalid plug in attempt # %d\n", retry);
 			if (!mbhc->mbhc_cfg->detect_extn_cable &&
