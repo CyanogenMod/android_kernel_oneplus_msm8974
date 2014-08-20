@@ -6,6 +6,9 @@
 
 #include "cpupri.h"
 
+/* task_struct::on_rq states: */
+#define TASK_ON_RQ_MIGRATING	2
+
 extern __read_mostly int scheduler_running;
 
 /*
@@ -681,6 +684,11 @@ static inline int task_running(struct rq *rq, struct task_struct *p)
 #endif
 }
 
+
+static inline int task_on_rq_migrating(struct task_struct *p)
+{
+	return p->on_rq == TASK_ON_RQ_MIGRATING;
+}
 
 #ifndef prepare_arch_switch
 # define prepare_arch_switch(next)	do { } while (0)
