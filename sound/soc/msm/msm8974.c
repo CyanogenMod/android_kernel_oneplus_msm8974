@@ -1879,10 +1879,10 @@ void *def_taiko_mbhc_cal(void)
 	btn_low[5] = 190;
 	btn_high[5] = 228;
 	btn_low[6] = 229;
-	btn_high[6] = 269;
-	btn_low[7] = 270;
+	btn_high[6] = 274;
+	btn_low[7] = 275;
 #ifdef CONFIG_MACH_OPPO
-	btn_high[7] = 600;
+	btn_high[7] = 800;
 #else
 	btn_high[7] = 500;
 #endif
