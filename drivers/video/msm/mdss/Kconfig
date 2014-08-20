@@ -35,3 +35,8 @@ config FB_MSM_MDSS_MDP3
 	---help---
 	The MDP3 provides support for an older version display controller
 	included in latest display sub-system, known as MDSS.
+
+config LCD_KCAL
+	depends on FB_MSM_MDSS
+	bool "Enable sysfs for LCD KCAL"
+	default n

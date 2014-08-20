@@ -8,3 +8,5 @@ obj-$(CONFIG_OPPO_TRACE) += oppo_trace.o
 
 obj-$(CONFIG_MACH_OPPO_MSM8974) += board-8974-oppo.o
 obj-$(CONFIG_MACH_OPPO_MSM8974) += board-8974-oppo-gpiomux.o
+
+obj-$(CONFIG_LCD_KCAL) += oppo_kcal_ctrl.o
