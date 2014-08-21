@@ -333,6 +333,7 @@ static ssize_t mdss_fb_store_split(struct device *dev,
 /* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/02/17  Add for set cabc */
 extern int mdss_dsi_panel_set_cabc(struct mdss_panel_data *panel_data, int level);
 extern int mdss_dsi_panel_set_gamma_index(struct mdss_panel_data *panel_data, int index);
+extern int mdss_dsi_panel_set_sre(struct mdss_panel_data *panel_data, bool enable);
 
 static ssize_t mdss_get_cabc(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -354,6 +355,29 @@ static ssize_t mdss_set_cabc(struct device *dev,
 
 	sscanf(buf, "%du", &level);
 	mdss_dsi_panel_set_cabc(pdata, level);
+	return count;
+}
+
+static ssize_t mdss_get_sre(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_panel_data *pdata = dev_get_platdata(&mfd->pdev->dev);
+	return sprintf(buf, "%d\n", pdata->panel_info.sre_enabled);
+}
+
+static ssize_t mdss_set_sre(struct device *dev,
+							   struct device_attribute *attr,
+							   const char *buf, size_t count)
+{
+	int value = 0;
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_panel_data *pdata = dev_get_platdata(&mfd->pdev->dev);
+
+	sscanf(buf, "%du", &value);
+	mdss_dsi_panel_set_sre(pdata, value > 0);
 	return count;
 }
 
@@ -382,6 +406,7 @@ static ssize_t mdss_set_gamma_index(struct device *dev,
 
 static DEVICE_ATTR(cabc, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_cabc, mdss_set_cabc);
 static DEVICE_ATTR(gamma, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_gamma_index, mdss_set_gamma_index);
+static DEVICE_ATTR(sre, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_sre, mdss_set_sre);
 
 extern int mdss_dsi_panel_get_panel_calibration(
 	struct mdss_panel_data *pdata, char *buf);
@@ -634,6 +659,7 @@ static struct attribute *mdss_fb_attrs[] = {
     &dev_attr_cabc.attr,
 	&dev_attr_gamma.attr,
     &dev_attr_panel_calibration.attr,
+	&dev_attr_sre.attr,
 #endif
 	&dev_attr_msm_fb_panel_info.attr,
 	NULL,
@@ -1019,6 +1045,10 @@ static void mdss_fb_scale_bl(struct msm_fb_data_type *mfd, u32 *bl_lvl)
 	(*bl_lvl) = temp;
 }
 
+#ifdef CONFIG_MACH_OPPO
+extern int mdss_dsi_panel_update_sre(struct mdss_panel_data *pdata, u32 bl_level);
+#endif
+
 /* must call this function from within mfd->bl_lock */
 void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 {
@@ -1054,6 +1084,10 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 		pdata->set_backlight(pdata, temp);
 		mfd->bl_level = bkl_lvl;
 		mfd->bl_level_scaled = temp;
+
+#ifdef CONFIG_MACH_OPPO
+		mdss_dsi_panel_update_sre(pdata, bkl_lvl);
+#endif
 
 		if (mfd->mdp.update_ad_input) {
 			update_ad_input = mfd->mdp.update_ad_input;

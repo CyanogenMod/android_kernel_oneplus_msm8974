@@ -360,10 +360,18 @@ struct mdss_panel_info {
 	struct edp_panel_info edp;
 
 #ifdef CONFIG_MACH_OPPO
-    int cabc_available;
-    int cabc_mode;
+	int cabc_available;
+	int cabc_mode;
+	int cabc_bl_max;
+	bool cabc_active;
+
 	int gamma_index;
 	int gamma_count;
+
+	int sre_available;
+	bool sre_enabled;
+	bool sre_active;
+	int sre_bl_threshold;
 #endif
 };
 
