@@ -364,6 +364,11 @@ struct mdss_panel_info {
     int cabc_mode;
 	int gamma_index;
 	int gamma_count;
+
+	int sre_available;
+	bool sre_enabled;
+	bool sre_active;
+	int sre_bl_threshold;
 #endif
 };
 

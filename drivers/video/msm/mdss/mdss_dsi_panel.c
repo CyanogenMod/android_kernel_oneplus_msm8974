@@ -36,6 +36,7 @@ static struct dsi_panel_cmds cabc_off_sequence;
 static struct dsi_panel_cmds cabc_user_interface_image_sequence;
 static struct dsi_panel_cmds cabc_still_image_sequence;
 static struct dsi_panel_cmds cabc_video_image_sequence;
+static struct dsi_panel_cmds cabc_sre_sequence;
 
 static struct dsi_panel_cmds gamma1;
 static struct dsi_panel_cmds gamma2;
@@ -72,7 +73,8 @@ static int mdss_dsi_update_cabc_level(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
     if (!pinfo->cabc_available)
         return 0;
 
-	pr_info("%s: update cabc level=%d", __func__, pinfo->cabc_mode);
+	pr_info("%s: update cabc level=%d sre=%d", __func__,
+			pinfo->cabc_mode, pinfo->sre_enabled);
 
 	switch (pinfo->cabc_mode)
 	{
@@ -81,7 +83,10 @@ static int mdss_dsi_update_cabc_level(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
 			break;
 		case 1:
-			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
+			if (pinfo->sre_available && pinfo->sre_active)
+				mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_sre_sequence);
+			else
+				mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
 			set_backlight_pwm(1);
 			break;
 		case 2:
@@ -137,6 +142,57 @@ out:
 	mutex_unlock(&config_mutex);
 	return ret;
 
+}
+
+int mdss_dsi_panel_update_sre(struct mdss_panel_data *pdata, u32 bl_level)
+{
+	int ret = 0;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+
+	if (pdata == NULL)
+		return -EINVAL;
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata, panel_data);
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+	if (!pinfo->sre_enabled)
+		return 0;
+
+	if (pinfo->sre_active && bl_level < pinfo->sre_bl_threshold) {
+		pinfo->sre_active = false;
+		ret = mdss_dsi_update_cabc_level(ctrl_pdata);
+	} else if (!pinfo->sre_active && bl_level >= pinfo->sre_bl_threshold) {
+		pinfo->sre_active = true;
+		ret = mdss_dsi_update_cabc_level(ctrl_pdata);
+	}
+	return ret;
+}
+
+int mdss_dsi_panel_set_sre(struct mdss_panel_data *pdata, bool enable)
+{
+	int ret = 0;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+
+    if (pdata == NULL) {
+	    pr_err("%s: Invalid input data\n", __func__);
+	    return -EINVAL;
+    }
+
+    ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata, panel_data);
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+    if (!pinfo->cabc_available || !pinfo->sre_available ||
+            enable == pinfo->sre_enabled)
+        return 0;
+
+	mutex_lock(&config_mutex);
+	pinfo->sre_enabled = enable;
+	pinfo->sre_active = false;
+	mutex_unlock(&config_mutex);
+
+	return ret;
 }
 
 static int mdss_dsi_update_gamma_index(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
@@ -1764,6 +1820,13 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	mdss_dsi_parse_dcs_cmds(np, &cabc_video_image_sequence,
 		"qcom,mdss-dsi-cabc-video-command", "qcom,mdss-dsi-off-command-state");
+
+	rc = mdss_dsi_parse_dcs_cmds(np, &cabc_sre_sequence,
+		"qcom,mdss-dsi-sre-ui-command", "qcom,mdss-dsi-off-command-state");
+
+	pinfo->sre_available = rc == 0 ? 1 : 0;
+
+	of_property_read_u32(np, "qcom,mdss-dsi-bl-sre-level", &pinfo->sre_bl_threshold);
 
 	rc = mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->calibration_cmds,
 		"qcom,mdss-dsi-calibration-command", "qcom,mdss-dsi-calibration-command-state");
