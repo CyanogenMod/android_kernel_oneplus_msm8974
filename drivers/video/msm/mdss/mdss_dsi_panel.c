@@ -43,6 +43,9 @@ static struct dsi_panel_cmds gamma2;
 static struct dsi_panel_cmds gamma3;
 static struct dsi_panel_cmds gamma4;
 
+static struct dsi_panel_cmds color_enhance_on_sequence;
+static struct dsi_panel_cmds color_enhance_off_sequence;
+
 static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 			struct dsi_panel_cmds *pcmds);
 
@@ -206,6 +209,61 @@ int mdss_dsi_panel_set_sre(struct mdss_panel_data *pdata, bool enable)
 	pinfo->sre_active = false;
 	mutex_unlock(&config_mutex);
 
+	return ret;
+}
+
+static int mdss_dsi_update_color_enhance(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
+{
+	struct mdss_panel_info *pinfo = NULL;
+
+	if (ctrl_pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+	if (!pinfo->color_enhance_available)
+		return -EINVAL;
+
+	pr_info("%s: enabled = %d", __func__, pinfo->color_enhance_enabled);
+
+	mdss_dsi_panel_cmds_send(ctrl_pdata, pinfo->color_enhance_enabled ?
+			&color_enhance_on_sequence : &color_enhance_off_sequence);
+
+	return 0;
+}
+
+int mdss_dsi_panel_set_color_enhance(struct mdss_panel_data *pdata, bool enabled)
+{
+	int ret = 0;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata, panel_data);
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+	if (!pinfo->color_enhance_available)
+		return -EINVAL;
+
+    mutex_lock(&config_mutex);
+
+	pinfo->color_enhance_enabled = enabled;
+
+	if (!pinfo->panel_power_on) {
+		pr_info("%s: lcd is off, queued color enhance change\n", __func__);
+		goto out;
+	}
+
+	ret = mdss_dsi_update_color_enhance(ctrl_pdata);
+
+out:
+    mutex_unlock(&config_mutex);
 	return ret;
 }
 
@@ -1048,6 +1106,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	set_backlight_pwm(1);
 
 	mdss_dsi_update_cabc_level(ctrl);
+	mdss_dsi_update_color_enhance(ctrl);
     mdss_dsi_update_gamma_index(ctrl);
 
 	if (ctrl->calibration_available && ctrl->calibration_cmds.cmd_cnt)
@@ -1852,6 +1911,12 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	of_property_read_u32(np, "qcom,mdss-dsi-bl-sre-level", &pinfo->sre_bl_threshold);
 
 	of_property_read_u32(np, "qcom,mdss-dsi-bl-cabc-max-level", &pinfo->cabc_bl_max);
+
+	rc = mdss_dsi_parse_dcs_cmds(np, &color_enhance_on_sequence,
+		"qcom,mdss-dsi-color-enhance-on-command", "qcom,mdss-dsi-off-command-state");
+	rc = rc && mdss_dsi_parse_dcs_cmds(np, &color_enhance_off_sequence,
+		"qcom,mdss-dsi-color-enhance-off-command", "qcom,mdss-dsi-off-command-state");
+	pinfo->color_enhance_available = (rc == 0);
 
 	rc = mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->calibration_cmds,
 		"qcom,mdss-dsi-calibration-command", "qcom,mdss-dsi-calibration-command-state");

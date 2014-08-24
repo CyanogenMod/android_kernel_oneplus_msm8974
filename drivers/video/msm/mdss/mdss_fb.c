@@ -334,6 +334,7 @@ static ssize_t mdss_fb_store_split(struct device *dev,
 extern int mdss_dsi_panel_set_cabc(struct mdss_panel_data *panel_data, int level);
 extern int mdss_dsi_panel_set_gamma_index(struct mdss_panel_data *panel_data, int index);
 extern int mdss_dsi_panel_set_sre(struct mdss_panel_data *panel_data, bool enable);
+extern int mdss_dsi_panel_set_color_enhance(struct mdss_panel_data *panel_data, bool enable);
 
 static ssize_t mdss_get_cabc(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -381,6 +382,29 @@ static ssize_t mdss_set_sre(struct device *dev,
 	return count;
 }
 
+static ssize_t mdss_get_color_enhance(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_panel_data *pdata = dev_get_platdata(&mfd->pdev->dev);
+	return sprintf(buf, "%d\n", pdata->panel_info.color_enhance_enabled);
+}
+
+static ssize_t mdss_set_color_enhance(struct device *dev,
+							   struct device_attribute *attr,
+							   const char *buf, size_t count)
+{
+	int value = 0;
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_panel_data *pdata = dev_get_platdata(&mfd->pdev->dev);
+
+	sscanf(buf, "%du", &value);
+	mdss_dsi_panel_set_color_enhance(pdata, value > 0);
+	return count;
+}
+
 static ssize_t mdss_get_gamma_index(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -407,6 +431,7 @@ static ssize_t mdss_set_gamma_index(struct device *dev,
 static DEVICE_ATTR(cabc, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_cabc, mdss_set_cabc);
 static DEVICE_ATTR(gamma, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_gamma_index, mdss_set_gamma_index);
 static DEVICE_ATTR(sre, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_sre, mdss_set_sre);
+static DEVICE_ATTR(color_enhance, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_color_enhance, mdss_set_color_enhance);
 
 extern int mdss_dsi_panel_get_panel_calibration(
 	struct mdss_panel_data *pdata, char *buf);
@@ -660,6 +685,7 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_gamma.attr,
     &dev_attr_panel_calibration.attr,
 	&dev_attr_sre.attr,
+	&dev_attr_color_enhance.attr,
 #endif
 	&dev_attr_msm_fb_panel_info.attr,
 	NULL,
