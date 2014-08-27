@@ -2647,6 +2647,8 @@ vreg_set_voltage_fail:
 
 void mdss_mdp_batfet_ctrl(struct mdss_data_type *mdata, int enable)
 {
+	int ret;
+
 	if (!mdata->batfet_required)
 		return;
 
@@ -2664,6 +2666,14 @@ void mdss_mdp_batfet_ctrl(struct mdss_data_type *mdata, int enable)
 			pr_debug("Batfet regulator disable w/o enable\n");
 			return;
 		}
+	}
+
+	if (enable) {
+		ret = regulator_enable(mdata->batfet);
+		if (ret)
+			pr_err("regulator_enable failed\n");
+	} else {
+		regulator_disable(mdata->batfet);
 	}
 }
 
