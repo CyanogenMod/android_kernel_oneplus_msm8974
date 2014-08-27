@@ -976,6 +976,13 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 		}
 	}
 
+	/*
+	 * Increment the overlay active count prior to calling ctl_start.
+	 * This is needed to ensure that if idle power collapse kicks in
+	 * right away, it would be handled correctly.
+	 */
+	atomic_inc(&mdp5_data->mdata->active_intf_cnt);
+
 	rc = mdss_mdp_ctl_start(ctl, false);
 	if (rc == 0) {
 		mdss_mdp_ctl_notifier_register(mdp5_data->ctl,
@@ -991,6 +998,7 @@ int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 
 ctl_error:
 	mdss_mdp_ctl_destroy(ctl);
+	atomic_dec(&mdp5_data->mdata->active_intf_cnt);
 	mdp5_data->ctl = NULL;
 end:
 	return rc;
@@ -2793,8 +2801,6 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 		}
 	}
 
-	atomic_inc(&mdp5_data->mdata->ov_active_panels);
-
 	if (!mfd->panel_info->cont_splash_enabled &&
 		(mfd->panel_info->type != DTV_PANEL)) {
 		rc = mdss_mdp_overlay_start(mfd);
@@ -2905,7 +2911,7 @@ static int mdss_mdp_overlay_off(struct msm_fb_data_type *mfd)
 			mdp5_data->ctl = NULL;
 		}
 
-		if (atomic_dec_return(&mdp5_data->mdata->ov_active_panels) == 0)
+		if (atomic_dec_return(&mdp5_data->mdata->active_intf_cnt) == 0)
 			mdss_mdp_rotator_release_all();
 
 		if (!mdp5_data->mdata->idle_pc_enabled) {

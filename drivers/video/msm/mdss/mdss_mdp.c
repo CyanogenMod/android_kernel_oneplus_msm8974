@@ -746,12 +746,13 @@ static int mdss_mdp_idle_pc_restore(void)
 	}
 
 	pr_debug("called from %pS\n", __builtin_return_address(0));
-	rc = mdss_iommu_attach(mdata);
+	rc = mdss_iommu_ctrl(1);
 	if (IS_ERR_VALUE(rc)) {
 		pr_err("mdss iommu attach failed rc=%d\n", rc);
 		goto end;
 	}
 	mdss_hw_init(mdata);
+	mdss_iommu_ctrl(0);
 	mdss_mdp_ctl_restore();
 	mdata->idle_pc = false;
 
@@ -1322,7 +1323,7 @@ static int mdss_mdp_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, mdata);
 	mdss_res = mdata;
 	mutex_init(&mdata->reg_lock);
-	atomic_set(&mdata->ov_active_panels, 0);
+	atomic_set(&mdata->active_intf_cnt, 0);
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mdp_phys");
 	if (!res) {
@@ -2679,6 +2680,7 @@ void mdss_mdp_batfet_ctrl(struct mdss_data_type *mdata, int enable)
 static void mdss_mdp_footswitch_ctrl(struct mdss_data_type *mdata, int on)
 {
 	int ret;
+	int active_cnt = 0;
 
 	if (!mdata->fs)
 		return;
@@ -2696,13 +2698,22 @@ static void mdss_mdp_footswitch_ctrl(struct mdss_data_type *mdata, int on)
 		}
 		mdata->fs_ena = true;
 	} else {
-		pr_debug("Disable MDP FS\n");
 		if (mdata->fs_ena) {
-			regulator_disable(mdata->fs);
-			if (!mdata->idle_pc) {
+			pr_debug("Disable MDP FS\n");
+			active_cnt = atomic_read(&mdata->active_intf_cnt);
+			if (active_cnt != 0) {
+				/*
+				 * Turning off GDSC while overlays are still
+				 * active.
+				 */
+				mdata->idle_pc = true;
+				pr_debug("idle pc. active overlays=%d\n",
+						active_cnt);
+			} else {
 				mdss_mdp_cx_ctrl(mdata, false);
 				mdss_mdp_batfet_ctrl(mdata, false);
 			}
+			regulator_disable(mdata->fs);
 		}
 		mdata->fs_ena = false;
 	}
@@ -2794,7 +2805,7 @@ static int mdss_mdp_runtime_resume(struct device *dev)
 		return -ENODEV;
 
 	dev_dbg(dev, "pm_runtime: resuming. active overlay cnt=%d\n",
-		atomic_read(&mdata->ov_active_panels));
+		atomic_read(&mdata->active_intf_cnt));
 
 	/* do not resume panels when coming out of idle power collapse */
 	if (!mdata->idle_pc)
@@ -2822,7 +2833,7 @@ static int mdss_mdp_runtime_suspend(struct device *dev)
 	if (!mdata)
 		return -ENODEV;
 	dev_dbg(dev, "pm_runtime: suspending. active overlay cnt=%d\n",
-		atomic_read(&mdata->ov_active_panels));
+		atomic_read(&mdata->active_intf_cnt));
 
 	if (mdata->clk_ena) {
 		pr_err("MDP suspend failed\n");
