@@ -1461,6 +1461,13 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 	for (i = 0, d = dt; i < sz; i++, d++) {
 		if ((i > 0) && !d->mic_bias && !d->swap_gnd &&
 		    (d->_type != dprev->_type)) {
+			if ((i == 1 && dprev->_type == PLUG_TYPE_HIGH_HPH &&
+						d->_type == PLUG_TYPE_HEADSET) ||
+				(i == 3 && dprev->_type == PLUG_TYPE_HEADSET &&
+						d->_type == PLUG_TYPE_HIGH_HPH)) {
+				pr_debug("%s: HIGH_HPH special case, continue", __func__);
+				continue;
+			}
 			pr_debug("%s: Invalid, inconsistent types\n", __func__);
 			type = PLUG_TYPE_INVALID;
 			goto exit;
