@@ -21,7 +21,6 @@
 #include <linux/io.h>
 
 #include <asm/cacheflush.h>
-#include <asm/hardware/gic.h>
 #include <asm/smp_scu.h>
 
 #include <mach/hardware.h>
@@ -54,13 +53,6 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
 	if (cpu_is_omap443x() && (omap_type() != OMAP2_DEVICE_TYPE_GP))
 		omap_secure_dispatcher(OMAP4_PPA_CPU_ACTRL_SMP_INDEX,
 							4, 0, 0, 0, 0, 0);
-
-	/*
-	 * If any interrupts are already enabled for the primary
-	 * core (e.g. timer irq), then they will not have been enabled
-	 * for us: do so
-	 */
-	gic_secondary_init(0);
 
 	/*
 	 * Synchronise with the boot thread.
