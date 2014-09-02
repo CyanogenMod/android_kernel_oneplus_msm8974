@@ -27,11 +27,6 @@
 			compatible = "ti,bq27541-battery";
 			reg = <0x55>;
 		};
-		pic16f_fastcg@25{
-			status = "okay";
-			compatible = "microchip,pic16f_fastcg";
-			reg = <0x25>;
-		};
 	};
 
 	i2c@f9928000 {
