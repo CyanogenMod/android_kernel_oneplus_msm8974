@@ -133,7 +133,7 @@
 #define WCD9XXX_V_CS_NO_MIC 5
 #define WCD9XXX_MB_MEAS_DELTA_MAX_MV 80
 #ifdef CONFIG_MACH_OPPO
-#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 90
+#define WCD9XXX_CS_MEAS_DELTA_MAX_MV 120
 #else
 #define WCD9XXX_CS_MEAS_DELTA_MAX_MV 12
 #endif
@@ -1461,17 +1461,19 @@ wcd9xxx_cs_find_plug_type(struct wcd9xxx_mbhc *mbhc,
 			 d->hphl_status & 0x01,
 			 d->_type, d->swap_gnd, d->mic_bias);
 
-		if ((!d->mic_bias &&
-		    (d->_vdces >= WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV &&
-		     d->_vdces <= WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV)) ||
-		    (d->mic_bias &&
-		    (d->_vdces >= WCD9XXX_MEAS_INVALD_RANGE_LOW_MV &&
-		     d->_vdces <= WCD9XXX_MEAS_INVALD_RANGE_HIGH_MV))) {
+		if (
+#ifndef CONFIG_MACH_OPPO
+		 (!d->mic_bias &&
+		 (d->_vdces >= WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV &&
+		  d->_vdces <= WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV)) ||
+#endif
+		 (d->mic_bias &&
+		 (d->_vdces >= WCD9XXX_MEAS_INVALD_RANGE_LOW_MV &&
+		  d->_vdces <= WCD9XXX_MEAS_INVALD_RANGE_HIGH_MV))) {
 			pr_debug("%s: within invalid range\n", __func__);
 			type = PLUG_TYPE_INVALID;
 			goto exit;
 		}
-
 	}
 
 	delta_thr = ((highhph_cnt == sz) || highhph) ?
