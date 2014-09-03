@@ -74,7 +74,7 @@ static int mdss_dsi_update_cabc_level(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	pinfo = &(ctrl_pdata->panel_data.panel_info);
 
     if (!pinfo->cabc_available)
-        return 0;
+        goto done;
 
 	pr_info("%s: update cabc level=%d (%d) sre=%d (%d)", __func__,
 			pinfo->cabc_mode, pinfo->cabc_active,
@@ -83,7 +83,6 @@ static int mdss_dsi_update_cabc_level(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	switch (pinfo->cabc_mode)
 	{
 		case 0:
-			set_backlight_pwm(0);
 			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
 			break;
 		case 1:
@@ -93,22 +92,22 @@ static int mdss_dsi_update_cabc_level(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 				mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
 			else
 				mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
-
-			set_backlight_pwm(1);
 			break;
 		case 2:
 			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_still_image_sequence);
-			set_backlight_pwm(1);
 			break;
 		case 3:
 			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_video_image_sequence);
-			set_backlight_pwm(1);
 			break;
 		default:
 			pr_err("%s: cabc level %d is not supported!\n",__func__, pinfo->cabc_mode);
 			ret = -EINVAL;
 			break;
 	}
+
+done:
+	set_backlight_pwm((pinfo->cabc_available && (pinfo->cabc_mode > 0)) ? 1 : 0);
+
 	return ret;
 }
 
@@ -1103,14 +1102,13 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
 
 #ifdef CONFIG_MACH_OPPO
-	set_backlight_pwm(1);
-
-	mdss_dsi_update_cabc_level(ctrl);
-	mdss_dsi_update_color_enhance(ctrl);
-    mdss_dsi_update_gamma_index(ctrl);
-
 	if (ctrl->calibration_available && ctrl->calibration_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->calibration_cmds);
+
+    mdss_dsi_update_gamma_index(ctrl);
+	mdss_dsi_update_color_enhance(ctrl);
+
+	mdss_dsi_update_cabc_level(ctrl);
 #endif
 
 	pr_debug("%s:-\n", __func__);
