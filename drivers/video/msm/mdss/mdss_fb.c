@@ -680,14 +680,11 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_show_blank_event.attr,
 	&dev_attr_idle_time.attr,
 	&dev_attr_idle_notify.attr,
+	&dev_attr_msm_fb_panel_info.attr,
 #ifdef CONFIG_MACH_OPPO
-    &dev_attr_cabc.attr,
 	&dev_attr_gamma.attr,
     &dev_attr_panel_calibration.attr,
-	&dev_attr_sre.attr,
-	&dev_attr_color_enhance.attr,
 #endif
-	&dev_attr_msm_fb_panel_info.attr,
 	NULL,
 };
 
@@ -697,11 +694,39 @@ static struct attribute_group mdss_fb_attr_group = {
 
 static int mdss_fb_create_sysfs(struct msm_fb_data_type *mfd)
 {
-	int rc;
+	int rc = 0;
+
+	if (mfd == NULL)
+		goto sysfs_err;
 
 	rc = sysfs_create_group(&mfd->fbi->dev->kobj, &mdss_fb_attr_group);
 	if (rc)
-		pr_err("sysfs group creation failed, rc=%d\n", rc);
+		goto sysfs_err;
+
+#ifdef CONFIG_MACH_OPPO
+	if (mfd->panel_info->cabc_available) {
+		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_cabc.attr);
+		if (rc)
+			goto sysfs_err;
+
+		if (mfd->panel_info->sre_available) {
+			rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_sre.attr);
+			if (rc)
+				goto sysfs_err;
+		}
+	}
+
+	if (mfd->panel_info->color_enhance_available) {
+		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_color_enhance.attr);
+		if (rc)
+			goto sysfs_err;
+	}
+#endif
+
+	return rc;
+
+sysfs_err:
+	pr_err("%s: sysfs group creation failed, rc=%d", __func__, rc);
 	return rc;
 }
 
