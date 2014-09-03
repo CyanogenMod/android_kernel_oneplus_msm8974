@@ -36,11 +36,15 @@ static struct dsi_panel_cmds cabc_off_sequence;
 static struct dsi_panel_cmds cabc_user_interface_image_sequence;
 static struct dsi_panel_cmds cabc_still_image_sequence;
 static struct dsi_panel_cmds cabc_video_image_sequence;
+static struct dsi_panel_cmds cabc_sre_sequence;
 
 static struct dsi_panel_cmds gamma1;
 static struct dsi_panel_cmds gamma2;
 static struct dsi_panel_cmds gamma3;
 static struct dsi_panel_cmds gamma4;
+
+static struct dsi_panel_cmds color_enhance_on_sequence;
+static struct dsi_panel_cmds color_enhance_off_sequence;
 
 static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 			struct dsi_panel_cmds *pcmds);
@@ -70,33 +74,40 @@ static int mdss_dsi_update_cabc_level(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	pinfo = &(ctrl_pdata->panel_data.panel_info);
 
     if (!pinfo->cabc_available)
-        return 0;
+        goto done;
 
-	pr_info("%s: update cabc level=%d", __func__, pinfo->cabc_mode);
+	pr_info("%s: update cabc level=%d (%d) sre=%d (%d)", __func__,
+			pinfo->cabc_mode, pinfo->cabc_active,
+			pinfo->sre_enabled, pinfo->sre_active);
 
 	switch (pinfo->cabc_mode)
 	{
 		case 0:
-			set_backlight_pwm(0);
 			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
 			break;
 		case 1:
-			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
-			set_backlight_pwm(1);
+			if (pinfo->sre_available && pinfo->sre_active)
+				mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_sre_sequence);
+			else if (pinfo->cabc_bl_max > 0 && !pinfo->cabc_active)
+				mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
+			else
+				mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
 			break;
 		case 2:
 			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_still_image_sequence);
-			set_backlight_pwm(1);
 			break;
 		case 3:
 			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_video_image_sequence);
-			set_backlight_pwm(1);
 			break;
 		default:
 			pr_err("%s: cabc level %d is not supported!\n",__func__, pinfo->cabc_mode);
 			ret = -EINVAL;
 			break;
 	}
+
+done:
+	set_backlight_pwm((pinfo->cabc_available && (pinfo->cabc_mode > 0)) ? 1 : 0);
+
 	return ret;
 }
 
@@ -137,6 +148,122 @@ out:
 	mutex_unlock(&config_mutex);
 	return ret;
 
+}
+
+int mdss_dsi_panel_update_sre(struct mdss_panel_data *pdata, u32 bl_level)
+{
+	int ret = 0;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+
+	if (pdata == NULL)
+		return -EINVAL;
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata, panel_data);
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+	if (!pinfo->cabc_mode || !pinfo->cabc_bl_max || !pinfo->sre_bl_threshold)
+		return 0;
+
+	// disable CABC above some backlight value since it's not effective at high
+	// brightness. optionally enable SRE when it's even higher to melt faces off.
+	if ((!pinfo->cabc_active || pinfo->sre_active) && bl_level <= pinfo->cabc_bl_max) {
+		pinfo->cabc_active = true;
+		pinfo->sre_active = false;
+		ret = mdss_dsi_update_cabc_level(ctrl_pdata);
+	} else if (bl_level > pinfo->cabc_bl_max) {
+		if (pinfo->sre_enabled && !pinfo->sre_active && bl_level >= pinfo->sre_bl_threshold) {
+			pinfo->cabc_active = false;
+			pinfo->sre_active = true;
+			ret = mdss_dsi_update_cabc_level(ctrl_pdata);
+		} else if (pinfo->cabc_active || pinfo->sre_active) {
+			pinfo->cabc_active = false;
+			pinfo->sre_active = false;
+			ret = mdss_dsi_update_cabc_level(ctrl_pdata);
+		}
+	}
+	return ret;
+}
+
+int mdss_dsi_panel_set_sre(struct mdss_panel_data *pdata, bool enable)
+{
+	int ret = 0;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+
+    if (pdata == NULL) {
+	    pr_err("%s: Invalid input data\n", __func__);
+	    return -EINVAL;
+    }
+
+    ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata, panel_data);
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+    if (!pinfo->cabc_available || !pinfo->sre_available ||
+            enable == pinfo->sre_enabled)
+        return 0;
+
+	mutex_lock(&config_mutex);
+	pinfo->sre_enabled = enable;
+	pinfo->sre_active = false;
+	mutex_unlock(&config_mutex);
+
+	return ret;
+}
+
+static int mdss_dsi_update_color_enhance(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
+{
+	struct mdss_panel_info *pinfo = NULL;
+
+	if (ctrl_pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+	if (!pinfo->color_enhance_available)
+		return -EINVAL;
+
+	pr_info("%s: enabled = %d", __func__, pinfo->color_enhance_enabled);
+
+	mdss_dsi_panel_cmds_send(ctrl_pdata, pinfo->color_enhance_enabled ?
+			&color_enhance_on_sequence : &color_enhance_off_sequence);
+
+	return 0;
+}
+
+int mdss_dsi_panel_set_color_enhance(struct mdss_panel_data *pdata, bool enabled)
+{
+	int ret = 0;
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata, panel_data);
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+	if (!pinfo->color_enhance_available)
+		return -EINVAL;
+
+    mutex_lock(&config_mutex);
+
+	pinfo->color_enhance_enabled = enabled;
+
+	if (!pinfo->panel_power_on) {
+		pr_info("%s: lcd is off, queued color enhance change\n", __func__);
+		goto out;
+	}
+
+	ret = mdss_dsi_update_color_enhance(ctrl_pdata);
+
+out:
+    mutex_unlock(&config_mutex);
+	return ret;
 }
 
 static int mdss_dsi_update_gamma_index(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
@@ -769,6 +896,7 @@ static int mdss_dsi_set_col_page_addr(struct mdss_panel_data *pdata)
 	struct mdss_rect *p_roi;
 	struct mdss_rect *c_roi;
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
+	struct mdss_dsi_ctrl_pdata *other = NULL;
 	struct dcs_cmd_req cmdreq;
 	int left_or_both = 0;
 
@@ -782,19 +910,32 @@ static int mdss_dsi_set_col_page_addr(struct mdss_panel_data *pdata)
 
 	pinfo = &pdata->panel_info;
 	p_roi = &pinfo->roi;
-	c_roi = &ctrl->roi;
 
 	/*
-	 * if broadcase mode enable or roi had changed
-	 * then do col_page update
+	 * to avoid keep sending same col_page info to panel,
+	 * if roi_merge enabled, the roi of left ctrl is used
+	 * to compare against new merged roi and saved new
+	 * merged roi to it after comparing.
+	 * if roi_merge disabled, then the calling ctrl's roi
+	 * and pinfo's roi are used to compare.
 	 */
+	if (pinfo->partial_update_roi_merge) {
+		left_or_both = mdss_dsi_roi_merge(ctrl, &roi);
+		other = mdss_dsi_get_ctrl_by_index(DSI_CTRL_LEFT);
+		c_roi = &other->roi;
+	} else {
+		c_roi = &ctrl->roi;
+		roi = *p_roi;
+	}
+
+	/* roi had changed, do col_page update */
 	if (mdss_dsi_sync_wait_enable(ctrl) ||
-				!mdss_rect_cmp(c_roi, p_roi)) {
+				!mdss_rect_cmp(c_roi, &roi)) {
 		pr_debug("%s: ndx=%d x=%d y=%d w=%d h=%d\n",
 				__func__, ctrl->ndx, p_roi->x,
 				p_roi->y, p_roi->w, p_roi->h);
 
-		*c_roi = *p_roi;	/* keep to ctrl */
+		*c_roi = roi; /* keep to ctrl */
 		if (c_roi->w == 0 || c_roi->h == 0) {
 			/* no new frame update */
 			pr_debug("%s: ctrl=%d, no partial roi set\n",
@@ -802,11 +943,6 @@ static int mdss_dsi_set_col_page_addr(struct mdss_panel_data *pdata)
 			if (!mdss_dsi_sync_wait_enable(ctrl))
 				return 0;
 		}
-
-		roi = *c_roi;
-
-		if (pinfo->partial_update_roi_merge)
-			left_or_both = mdss_dsi_roi_merge(ctrl, &roi);
 
 		if (pinfo->partial_update_dcs_cmd_by_left) {
 			if (left_or_both && ctrl->ndx == DSI_CTRL_RIGHT) {
@@ -966,13 +1102,13 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
 
 #ifdef CONFIG_MACH_OPPO
-	set_backlight_pwm(1);
-
-	mdss_dsi_update_cabc_level(ctrl);
-    mdss_dsi_update_gamma_index(ctrl);
-
 	if (ctrl->calibration_available && ctrl->calibration_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->calibration_cmds);
+
+    mdss_dsi_update_gamma_index(ctrl);
+	mdss_dsi_update_color_enhance(ctrl);
+
+	mdss_dsi_update_cabc_level(ctrl);
 #endif
 
 	pr_debug("%s:-\n", __func__);
@@ -1764,6 +1900,21 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	mdss_dsi_parse_dcs_cmds(np, &cabc_video_image_sequence,
 		"qcom,mdss-dsi-cabc-video-command", "qcom,mdss-dsi-off-command-state");
+
+	rc = mdss_dsi_parse_dcs_cmds(np, &cabc_sre_sequence,
+		"qcom,mdss-dsi-sre-ui-command", "qcom,mdss-dsi-off-command-state");
+
+	pinfo->sre_available = rc == 0 ? 1 : 0;
+
+	of_property_read_u32(np, "qcom,mdss-dsi-bl-sre-level", &pinfo->sre_bl_threshold);
+
+	of_property_read_u32(np, "qcom,mdss-dsi-bl-cabc-max-level", &pinfo->cabc_bl_max);
+
+	rc = mdss_dsi_parse_dcs_cmds(np, &color_enhance_on_sequence,
+		"qcom,mdss-dsi-color-enhance-on-command", "qcom,mdss-dsi-off-command-state");
+	rc = rc && mdss_dsi_parse_dcs_cmds(np, &color_enhance_off_sequence,
+		"qcom,mdss-dsi-color-enhance-off-command", "qcom,mdss-dsi-off-command-state");
+	pinfo->color_enhance_available = (rc == 0);
 
 	rc = mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->calibration_cmds,
 		"qcom,mdss-dsi-calibration-command", "qcom,mdss-dsi-calibration-command-state");

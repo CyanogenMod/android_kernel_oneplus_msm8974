@@ -12,11 +12,16 @@
 
 &soc {
 	slim@fe12f000 {
-		cdc-es325-supply = <&pm8941_lvs2>;
-
 		taiko_codec {
-			cdc-hpmic_switch-1-supply = <&pm8941_l24>;
-			qcom,cdc-micbias-cfilt2-mv = <2000>;
+			cdc-vdd-hpmic-switch-supply = <&pm8941_l24>;
+			qcom,cdc-vdd-hpmic-switch-voltage = <3075000 3075000>;
+			qcom,cdc-vdd-hpmic-switch-current = <25000>;
+			qcom,cdc-on-demand-supplies = "cdc-vdd-hpmic-switch";
+
+			qcom,cdc-micbias1-ext-cap;
+			qcom,cdc-micbias2-ext-cap;
+			qcom,cdc-micbias3-ext-cap;
+			qcom,cdc-micbias4-ext-cap;
 		};
 	};
 
@@ -58,11 +63,5 @@
 		qcom,yda145_boost-gpio = <&msmgpio 67 0>;
 		enable_spk-gpio = <&msmgpio 73 0>;
 		qcom,mbhc-audio-jack-type = "4-pole-jack";
-	};
-};
-
-&pm8941_lsid0 {
-	clkdiv@5c00 {
-		qcom,cxo-div = <1>;
 	};
 };

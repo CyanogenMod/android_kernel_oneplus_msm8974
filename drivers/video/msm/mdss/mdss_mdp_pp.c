@@ -196,6 +196,15 @@ static u32 igc_limited[IGC_LUT_ENTRIES] = {
 #define PP_FLAGS_DIRTY_HIST_COL	0x80
 #define PP_FLAGS_DIRTY_PGC	0x100
 #define PP_FLAGS_DIRTY_SHARP	0x200
+/* Leave space for future features */
+#define PP_FLAGS_RESUME_COMMIT	0x10000000
+
+#define IS_PP_RESUME_COMMIT(x)	((x) & PP_FLAGS_RESUME_COMMIT)
+#define PP_FLAGS_LUT_BASED (PP_FLAGS_DIRTY_IGC | PP_FLAGS_DIRTY_GAMUT | \
+		PP_FLAGS_DIRTY_PGC | PP_FLAGS_DIRTY_ARGC)
+#define IS_PP_LUT_DIRTY(x)	((x) & PP_FLAGS_LUT_BASED)
+#define IS_SIX_ZONE_DIRTY(d, pa)	(((d) & PP_FLAGS_DIRTY_PA) && \
+		((pa) & MDP_PP_PA_SIX_ZONE_ENABLE))
 
 #define PP_SSPP		0
 #define PP_DSPP		1
@@ -405,14 +414,21 @@ int mdss_mdp_csc_setup_data(u32 block, u32 blk_idx, u32 tbl_idx,
 	mdata = mdss_mdp_get_mdata();
 	switch (block) {
 	case MDSS_MDP_BLOCK_SSPP:
-		if (blk_idx < mdata->nvig_pipes) {
-			pipe = mdata->vig_pipes + blk_idx;
+		pipe = mdss_mdp_pipe_search(mdata, BIT(blk_idx));
+		if (!pipe) {
+			pr_err("invalid blk index=%d\n", blk_idx);
+			ret = -EINVAL;
+			break;
+		}
+		if (mdss_mdp_pipe_is_yuv(pipe)) {
 			base = pipe->base;
 			if (tbl_idx == 1)
 				base += MDSS_MDP_REG_VIG_CSC_1_BASE;
 			else
 				base += MDSS_MDP_REG_VIG_CSC_0_BASE;
 		} else {
+			pr_err("non ViG pipe %d for CSC is not allowed\n",
+				blk_idx);
 			ret = -EINVAL;
 		}
 		break;
@@ -429,7 +445,7 @@ int mdss_mdp_csc_setup_data(u32 block, u32 blk_idx, u32 tbl_idx,
 		break;
 	}
 	if (ret != 0) {
-		pr_err("unsupported block id for csc\n");
+		pr_err("unsupported block id %d for csc\n", blk_idx);
 		return ret;
 	}
 
@@ -965,7 +981,7 @@ static int mdss_mdp_scale_setup(struct mdss_mdp_pipe *pipe)
 	    (pipe->pp_res.pp_sts.sharp_sts & PP_STS_ENABLE) ||
 	    (chroma_sample == MDSS_MDP_CHROMA_420) ||
 	    (chroma_sample == MDSS_MDP_CHROMA_H1V2) ||
-	    pipe->scale.enable_pxl_ext) {
+	    (pipe->scale.enable_pxl_ext && (src_h != pipe->dst.h))) {
 		pr_debug("scale y - src_h=%d dst_h=%d\n", src_h, pipe->dst.h);
 
 		if ((src_h / MAX_DOWNSCALE_RATIO) > pipe->dst.h) {
@@ -1021,7 +1037,7 @@ static int mdss_mdp_scale_setup(struct mdss_mdp_pipe *pipe)
 	    (pipe->pp_res.pp_sts.sharp_sts & PP_STS_ENABLE) ||
 	    (chroma_sample == MDSS_MDP_CHROMA_420) ||
 	    (chroma_sample == MDSS_MDP_CHROMA_H2V1) ||
-	    pipe->scale.enable_pxl_ext) {
+	    (pipe->scale.enable_pxl_ext && (src_w != pipe->dst.w))) {
 		pr_debug("scale x - src_w=%d dst_w=%d\n", src_w, pipe->dst.w);
 
 		if ((src_w / MAX_DOWNSCALE_RATIO) > pipe->dst.w) {
@@ -1599,10 +1615,12 @@ int mdss_mdp_pp_setup_locked(struct mdss_mdp_ctl *ctl)
 {
 	struct mdss_data_type *mdata = ctl->mdata;
 	int ret = 0;
+	u32 flags, pa_v2_flags;
+	u32 max_bw_needed;
 	u32 mixer_cnt;
 	u32 mixer_id[MDSS_MDP_INTF_MAX_LAYERMIXER];
 	u32 disp_num;
-	int i;
+	int i, req = -1;
 	bool valid_mixers = true;
 	if ((!ctl->mfd) || (!mdss_pp_res))
 		return -EINVAL;
@@ -1631,6 +1649,25 @@ int mdss_mdp_pp_setup_locked(struct mdss_mdp_ctl *ctl)
 	}
 
 	mutex_lock(&mdss_pp_mutex);
+
+	flags = mdss_pp_res->pp_disp_flags[disp_num];
+	pa_v2_flags = mdss_pp_res->pa_v2_disp_cfg[disp_num].flags;
+
+	/*
+	 * If a LUT based PP feature needs to be reprogrammed during resume,
+	 * increase the register bus bandwidth to maximum frequency
+	 * in order to speed up the register reprogramming.
+	 */
+	max_bw_needed = (IS_PP_RESUME_COMMIT(flags) &&
+				(IS_PP_LUT_DIRTY(flags) ||
+				IS_SIX_ZONE_DIRTY(flags, pa_v2_flags)));
+	if (mdata->reg_bus_hdl && max_bw_needed) {
+		req = msm_bus_scale_client_update_request(mdata->reg_bus_hdl,
+				REG_CLK_CFG_HIGH);
+		if (req)
+			pr_err("Updated reg_bus_scale failed, ret = %d", req);
+	}
+
 	if (ctl->mixer_left) {
 		pp_mixer_setup(disp_num, ctl->mixer_left);
 		pp_dspp_setup(disp_num, ctl->mixer_left);
@@ -1645,6 +1682,16 @@ int mdss_mdp_pp_setup_locked(struct mdss_mdp_ctl *ctl)
 		if (disp_num < mdata->nad_cfgs)
 			mdata->ad_cfgs[disp_num].reg_sts = 0;
 	}
+
+	if (mdata->reg_bus_hdl && max_bw_needed) {
+		req = msm_bus_scale_client_update_request(mdata->reg_bus_hdl,
+				REG_CLK_CFG_OFF);
+		if (req)
+			pr_err("Updated reg_bus_scale failed, ret = %d", req);
+	}
+	if (IS_PP_RESUME_COMMIT(flags))
+		mdss_pp_res->pp_disp_flags[disp_num] &=
+			~PP_FLAGS_RESUME_COMMIT;
 	mutex_unlock(&mdss_pp_mutex);
 exit:
 	return ret;
@@ -1758,6 +1805,7 @@ int mdss_mdp_pp_resume(struct mdss_mdp_ctl *ctl, u32 dspp_num)
 	}
 
 	mdss_pp_res->pp_disp_flags[disp_num] |= flags;
+	mdss_pp_res->pp_disp_flags[disp_num] |= PP_FLAGS_RESUME_COMMIT;
 	return 0;
 }
 
@@ -4957,26 +5005,37 @@ static int is_valid_calib_addr(void *addr, u32 operation)
 		    ptr <= (mdss_res->mdp_base + MDSS_MDP_REG_IGC_VIG_BASE +
 						MDSS_MDP_IGC_SSPP_SIZE)) {
 		ret = MDP_PP_OPS_READ | MDP_PP_OPS_WRITE;
-	} else if (ptr >= dspp_base && ptr < (dspp_base +
-		(mdss_res->nmixers_intf * MDSS_MDP_DSPP_ADDRESS_OFFSET))) {
-		ret = is_valid_calib_dspp_addr(ptr);
-	} else if (ptr >= ctl_base && ptr < (ctl_base + (mdss_res->nctl
-					* MDSS_MDP_CTL_ADDRESS_OFFSET))) {
-		ret = is_valid_calib_ctrl_addr(ptr);
-	} else if (ptr >= vig_base && ptr < (vig_base + (mdss_res->nvig_pipes
-					* MDSS_MDP_SSPP_ADDRESS_OFFSET))) {
-		ret = is_valid_calib_vig_addr(ptr);
-	} else if (ptr >= rgb_base && ptr < (rgb_base + (mdss_res->nrgb_pipes
-					* MDSS_MDP_SSPP_ADDRESS_OFFSET))) {
-		ret = is_valid_calib_rgb_addr(ptr);
-	} else if (ptr >= dma_base && ptr < (dma_base + (mdss_res->ndma_pipes
-					* MDSS_MDP_SSPP_ADDRESS_OFFSET))) {
-		ret = is_valid_calib_dma_addr(ptr);
-	} else if (ptr >= mixer_base && ptr < (mixer_base +
-		(mdss_res->nmixers_intf * MDSS_MDP_LM_ADDRESS_OFFSET))) {
-		ret = is_valid_calib_mixer_addr(ptr);
+	} else {
+		if (ptr >= dspp_base) {
+			ret = is_valid_calib_dspp_addr(ptr);
+			if (ret)
+				goto valid_addr;
+		}
+		if (ptr >= ctl_base) {
+			ret = is_valid_calib_ctrl_addr(ptr);
+			if (ret)
+				goto valid_addr;
+		}
+		if (ptr >= vig_base) {
+			ret = is_valid_calib_vig_addr(ptr);
+			if (ret)
+				goto valid_addr;
+		}
+		if (ptr >= rgb_base) {
+			ret = is_valid_calib_rgb_addr(ptr);
+			if (ret)
+				goto valid_addr;
+		}
+		if (ptr >= dma_base) {
+			ret = is_valid_calib_dma_addr(ptr);
+			if (ret)
+				goto valid_addr;
+		}
+		if (ptr >= mixer_base)
+			ret = is_valid_calib_mixer_addr(ptr);
 	}
 
+valid_addr:
 	return ret & operation;
 }
 

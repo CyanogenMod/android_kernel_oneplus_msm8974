@@ -63,8 +63,7 @@ static int dsi_panel_handler(struct mdss_panel_data *pdata, int enable)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	if (enable) {
-		dsi_ctrl_gpio_request(ctrl_pdata);
+	if (enable && pdata->panel_info.panel_power_on == 0) {
 		mdss_dsi_panel_reset(pdata, 1);
 		pdata->panel_info.panel_power_on = 1;
 		rc = ctrl_pdata->on(pdata);
@@ -76,7 +75,6 @@ static int dsi_panel_handler(struct mdss_panel_data *pdata, int enable)
 		rc = ctrl_pdata->off(pdata);
 		pdata->panel_info.panel_power_on = 0;
 		mdss_dsi_panel_reset(pdata, 0);
-		dsi_ctrl_gpio_free(ctrl_pdata);
 	}
 	return rc;
 }
@@ -157,15 +155,6 @@ static int dsi_parse_gpio(struct platform_device *pdev,
 		pr_err("%s:%d, Disp_en gpio not specified\n",
 						__func__, __LINE__);
 
-	ctrl_pdata->disp_te_gpio = -1;
-	if (ctrl_pdata->panel_data.panel_info.mipi.mode == DSI_CMD_MODE) {
-		ctrl_pdata->disp_te_gpio = of_get_named_gpio(np,
-						"qcom,platform-te-gpio", 0);
-		if (!gpio_is_valid(ctrl_pdata->disp_te_gpio))
-			pr_err("%s:%d, Disp_te gpio not specified\n",
-							__func__, __LINE__);
-	}
-
 	ctrl_pdata->rst_gpio = of_get_named_gpio(np,
 					"qcom,platform-reset-gpio", 0);
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio))
@@ -184,32 +173,10 @@ static int dsi_parse_gpio(struct platform_device *pdev,
 	return 0;
 }
 
-int dsi_ctrl_gpio_request(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
-{
-	int rc = 0;
-
-	if (gpio_is_valid(ctrl_pdata->disp_te_gpio)) {
-		rc = gpio_request(ctrl_pdata->disp_te_gpio, "disp_te");
-		if (rc)
-			ctrl_pdata->disp_te_gpio_requested = 0;
-		else
-			ctrl_pdata->disp_te_gpio_requested = 1;
-	}
-
-	return rc;
-}
-
-void dsi_ctrl_gpio_free(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
-{
-	if (ctrl_pdata->disp_te_gpio_requested) {
-		gpio_free(ctrl_pdata->disp_te_gpio);
-		ctrl_pdata->disp_te_gpio_requested = 0;
-	}
-}
-
 static void mdss_dsi_put_dt_vreg_data(struct device *dev,
 	struct dss_module_power *module_power)
 {
+	struct dss_module_power *module_power = &(ctrl_pdata->power_data);
 	if (!module_power) {
 		pr_err("%s: invalid input\n", __func__);
 		return;

@@ -1202,11 +1202,11 @@ int mdss_mdp_pipe_queue_data(struct mdss_mdp_pipe *pipe,
 	 * line and block mode operations
 	 */
 	params_changed = (pipe->params_changed) ||
-		((pipe->type == MDSS_MDP_PIPE_TYPE_DMA) &&
-		 (pipe->mixer->type == MDSS_MDP_MIXER_TYPE_WRITEBACK) &&
-		 (ctl->mdata->mixer_switched)) || ctl->roi_changed;
-	if ((src_data == NULL || !pipe->has_buf) ||
-			(pipe->flags & MDP_SOLID_FILL)) {
+			 ((pipe->type == MDSS_MDP_PIPE_TYPE_DMA) &&
+			 (pipe->mixer->type == MDSS_MDP_MIXER_TYPE_WRITEBACK)
+			 && (ctl->mdata->mixer_switched)) ||
+			 ctl->roi_changed;
+	if (src_data == NULL || (pipe->flags & MDP_SOLID_FILL)) {
 		pipe->params_changed = 0;
 		mdss_mdp_pipe_solidfill_setup(pipe);
 		goto update_nobuf;
@@ -1237,12 +1237,6 @@ int mdss_mdp_pipe_queue_data(struct mdss_mdp_pipe *pipe,
 		if (pipe->type == MDSS_MDP_PIPE_TYPE_VIG)
 			mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_VIG_OP_MODE,
 			opmode);
-	}
-
-	if (src_data == NULL || !pipe->has_buf) {
-		pr_debug("src_data=%p has_buf=%d pipe num=%dx",
-				src_data, pipe->has_buf, pipe->num);
-		goto update_nobuf;
 	}
 
 	mdss_mdp_smp_alloc(pipe);

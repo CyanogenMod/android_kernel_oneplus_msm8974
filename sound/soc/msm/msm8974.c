@@ -10,6 +10,8 @@
  * GNU General Public License for more details.
  */
 
+#define DEBUG
+
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
@@ -129,23 +131,17 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.gpio_level_insert = 0,
 #endif
 	.detect_extn_cable = true,
-#ifdef CONFIG_MACH_OPPO //luyan modify micbias to dc
-	.micbias_enable_flags = 1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET | 1<<MBHC_MICBIAS_ENABLE_REGULAR_HEADSET,
-#else
 	.micbias_enable_flags = 1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET,
-#endif
 	.insert_detect = true,
 	.swap_gnd_mic = NULL,
-#ifdef CONFIG_MACH_OPPO
-	.set_gnd_mic_gpio = NULL,
-#endif
+	.reset_gnd_mic = NULL,
 	.cs_enable_flags = (1 << MBHC_CS_ENABLE_POLLING |
 			    1 << MBHC_CS_ENABLE_INSERTION |
 			    1 << MBHC_CS_ENABLE_REMOVAL),
 	.do_recalibration = true,
 	.use_vddio_meas = true,
 	.enable_anc_mic_detect = false,
-	.hw_jack_type = SIX_POLE_JACK,
+	.hw_jack_type = FOUR_POLE_JACK,
 };
 
 struct msm_auxpcm_gpio {
@@ -1571,14 +1567,6 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 			hdmi_rx_sample_rate_get, hdmi_rx_sample_rate_put),
 };
 
-#ifdef CONFIG_MACH_OPPO
-static void msm8974_set_gnd_mic_gpio(struct snd_soc_codec *codec, int value)
-{
-	struct snd_soc_card *card = codec->card;
-	struct msm8974_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
-	gpio_set_value_cansleep(pdata->us_euro_gpio, value);
-}
-#else
 static bool msm8974_swap_gnd_mic(struct snd_soc_codec *codec)
 {
 	struct snd_soc_card *card = codec->card;
@@ -1586,9 +1574,9 @@ static bool msm8974_swap_gnd_mic(struct snd_soc_codec *codec)
 	int value = gpio_get_value_cansleep(pdata->us_euro_gpio);
 	pr_debug("%s: swap select switch %d to %d\n", __func__, value, !value);
 	gpio_set_value_cansleep(pdata->us_euro_gpio, !value);
+	msleep(150);
 	return true;
 }
-#endif
 
 static int msm_afe_set_config(struct snd_soc_codec *codec)
 {
@@ -1865,55 +1853,22 @@ void *def_taiko_mbhc_cal(void)
 	S(n_btn_meas, 1);
 	S(n_btn_con, 2);
 	S(num_btn, WCD9XXX_MBHC_DEF_BUTTONS);
-#ifdef CONFIG_MACH_OPPO
-	S(v_btn_press_delta_sta, 0);
-#else
 	S(v_btn_press_delta_sta, 100);
-#endif
 	S(v_btn_press_delta_cic, 50);
 #undef S
 	btn_cfg = WCD9XXX_MBHC_CAL_BTN_DET_PTR(taiko_cal);
 	btn_low = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_V_BTN_LOW);
 	btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg,
 					       MBHC_BTN_DET_V_BTN_HIGH);
-#ifdef CONFIG_MACH_FIND7OP
+#ifdef CONFIG_MACH_OPPO
 	btn_low[0] = -70;
 	btn_high[0] = 50;
 	btn_low[1] = 51;
-	btn_high[1] = 52;
-	btn_low[2] = 53;
-	btn_high[2] = 54;
-	btn_low[3] = 55;
-	btn_high[3] = 263;
-	btn_low[4] = 264;
-	btn_high[4] = 265;
-	btn_low[5] = 266;
-	btn_high[5] = 267;
-	btn_low[6] = 268;
-	btn_high[6] = 269;
-	btn_low[7] = 270;
-	btn_high[7] = 600;
-#elif defined(CONFIG_MACH_FIND7)
-	btn_low[0] = -70;
-	btn_high[0] = 40;
-	btn_low[1] = 41;
-	btn_high[1] = 61;
-	btn_low[2] = 62;
-	btn_high[2] = 104;
-	btn_low[3] = 105;
-	btn_high[3] = 148;
-	btn_low[4] = 149;
-	btn_high[4] = 189;
-	btn_low[5] = 190;
-	btn_high[5] = 228;
-	btn_low[6] = 229;
-	btn_high[6] = 269;
-	btn_low[7] = 270;
-	btn_high[7] = 500;
 #else
 	btn_low[0] = -50;
 	btn_high[0] = 20;
 	btn_low[1] = 21;
+#endif
 	btn_high[1] = 61;
 	btn_low[2] = 62;
 	btn_high[2] = 104;
@@ -1924,8 +1879,11 @@ void *def_taiko_mbhc_cal(void)
 	btn_low[5] = 190;
 	btn_high[5] = 228;
 	btn_low[6] = 229;
-	btn_high[6] = 269;
-	btn_low[7] = 270;
+	btn_high[6] = 274;
+	btn_low[7] = 275;
+#ifdef CONFIG_MACH_OPPO
+	btn_high[7] = 800;
+#else
 	btn_high[7] = 500;
 #endif
 	n_ready = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_N_READY);
@@ -3068,6 +3026,16 @@ static int msm8974_prepare_codec_mclk(struct snd_soc_card *card)
 	return 0;
 }
 
+static bool msm8974_reset_gnd_mic(struct snd_soc_card *card)
+{
+	struct msm8974_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+
+	/* Set initial GPIO state, high -> US, low -> EU*/
+	gpio_direction_output(pdata->us_euro_gpio, 1);
+	msleep(50);
+	return true;
+}
+
 static int msm8974_prepare_us_euro(struct snd_soc_card *card)
 {
 	struct msm8974_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
@@ -3082,10 +3050,7 @@ static int msm8974_prepare_us_euro(struct snd_soc_card *card)
 				__func__, pdata->us_euro_gpio, ret);
 			return ret;
 		}
-#ifdef CONFIG_MACH_OPPO
-		/* Set initial GPIO state, high -> US, low -> EU*/
-		gpio_direction_output(pdata->us_euro_gpio, 1);
-#endif
+		msm8974_reset_gnd_mic(card);
 	}
 
 	return 0;
@@ -3264,11 +3229,8 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 	} else {
 		dev_dbg(&pdev->dev, "%s detected %d",
 			"qcom,us-euro-gpios", pdata->us_euro_gpio);
-#ifdef CONFIG_MACH_OPPO
-		mbhc_cfg.set_gnd_mic_gpio = msm8974_set_gnd_mic_gpio;
-#else
 		mbhc_cfg.swap_gnd_mic = msm8974_swap_gnd_mic;
-#endif
+		mbhc_cfg.reset_gnd_mic = msm8974_reset_gnd_mic;
 	}
 
 	ret = msm8974_prepare_us_euro(card);

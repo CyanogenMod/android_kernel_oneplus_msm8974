@@ -171,6 +171,9 @@ struct mdss_data_type {
 	u32 *clock_levels;
 	u32 nclk_lvl;
 
+	u32 enable_bw_release;
+	u32 enable_rotator_bw_release;
+
 	struct mdss_hw_settings *hw_settings;
 
 	struct mdss_mdp_pipe *vig_pipes;
@@ -186,8 +189,10 @@ struct mdss_data_type {
 	struct mdss_mdp_mixer *mixer_wb;
 	u32 nmixers_intf;
 	u32 nmixers_wb;
+
 	struct mdss_mdp_ctl *ctl_off;
 	u32 nctl;
+
 	struct mdss_mdp_dp_intf *dp_off;
 	u32 ndp;
 	void *video_intf;
@@ -214,6 +219,7 @@ struct mdss_data_type {
 	struct mdss_prefill_data prefill_data;
 	bool idle_pc;
 	struct mdss_perf_tune perf_tune;
+	atomic_t active_intf_cnt;
 	int iommu_ref_cnt;
 
 	u64 ab[MDSS_MAX_HW_BLK];
