@@ -220,6 +220,11 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	if (!IS_CALIB_MODE_BL(mfd) && (!mfd->ext_bl_ctrl || !value ||
 							!mfd->bl_level)) {
 		mutex_lock(&mfd->bl_lock);
+		/* If this is the first backlight write after powering on,
+		   wait until the first frame is committed to avoid showing
+		   any garbage left over in frame memory */
+		if (!mfd->bl_level && value && mfd->panel.type == MIPI_CMD_PANEL)
+			mfd->bl_updated = false;
 		mdss_fb_set_backlight(mfd, bl_lvl);
 		mutex_unlock(&mfd->bl_lock);
 	}
