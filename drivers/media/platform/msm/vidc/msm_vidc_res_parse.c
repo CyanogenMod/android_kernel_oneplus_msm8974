@@ -590,9 +590,11 @@ int read_platform_resources_from_dt(
 	kres = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	res->irq = kres ? kres->start : -1;
 
-	of_property_read_u32(pdev->dev.of_node,
-			"qcom,ocmem-size", &res->ocmem_size);
-
+	rc = of_property_read_u32(pdev->dev.of_node,
+						"qcom,ocmem-size", &res->ocmem_size);
+	if (rc) {
+		dprintk(VIDC_INFO, "Failed to read ocmem size: %d\n", rc);
+	}
 	rc = msm_vidc_load_freq_table(res);
 	if (rc) {
 		dprintk(VIDC_ERR, "Failed to load freq table: %d\n", rc);
