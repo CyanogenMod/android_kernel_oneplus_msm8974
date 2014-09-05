@@ -249,7 +249,7 @@ static void lpm_system_level_update(void)
 	struct lpm_system_level *l = NULL;
 	uint32_t max_l2_mode;
 	static DEFINE_MUTEX(lpm_lock);
-
+	
 	mutex_lock(&lpm_lock);
 
 	if (num_powered_cores == 1)
@@ -522,8 +522,7 @@ static noinline int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 	if (!sys_state.cpu_level)
 		return -EINVAL;
 
-	if (!dev->cpu)
-		next_event_us = (uint32_t)(ktime_to_us(get_next_event_time()));
+	next_event_us = (uint32_t)(ktime_to_us(get_next_event_time(dev->cpu)));
 
 	for (i = 0; i < sys_state.num_cpu_levels; i++) {
 		struct lpm_cpu_level *level = &sys_state.cpu_level[i];
@@ -589,7 +588,7 @@ static noinline int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 		}
 	}
 
-	if (modified_time_us && !dev->cpu)
+	if (modified_time_us)
 		msm_pm_set_timer(modified_time_us);
 
 	return best_level;
