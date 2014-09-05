@@ -52,20 +52,6 @@
 
 static struct lm3630_chip_data *lm3630_pchip;
 
-#ifdef CONFIG_BL_REGISTER
-enum lm3630_leds {
-	BLED_ALL = 0,
-	BLED_1,
-	BLED_2
-};
-
-static const char * const bled_name[] = {
-	[BLED_ALL] = "lm3630_bled",	/*Bank1 controls all string */
-	[BLED_1] = "lm3630_bled1",	/*Bank1 controls bled1 */
-	[BLED_2] = "lm3630_bled2",	/*Bank1 or 2 controls bled2 */
-};
-#endif
-
 struct lm3630_chip_data {
 	struct device *dev;
 	struct delayed_work work;
@@ -209,203 +195,6 @@ static int lm3630_intr_config(struct lm3630_chip_data *pchip)
 	return 0;
 }
 
-
-#ifdef CONFIG_BL_REGISTER
-static bool
-set_intensity(struct backlight_device *bl, struct lm3630_chip_data *pchip)
-{
-	if (!pchip->pdata->pwm_set_intensity)
-		return false;
-	pchip->pdata->pwm_set_intensity(bl->props.brightness - 1,
-					pchip->pdata->pwm_period);
-	return true;
-}
-
-/* update and get brightness */
-static int lm3630_bank_a_update_status(struct backlight_device *bl)
-{
-	int ret;
-	struct lm3630_chip_data *pchip = bl_get_data(bl);
-	enum lm3630_pwm_ctrl pwm_ctrl = pchip->pdata->pwm_ctrl;
-
-	/* brightness 0 means disable */
-	if (!bl->props.brightness) {
-		ret = regmap_update_bits(pchip->regmap, REG_CTRL, 0x04, 0x00);
-		if (ret < 0)
-			goto out;
-		return bl->props.brightness;
-	}
-
-	/* pwm control */
-	if (pwm_ctrl == PWM_CTRL_BANK_A || pwm_ctrl == PWM_CTRL_BANK_ALL) {
-		if (!set_intensity(bl, pchip))
-			dev_err(pchip->dev, "No pwm control func. in plat-data\n");
-	} else {
-
-		/* i2c control */
-		ret = regmap_update_bits(pchip->regmap, REG_CTRL, 0x80, 0x00);
-		if (ret < 0)
-			goto out;
-		mdelay(1);
-		ret = regmap_write(pchip->regmap,
-				   REG_BRT_A, bl->props.brightness - 1);
-		if (ret < 0)
-			goto out;
-	}
-	return bl->props.brightness;
-out:
-	dev_err(pchip->dev, "i2c failed to access REG_CTRL\n");
-	return bl->props.brightness;
-}
-
-static int lm3630_bank_a_get_brightness(struct backlight_device *bl)
-{
-	unsigned int reg_val;
-	int brightness, ret;
-	struct lm3630_chip_data *pchip = bl_get_data(bl);
-	enum lm3630_pwm_ctrl pwm_ctrl = pchip->pdata->pwm_ctrl;
-
-	if (pwm_ctrl == PWM_CTRL_BANK_A || pwm_ctrl == PWM_CTRL_BANK_ALL) {
-		ret = regmap_read(pchip->regmap, REG_PWM_OUTHIGH, &reg_val);
-		if (ret < 0)
-			goto out;
-		brightness = reg_val & 0x01;
-		ret = regmap_read(pchip->regmap, REG_PWM_OUTLOW, &reg_val);
-		if (ret < 0)
-			goto out;
-		brightness = ((brightness << 8) | reg_val) + 1;
-	} else {
-		ret = regmap_update_bits(pchip->regmap, REG_CTRL, 0x80, 0x00);
-		if (ret < 0)
-			goto out;
-		mdelay(1);
-		ret = regmap_read(pchip->regmap, REG_BRT_A, &reg_val);
-		if (ret < 0)
-			goto out;
-		brightness = reg_val + 1;
-	}
-	bl->props.brightness = brightness;
-	return bl->props.brightness;
-out:
-	dev_err(pchip->dev, "i2c failed to access register\n");
-	return 0;
-}
-
-
-static const struct backlight_ops lm3630_bank_a_ops = {
-	.options = BL_CORE_SUSPENDRESUME,
-	.update_status = lm3630_bank_a_update_status,
-	.get_brightness = lm3630_bank_a_get_brightness,
-};
-
-static int lm3630_bank_b_update_status(struct backlight_device *bl)
-{
-	int ret;
-	struct lm3630_chip_data *pchip = bl_get_data(bl);
-	enum lm3630_pwm_ctrl pwm_ctrl = pchip->pdata->pwm_ctrl;
-
-	if (pwm_ctrl == PWM_CTRL_BANK_B || pwm_ctrl == PWM_CTRL_BANK_ALL) {
-		if (!set_intensity(bl, pchip))
-			dev_err(pchip->dev,
-				"no pwm control func. in plat-data\n");
-	} else {
-		ret = regmap_update_bits(pchip->regmap, REG_CTRL, 0x80, 0x00);
-		if (ret < 0)
-			goto out;
-		mdelay(1);
-		ret = regmap_write(pchip->regmap,
-				   REG_BRT_B, bl->props.brightness - 1);
-	}
-	return bl->props.brightness;
-out:
-	dev_err(pchip->dev, "i2c failed to access register\n");
-	return bl->props.brightness;
-}
-
-static int lm3630_bank_b_get_brightness(struct backlight_device *bl)
-{
-	unsigned int reg_val;
-	int brightness, ret;
-	struct lm3630_chip_data *pchip = bl_get_data(bl);
-	enum lm3630_pwm_ctrl pwm_ctrl = pchip->pdata->pwm_ctrl;
-
-	if (pwm_ctrl == PWM_CTRL_BANK_B || pwm_ctrl == PWM_CTRL_BANK_ALL) {
-		ret = regmap_read(pchip->regmap, REG_PWM_OUTHIGH, &reg_val);
-		if (ret < 0)
-			goto out;
-		brightness = reg_val & 0x01;
-		ret = regmap_read(pchip->regmap, REG_PWM_OUTLOW, &reg_val);
-		if (ret < 0)
-			goto out;
-		brightness = ((brightness << 8) | reg_val) + 1;
-	} else {
-		ret = regmap_update_bits(pchip->regmap, REG_CTRL, 0x80, 0x00);
-		if (ret < 0)
-			goto out;
-		mdelay(1);
-		ret = regmap_read(pchip->regmap, REG_BRT_B, &reg_val);
-		if (ret < 0)
-			goto out;
-		brightness = reg_val + 1;
-	}
-	bl->props.brightness = brightness;
-
-	return bl->props.brightness;
-out:
-	dev_err(pchip->dev, "i2c failed to access register\n");
-	return bl->props.brightness;
-}
-
-
-static const struct backlight_ops lm3630_bank_b_ops = {
-	.options = BL_CORE_SUSPENDRESUME,
-	.update_status = lm3630_bank_b_update_status,
-	.get_brightness = lm3630_bank_b_get_brightness,
-};
-
-
-static int lm3630_backlight_register(struct lm3630_chip_data *pchip,
-				     enum lm3630_leds ledno)
-{
-	const char *name = bled_name[ledno];
-	struct backlight_properties props;
-	struct lm3630_platform_data *pdata = pchip->pdata;
-
-	props.type = BACKLIGHT_RAW;
-	switch (ledno) {
-	case BLED_1:
-	case BLED_ALL:
-		props.brightness = pdata->init_brt_led1;
-		props.max_brightness = pdata->max_brt_led1;
-		pchip->bled1 =
-		    backlight_device_register(name, pchip->dev, pchip,
-					      &lm3630_bank_a_ops, &props);
-		if (IS_ERR(pchip->bled1))
-			return PTR_ERR(pchip->bled1);
-		break;
-	case BLED_2:
-		props.brightness = pdata->init_brt_led2;
-		props.max_brightness = pdata->max_brt_led2;
-		pchip->bled2 =
-		    backlight_device_register(name, pchip->dev, pchip,
-					      &lm3630_bank_b_ops, &props);
-		if (IS_ERR(pchip->bled2))
-			return PTR_ERR(pchip->bled2);
-		break;
-	}
-	return 0;
-}
-
-
-static void lm3630_backlight_unregister(struct lm3630_chip_data *pchip)
-{
-	if (pchip->bled1)
-		backlight_device_unregister(pchip->bled1);
-	if (pchip->bled2)
-		backlight_device_unregister(pchip->bled2);
-}
-#else
-
 /* update and get brightness */
  int lm3630_bank_a_update_status(u32 bl_level)
 {
@@ -466,8 +255,6 @@ out:
 	dev_err(pchip->dev, "i2c failed to access REG_CTRL\n");
 	return bl_level;
 }
-
-#endif
 
 static const struct regmap_config lm3630_regmap = {
 	.reg_bits = 8,
@@ -594,11 +381,12 @@ static int lm3630_probe(struct i2c_client *client,
 	struct lm3630_platform_data *pdata = client->dev.platform_data;
 	struct lm3630_chip_data *pchip;
 	int ret;
+
 /* OPPO 2013-10-24 yxq Add begin for backlight info */
     unsigned int revision;
     static char *temp;
 /* OPPO 2013-10-24 yxq Add end */
-	printk("%s:yanghai.\n", __func__);
+
 	if (client->dev.of_node) {
 		pdata = devm_kzalloc(&client->dev,
 			sizeof(struct lm3630_platform_data), GFP_KERNEL);
@@ -667,32 +455,6 @@ static int lm3630_probe(struct i2c_client *client,
 		dev_err(&client->dev, "fail : init chip\n");
 		goto err_chip_init;
 	}
-#ifdef CONFIG_BL_REGISTER
-	switch (pdata->bank_a_ctrl) {
-	case BANK_A_CTRL_ALL:
-		ret = lm3630_backlight_register(pchip, BLED_ALL);
-		pdata->bank_b_ctrl = BANK_B_CTRL_DISABLE;
-		break;
-	case BANK_A_CTRL_LED1:
-		ret = lm3630_backlight_register(pchip, BLED_1);
-		break;
-	case BANK_A_CTRL_LED2:
-		ret = lm3630_backlight_register(pchip, BLED_2);
-		pdata->bank_b_ctrl = BANK_B_CTRL_DISABLE;
-		break;
-	default:
-		break;
-	}
-
-	if (ret < 0)
-		goto err_bl_reg;
-
-	if (pdata->bank_b_ctrl && pchip->bled2 == NULL) {
-		ret = lm3630_backlight_register(pchip, BLED_2);
-		if (ret < 0)
-			goto err_bl_reg;
-	}
-#endif
 
 	/* interrupt enable  : irq 0 is not allowed for lm3630 */
 	pchip->irq = client->irq;
@@ -713,11 +475,7 @@ static int lm3630_probe(struct i2c_client *client,
 #endif //CONFIG_MACH_OPPO
 
 	return 0;
-#ifdef CONFIG_BL_REGISTER
-err_bl_reg:
-	dev_err(&client->dev, "fail : backlight register.\n");
-	lm3630_backlight_unregister(pchip);
-#endif
+
 err_chip_init:
 	return ret;
 
@@ -746,9 +504,7 @@ static int lm3630_remove(struct i2c_client *client)
 	ret = regmap_write(pchip->regmap, REG_BRT_B, 0);
 	if (ret < 0)
 		dev_err(pchip->dev, "i2c failed to access register\n");
-#ifdef CONFIG_BL_REGISTER
-	lm3630_backlight_unregister(pchip);
-#endif
+
 	if (gpio_is_valid(LM3630_ENABLE_GPIO))
 		gpio_free(LM3630_ENABLE_GPIO);
 
@@ -767,9 +523,9 @@ static const struct i2c_device_id lm3630_id[] = {
 
 MODULE_DEVICE_TABLE(i2c, lm3630_id);
 
-static int lm3630_suspend(struct i2c_client *client, pm_message_t mesg)
+static int lm3630_suspend(struct device *dev)
 {
-	int rc ;
+	int rc;
 
 	pr_debug("%s:backlight suspend.\n", __func__);
     rc = regmap_write(lm3630_pchip->regmap, REG_BRT_A, 0);
@@ -778,15 +534,11 @@ static int lm3630_suspend(struct i2c_client *client, pm_message_t mesg)
 	{
 		pr_err("%s: unable to shotdown !!!!!!!!!!!!\n", __func__);
 	}
-//	rc = gpio_direction_output(LM3630_ENABLE_GPIO, 0);
-//	if (rc) {
-//		pr_err("%s: unable to enable!!!!!!!!!!!!\n", __func__);
-//		return rc;
-//	}
 
 	return 0;
 }
-static int lm3630_resume(struct i2c_client *client)
+
+static int lm3630_resume(struct device *dev)
 {
 	int rc ;
 
@@ -798,11 +550,6 @@ static int lm3630_resume(struct i2c_client *client)
 	{
 		pr_err("%s: unable to shotdown !!!!!!!!!!!!\n", __func__);
 	}
-//	rc = gpio_direction_output(LM3630_ENABLE_GPIO, 1);
-//	if (rc) {
-//		pr_err("%s: unable to enable!!!!!!!!!!!!\n", __func__);
-//		return rc;
-//	}
 
 	return 0;
 }
@@ -851,16 +598,17 @@ static struct of_device_id lm3630_table[] = {
 #define lm3630_table NULL
 #endif
 
+static SIMPLE_DEV_PM_OPS(lm3630_pm_ops, lm3630_suspend, lm3630_resume);
+
 static struct i2c_driver lm3630_i2c_driver = {
 	.driver = {
 		  .name = LM3630_NAME,
 		  .owner	= THIS_MODULE,
 		  .of_match_table = lm3630_table,
-		   },
+		  .pm = &lm3630_pm_ops,
+	},
 	.probe = lm3630_probe,
 	.remove = lm3630_remove,
-	.suspend = lm3630_suspend,
-	.resume = lm3630_resume,
 	.id_table = lm3630_id,
 };
 
@@ -870,4 +618,3 @@ MODULE_DESCRIPTION("Texas Instruments Backlight driver for LM3630");
 MODULE_AUTHOR("G.Shark Jeong <gshark.jeong@gmail.com>");
 MODULE_AUTHOR("Daniel Jeong <daniel.jeong@ti.com>");
 MODULE_LICENSE("GPL v2");
-
