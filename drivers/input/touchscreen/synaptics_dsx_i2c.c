@@ -2878,7 +2878,7 @@ static void synaptics_rmi4_report_touch(struct synaptics_rmi4_data *rmi4_data,
  * and calls synaptics_rmi4_report_touch() with the appropriate
  * function handler for each function with valid data inputs.
  */
-static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data)
+static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data, const ktime_t timestamp)
 {
 	int retval;
 	unsigned char data[MAX_INTR_REGISTERS + 1];
@@ -2887,7 +2887,6 @@ static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data)
 	struct synaptics_rmi4_fn *fhandler;
 	struct synaptics_rmi4_exp_fn *exp_fhandler;
 	struct synaptics_rmi4_device_info *rmi;
-	ktime_t timestamp = ktime_get();
 
 	rmi = &(rmi4_data->rmi4_mod_info);
 
@@ -2951,16 +2950,6 @@ static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data)
 	return;
 }
 
-//irq work function
-static void synaptics_rmi4_report_work(struct work_struct *work) {
-	struct synaptics_rmi4_data *rmi4_data = syna_rmi4_data;
-
-	if (!rmi4_data->touch_stopped)
-		synaptics_rmi4_sensor_report(rmi4_data);
-
-	enable_irq(rmi4_data->i2c_client->irq);
-}
-
 /**
  * synaptics_rmi4_irq()
  *
@@ -2974,11 +2963,10 @@ static void synaptics_rmi4_report_work(struct work_struct *work) {
 static irqreturn_t synaptics_rmi4_irq(int irq, void *data)
 {
 	struct synaptics_rmi4_data *rmi4_data = data;
+	ktime_t timestamp = ktime_get();
 
-	disable_irq_nosync(rmi4_data->i2c_client->irq);
-
-	//use work to handle irq event
-	queue_work(rmi4_data->reportqueue, &rmi4_data->reportwork);
+	if (!rmi4_data->touch_stopped)
+		synaptics_rmi4_sensor_report(rmi4_data, timestamp);
 
 	return IRQ_HANDLED;
 }
@@ -4530,10 +4518,6 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 	synaptics_ts_init_virtual_key(rmi4_data);
 	synaptics_rmi4_init_touchpanel_proc();
 
-	//add work queue init
-	rmi4_data->reportqueue = create_singlethread_workqueue("synaptics_wq");
-	INIT_WORK(&rmi4_data->reportwork, synaptics_rmi4_report_work);
-
 	retval = synaptics_rmi4_irq_enable(rmi4_data, true);
 	if (retval < 0) {
 		dev_err(&client->dev,
@@ -4585,7 +4569,6 @@ err_sysfs:
 	cancel_delayed_work_sync(&exp_data.work);
 	flush_workqueue(exp_data.workqueue);
 	destroy_workqueue(exp_data.workqueue);
-	destroy_workqueue(rmi4_data->reportqueue);
 
 	synaptics_rmi4_irq_enable(rmi4_data, false);
 
