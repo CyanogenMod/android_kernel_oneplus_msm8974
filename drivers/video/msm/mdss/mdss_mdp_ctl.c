@@ -454,6 +454,7 @@ int mdss_mdp_perf_calc_pipe(struct mdss_mdp_pipe *pipe,
 	struct mdss_rect src, dst;
 	bool is_fbc = false;
 	struct mdss_mdp_prefill_params prefill_params;
+	bool calc_smp_size = false;
 
 	if (!pipe || !perf || !pipe->mixer)
 		return -EINVAL;
@@ -539,8 +540,9 @@ int mdss_mdp_perf_calc_pipe(struct mdss_mdp_pipe *pipe,
 		return 0;
 	}
 
+	calc_smp_size = (flags & PERF_CALC_PIPE_CALC_SMP_SIZE) ? true : false;
 	prefill_params.smp_bytes = mdss_mdp_perf_calc_smp_size(pipe,
-		(flags & PERF_CALC_PIPE_CALC_SMP_SIZE));
+			calc_smp_size);
 	prefill_params.xres = xres;
 	prefill_params.src_w = src.w;
 	prefill_params.src_h = src_h;
