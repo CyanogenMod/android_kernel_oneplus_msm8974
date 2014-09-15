@@ -18,11 +18,24 @@
 	aliases {
 		serial0 = &blsp1_uart1;
 	};
+
+	oem_data_mem: oem_data_region@5900000 {
+		linux,reserve-contiguous-region;
+		linux,reserve-region;
+		linux,remove-completely;
+		reg = <0x5900000 0x100000>;
+	};
 };
 
 &soc {
 	serial@f991e000 {
 		status = "ok";
+	};
+
+	oem_data_sharedmem {
+		compatible = "qcom,sharedmem-uio";
+		reg = <0x5900000 0x100000>;
+		reg-names = "oem_data";
 	};
 
 	qcom,mdss_mdp@fd900000 {
