@@ -167,6 +167,13 @@ config CPU_FREQ_DEFAULT_GOV_DARKNESS
 	bool "darkness"
 	select CPU_FREQ_GOV_DARKNESS
 
+config CPU_FREQ_DEFAULT_GOV_INTELLIDEMAND
+
+	bool "intellidemand"
+	select CPU_FREQ_GOV_INTELLIDEMAND
+	help
+	  Use the CPUFreq governor 'intellidemand' as default.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -337,6 +344,11 @@ config CPU_FREQ_GOV_ALUCARD
 
 config CPU_FREQ_GOV_DARKNESS
 	tristate "'darkness' cpufreq policy governor"
+
+config CPU_FREQ_GOV_INTELLIDEMAND
+    tristate "'intellidemand' cpufreq governor"
+    depends on CPU_FREQ
+
 
 menu "x86 CPU frequency scaling drivers"
 depends on X86
