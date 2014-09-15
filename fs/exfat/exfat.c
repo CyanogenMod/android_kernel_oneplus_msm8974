@@ -166,8 +166,6 @@ INT32 ffsMountVol(struct super_block *sb, INT32 drv)
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 	BD_INFO_T *p_bd = &(EXFAT_SB(sb)->bd_info);
 
-	printk("[EXFAT] trying to mount...\n");
-
 	p_fs->drv = drv;
 	p_fs->dev_ejected = FALSE;
 
@@ -225,14 +223,9 @@ INT32 ffsMountVol(struct super_block *sb, INT32 drv)
 		if (p_pbr->bpb[i])
 			break;
 
-	if (i < 53) {
-		if (GET16(p_pbr->bpb+11))
-			ret = fat16_mount(sb, p_pbr);
-		else
-			ret = fat32_mount(sb, p_pbr);
-	} else {
+	ret = FFS_FORMATERR;
+	if (i >= 53)
 		ret = exfat_mount(sb, p_pbr);
-	}
 
 	brelse(tmp_bh);
 
@@ -264,8 +257,6 @@ INT32 ffsMountVol(struct super_block *sb, INT32 drv)
 		return FFS_MEDIAERR;
 	}
 	
-	printk("[EXFAT] mounted successfully\n");
-
 	return FFS_SUCCESS;
 } 
 
@@ -273,8 +264,6 @@ INT32 ffsUmountVol(struct super_block *sb)
 {
 	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
 	
-	printk("[EXFAT] trying to unmount...\n");
-
 	fs_sync(sb, 0);
 	fs_set_vol_flags(sb, VOL_CLEAN);
 
@@ -288,13 +277,8 @@ INT32 ffsUmountVol(struct super_block *sb)
 
 	bdev_close(sb);
 
-	if (p_fs->dev_ejected) {
-		printk( "[EXFAT] unmounted with media errors. "
-			"device's already ejected.\n");
+	if (p_fs->dev_ejected)
 		return FFS_MEDIAERR;
-	}
-	
-	printk("[EXFAT] unmounted successfully\n");
 
 	return FFS_SUCCESS;
 } 
@@ -779,32 +763,34 @@ INT32 ffsTruncateFile(struct inode *inode, UINT64 old_size, UINT64 new_size)
 		fid->start_clu = CLUSTER_32(~0);
 	}
 
-	if (p_fs->vol_type == EXFAT) {
-		es = get_entry_set_in_dir(sb, &(fid->dir), fid->entry, ES_ALL_ENTRIES, &ep);
-		if (es == NULL)
-			return FFS_MEDIAERR;
-		ep2 = ep+1;
-	} else {
-		ep = get_entry_in_dir(sb, &(fid->dir), fid->entry, &sector);
-		if (!ep)
-			return FFS_MEDIAERR;
-		ep2 = ep;
-	}
+	if (fid->dir.dir != DIR_DELETED) {
+		if (p_fs->vol_type == EXFAT) {
+			es = get_entry_set_in_dir(sb, &(fid->dir), fid->entry, ES_ALL_ENTRIES, &ep);
+			if (es == NULL)
+				return FFS_MEDIAERR;
+			ep2 = ep+1;
+		} else {
+			ep = get_entry_in_dir(sb, &(fid->dir), fid->entry, &sector);
+			if (!ep)
+				return FFS_MEDIAERR;
+			ep2 = ep;
+		}
 
-	p_fs->fs_func->set_entry_time(ep, tm_current(&tm, tz_utc), TM_MODIFY);
-	p_fs->fs_func->set_entry_attr(ep, fid->attr);
+		p_fs->fs_func->set_entry_time(ep, tm_current(&tm, tz_utc), TM_MODIFY);
+		p_fs->fs_func->set_entry_attr(ep, fid->attr);
 
-	p_fs->fs_func->set_entry_size(ep2, new_size);
-	if (new_size == 0) {
-		p_fs->fs_func->set_entry_flag(ep2, 0x01);
-		p_fs->fs_func->set_entry_clu0(ep2, CLUSTER_32(0));
-	}
+		p_fs->fs_func->set_entry_size(ep2, new_size);
+		if (new_size == 0) {
+			p_fs->fs_func->set_entry_flag(ep2, 0x01);
+			p_fs->fs_func->set_entry_clu0(ep2, CLUSTER_32(0));
+		}
 
-	if (p_fs->vol_type != EXFAT)
-		buf_modify(sb, sector);
-	else {
-		update_dir_checksum_with_entry_set(sb, es);
-		release_entry_set(es);
+		if (p_fs->vol_type != EXFAT)
+			buf_modify(sb, sector);
+		else {
+			update_dir_checksum_with_entry_set(sb, es);
+			release_entry_set(es);
+		}
 	}
 
 	if (last_clu != CLUSTER_32(0)) {
@@ -860,6 +846,7 @@ INT32 ffsMoveFile(struct inode *old_parent_inode, FILE_ID_T *fid, struct inode *
 	struct inode *new_inode = new_dentry->d_inode;
 	int num_entries;
 	FILE_ID_T *new_fid = NULL;
+	UINT32 new_entry_type = TYPE_UNUSED;
 	INT32 new_entry=0;
 
 	if ((new_path == NULL) || (STRLEN(new_path) == 0))
@@ -886,8 +873,6 @@ INT32 ffsMoveFile(struct inode *old_parent_inode, FILE_ID_T *fid, struct inode *
 		return FFS_PERMISSIONERR;
 
 	if (new_inode) {
-		UINT32 entry_type;
-
 		ret = FFS_MEDIAERR;
 		new_fid = &EXFAT_I(new_inode)->fid;
 
@@ -899,9 +884,9 @@ INT32 ffsMoveFile(struct inode *old_parent_inode, FILE_ID_T *fid, struct inode *
 		if (!ep)
 			goto out;
 
-		entry_type = p_fs->fs_func->get_entry_type(ep);
+		new_entry_type = p_fs->fs_func->get_entry_type(ep);
 
-		if (entry_type == TYPE_DIR) {
+		if (new_entry_type == TYPE_DIR) {
 			CHAIN_T new_clu;
 			new_clu.dir = new_fid->start_clu;
 			new_clu.size = (INT32)((new_fid->size-1) >> p_fs->cluster_size_bits) + 1;
@@ -911,6 +896,10 @@ INT32 ffsMoveFile(struct inode *old_parent_inode, FILE_ID_T *fid, struct inode *
 				return FFS_FILEEXIST;
 		}
 	}
+
+	if (STRLEN(new_path) >= MAX_NAME_LENGTH)
+		return FFS_NAMETOOLONG;
+
 
 	ret = resolve_path(new_parent_inode, new_path, &newdir, &uni_name);
 	if (ret)
@@ -932,6 +921,21 @@ INT32 ffsMoveFile(struct inode *old_parent_inode, FILE_ID_T *fid, struct inode *
 		if (num_entries < 0)
 			goto out;
 		p_fs->fs_func->delete_dir_entry(sb, p_dir, new_entry, 0, num_entries+1);
+		if (new_entry_type == TYPE_DIR) {
+			CHAIN_T new_clu_to_free;
+			new_clu_to_free.dir = new_fid->start_clu;
+			new_clu_to_free.size = (INT32)((new_fid->size-1) >> p_fs->cluster_size_bits) + 1;
+			new_clu_to_free.flags = new_fid->flags;
+
+			p_fs->fs_func->free_cluster(sb, &new_clu_to_free, 1);
+
+			new_fid->size = 0;
+			new_fid->start_clu = CLUSTER_32(~0);
+			new_fid->flags = (p_fs->vol_type == EXFAT) ? 0x03 : 0x01;
+		}
+
+		new_fid->dir.dir = DIR_DELETED;
+
 	}
 out:
 #if (DELAYED_SYNC == 0)
@@ -980,6 +984,7 @@ INT32 ffsRemoveFile(struct inode *inode, FILE_ID_T *fid)
 	fid->size = 0;
 	fid->start_clu = CLUSTER_32(~0);
 	fid->flags = (p_fs->vol_type == EXFAT)? 0x03: 0x01;
+	fid->dir.dir = DIR_DELETED;
 
 #if (DELAYED_SYNC == 0)
 	fs_sync(sb, 0);
@@ -1007,6 +1012,9 @@ INT32 ffsSetAttr(struct inode *inode, UINT32 attr)
 			return FFS_MEDIAERR;
 		return FFS_SUCCESS;
 	}
+
+	if (fid->dir.dir == DIR_DELETED)
+		return FFS_SUCCESS;
 
 	if (is_dir) {
 		if ((fid->dir.dir == p_fs->root_dir) &&
@@ -1196,6 +1204,9 @@ INT32 ffsSetStat(struct inode *inode, DIR_ENTRY_T *info)
 	FILE_ID_T *fid = &(EXFAT_I(inode)->fid);
 	UINT8 is_dir = (fid->type == TYPE_DIR) ? 1 : 0;
 
+	if (fid->dir.dir == DIR_DELETED)
+		return FFS_SUCCESS;
+
 	if (is_dir) {
 		if ((fid->dir.dir == p_fs->root_dir) &&
 			(fid->entry == -1)) {
@@ -1329,33 +1340,35 @@ INT32 ffsMapCluster(struct inode *inode, INT32 clu_offset, UINT32 *clu)
 		num_clusters += num_alloced;
 		*clu = new_clu.dir;
 
-		if (p_fs->vol_type == EXFAT) {
-			es = get_entry_set_in_dir(sb, &(fid->dir), fid->entry, ES_ALL_ENTRIES, &ep);
-			if (es == NULL)
-				return FFS_MEDIAERR;
-			ep++;
-		}
-
-		if (modified) {
-			if (p_fs->vol_type != EXFAT) {
-				ep = get_entry_in_dir(sb, &(fid->dir), fid->entry, &sector);
-				if (!ep)
+		if (fid->dir.dir != DIR_DELETED) {
+			if (p_fs->vol_type == EXFAT) {
+				es = get_entry_set_in_dir(sb, &(fid->dir), fid->entry, ES_ALL_ENTRIES, &ep);
+				if (es == NULL)
 					return FFS_MEDIAERR;
+				ep++;
 			}
 
-			if (p_fs->fs_func->get_entry_flag(ep) != fid->flags)
-				p_fs->fs_func->set_entry_flag(ep, fid->flags);
+			if (modified) {
+				if (p_fs->vol_type != EXFAT) {
+					ep = get_entry_in_dir(sb, &(fid->dir), fid->entry, &sector);
+					if (!ep)
+						return FFS_MEDIAERR;
+				}
 
-			if (p_fs->fs_func->get_entry_clu0(ep) != fid->start_clu)
-				p_fs->fs_func->set_entry_clu0(ep, fid->start_clu);
+				if (p_fs->fs_func->get_entry_flag(ep) != fid->flags)
+					p_fs->fs_func->set_entry_flag(ep, fid->flags);
 
-			if (p_fs->vol_type != EXFAT)
-				buf_modify(sb, sector);
-		}
+				if (p_fs->fs_func->get_entry_clu0(ep) != fid->start_clu)
+					p_fs->fs_func->set_entry_clu0(ep, fid->start_clu);
 
-		if (p_fs->vol_type == EXFAT) {
-			update_dir_checksum_with_entry_set(sb, es);
-			release_entry_set(es);
+				if (p_fs->vol_type != EXFAT)
+					buf_modify(sb, sector);
+			}
+
+			if (p_fs->vol_type == EXFAT) {
+				update_dir_checksum_with_entry_set(sb, es);
+				release_entry_set(es);
+			}
 		}
 
 		inode->i_blocks += num_alloced << (p_fs->cluster_size_bits - 9);
@@ -1599,6 +1612,7 @@ INT32 ffsRemoveDir(struct inode *inode, FILE_ID_T *fid)
 	fid->size = 0;
 	fid->start_clu = CLUSTER_32(~0);
 	fid->flags = (p_fs->vol_type == EXFAT)? 0x03: 0x01;
+	fid->dir.dir = DIR_DELETED;
 
 #if (DELAYED_SYNC == 0)
 	fs_sync(sb, 0);
@@ -1610,6 +1624,45 @@ INT32 ffsRemoveDir(struct inode *inode, FILE_ID_T *fid)
 
 	return FFS_SUCCESS;
 }
+
+INT32 ffsRemoveEntry(struct inode *inode, FILE_ID_T *fid)
+{
+	INT32 dentry;
+	CHAIN_T dir;
+	DENTRY_T *ep;
+	struct super_block *sb = inode->i_sb;
+	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
+
+	dir.dir = fid->dir.dir;
+	dir.size = fid->dir.size;
+	dir.flags = fid->dir.flags;
+
+	dentry = fid->entry;
+
+	ep = get_entry_in_dir(sb, &dir, dentry, NULL);
+	if (!ep)
+		return FFS_MEDIAERR;
+
+	if (p_fs->fs_func->get_entry_attr(ep) & ATTR_READONLY)
+		return FFS_PERMISSIONERR;
+
+	fs_set_vol_flags(sb, VOL_DIRTY);
+
+	remove_file(inode, &dir, dentry);
+
+	fid->dir.dir = DIR_DELETED;
+
+#if (DELAYED_SYNC == 0)
+	fs_sync(sb, 0);
+	fs_set_vol_flags(sb, VOL_CLEAN);
+#endif
+
+	if (p_fs->dev_ejected)
+		return FFS_MEDIAERR;
+
+	return FFS_SUCCESS;
+}
+
 
 INT32 fs_init(void)
 {
@@ -3136,6 +3189,12 @@ DENTRY_T *get_entry_in_dir(struct super_block *sb, CHAIN_T *p_dir, INT32 entry, 
 	INT32 off;
 	UINT32 sec;
 	UINT8 *buf;
+	FS_INFO_T *p_fs = &(EXFAT_SB(sb)->fs_info);
+
+	if (p_fs->dev_ejected)
+		return NULL;
+
+	BUG_ON(p_dir->dir == DIR_DELETED);
 
 	if (find_location(sb, p_dir, entry, &sec, &off) != FFS_SUCCESS)
 		return NULL;
@@ -3167,6 +3226,11 @@ ENTRY_SET_CACHE_T *get_entry_set_in_dir (struct super_block *sb, CHAIN_T *p_dir,
 	UINT8 *buf;
 	UINT8 num_entries;
 	INT32 mode = ES_MODE_STARTED;
+	
+	if (p_fs->dev_ejected)
+		return NULL;
+
+	BUG_ON(p_dir->dir == DIR_DELETED);
 
 	PRINTK("get_entry_set_in_dir entered\n");
 	PRINTK("p_dir dir %u flags %x size %d\n", p_dir->dir, p_dir->flags, p_dir->size);
@@ -4891,8 +4955,10 @@ INT32 sector_read(struct super_block *sb, UINT32 sec, struct buffer_head **bh, I
 
 	if (!p_fs->dev_ejected) {
 		ret = bdev_read(sb, sec, bh, 1, read);
-		if (ret != FFS_SUCCESS)
+		if (ret != FFS_SUCCESS) {
+			fs_error(sb);
 			p_fs->dev_ejected = TRUE;
+		}
 	}
 
 	return ret;
@@ -4917,8 +4983,10 @@ INT32 sector_write(struct super_block *sb, UINT32 sec, struct buffer_head *bh, I
 
 	if (!p_fs->dev_ejected) {
 		ret = bdev_write(sb, sec, bh, 1, sync);
-		if (ret != FFS_SUCCESS)
+		if (ret != FFS_SUCCESS) {
+			fs_error(sb);
 			p_fs->dev_ejected = TRUE;
+		}
 	}
 
 	return ret;
@@ -4937,8 +5005,10 @@ INT32 multi_sector_read(struct super_block *sb, UINT32 sec, struct buffer_head *
 
 	if (!p_fs->dev_ejected) {
 		ret = bdev_read(sb, sec, bh, num_secs, read);
-		if (ret != FFS_SUCCESS)
+		if (ret != FFS_SUCCESS) {
+			fs_error(sb);
 			p_fs->dev_ejected = TRUE;
+		}
 	}
 
 	return ret;
@@ -4962,8 +5032,10 @@ INT32 multi_sector_write(struct super_block *sb, UINT32 sec, struct buffer_head 
 
 	if (!p_fs->dev_ejected) {
 		ret = bdev_write(sb, sec, bh, num_secs, sync);
-		if (ret != FFS_SUCCESS)
+		if (ret != FFS_SUCCESS) {
+			fs_error(sb);
 			p_fs->dev_ejected = TRUE;
+		}
 	}
 
 	return ret;

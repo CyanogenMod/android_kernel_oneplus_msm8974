@@ -157,6 +157,7 @@ extern "C" {
 	INT32 FsCreateDir(struct inode *inode, UINT8 *path, FILE_ID_T *fid);
 	INT32 FsReadDir(struct inode *inode, DIR_ENTRY_T *dir_entry);
 	INT32 FsRemoveDir(struct inode *inode, FILE_ID_T *fid);
+	INT32 FsRemoveEntry(struct inode *inode, FILE_ID_T *fid);
 
 	INT32 FsReleaseCache(struct super_block *sb);
 #ifdef __cplusplus

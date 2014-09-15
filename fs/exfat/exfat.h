@@ -92,6 +92,8 @@ extern "C" {
 #define CS_PBR_SECTOR           1
 #define CS_DEFAULT              2
 
+#define DIR_DELETED		0xFFFF0321
+
 #define CLUSTER_16(x)           ((UINT16)(x))
 #define CLUSTER_32(x)           ((UINT32)(x))
 
@@ -478,6 +480,7 @@ extern "C" {
 	INT32 ffsCreateDir(struct inode *inode, UINT8 *path, FILE_ID_T *fid);
 	INT32 ffsReadDir(struct inode *inode, DIR_ENTRY_T *dir_ent);
 	INT32 ffsRemoveDir(struct inode *inode, FILE_ID_T *fid);
+	INT32 ffsRemoveEntry(struct inode *inode, FILE_ID_T *fid);
 
 	INT32  fs_init(void);
 	INT32  fs_shutdown(void);
