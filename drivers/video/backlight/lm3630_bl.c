@@ -220,6 +220,10 @@ static int lm3630_intr_config(struct lm3630_chip_data *pchip)
 		backlight_on = false;
 
 		// Add external function calls here...
+#ifdef CONFIG_DYNAMIC_FSYNC
+		// if dynamic fsync is defined call external suspend function
+		dyn_fsync_suspend();
+#endif
 	}
 	// if display is switched on
 	if (bl_level != 0 && pre_brightness == 0) 
@@ -228,6 +232,10 @@ static int lm3630_intr_config(struct lm3630_chip_data *pchip)
 		backlight_on = true;
 
 		// Add external function calls here...
+#ifdef CONFIG_DYNAMIC_FSYNC
+		// if dynamic fsync is defined call external resume function
+		dyn_fsync_resume();
+#endif		
 	}
 #endif
 

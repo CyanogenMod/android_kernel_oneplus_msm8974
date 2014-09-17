@@ -305,4 +305,11 @@ config RESTRICT_ROOTFS_SLAVE
 	  This option requires that a tmpfs volume is mounted as /storage in
 	  Android init.rc.  If this volume is unavailable, then we fall back to the
 	  previous behavior of marking the entire filesystem hierarchy as slave.
+
+config DYNAMIC_FSYNC
+	bool "dynamic file sync control"
+	default n
+	help
+	  An experimental file sync control using new power_suspend driver 	  
+
 endmenu
