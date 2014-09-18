@@ -697,6 +697,7 @@ static void mdss_mdp_pipe_free(struct kref *kref)
 	pipe->bwc_mode = 0;
 	pipe->mfd = NULL;
 	memset(&pipe->scale, 0, sizeof(struct mdp_scale_data));
+	memset(&pipe->req_data, 0, sizeof(pipe->req_data));
 }
 
 static int mdss_mdp_is_pipe_idle(struct mdss_mdp_pipe *pipe,

@@ -522,14 +522,6 @@ int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 	if (ret)
 		return ret;
 
-	pipe = mdss_mdp_mixer_stage_pipe(mdp5_data->ctl, mixer_mux,
-					req->z_order);
-	if (pipe && pipe->ndx != req->id) {
-		pr_debug("replacing pnum=%d at stage=%d mux=%d\n",
-				pipe->num, req->z_order, mixer_mux);
-		mdss_mdp_mixer_pipe_unstage(pipe);
-	}
-
 	mixer = mdss_mdp_mixer_get(mdp5_data->ctl, mixer_mux);
 	if (!mixer) {
 		pr_err("unable to get mixer\n");
@@ -609,6 +601,11 @@ int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 		}
 	}
 
+	if (!memcmp(req, &pipe->req_data, sizeof(*req))) {
+		pr_debug("skipping pipe_reconfiguration\n");
+		goto skip_reconfigure;
+	}
+
 	pipe->flags = req->flags;
 	bwc_enabled = req->flags & MDP_BWC_EN;
 	if (bwc_enabled  &&  !mdp5_data->mdata->has_bwc) {
@@ -663,9 +660,6 @@ int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 		pipe->overfetch_disable = 0;
 	}
 	pipe->bg_color = req->bg_color;
-
-	req->id = pipe->ndx;
-	pipe->req_data = *req;
 
 	if (pipe->flags & MDP_OVERLAY_PP_CFG_EN) {
 		memcpy(&pipe->pp_cfg, &req->overlay_pp_cfg,
@@ -755,16 +749,19 @@ int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 		goto exit_fail;
 	}
 
-	pipe->params_changed++;
+	req->id = pipe->ndx;
 
 	req->vert_deci = pipe->vert_deci;
 
+	pipe->req_data = *req;
+
+	pipe->params_changed++;
+skip_reconfigure:
 	*ppipe = pipe;
 
 	mdss_mdp_pipe_unmap(pipe);
 
 	return ret;
-
 exit_fail:
 	mdss_mdp_pipe_unmap(pipe);
 
