@@ -491,8 +491,8 @@
 			reg = <0xf9088000 0x1000>, /* APCS_ALIAS0_KPSS_ACS */
 				<0xf908a800 0x1000>; /* APCS_ALIAS0_KPSS_MDD */
 			reg-names = "acs", "mdd";
-			regulator-min-microvolt = <400000>;
-			regulator-max-microvolt = <1350000>;
+			regulator-min-microvolt = <500000>;
+			regulator-max-microvolt = <1250000>;
 			qcom,headroom-voltage = <150000>;
 			qcom,retention-voltage = <465000>;
 			qcom,ldo-default-voltage = <600000>;
@@ -507,8 +507,8 @@
 			reg = <0xf9098000 0x1000>, /* APCS_ALIAS1_KPSS_ACS */
 				<0xf909a800 0x1000>; /* APCS_ALIAS1_KPSS_MDD */
 			reg-names = "acs", "mdd";
-			regulator-min-microvolt = <400000>;
-			regulator-max-microvolt = <1350000>;
+			regulator-min-microvolt = <500000>;
+			regulator-max-microvolt = <1250000>;
 			qcom,headroom-voltage = <150000>;
 			qcom,retention-voltage = <465000>;
 			qcom,ldo-default-voltage = <600000>;
@@ -523,8 +523,8 @@
 			reg = <0xf90a8000 0x1000>, /* APCS_ALIAS2_KPSS_ACS */
 				<0xf90aa800 0x1000>; /* APCS_ALIAS2_KPSS_MDD */
 			reg-names = "acs", "mdd";
-			regulator-min-microvolt = <400000>;
-			regulator-max-microvolt = <1350000>;
+			regulator-min-microvolt = <500000>;
+			regulator-max-microvolt = <1250000>;
 			qcom,headroom-voltage = <150000>;
 			qcom,retention-voltage = <465000>;
 			qcom,ldo-default-voltage = <600000>;
@@ -539,8 +539,8 @@
 			reg = <0xf90b8000 0x1000>, /* APCS_ALIAS3_KPSS_ACS */
 				<0xf90ba800 0x1000>; /* APCS_ALIAS3_KPSS_MDD */
 			reg-names = "acs", "mdd";
-			regulator-min-microvolt = <400000>;
-			regulator-max-microvolt = <1350000>;
+			regulator-min-microvolt = <500000>;
+			regulator-max-microvolt = <1250000>;
 			qcom,headroom-voltage = <150000>;
 			qcom,retention-voltage = <465000>;
 			qcom,ldo-default-voltage = <600000>;
