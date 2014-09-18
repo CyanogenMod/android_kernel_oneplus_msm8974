@@ -144,6 +144,8 @@ struct mdss_data_type {
 	u8 vsync_ena;
 	unsigned long min_mdp_clk;
 
+	struct notifier_block gdsc_cb;
+
 	u32 res_init;
 
 	u32 highest_bank_bit;
