@@ -316,7 +316,7 @@ static struct cpufreq_driver msm_cpufreq_driver = {
 static struct cpufreq_frequency_table *cpufreq_parse_dt(struct device *dev,
 						char *tbl_name, int cpu)
 {
-	int ret, nf, i, j;
+	int ret, nf, i;
 	u32 *data;
 	struct cpufreq_frequency_table *ftbl;
 
@@ -382,7 +382,7 @@ static struct cpufreq_frequency_table *cpufreq_parse_dt(struct device *dev,
 	if (!dts_freq_table)
 		return ERR_PTR(-ENOMEM);
 
-	dts_freq_table = *ftbl;
+	*dts_freq_table = *ftbl;
 
 	for (i = 0; i < nf; i++)
 		dts_freq_table[i].frequency = data[i];
