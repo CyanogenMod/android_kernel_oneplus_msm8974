@@ -443,6 +443,7 @@ static int __mdss_mdp_validate_pxl_extn(struct mdss_mdp_pipe *pipe)
 			pr_err("roi_w[%d]=%d, src_img:[%d, %d]\n",
 					plane, pipe->scale.roi_w[plane],
 					pipe->img_width, pipe->img_height);
+			pipe->scale.enable_pxl_ext = 0;
 			return -EINVAL;
 		}
 	}
