@@ -427,6 +427,7 @@
 			23 01 00 00 01 00 02 b0 03];
 		qcom,partial-update-enabled;
 		qcom,panel-roi-alignment = <900 4 0 2 540 2>;
+		qcom,ulps-enabled;
 	};
 
 	dsi_sharp_1080_cmd: qcom,mdss_dsi_sharp_1080p_cmd {
