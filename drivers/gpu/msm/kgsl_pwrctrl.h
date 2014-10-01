@@ -30,6 +30,26 @@
 /* Only two supported levels, min & max */
 #define KGSL_CONSTRAINT_PWR_MAXLEVELS 2
 
+/* Symbolic table for the constraint type */
+#define KGSL_CONSTRAINT_TYPES \
+	{ KGSL_CONSTRAINT_NONE, "None" }, \
+	{ KGSL_CONSTRAINT_PWRLEVEL, "Pwrlevel" }
+/* Symbolic table for the constraint sub type */
+#define KGSL_CONSTRAINT_PWRLEVEL_SUBTYPES \
+	{ KGSL_CONSTRAINT_PWR_MIN, "Min" }, \
+	{ KGSL_CONSTRAINT_PWR_MAX, "Max" }
+
+/*
+ * States for thermal cycling.  _DISABLE means that no cycling has been
+ * requested.  _ENABLE means that cycling has been requested, but GPU
+ * DCVS is currently recommending running at a lower frequency than the
+ * cycle frequency.  _ACTIVE means that the frequency is actively being
+ * cycled.
+ */
+#define CYCLE_DISABLE	0
+#define CYCLE_ENABLE	1
+#define CYCLE_ACTIVE	2
+
 struct platform_device;
 
 struct kgsl_clk_stats {
@@ -48,12 +68,12 @@ struct kgsl_pwr_constraint {
 		} pwrlevel;
 	} hint;
 	unsigned long expires;
+	uint32_t owner_id;
 };
 
 /**
  * struct kgsl_pwrctrl - Power control settings for a KGSL device
  * @interrupt_num - The interrupt number for the device
- * @ebi1_clk - Pointer to the EBI clock structure
  * @grp_clks - Array of clocks structures that we control
  * @power_flags - Control flags for power
  * @pwrlevels - List of supported power levels
@@ -69,7 +89,6 @@ struct kgsl_pwr_constraint {
  * @gpu_reg - pointer to the regulator structure for gpu_reg
  * @gpu_cx - pointer to the regulator structure for gpu_cx
  * @pcl - bus scale identifier
- * @idle_needed - true if the device needs a idle before clock change
  * @irq_name - resource name for the IRQ
  * @clk_stats - structure of clock statistics
  * @pm_qos_req_dma - the power management quality of service structure
@@ -82,7 +101,6 @@ struct kgsl_pwr_constraint {
 
 struct kgsl_pwrctrl {
 	int interrupt_num;
-	struct clk *ebi1_clk;
 	struct clk *grp_clks[KGSL_MAX_CLKS];
 	unsigned long power_flags;
 	unsigned long ctrl_flags;
@@ -95,12 +113,11 @@ struct kgsl_pwrctrl {
 	unsigned int max_pwrlevel;
 	unsigned int min_pwrlevel;
 	unsigned int num_pwrlevels;
-	unsigned int interval_timeout;
+	unsigned long interval_timeout;
 	bool strtstp_sleepwake;
 	struct regulator *gpu_reg;
 	struct regulator *gpu_cx;
 	uint32_t pcl;
-	unsigned int idle_needed;
 	const char *irq_name;
 	bool irq_last;
 	struct kgsl_clk_stats clk_stats;
@@ -111,6 +128,12 @@ struct kgsl_pwrctrl {
 	unsigned int bus_index[KGSL_MAX_PWRLEVELS];
 	uint64_t bus_ib[KGSL_MAX_PWRLEVELS];
 	struct kgsl_pwr_constraint constraint;
+	bool superfast;
+	struct work_struct thermal_cycle_ws;
+	struct timer_list thermal_timer;
+	uint32_t thermal_timeout;
+	uint32_t thermal_cycle;
+	uint32_t thermal_highlow;
 };
 
 void kgsl_pwrctrl_irq(struct kgsl_device *device, int state);
@@ -156,5 +179,6 @@ int __must_check kgsl_active_count_get_light(struct kgsl_device *device);
 void kgsl_active_count_put(struct kgsl_device *device);
 int kgsl_active_count_wait(struct kgsl_device *device, int count);
 void kgsl_pwrctrl_busy_time(struct kgsl_device *device, u64 time, u64 busy);
-
+void kgsl_pwrctrl_set_constraint(struct kgsl_device *device,
+			struct kgsl_pwr_constraint *pwrc, uint32_t id);
 #endif /* __KGSL_PWRCTRL_H */

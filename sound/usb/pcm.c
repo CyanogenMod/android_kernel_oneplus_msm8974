@@ -16,6 +16,7 @@
 
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/bitrev.h>
 #include <linux/ratelimit.h>
 #include <linux/usb.h>
 #include <linux/usb/audio.h>
@@ -99,7 +100,7 @@ static struct audioformat *find_format(struct snd_usb_substream *subs)
 	int cur_attr = 0, attr;
 
 	list_for_each_entry(fp, &subs->fmt_list, list) {
-		if (!(fp->formats & (1uLL << subs->pcm_format)))
+		if (!(fp->formats & pcm_format_to_bits(subs->pcm_format)))
 			continue;
 		if (fp->channels != subs->channels)
 			continue;
@@ -165,8 +166,8 @@ static int init_pitch_v1(struct snd_usb_audio *chip, int iface,
 				   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_OUT,
 				   UAC_EP_CS_ATTR_PITCH_CONTROL << 8, ep,
 				   data, sizeof(data))) < 0) {
-		snd_printk(KERN_ERR "%d:%d:%d: cannot set enable PITCH\n",
-			   dev->devnum, iface, ep);
+		usb_audio_err(chip, "%d:%d: cannot set enable PITCH\n",
+			      iface, ep);
 		return err;
 	}
 
@@ -186,8 +187,8 @@ static int init_pitch_v2(struct snd_usb_audio *chip, int iface,
 				   USB_TYPE_CLASS | USB_RECIP_ENDPOINT | USB_DIR_OUT,
 				   UAC2_EP_CS_PITCH << 8, 0,
 				   data, sizeof(data))) < 0) {
-		snd_printk(KERN_ERR "%d:%d:%d: cannot set enable PITCH (v2)\n",
-			   dev->devnum, iface, fmt->altsetting);
+		usb_audio_err(chip, "%d:%d: cannot set enable PITCH (v2)\n",
+			      iface, fmt->altsetting);
 		return err;
 	}
 
@@ -201,13 +202,11 @@ int snd_usb_init_pitch(struct snd_usb_audio *chip, int iface,
 		       struct usb_host_interface *alts,
 		       struct audioformat *fmt)
 {
-	struct usb_interface_descriptor *altsd = get_iface_desc(alts);
-
 	/* if endpoint doesn't have pitch control, bail out */
 	if (!(fmt->attributes & UAC_EP_CS_ATTR_PITCH_CONTROL))
 		return 0;
 
-	switch (altsd->bInterfaceProtocol) {
+	switch (fmt->protocol) {
 	case UAC_VERSION_1:
 	default:
 		return init_pitch_v1(chip, iface, alts, fmt);
@@ -227,7 +226,7 @@ static int start_endpoints(struct snd_usb_substream *subs, bool can_sleep)
 	if (!test_and_set_bit(SUBSTREAM_FLAG_DATA_EP_STARTED, &subs->flags)) {
 		struct snd_usb_endpoint *ep = subs->data_endpoint;
 
-		snd_printdd(KERN_DEBUG "Starting data EP @%p\n", ep);
+		dev_dbg(&subs->dev->dev, "Starting data EP @%p\n", ep);
 
 		ep->data_subs = subs;
 		err = snd_usb_endpoint_start(ep, can_sleep);
@@ -242,21 +241,21 @@ static int start_endpoints(struct snd_usb_substream *subs, bool can_sleep)
 		struct snd_usb_endpoint *ep = subs->sync_endpoint;
 
 		if (subs->data_endpoint->iface != subs->sync_endpoint->iface ||
-		    subs->data_endpoint->alt_idx != subs->sync_endpoint->alt_idx) {
+		    subs->data_endpoint->altsetting != subs->sync_endpoint->altsetting) {
 			err = usb_set_interface(subs->dev,
 						subs->sync_endpoint->iface,
-						subs->sync_endpoint->alt_idx);
+						subs->sync_endpoint->altsetting);
 			if (err < 0) {
-				snd_printk(KERN_ERR
-					   "%d:%d:%d: cannot set interface (%d)\n",
-					   subs->dev->devnum,
+				clear_bit(SUBSTREAM_FLAG_SYNC_EP_STARTED, &subs->flags);
+				dev_err(&subs->dev->dev,
+					   "%d:%d: cannot set interface (%d)\n",
 					   subs->sync_endpoint->iface,
-					   subs->sync_endpoint->alt_idx, err);
+					   subs->sync_endpoint->altsetting, err);
 				return -EIO;
 			}
 		}
 
-		snd_printdd(KERN_DEBUG "Starting sync EP @%p\n", ep);
+		dev_dbg(&subs->dev->dev, "Starting sync EP @%p\n", ep);
 
 		ep->sync_slave = subs->data_endpoint;
 		err = snd_usb_endpoint_start(ep, can_sleep);
@@ -299,6 +298,168 @@ static int deactivate_endpoints(struct snd_usb_substream *subs)
 	return 0;
 }
 
+static int search_roland_implicit_fb(struct usb_device *dev, int ifnum,
+				     unsigned int altsetting,
+				     struct usb_host_interface **alts,
+				     unsigned int *ep)
+{
+	struct usb_interface *iface;
+	struct usb_interface_descriptor *altsd;
+	struct usb_endpoint_descriptor *epd;
+
+	iface = usb_ifnum_to_if(dev, ifnum);
+	if (!iface || iface->num_altsetting < altsetting + 1)
+		return -ENOENT;
+	*alts = &iface->altsetting[altsetting];
+	altsd = get_iface_desc(*alts);
+	if (altsd->bAlternateSetting != altsetting ||
+	    altsd->bInterfaceClass != USB_CLASS_VENDOR_SPEC ||
+	    (altsd->bInterfaceSubClass != 2 &&
+	     altsd->bInterfaceProtocol != 2   ) ||
+	    altsd->bNumEndpoints < 1)
+		return -ENOENT;
+	epd = get_endpoint(*alts, 0);
+	if (!usb_endpoint_is_isoc_in(epd) ||
+	    (epd->bmAttributes & USB_ENDPOINT_USAGE_MASK) !=
+					USB_ENDPOINT_USAGE_IMPLICIT_FB)
+		return -ENOENT;
+	*ep = epd->bEndpointAddress;
+	return 0;
+}
+
+static int set_sync_ep_implicit_fb_quirk(struct snd_usb_substream *subs,
+					 struct usb_device *dev,
+					 struct usb_interface_descriptor *altsd,
+					 unsigned int attr)
+{
+	struct usb_host_interface *alts;
+	struct usb_interface *iface;
+	unsigned int ep;
+
+	/* Implicit feedback sync EPs consumers are always playback EPs */
+	if (subs->direction != SNDRV_PCM_STREAM_PLAYBACK)
+		return 0;
+
+	switch (subs->stream->chip->usb_id) {
+	case USB_ID(0x0763, 0x2030): /* M-Audio Fast Track C400 */
+	case USB_ID(0x0763, 0x2031): /* M-Audio Fast Track C600 */
+		ep = 0x81;
+		iface = usb_ifnum_to_if(dev, 3);
+
+		if (!iface || iface->num_altsetting == 0)
+			return -EINVAL;
+
+		alts = &iface->altsetting[1];
+		goto add_sync_ep;
+		break;
+	case USB_ID(0x0763, 0x2080): /* M-Audio FastTrack Ultra */
+	case USB_ID(0x0763, 0x2081):
+		ep = 0x81;
+		iface = usb_ifnum_to_if(dev, 2);
+
+		if (!iface || iface->num_altsetting == 0)
+			return -EINVAL;
+
+		alts = &iface->altsetting[1];
+		goto add_sync_ep;
+	}
+	if (attr == USB_ENDPOINT_SYNC_ASYNC &&
+	    altsd->bInterfaceClass == USB_CLASS_VENDOR_SPEC &&
+	    altsd->bInterfaceProtocol == 2 &&
+	    altsd->bNumEndpoints == 1 &&
+	    USB_ID_VENDOR(subs->stream->chip->usb_id) == 0x0582 /* Roland */ &&
+	    search_roland_implicit_fb(dev, altsd->bInterfaceNumber + 1,
+				      altsd->bAlternateSetting,
+				      &alts, &ep) >= 0) {
+		goto add_sync_ep;
+	}
+
+	/* No quirk */
+	return 0;
+
+add_sync_ep:
+	subs->sync_endpoint = snd_usb_add_endpoint(subs->stream->chip,
+						   alts, ep, !subs->direction,
+						   SND_USB_ENDPOINT_TYPE_DATA);
+	if (!subs->sync_endpoint)
+		return -EINVAL;
+
+	subs->data_endpoint->sync_master = subs->sync_endpoint;
+
+	return 0;
+}
+
+static int set_sync_endpoint(struct snd_usb_substream *subs,
+			     struct audioformat *fmt,
+			     struct usb_device *dev,
+			     struct usb_host_interface *alts,
+			     struct usb_interface_descriptor *altsd)
+{
+	int is_playback = subs->direction == SNDRV_PCM_STREAM_PLAYBACK;
+	unsigned int ep, attr;
+	bool implicit_fb;
+	int err;
+
+	/* we need a sync pipe in async OUT or adaptive IN mode */
+	/* check the number of EP, since some devices have broken
+	 * descriptors which fool us.  if it has only one EP,
+	 * assume it as adaptive-out or sync-in.
+	 */
+	attr = fmt->ep_attr & USB_ENDPOINT_SYNCTYPE;
+
+	err = set_sync_ep_implicit_fb_quirk(subs, dev, altsd, attr);
+	if (err < 0)
+		return err;
+
+	if (altsd->bNumEndpoints < 2)
+		return 0;
+
+	if ((is_playback && attr != USB_ENDPOINT_SYNC_ASYNC) ||
+	    (!is_playback && attr != USB_ENDPOINT_SYNC_ADAPTIVE))
+		return 0;
+
+	/* check sync-pipe endpoint */
+	/* ... and check descriptor size before accessing bSynchAddress
+	   because there is a version of the SB Audigy 2 NX firmware lacking
+	   the audio fields in the endpoint descriptors */
+	if ((get_endpoint(alts, 1)->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_ISOC ||
+	    (get_endpoint(alts, 1)->bLength >= USB_DT_ENDPOINT_AUDIO_SIZE &&
+	     get_endpoint(alts, 1)->bSynchAddress != 0)) {
+		dev_err(&dev->dev,
+			"%d:%d : invalid sync pipe. bmAttributes %02x, bLength %d, bSynchAddress %02x\n",
+			   fmt->iface, fmt->altsetting,
+			   get_endpoint(alts, 1)->bmAttributes,
+			   get_endpoint(alts, 1)->bLength,
+			   get_endpoint(alts, 1)->bSynchAddress);
+		return -EINVAL;
+	}
+	ep = get_endpoint(alts, 1)->bEndpointAddress;
+	if (get_endpoint(alts, 0)->bLength >= USB_DT_ENDPOINT_AUDIO_SIZE &&
+	    ((is_playback && ep != (unsigned int)(get_endpoint(alts, 0)->bSynchAddress | USB_DIR_IN)) ||
+	     (!is_playback && ep != (unsigned int)(get_endpoint(alts, 0)->bSynchAddress & ~USB_DIR_IN)))) {
+		dev_err(&dev->dev,
+			"%d:%d : invalid sync pipe. is_playback %d, ep %02x, bSynchAddress %02x\n",
+			   fmt->iface, fmt->altsetting,
+			   is_playback, ep, get_endpoint(alts, 0)->bSynchAddress);
+		return -EINVAL;
+	}
+
+	implicit_fb = (get_endpoint(alts, 1)->bmAttributes & USB_ENDPOINT_USAGE_MASK)
+			== USB_ENDPOINT_USAGE_IMPLICIT_FB;
+
+	subs->sync_endpoint = snd_usb_add_endpoint(subs->stream->chip,
+						   alts, ep, !subs->direction,
+						   implicit_fb ?
+							SND_USB_ENDPOINT_TYPE_DATA :
+							SND_USB_ENDPOINT_TYPE_SYNC);
+	if (!subs->sync_endpoint)
+		return -EINVAL;
+
+	subs->data_endpoint->sync_master = subs->sync_endpoint;
+
+	return 0;
+}
+
 /*
  * find a matching format and set up the interface
  */
@@ -308,9 +469,7 @@ static int set_format(struct snd_usb_substream *subs, struct audioformat *fmt)
 	struct usb_host_interface *alts;
 	struct usb_interface_descriptor *altsd;
 	struct usb_interface *iface;
-	unsigned int ep, attr;
-	int is_playback = subs->direction == SNDRV_PCM_STREAM_PLAYBACK;
-	int err, implicit_fb = 0;
+	int err;
 
 	iface = usb_ifnum_to_if(dev, fmt->iface);
 	if (WARN_ON(!iface))
@@ -327,8 +486,9 @@ static int set_format(struct snd_usb_substream *subs, struct audioformat *fmt)
 	if (subs->interface >= 0 && subs->interface != fmt->iface) {
 		err = usb_set_interface(subs->dev, subs->interface, 0);
 		if (err < 0) {
-			snd_printk(KERN_ERR "%d:%d:%d: return to setting 0 failed (%d)\n",
-				dev->devnum, fmt->iface, fmt->altsetting, err);
+			dev_err(&dev->dev,
+				"%d:%d: return to setting 0 failed (%d)\n",
+				fmt->iface, fmt->altsetting, err);
 			return -EIO;
 		}
 		subs->interface = -1;
@@ -340,104 +500,32 @@ static int set_format(struct snd_usb_substream *subs, struct audioformat *fmt)
 	    subs->altset_idx != fmt->altset_idx) {
 		err = usb_set_interface(dev, fmt->iface, fmt->altsetting);
 		if (err < 0) {
-			snd_printk(KERN_ERR "%d:%d:%d: usb_set_interface failed (%d)\n",
-				   dev->devnum, fmt->iface, fmt->altsetting, err);
+			dev_err(&dev->dev,
+				"%d:%d: usb_set_interface failed (%d)\n",
+				fmt->iface, fmt->altsetting, err);
 			return -EIO;
 		}
-		snd_printdd(KERN_INFO "setting usb interface %d:%d\n",
-				fmt->iface, fmt->altsetting);
+		dev_dbg(&dev->dev, "setting usb interface %d:%d\n",
+			fmt->iface, fmt->altsetting);
 		subs->interface = fmt->iface;
 		subs->altset_idx = fmt->altset_idx;
+
+		snd_usb_set_interface_quirk(dev);
 	}
 
 	subs->data_endpoint = snd_usb_add_endpoint(subs->stream->chip,
 						   alts, fmt->endpoint, subs->direction,
 						   SND_USB_ENDPOINT_TYPE_DATA);
+
 	if (!subs->data_endpoint)
 		return -EINVAL;
 
-	/* we need a sync pipe in async OUT or adaptive IN mode */
-	/* check the number of EP, since some devices have broken
-	 * descriptors which fool us.  if it has only one EP,
-	 * assume it as adaptive-out or sync-in.
-	 */
-	attr = fmt->ep_attr & USB_ENDPOINT_SYNCTYPE;
+	err = set_sync_endpoint(subs, fmt, dev, alts, altsd);
+	if (err < 0)
+		return err;
 
-	switch (subs->stream->chip->usb_id) {
-	case USB_ID(0x0763, 0x2030): /* M-Audio Fast Track C400 */
-	case USB_ID(0x0763, 0x2031): /* M-Audio Fast Track C600 */
-		if (is_playback) {
-			implicit_fb = 1;
-			ep = 0x81;
-			iface = usb_ifnum_to_if(dev, 3);
-
-			if (!iface || iface->num_altsetting == 0)
-				return -EINVAL;
-
-			alts = &iface->altsetting[1];
-			goto add_sync_ep;
-		}
-		break;
-	case USB_ID(0x0763, 0x2080): /* M-Audio FastTrack Ultra */
-	case USB_ID(0x0763, 0x2081):
-		if (is_playback) {
-			implicit_fb = 1;
-			ep = 0x81;
-			iface = usb_ifnum_to_if(dev, 2);
-
-			if (!iface || iface->num_altsetting == 0)
-				return -EINVAL;
-
-			alts = &iface->altsetting[1];
-			goto add_sync_ep;
-		}
-	}
-
-	if (((is_playback && attr == USB_ENDPOINT_SYNC_ASYNC) ||
-	     (!is_playback && attr == USB_ENDPOINT_SYNC_ADAPTIVE)) &&
-	    altsd->bNumEndpoints >= 2) {
-		/* check sync-pipe endpoint */
-		/* ... and check descriptor size before accessing bSynchAddress
-		   because there is a version of the SB Audigy 2 NX firmware lacking
-		   the audio fields in the endpoint descriptors */
-		if ((get_endpoint(alts, 1)->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_ISOC ||
-		    (get_endpoint(alts, 1)->bLength >= USB_DT_ENDPOINT_AUDIO_SIZE &&
-		     get_endpoint(alts, 1)->bSynchAddress != 0 &&
-		     !implicit_fb)) {
-			snd_printk(KERN_ERR "%d:%d:%d : invalid sync pipe. bmAttributes %02x, bLength %d, bSynchAddress %02x\n",
-				   dev->devnum, fmt->iface, fmt->altsetting,
-				   get_endpoint(alts, 1)->bmAttributes,
-				   get_endpoint(alts, 1)->bLength,
-				   get_endpoint(alts, 1)->bSynchAddress);
-			return -EINVAL;
-		}
-		ep = get_endpoint(alts, 1)->bEndpointAddress;
-		if (!implicit_fb &&
-		    get_endpoint(alts, 0)->bLength >= USB_DT_ENDPOINT_AUDIO_SIZE &&
-		    (( is_playback && ep != (unsigned int)(get_endpoint(alts, 0)->bSynchAddress | USB_DIR_IN)) ||
-		     (!is_playback && ep != (unsigned int)(get_endpoint(alts, 0)->bSynchAddress & ~USB_DIR_IN)))) {
-			snd_printk(KERN_ERR "%d:%d:%d : invalid sync pipe. is_playback %d, ep %02x, bSynchAddress %02x\n",
-				   dev->devnum, fmt->iface, fmt->altsetting,
-				   is_playback, ep, get_endpoint(alts, 0)->bSynchAddress);
-			return -EINVAL;
-		}
-
-		implicit_fb = (get_endpoint(alts, 1)->bmAttributes & USB_ENDPOINT_USAGE_MASK)
-				== USB_ENDPOINT_USAGE_IMPLICIT_FB;
-
-add_sync_ep:
-		subs->sync_endpoint = snd_usb_add_endpoint(subs->stream->chip,
-							   alts, ep, !subs->direction,
-							   implicit_fb ?
-								SND_USB_ENDPOINT_TYPE_DATA :
-								SND_USB_ENDPOINT_TYPE_SYNC);
-		if (!subs->sync_endpoint)
-			return -EINVAL;
-
-		subs->data_endpoint->sync_master = subs->sync_endpoint;
-	}
-
-	if ((err = snd_usb_init_pitch(subs->stream->chip, fmt->iface, alts, fmt)) < 0)
+	err = snd_usb_init_pitch(subs->stream->chip, fmt->iface, alts, fmt);
+	if (err < 0)
 		return err;
 
 	subs->cur_audiofmt = fmt;
@@ -463,20 +551,23 @@ add_sync_ep:
  * - Requested PCM format is not supported.
  * - Requested sample rate is not supported.
  */
-static int match_endpoint_audioformats(struct audioformat *fp,
-	struct audioformat *match, int rate,
-	snd_pcm_format_t pcm_format)
+static int match_endpoint_audioformats(struct snd_usb_substream *subs,
+				       struct audioformat *fp,
+				       struct audioformat *match, int rate,
+				       snd_pcm_format_t pcm_format)
 {
 	int i;
 	int score = 0;
 
 	if (fp->channels < 1) {
-		snd_printdd("%s: (fmt @%p) no channels\n", __func__, fp);
+		dev_dbg(&subs->dev->dev,
+			"%s: (fmt @%p) no channels\n", __func__, fp);
 		return 0;
 	}
 
-	if (!(fp->formats & (1ULL << pcm_format))) {
-		snd_printdd("%s: (fmt @%p) no match for format %d\n", __func__,
+	if (!(fp->formats & pcm_format_to_bits(pcm_format))) {
+		dev_dbg(&subs->dev->dev,
+			"%s: (fmt @%p) no match for format %d\n", __func__,
 			fp, pcm_format);
 		return 0;
 	}
@@ -488,7 +579,8 @@ static int match_endpoint_audioformats(struct audioformat *fp,
 		}
 	}
 	if (!score) {
-		snd_printdd("%s: (fmt @%p) no match for rate %d\n", __func__,
+		dev_dbg(&subs->dev->dev,
+			"%s: (fmt @%p) no match for rate %d\n", __func__,
 			fp, rate);
 		return 0;
 	}
@@ -496,7 +588,8 @@ static int match_endpoint_audioformats(struct audioformat *fp,
 	if (fp->channels == match->channels)
 		score++;
 
-	snd_printdd("%s: (fmt @%p) score %d\n", __func__, fp, score);
+	dev_dbg(&subs->dev->dev,
+		"%s: (fmt @%p) score %d\n", __func__, fp, score);
 
 	return score;
 }
@@ -520,13 +613,15 @@ static int configure_sync_endpoint(struct snd_usb_substream *subs)
 						   subs->pcm_format,
 						   subs->channels,
 						   subs->period_bytes,
+						   0, 0,
 						   subs->cur_rate,
 						   subs->cur_audiofmt,
 						   NULL);
 
 	/* Try to find the best matching audioformat. */
 	list_for_each_entry(fp, &sync_subs->fmt_list, list) {
-		int score = match_endpoint_audioformats(fp, subs->cur_audiofmt,
+		int score = match_endpoint_audioformats(subs,
+							fp, subs->cur_audiofmt,
 			subs->cur_rate, subs->pcm_format);
 
 		if (score > cur_score) {
@@ -536,7 +631,8 @@ static int configure_sync_endpoint(struct snd_usb_substream *subs)
 	}
 
 	if (unlikely(sync_fp == NULL)) {
-		snd_printk(KERN_ERR "%s: no valid audioformat for sync ep %x found\n",
+		dev_err(&subs->dev->dev,
+			"%s: no valid audioformat for sync ep %x found\n",
 			__func__, sync_subs->ep_num);
 		return -EINVAL;
 	}
@@ -548,7 +644,8 @@ static int configure_sync_endpoint(struct snd_usb_substream *subs)
 	if (sync_fp->channels != subs->channels) {
 		sync_period_bytes = (subs->period_bytes / subs->channels) *
 			sync_fp->channels;
-		snd_printdd("%s: adjusted sync ep period bytes (%d -> %d)\n",
+		dev_dbg(&subs->dev->dev,
+			"%s: adjusted sync ep period bytes (%d -> %d)\n",
 			__func__, subs->period_bytes, sync_period_bytes);
 	}
 
@@ -556,6 +653,7 @@ static int configure_sync_endpoint(struct snd_usb_substream *subs)
 					  subs->pcm_format,
 					  sync_fp->channels,
 					  sync_period_bytes,
+					  0, 0,
 					  subs->cur_rate,
 					  sync_fp,
 					  NULL);
@@ -578,6 +676,8 @@ static int configure_endpoint(struct snd_usb_substream *subs)
 					  subs->pcm_format,
 					  subs->channels,
 					  subs->period_bytes,
+					  subs->period_frames,
+					  subs->buffer_periods,
 					  subs->cur_rate,
 					  subs->cur_audiofmt,
 					  subs->sync_endpoint);
@@ -614,12 +714,15 @@ static int snd_usb_hw_params(struct snd_pcm_substream *substream,
 
 	subs->pcm_format = params_format(hw_params);
 	subs->period_bytes = params_period_bytes(hw_params);
+	subs->period_frames = params_period_size(hw_params);
+	subs->buffer_periods = params_periods(hw_params);
 	subs->channels = params_channels(hw_params);
 	subs->cur_rate = params_rate(hw_params);
 
 	fmt = find_format(subs);
 	if (!fmt) {
-		snd_printd(KERN_DEBUG "cannot set format: format = %#x, rate = %d, channels = %d\n",
+		dev_dbg(&subs->dev->dev,
+			"cannot set format: format = %#x, rate = %d, channels = %d\n",
 			   subs->pcm_format, subs->cur_rate, subs->channels);
 		return -EINVAL;
 	}
@@ -675,7 +778,7 @@ static int snd_usb_pcm_prepare(struct snd_pcm_substream *substream)
 	int ret;
 
 	if (! subs->cur_audiofmt) {
-		snd_printk(KERN_ERR "usbaudio: no format is specified!\n");
+		dev_err(&subs->dev->dev, "no format is specified!\n");
 		return -ENXIO;
 	}
 
@@ -1118,6 +1221,12 @@ static int snd_usb_pcm_open(struct snd_pcm_substream *substream, int direction)
 	runtime->private_data = subs;
 	subs->pcm_substream = substream;
 	/* runtime PM is also done there */
+
+	/* initialize DSD/DOP context */
+	subs->dsd_dop.byte_idx = 0;
+	subs->dsd_dop.channel = 0;
+	subs->dsd_dop.marker = 1;
+
 	return setup_hw_info(runtime, subs);
 }
 
@@ -1160,9 +1269,10 @@ static void retire_capture_urb(struct snd_usb_substream *subs,
 	stride = runtime->frame_bits >> 3;
 
 	for (i = 0; i < urb->number_of_packets; i++) {
-		cp = (unsigned char *)urb->transfer_buffer + urb->iso_frame_desc[i].offset;
+		cp = (unsigned char *)urb->transfer_buffer + urb->iso_frame_desc[i].offset + subs->pkt_offset_adj;
 		if (urb->iso_frame_desc[i].status && printk_ratelimit()) {
-			snd_printdd(KERN_ERR "frame %d active: %d\n", i, urb->iso_frame_desc[i].status);
+			dev_dbg(&subs->dev->dev, "frame %d active: %d\n",
+				i, urb->iso_frame_desc[i].status);
 			// continue;
 		}
 		bytes = urb->iso_frame_desc[i].actual_length;
@@ -1170,11 +1280,10 @@ static void retire_capture_urb(struct snd_usb_substream *subs,
 		if (!subs->txfr_quirk)
 			bytes = frames * stride;
 		if (bytes % (runtime->sample_bits >> 3) != 0) {
-#ifdef CONFIG_SND_DEBUG_VERBOSE
 			int oldbytes = bytes;
-#endif
 			bytes = frames * stride;
-			snd_printdd(KERN_ERR "Corrected urb data len. %d->%d\n",
+			dev_warn(&subs->dev->dev,
+				 "Corrected urb data len. %d->%d\n",
 							oldbytes, bytes);
 		}
 		/* update the current pointer */
@@ -1214,6 +1323,61 @@ static void retire_capture_urb(struct snd_usb_substream *subs,
 		snd_pcm_period_elapsed(subs->pcm_substream);
 }
 
+static inline void fill_playback_urb_dsd_dop(struct snd_usb_substream *subs,
+					     struct urb *urb, unsigned int bytes)
+{
+	struct snd_pcm_runtime *runtime = subs->pcm_substream->runtime;
+	unsigned int stride = runtime->frame_bits >> 3;
+	unsigned int dst_idx = 0;
+	unsigned int src_idx = subs->hwptr_done;
+	unsigned int wrap = runtime->buffer_size * stride;
+	u8 *dst = urb->transfer_buffer;
+	u8 *src = runtime->dma_area;
+	u8 marker[] = { 0x05, 0xfa };
+
+	/*
+	 * The DSP DOP format defines a way to transport DSD samples over
+	 * normal PCM data endpoints. It requires stuffing of marker bytes
+	 * (0x05 and 0xfa, alternating per sample frame), and then expects
+	 * 2 additional bytes of actual payload. The whole frame is stored
+	 * LSB.
+	 *
+	 * Hence, for a stereo transport, the buffer layout looks like this,
+	 * where L refers to left channel samples and R to right.
+	 *
+	 *   L1 L2 0x05   R1 R2 0x05   L3 L4 0xfa  R3 R4 0xfa
+	 *   L5 L6 0x05   R5 R6 0x05   L7 L8 0xfa  R7 R8 0xfa
+	 *   .....
+	 *
+	 */
+
+	while (bytes--) {
+		if (++subs->dsd_dop.byte_idx == 3) {
+			/* frame boundary? */
+			dst[dst_idx++] = marker[subs->dsd_dop.marker];
+			src_idx += 2;
+			subs->dsd_dop.byte_idx = 0;
+
+			if (++subs->dsd_dop.channel % runtime->channels == 0) {
+				/* alternate the marker */
+				subs->dsd_dop.marker++;
+				subs->dsd_dop.marker %= ARRAY_SIZE(marker);
+				subs->dsd_dop.channel = 0;
+			}
+		} else {
+			/* stuff the DSD payload */
+			int idx = (src_idx + subs->dsd_dop.byte_idx - 1) % wrap;
+
+			if (subs->cur_audiofmt->dsd_bitrev)
+				dst[dst_idx++] = bitrev8(src[idx]);
+			else
+				dst[dst_idx++] = src[idx];
+
+			subs->hwptr_done++;
+		}
+	}
+}
+
 static void prepare_playback_urb(struct snd_usb_substream *subs,
 				 struct urb *urb)
 {
@@ -1229,6 +1393,7 @@ static void prepare_playback_urb(struct snd_usb_substream *subs,
 	frames = 0;
 	urb->number_of_packets = 0;
 	spin_lock_irqsave(&subs->lock, flags);
+	subs->frame_limit += ep->max_urb_frames;
 	for (i = 0; i < ctx->packets; i++) {
 		if (ctx->packet_size[i])
 			counts = ctx->packet_size[i];
@@ -1243,6 +1408,7 @@ static void prepare_playback_urb(struct snd_usb_substream *subs,
 		subs->transfer_done += counts;
 		if (subs->transfer_done >= runtime->period_size) {
 			subs->transfer_done -= runtime->period_size;
+			subs->frame_limit = 0;
 			period_elapsed = 1;
 			if (subs->fmt_type == UAC_FORMAT_TYPE_II) {
 				if (subs->transfer_done > 0) {
@@ -1265,24 +1431,46 @@ static void prepare_playback_urb(struct snd_usb_substream *subs,
 				break;
 			}
 		}
-		if (period_elapsed &&
-		    !snd_usb_endpoint_implict_feedback_sink(subs->data_endpoint)) /* finish at the period boundary */
+		/* finish at the period boundary or after enough frames */
+		if ((period_elapsed ||
+				subs->transfer_done >= subs->frame_limit) &&
+		    !snd_usb_endpoint_implicit_feedback_sink(ep))
 			break;
 	}
 	bytes = frames * ep->stride;
-	if (subs->hwptr_done + bytes > runtime->buffer_size * stride) {
-		/* err, the transferred area goes over buffer boundary. */
-		unsigned int bytes1 =
-			runtime->buffer_size * stride - subs->hwptr_done;
-		memcpy(urb->transfer_buffer,
-		       runtime->dma_area + subs->hwptr_done, bytes1);
-		memcpy(urb->transfer_buffer + bytes1,
-		       runtime->dma_area, bytes - bytes1);
+
+	if (unlikely(subs->pcm_format == SNDRV_PCM_FORMAT_DSD_U16_LE &&
+		     subs->cur_audiofmt->dsd_dop)) {
+		fill_playback_urb_dsd_dop(subs, urb, bytes);
+	} else if (unlikely(subs->pcm_format == SNDRV_PCM_FORMAT_DSD_U8 &&
+			   subs->cur_audiofmt->dsd_bitrev)) {
+		/* bit-reverse the bytes */
+		u8 *buf = urb->transfer_buffer;
+		for (i = 0; i < bytes; i++) {
+			int idx = (subs->hwptr_done + i)
+				% (runtime->buffer_size * stride);
+			buf[i] = bitrev8(runtime->dma_area[idx]);
+		}
+
+		subs->hwptr_done += bytes;
 	} else {
-		memcpy(urb->transfer_buffer,
-		       runtime->dma_area + subs->hwptr_done, bytes);
+		/* usual PCM */
+		if (subs->hwptr_done + bytes > runtime->buffer_size * stride) {
+			/* err, the transferred area goes over buffer boundary. */
+			unsigned int bytes1 =
+				runtime->buffer_size * stride - subs->hwptr_done;
+			memcpy(urb->transfer_buffer,
+			       runtime->dma_area + subs->hwptr_done, bytes1);
+			memcpy(urb->transfer_buffer + bytes1,
+			       runtime->dma_area, bytes - bytes1);
+		} else {
+			memcpy(urb->transfer_buffer,
+			       runtime->dma_area + subs->hwptr_done, bytes);
+		}
+
+		subs->hwptr_done += bytes;
 	}
-	subs->hwptr_done += bytes;
+
 	if (subs->hwptr_done >= runtime->buffer_size * stride)
 		subs->hwptr_done -= runtime->buffer_size * stride;
 
@@ -1338,7 +1526,8 @@ static void retire_playback_urb(struct snd_usb_substream *subs,
 	 * on two reads of a counter updated every ms.
 	 */
 	if (abs(est_delay - subs->last_delay) * 1000 > runtime->rate * 2)
-		snd_printk(KERN_DEBUG "delay: estimated %d, actual %d\n",
+		pr_debug_ratelimited(
+			"delay: estimated %d, actual %d\n",
 			est_delay, subs->last_delay);
 
 	if (!subs->running) {
