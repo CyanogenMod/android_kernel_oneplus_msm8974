@@ -817,6 +817,7 @@ static int __init nbd_init(void)
 		 * Tell the block layer that we are not a rotational device
 		 */
 		queue_flag_set_unlocked(QUEUE_FLAG_NONROT, disk->queue);
+		queue_flag_clear_unlocked(QUEUE_FLAG_ADD_RANDOM, disk->queue);
 	}
 
 	if (register_blkdev(NBD_MAJOR, "nbd")) {
