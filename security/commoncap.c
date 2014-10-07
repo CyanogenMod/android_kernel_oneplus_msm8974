@@ -85,6 +85,8 @@ int cap_capable(const struct cred *cred, struct user_namespace *targ_ns,
 		return 0;
 	if (cap == CAP_NET_ADMIN && in_egroup_p(AID_NET_ADMIN))
 		return 0;
+    if (cap == CAP_SYSLOG && in_egroup_p(AID_SYSTEM))
+        return 0;
 #endif
 
 	for (;;) {
