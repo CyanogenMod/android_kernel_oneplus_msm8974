@@ -47,11 +47,8 @@
  *
  * @MDP_NOTIFY_FRAME_BEGIN:	Frame update has started, the frame is about to
  *				be programmed into hardware.
- * @MDP_NOTIFY_FRAME_CFG_DONE:	Frame configuration is done.
- * @MDP_NOTIFY_FRAME_CTX_DONE:	Frame has finished accessing sw context.
- *				Next frame can start preparing.
  * @MDP_NOTIFY_FRAME_READY:	Frame ready to be kicked off, this can be used
- *				as the last point in time to synchronize with
+ *				as the last point in time to synchronized with
  *				source buffers before kickoff.
  * @MDP_NOTIFY_FRAME_FLUSHED:	Configuration of frame has been flushed and
  *				DMA transfer has started.
@@ -65,12 +62,11 @@
  */
 enum mdp_notify_event {
 	MDP_NOTIFY_FRAME_BEGIN = 1,
-	MDP_NOTIFY_FRAME_CFG_DONE,
-	MDP_NOTIFY_FRAME_CTX_DONE,
 	MDP_NOTIFY_FRAME_READY,
 	MDP_NOTIFY_FRAME_FLUSHED,
 	MDP_NOTIFY_FRAME_DONE,
 	MDP_NOTIFY_FRAME_TIMEOUT,
+	MDP_NOTIFY_FRAME_START,
 };
 
 struct disp_info_type_suspend {
@@ -92,8 +88,6 @@ struct msm_sync_pt_data {
 	char *fence_name;
 	u32 acq_fen_cnt;
 	struct sync_fence *acq_fen[MDP_MAX_FENCE_FD];
-	u32 temp_fen_cnt;
-	struct sync_fence *temp_fen[MDP_MAX_FENCE_FD];
 
 	struct sw_sync_timeline *timeline;
 	int timeline_value;

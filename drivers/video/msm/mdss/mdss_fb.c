@@ -2223,9 +2223,12 @@ static void mdss_fb_power_setting_idle(struct msm_fb_data_type *mfd)
 	}
 }
 
-static void __mdss_fb_copy_fence(struct msm_sync_pt_data *sync_pt_data,
-	struct sync_fence **fences, u32 *fence_cnt)
+int mdss_fb_wait_for_fence(struct msm_sync_pt_data *sync_pt_data)
 {
+	struct sync_fence *fences[MDP_MAX_FENCE_FD];
+	int fence_cnt;
+	int i, ret = 0;
+
 	pr_debug("%s: wait for fences\n", sync_pt_data->fence_name);
 
 	mutex_lock(&sync_pt_data->sync_mutex);
@@ -2233,18 +2236,12 @@ static void __mdss_fb_copy_fence(struct msm_sync_pt_data *sync_pt_data,
 	 * Assuming that acq_fen_cnt is sanitized in bufsync ioctl
 	 * to check for sync_pt_data->acq_fen_cnt <= MDP_MAX_FENCE_FD
 	 */
-	*fence_cnt = sync_pt_data->acq_fen_cnt;
+	fence_cnt = sync_pt_data->acq_fen_cnt;
 	sync_pt_data->acq_fen_cnt = 0;
-	if (*fence_cnt)
+	if (fence_cnt)
 		memcpy(fences, sync_pt_data->acq_fen,
-				*fence_cnt * sizeof(struct sync_fence *));
+				fence_cnt * sizeof(struct sync_fence *));
 	mutex_unlock(&sync_pt_data->sync_mutex);
-}
-
-static void __mdss_fb_wait_for_fence_sub(struct msm_sync_pt_data *sync_pt_data,
-	struct sync_fence **fences, int fence_cnt)
-{
-	int i, ret = 0;
 
 	/* buf sync */
 	for (i = 0; i < fence_cnt && !ret; i++) {
@@ -2267,19 +2264,6 @@ static void __mdss_fb_wait_for_fence_sub(struct msm_sync_pt_data *sync_pt_data,
 		for (; i < fence_cnt; i++)
 			sync_fence_put(fences[i]);
 	}
-
-}
-
-int mdss_fb_wait_for_fence(struct msm_sync_pt_data *sync_pt_data)
-{
-	struct sync_fence *fences[MDP_MAX_FENCE_FD];
-	int fence_cnt = 0;
-
-	__mdss_fb_copy_fence(sync_pt_data, fences, &fence_cnt);
-
-	if (fence_cnt)
-		__mdss_fb_wait_for_fence_sub(sync_pt_data,
-			fences, fence_cnt);
 
 	return fence_cnt;
 }
@@ -2356,7 +2340,6 @@ static int __mdss_fb_sync_buf_done_callback(struct notifier_block *p,
 {
 	struct msm_sync_pt_data *sync_pt_data;
 	struct msm_fb_data_type *mfd;
-	int fence_cnt;
 
 	sync_pt_data = container_of(p, struct msm_sync_pt_data, notifier);
 	mfd = container_of(sync_pt_data, struct msm_fb_data_type,
@@ -2371,13 +2354,8 @@ static int __mdss_fb_sync_buf_done_callback(struct notifier_block *p,
 		}
 		break;
 	case MDP_NOTIFY_FRAME_READY:
-		if (sync_pt_data->async_wait_fences &&
-			sync_pt_data->temp_fen_cnt) {
-			fence_cnt = sync_pt_data->temp_fen_cnt;
-			sync_pt_data->temp_fen_cnt = 0;
-			__mdss_fb_wait_for_fence_sub(sync_pt_data,
-				sync_pt_data->temp_fen, fence_cnt);
-		}
+		if (sync_pt_data->async_wait_fences)
+			mdss_fb_wait_for_fence(sync_pt_data);
 		break;
 	case MDP_NOTIFY_FRAME_FLUSHED:
 		pr_debug("%s: frame flushed\n", sync_pt_data->fence_name);
@@ -2391,13 +2369,7 @@ static int __mdss_fb_sync_buf_done_callback(struct notifier_block *p,
 		pr_debug("%s: frame done\n", sync_pt_data->fence_name);
 		mdss_fb_signal_timeline(sync_pt_data);
 		break;
-	case MDP_NOTIFY_FRAME_CFG_DONE:
-		if (sync_pt_data->async_wait_fences)
-			__mdss_fb_copy_fence(sync_pt_data,
-					sync_pt_data->temp_fen,
-					&sync_pt_data->temp_fen_cnt);
-		break;
-	case MDP_NOTIFY_FRAME_CTX_DONE:
+	case MDP_NOTIFY_FRAME_START:
 		mdss_fb_release_kickoff(mfd);
 		break;
 	}
