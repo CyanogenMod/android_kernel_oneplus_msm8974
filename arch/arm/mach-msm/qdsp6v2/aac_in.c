@@ -232,8 +232,8 @@ static long aac_in_ioctl(struct file *file,
 		if (min_bitrate < 24000)
 			min_bitrate = 24000;
 		max_bitrate = 6*(cfg.sample_rate)*(cfg.channels);
-		if (max_bitrate > 192000)
-			max_bitrate = 192000;
+		if (max_bitrate > 320000)
+			max_bitrate = 320000;
 		if ((cfg.bit_rate < min_bitrate) ||
 					(cfg.bit_rate > max_bitrate)) {
 			pr_err("%s: bitrate permissible: max=%d, min=%d\n",
