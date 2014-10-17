@@ -5017,27 +5017,30 @@ int wcd9xxx_mbhc_init(struct wcd9xxx_mbhc *mbhc, struct wcd9xxx_resmgr *resmgr,
 
 #ifdef CONFIG_MACH_OPPO
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
-				       SND_JACK_BTN_1,
+				       SND_JACK_BTN_0,
 				       KEY_MEDIA);
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_1,
+				       KEY_UNKNOWN);
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
 				       SND_JACK_BTN_2,
-				       KEY_VOLUMEUP);
+				       KEY_UNKNOWN);
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
 				       SND_JACK_BTN_3,
-				       KEY_MEDIA);
+				       KEY_UNKNOWN);
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_4,
+				       KEY_UNKNOWN);
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
 					   SND_JACK_BTN_5,
 					   KEY_VOLUMEUP);
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
 					   SND_JACK_BTN_6,
-					   KEY_VOLUMEUP);
+					   KEY_UNKNOWN);
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
 				       SND_JACK_BTN_7,
 				       KEY_VOLUMEDOWN);
 #endif
-		ret = snd_jack_set_key(mbhc->button_jack.jack,
-				       SND_JACK_BTN_0,
-				       KEY_MEDIA);
 		if (ret) {
 			pr_err("%s: Failed to set code for btn-0\n",
 				__func__);
