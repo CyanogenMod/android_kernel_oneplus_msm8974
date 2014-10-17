@@ -1496,6 +1496,8 @@ done:
  *
  * Release any resources allocated by calling process, this can be called
  * on fb_release to release any overlays/rotator sessions left open.
+ *
+ * Return number of resources released
  */
 static int __mdss_mdp_overlay_release_all(struct msm_fb_data_type *mfd,
 	bool release_all, uint32_t pid)
@@ -1534,9 +1536,6 @@ static int __mdss_mdp_overlay_release_all(struct msm_fb_data_type *mfd,
 	}
 	mutex_unlock(&mdp5_data->ov_lock);
 
-	if (cnt)
-		mfd->mdp.kickoff_fnc(mfd, NULL);
-
 	list_for_each_entry_safe(rot, tmp, &mdp5_data->rot_proc_list, list) {
 		if (rot->pid == pid) {
 			if (!list_empty(&rot->list))
@@ -1545,7 +1544,7 @@ static int __mdss_mdp_overlay_release_all(struct msm_fb_data_type *mfd,
 		}
 	}
 
-	return 0;
+	return cnt;
 }
 
 static int mdss_mdp_overlay_play_wait(struct msm_fb_data_type *mfd,
