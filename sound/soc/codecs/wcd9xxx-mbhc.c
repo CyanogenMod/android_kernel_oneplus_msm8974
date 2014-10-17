@@ -3447,25 +3447,21 @@ static int wcd9xxx_get_button_mask(const int btn)
 	int mask = 0;
 	switch (btn) {
 	case 0:
+	case 1:
 		mask = SND_JACK_BTN_0;
 		break;
-	case 1:
-		mask = SND_JACK_BTN_1;
-		break;
 	case 2:
-		mask = SND_JACK_BTN_2;
+		mask = SND_JACK_BTN_5;
 		break;
 	case 3:
-		mask = SND_JACK_BTN_3;
+		mask = SND_JACK_BTN_0;
 		break;
 	case 4:
 		mask = SND_JACK_BTN_4;
 		break;
 	case 5:
-		mask = SND_JACK_BTN_5;
-		break;
 	case 6:
-		mask = SND_JACK_BTN_6;
+		mask = SND_JACK_BTN_5;
 		break;
 	case 7:
 		mask = SND_JACK_BTN_7;
@@ -5019,27 +5015,16 @@ int wcd9xxx_mbhc_init(struct wcd9xxx_mbhc *mbhc, struct wcd9xxx_resmgr *resmgr,
 
 #ifdef CONFIG_MACH_OPPO
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
-				       SND_JACK_BTN_1,
-				       KEY_MEDIA);
-		ret = snd_jack_set_key(mbhc->button_jack.jack,
-				       SND_JACK_BTN_2,
-				       KEY_VOLUMEUP);
-		ret = snd_jack_set_key(mbhc->button_jack.jack,
-				       SND_JACK_BTN_3,
+				       SND_JACK_BTN_0,
 				       KEY_MEDIA);
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
 					   SND_JACK_BTN_5,
 					   KEY_VOLUMEUP);
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
-					   SND_JACK_BTN_6,
-					   KEY_VOLUMEUP);
-		ret = snd_jack_set_key(mbhc->button_jack.jack,
 				       SND_JACK_BTN_7,
 				       KEY_VOLUMEDOWN);
 #endif
-		ret = snd_jack_set_key(mbhc->button_jack.jack,
-				       SND_JACK_BTN_0,
-				       KEY_MEDIA);
+
 		if (ret) {
 			pr_err("%s: Failed to set code for btn-0\n",
 				__func__);
