@@ -57,6 +57,7 @@
 #ifdef CONFIG_SND_PCM
 #include "f_audio_source.c"
 #endif
+#include "f_fs.c"
 #include "f_mass_storage.c"
 #include "u_serial.c"
 #include "u_sdio.c"
@@ -211,6 +212,8 @@ struct android_dev {
 
 	/* A list node inside the android_dev_list */
 	struct list_head list_item;
+
+	char ffs_aliases[256];
 };
 
 struct android_configuration {
@@ -431,6 +434,163 @@ static void android_disable(struct android_dev *dev)
 
 /*-------------------------------------------------------------------------*/
 /* Supported functions initialization */
+
+struct functionfs_config {
+	bool opened;
+	bool enabled;
+	struct ffs_data *data;
+};
+
+static int ffs_function_init(struct android_usb_function *f,
+			     struct usb_composite_dev *cdev)
+{
+	f->config = kzalloc(sizeof(struct functionfs_config), GFP_KERNEL);
+	if (!f->config)
+		return -ENOMEM;
+
+	return functionfs_init();
+}
+
+static void ffs_function_cleanup(struct android_usb_function *f)
+{
+	functionfs_cleanup();
+	kfree(f->config);
+}
+
+static void ffs_function_enable(struct android_usb_function *f)
+{
+	struct android_dev *dev = f->android_dev;
+	struct functionfs_config *config = f->config;
+
+	config->enabled = true;
+
+	/* Disable the gadget until the function is ready */
+	if (!config->opened)
+		android_disable(dev);
+}
+
+static void ffs_function_disable(struct android_usb_function *f)
+{
+	struct android_dev *dev = f->android_dev;
+	struct functionfs_config *config = f->config;
+
+	config->enabled = false;
+
+	/* Balance the disable that was called in closed_callback */
+	if (!config->opened)
+		android_enable(dev);
+}
+
+static int ffs_function_bind_config(struct android_usb_function *f,
+				    struct usb_configuration *c)
+{
+	struct functionfs_config *config = f->config;
+	return functionfs_bind_config(c->cdev, c, config->data);
+}
+
+static ssize_t
+ffs_aliases_show(struct device *pdev, struct device_attribute *attr, char *buf)
+{
+	struct android_dev *dev;
+	int ret;
+
+	dev = list_first_entry(&android_dev_list, struct android_dev,
+			list_item);
+
+	mutex_lock(&dev->mutex);
+	ret = sprintf(buf, "%s\n", dev->ffs_aliases);
+	mutex_unlock(&dev->mutex);
+
+	return ret;
+}
+
+static ssize_t
+ffs_aliases_store(struct device *pdev, struct device_attribute *attr,
+					const char *buf, size_t size)
+{
+	struct android_dev *dev;
+	char buff[256];
+
+	dev = list_first_entry(&android_dev_list, struct android_dev,
+			list_item);
+	mutex_lock(&dev->mutex);
+
+	if (dev->enabled) {
+		mutex_unlock(&dev->mutex);
+		return -EBUSY;
+	}
+
+	strlcpy(buff, buf, sizeof(buff));
+	strlcpy(dev->ffs_aliases, strim(buff), sizeof(dev->ffs_aliases));
+
+	mutex_unlock(&dev->mutex);
+
+	return size;
+}
+
+static DEVICE_ATTR(aliases, S_IRUGO | S_IWUSR, ffs_aliases_show,
+					       ffs_aliases_store);
+static struct device_attribute *ffs_function_attributes[] = {
+	&dev_attr_aliases,
+	NULL
+};
+
+static struct android_usb_function ffs_function = {
+	.name		= "ffs",
+	.init		= ffs_function_init,
+	.enable		= ffs_function_enable,
+	.disable	= ffs_function_disable,
+	.cleanup	= ffs_function_cleanup,
+	.bind_config	= ffs_function_bind_config,
+	.attributes	= ffs_function_attributes,
+};
+
+static int functionfs_ready_callback(struct ffs_data *ffs)
+{
+	struct android_dev *dev = ffs_function.android_dev;
+	struct functionfs_config *config = ffs_function.config;
+	int ret = 0;
+
+	mutex_lock(&dev->mutex);
+
+	ret = functionfs_bind(ffs, dev->cdev);
+	if (ret)
+		goto err;
+
+	config->data = ffs;
+	config->opened = true;
+
+	if (config->enabled)
+		android_enable(dev);
+
+err:
+	mutex_unlock(&dev->mutex);
+	return ret;
+}
+
+static void functionfs_closed_callback(struct ffs_data *ffs)
+{
+	struct android_dev *dev = ffs_function.android_dev;
+	struct functionfs_config *config = ffs_function.config;
+
+	mutex_lock(&dev->mutex);
+
+	if (config->enabled)
+		android_disable(dev);
+
+	config->opened = false;
+	config->data = NULL;
+
+	functionfs_unbind(ffs);
+
+	mutex_unlock(&dev->mutex);
+}
+
+static int functionfs_check_dev_callback(const char *dev_name)
+{
+	return 0;
+}
+
 
 struct adb_data {
 	bool opened;
@@ -2016,6 +2176,7 @@ static struct android_usb_function uasp_function = {
 };
 
 static struct android_usb_function *supported_functions[] = {
+	&ffs_function,
 	&mbim_function,
 	&ecm_qc_function,
 #ifdef CONFIG_SND_PCM
@@ -2322,7 +2483,10 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 	struct android_usb_function_holder *f_holder;
 	char *name;
 	char buf[256], *b;
+	char aliases[256], *a;
 	int err;
+	int is_ffs;
+	int ffs_enabled = 0;
 
 	mutex_lock(&dev->mutex);
 
@@ -2350,26 +2514,47 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 
 	while (b) {
 		conf_str = strsep(&b, ":");
-		if (conf_str) {
-			/* If the next not equal to the head, take it */
-			if (curr_conf->next != &dev->configs)
-				conf = list_entry(curr_conf->next,
-						  struct android_configuration,
-						  list_item);
-			else
-				conf = alloc_android_config(dev);
+		if (!conf_str)
+			continue;
 
-			curr_conf = curr_conf->next;
-		}
+		/* If the next not equal to the head, take it */
+		if (curr_conf->next != &dev->configs)
+			conf = list_entry(curr_conf->next,
+					  struct android_configuration,
+					  list_item);
+		else
+			conf = alloc_android_config(dev);
 
+		curr_conf = curr_conf->next;
 		while (conf_str) {
 			name = strsep(&conf_str, ",");
-			if (name) {
-				err = android_enable_function(dev, conf, name);
-				if (err)
-					pr_err("android_usb: Cannot enable %s",
-						name);
+			is_ffs = 0;
+			strlcpy(aliases, dev->ffs_aliases, sizeof(aliases));
+			a = aliases;
+
+			while (a) {
+				char *alias = strsep(&a, ",");
+				if (alias && !strcmp(name, alias)) {
+					is_ffs = 1;
+					break;
+				}
 			}
+
+			if (is_ffs) {
+				if (ffs_enabled)
+					continue;
+				err = android_enable_function(dev, conf, "ffs");
+				if (err)
+					pr_err("android_usb: Cannot enable ffs (%d)",
+										err);
+				else
+					ffs_enabled = 1;
+				continue;
+			}
+			err = android_enable_function(dev, conf, name);
+			if (err)
+				pr_err("android_usb: Cannot enable '%s' (%d)",
+								   name, err);
 		}
 	}
 

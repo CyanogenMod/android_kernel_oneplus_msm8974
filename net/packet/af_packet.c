@@ -812,37 +812,27 @@ static void prb_open_block(struct tpacket_kbdq_core *pkc1,
 
 	smp_rmb();
 
-	if (likely(TP_STATUS_KERNEL == BLOCK_STATUS(pbd1))) {
+	/* We could have just memset this but we will lose the
+	 * flexibility of making the priv area sticky
+	 */
+	BLOCK_SNUM(pbd1) = pkc1->knxt_seq_num++;
+	BLOCK_NUM_PKTS(pbd1) = 0;
+	BLOCK_LEN(pbd1) = BLK_PLUS_PRIV(pkc1->blk_sizeof_priv);
+	getnstimeofday(&ts);
+	h1->ts_first_pkt.ts_sec = ts.tv_sec;
+	h1->ts_first_pkt.ts_nsec = ts.tv_nsec;
+	pkc1->pkblk_start = (char *)pbd1;
+	pkc1->nxt_offset = (char *)(pkc1->pkblk_start +
+				    BLK_PLUS_PRIV(pkc1->blk_sizeof_priv));
+	BLOCK_O2FP(pbd1) = (__u32)BLK_PLUS_PRIV(pkc1->blk_sizeof_priv);
+	BLOCK_O2PRIV(pbd1) = BLK_HDR_LEN;
+	pbd1->version = pkc1->version;
+	pkc1->prev = pkc1->nxt_offset;
+	pkc1->pkblk_end = pkc1->pkblk_start + pkc1->kblk_size;
+	prb_thaw_queue(pkc1);
+	_prb_refresh_rx_retire_blk_timer(pkc1);
 
-		/* We could have just memset this but we will lose the
-		 * flexibility of making the priv area sticky
-		 */
-		BLOCK_SNUM(pbd1) = pkc1->knxt_seq_num++;
-		BLOCK_NUM_PKTS(pbd1) = 0;
-		BLOCK_LEN(pbd1) = BLK_PLUS_PRIV(pkc1->blk_sizeof_priv);
-		getnstimeofday(&ts);
-		h1->ts_first_pkt.ts_sec = ts.tv_sec;
-		h1->ts_first_pkt.ts_nsec = ts.tv_nsec;
-		pkc1->pkblk_start = (char *)pbd1;
-		pkc1->nxt_offset = (char *)(pkc1->pkblk_start +
-		BLK_PLUS_PRIV(pkc1->blk_sizeof_priv));
-		BLOCK_O2FP(pbd1) = (__u32)BLK_PLUS_PRIV(pkc1->blk_sizeof_priv);
-		BLOCK_O2PRIV(pbd1) = BLK_HDR_LEN;
-		pbd1->version = pkc1->version;
-		pkc1->prev = pkc1->nxt_offset;
-		pkc1->pkblk_end = pkc1->pkblk_start + pkc1->kblk_size;
-		prb_thaw_queue(pkc1);
-		_prb_refresh_rx_retire_blk_timer(pkc1);
-
-		smp_wmb();
-
-		return;
-	}
-
-	WARN(1, "ERROR block:%p is NOT FREE status:%d kactive_blk_num:%d\n",
-		pbd1, BLOCK_STATUS(pbd1), pkc1->kactive_blk_num);
-	dump_stack();
-	BUG();
+	smp_wmb();
 }
 
 /*
@@ -933,10 +923,6 @@ static void prb_retire_current_block(struct tpacket_kbdq_core *pkc,
 		prb_close_block(pkc, pbd, po, status);
 		return;
 	}
-
-	WARN(1, "ERROR-pbd[%d]:%p\n", pkc->kactive_blk_num, pbd);
-	dump_stack();
-	BUG();
 }
 
 static int prb_curr_blk_in_use(struct tpacket_kbdq_core *pkc,
@@ -1280,6 +1266,14 @@ static void __fanout_unlink(struct sock *sk, struct packet_sock *po)
 	spin_unlock(&f->lock);
 }
 
+bool match_fanout_group(struct packet_type *ptype, struct sock * sk)
+{
+	if (ptype->af_packet_priv == (void*)((struct packet_sock *)sk)->fanout)
+		return true;
+
+	return false;
+}
+
 static int fanout_add(struct sock *sk, u16 id, u16 type_flags)
 {
 	struct packet_sock *po = pkt_sk(sk);
@@ -1332,6 +1326,7 @@ static int fanout_add(struct sock *sk, u16 id, u16 type_flags)
 		match->prot_hook.dev = po->prot_hook.dev;
 		match->prot_hook.func = packet_rcv_fanout;
 		match->prot_hook.af_packet_priv = match;
+		match->prot_hook.id_match = match_fanout_group;
 		dev_add_pack(&match->prot_hook);
 		list_add(&match->list, &fanout_list);
 	}
@@ -1943,7 +1938,6 @@ static void tpacket_destruct_skb(struct sk_buff *skb)
 
 	if (likely(po->tx_ring.pg_vec)) {
 		ph = skb_shinfo(skb)->destructor_arg;
-		BUG_ON(__packet_get_status(po, ph) != TP_STATUS_SENDING);
 		BUG_ON(atomic_read(&po->tx_ring.pending) == 0);
 		atomic_dec(&po->tx_ring.pending);
 		__packet_set_status(po, ph, TP_STATUS_AVAILABLE);
@@ -2442,13 +2436,15 @@ static int packet_release(struct socket *sock)
 
 	packet_flush_mclist(sk);
 
-	memset(&req_u, 0, sizeof(req_u));
-
-	if (po->rx_ring.pg_vec)
+	if (po->rx_ring.pg_vec) {
+		memset(&req_u, 0, sizeof(req_u));
 		packet_set_ring(sk, &req_u, 1, 0);
+	}
 
-	if (po->tx_ring.pg_vec)
+	if (po->tx_ring.pg_vec) {
+		memset(&req_u, 0, sizeof(req_u));
 		packet_set_ring(sk, &req_u, 1, 1);
+	}
 
 	fanout_release(sk);
 
@@ -2852,12 +2848,11 @@ static int packet_getname_spkt(struct socket *sock, struct sockaddr *uaddr,
 		return -EOPNOTSUPP;
 
 	uaddr->sa_family = AF_PACKET;
+	memset(uaddr->sa_data, 0, sizeof(uaddr->sa_data));
 	rcu_read_lock();
 	dev = dev_get_by_index_rcu(sock_net(sk), pkt_sk(sk)->ifindex);
 	if (dev)
-		strncpy(uaddr->sa_data, dev->name, 14);
-	else
-		memset(uaddr->sa_data, 0, 14);
+		strlcpy(uaddr->sa_data, dev->name, sizeof(uaddr->sa_data));
 	rcu_read_unlock();
 	*uaddr_len = sizeof(*uaddr);
 

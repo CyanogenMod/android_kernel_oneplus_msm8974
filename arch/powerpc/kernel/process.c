@@ -799,16 +799,8 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 #endif /* CONFIG_PPC_STD_MMU_64 */
 #ifdef CONFIG_PPC64 
 	if (cpu_has_feature(CPU_FTR_DSCR)) {
-		if (current->thread.dscr_inherit) {
-			p->thread.dscr_inherit = 1;
-			p->thread.dscr = current->thread.dscr;
-		} else if (0 != dscr_default) {
-			p->thread.dscr_inherit = 1;
-			p->thread.dscr = dscr_default;
-		} else {
-			p->thread.dscr_inherit = 0;
-			p->thread.dscr = 0;
-		}
+		p->thread.dscr_inherit = current->thread.dscr_inherit;
+		p->thread.dscr = current->thread.dscr;
 	}
 #endif
 
@@ -1226,7 +1218,7 @@ EXPORT_SYMBOL(dump_stack);
 
 #ifdef CONFIG_PPC64
 /* Called with hard IRQs off */
-void __ppc64_runlatch_on(void)
+void notrace __ppc64_runlatch_on(void)
 {
 	struct thread_info *ti = current_thread_info();
 	unsigned long ctrl;
@@ -1239,7 +1231,7 @@ void __ppc64_runlatch_on(void)
 }
 
 /* Called with hard IRQs off */
-void __ppc64_runlatch_off(void)
+void notrace __ppc64_runlatch_off(void)
 {
 	struct thread_info *ti = current_thread_info();
 	unsigned long ctrl;

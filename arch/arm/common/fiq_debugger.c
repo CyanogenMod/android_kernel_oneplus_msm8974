@@ -81,7 +81,12 @@ struct fiq_debugger_state {
 	atomic_t unhandled_fiq_count;
 	bool in_fiq;
 
+	struct work_struct work;
+	spinlock_t work_lock;
+	char work_cmd[DEBUG_MAX];
+
 #ifdef CONFIG_FIQ_DEBUGGER_CONSOLE
+	spinlock_t console_lock;
 	struct console console;
 	struct tty_struct *tty;
 	int tty_open_count;
@@ -557,6 +562,53 @@ static void do_kgdb(struct fiq_debugger_state *state)
 }
 #endif
 
+static void debug_schedule_work(struct fiq_debugger_state *state, char *cmd)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&state->work_lock, flags);
+	if (state->work_cmd[0] != '\0') {
+		debug_printf(state, "work command processor busy\n");
+		spin_unlock_irqrestore(&state->work_lock, flags);
+		return;
+	}
+
+	strlcpy(state->work_cmd, cmd, sizeof(state->work_cmd));
+	spin_unlock_irqrestore(&state->work_lock, flags);
+
+	schedule_work(&state->work);
+}
+
+static void debug_work(struct work_struct *work)
+{
+	struct fiq_debugger_state *state;
+	char work_cmd[DEBUG_MAX];
+	char *cmd;
+	unsigned long flags;
+
+	state = container_of(work, struct fiq_debugger_state, work);
+
+	spin_lock_irqsave(&state->work_lock, flags);
+
+	strlcpy(work_cmd, state->work_cmd, sizeof(work_cmd));
+	state->work_cmd[0] = '\0';
+
+	spin_unlock_irqrestore(&state->work_lock, flags);
+
+	cmd = work_cmd;
+	if (!strncmp(cmd, "reboot", 6)) {
+		cmd += 6;
+		while (*cmd == ' ')
+			cmd++;
+		if (cmd != '\0')
+			kernel_restart(cmd);
+		else
+			kernel_restart(NULL);
+	} else {
+		debug_printf(state, "unknown work command '%s'\n", work_cmd);
+	}
+}
+
 /* This function CANNOT be called in FIQ context */
 static void debug_irq_exec(struct fiq_debugger_state *state, char *cmd)
 {
@@ -570,6 +622,8 @@ static void debug_irq_exec(struct fiq_debugger_state *state, char *cmd)
 	if (!strcmp(cmd, "kgdb"))
 		do_kgdb(state);
 #endif
+	if (!strncmp(cmd, "reboot", 6))
+		debug_schedule_work(state, cmd);
 }
 
 static void debug_help(struct fiq_debugger_state *state)
@@ -579,7 +633,8 @@ static void debug_help(struct fiq_debugger_state *state)
 				" regs          Register dump\n"
 				" allregs       Extended Register dump\n"
 				" bt            Stack trace\n"
-				" reboot        Reboot\n"
+				" reboot [<c>]  Reboot with command <c>\n"
+				" reset [<c>]   Hard reset with command <c>\n"
 				" irqs          Interupt status\n"
 				" kmsg          Kernel log\n"
 				" version       Kernel version\n");
@@ -630,16 +685,16 @@ static bool debug_fiq_exec(struct fiq_debugger_state *state,
 		dump_allregs(state, regs);
 	} else if (!strcmp(cmd, "bt")) {
 		dump_stacktrace(state, (struct pt_regs *)regs, 100, svc_sp);
-	} else if (!strncmp(cmd, "reboot", 6)) {
-		cmd += 6;
+	} else if (!strncmp(cmd, "reset", 5)) {
+		cmd += 5;
 		while (*cmd == ' ')
 			cmd++;
 		if (*cmd) {
 			char tmp_cmd[32];
 			strlcpy(tmp_cmd, cmd, sizeof(tmp_cmd));
-			kernel_restart(tmp_cmd);
+			machine_restart(tmp_cmd);
 		} else {
-			kernel_restart(NULL);
+			machine_restart(NULL);
 		}
 	} else if (!strcmp(cmd, "irqs")) {
 		dump_irqs(state);
@@ -654,8 +709,9 @@ static bool debug_fiq_exec(struct fiq_debugger_state *state,
 		state->no_sleep = true;
 		debug_printf(state, "disabling sleep\n");
 	} else if (!strcmp(cmd, "console")) {
-		state->console_enable = true;
 		debug_printf(state, "console mode\n");
+		debug_uart_flush(state);
+		state->console_enable = true;
 	} else if (!strcmp(cmd, "cpu")) {
 		debug_printf(state, "cpu %d\n", state->current_cpu);
 	} else if (!strncmp(cmd, "cpu ", 4)) {
@@ -842,7 +898,8 @@ static bool debug_handle_uart_interrupt(struct fiq_debugger_state *state,
 		}
 		last_c = c;
 	}
-	debug_uart_flush(state);
+	if (!state->console_enable)
+		debug_uart_flush(state);
 	if (state->pdata->fiq_ack)
 		state->pdata->fiq_ack(state->pdev, state->fiq);
 
@@ -926,6 +983,7 @@ static void debug_console_write(struct console *co,
 				const char *s, unsigned int count)
 {
 	struct fiq_debugger_state *state;
+	unsigned long flags;
 
 	state = container_of(co, struct fiq_debugger_state, console);
 
@@ -933,12 +991,14 @@ static void debug_console_write(struct console *co,
 		return;
 
 	debug_uart_enable(state);
+	spin_lock_irqsave(&state->console_lock, flags);
 	while (count--) {
 		if (*s == '\n')
 			debug_putc(state, '\r');
 		debug_putc(state, *s++);
 	}
 	debug_uart_flush(state);
+	spin_unlock_irqrestore(&state->console_lock, flags);
 	debug_uart_disable(state);
 }
 
@@ -979,8 +1039,10 @@ int  fiq_tty_write(struct tty_struct *tty, const unsigned char *buf, int count)
 		return count;
 
 	debug_uart_enable(state);
+	spin_lock_irq(&state->console_lock);
 	for (i = 0; i < count; i++)
 		debug_putc(state, *buf++);
+	spin_unlock_irq(&state->console_lock);
 	debug_uart_disable(state);
 
 	return count;
@@ -988,7 +1050,7 @@ int  fiq_tty_write(struct tty_struct *tty, const unsigned char *buf, int count)
 
 int  fiq_tty_write_room(struct tty_struct *tty)
 {
-	return 1024;
+	return 16;
 }
 
 #ifdef CONFIG_CONSOLE_POLL
@@ -1189,6 +1251,9 @@ static int fiq_debugger_probe(struct platform_device *pdev)
 	state->signal_irq = platform_get_irq_byname(pdev, "signal");
 	state->wakeup_irq = platform_get_irq_byname(pdev, "wakeup");
 
+	INIT_WORK(&state->work, debug_work);
+	spin_lock_init(&state->work_lock);
+
 	platform_set_drvdata(pdev, state);
 
 	spin_lock_init(&state->sleep_timer_lock);
@@ -1275,6 +1340,7 @@ static int fiq_debugger_probe(struct platform_device *pdev)
 		handle_wakeup(state);
 
 #if defined(CONFIG_FIQ_DEBUGGER_CONSOLE)
+	spin_lock_init(&state->console_lock);
 	state->console = fiq_debugger_console;
 	state->console.index = pdev->id;
 	if (!console_set_on_cmdline)

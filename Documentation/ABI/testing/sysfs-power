@@ -232,6 +232,7 @@ Description:
 		wakeup sources created with the help of /sys/power/wake_lock
 		that are inactive at the moment, separated with spaces.
 
+
 What:		/sys/power/pm_print_times
 Date:		May 2012
 Contact:	Sameer Nanda <snanda@chromium.org>
