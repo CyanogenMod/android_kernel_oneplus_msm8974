@@ -125,7 +125,7 @@
 			linux,input-type = <5>;
 			linux,code = <0>;
 			gpio-key,wakeup;
-			debounce-interval = <15>;
+			debounce-interval = <150>;
 		};
 	};
 
