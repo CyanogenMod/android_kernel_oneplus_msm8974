@@ -204,13 +204,13 @@
 		qcom,ulps-enabled;
 	};
 
-	dsi_truly_1080_vid: qcom,mdss_dsi_truly_1080p_video {
+	dsi_LG_1080_vid: qcom,mdss_dsi_LG_1080p_video {
 		compatible = "qcom,mdss-dsi-panel2";
 		status = "ok";
 		qcom,mdss-pan-physical-width-dimension = <68>;
 		qcom,mdss-pan-physical-height-dimension = <121>;
-		qcom,mdss-dsi-panel-name = "truly 1080p video mode dsi panel";
-		qcom,mdss-dsi-panel-manufacture = "truly";
+		qcom,mdss-dsi-panel-name = "LG 1080p video mode dsi panel";
+		qcom,mdss-dsi-panel-manufacture = "LG";
 		qcom,mdss-dsi-panel-version = "R63315";
 		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
 		qcom,mdss-dsi-panel-type = "dsi_video_mode";
@@ -288,12 +288,12 @@
 		qcom,cont-splash-enabled;
 	};
 
-	dsi_truly_1080_cmd: qcom,mdss_dsi_truly_1080p_cmd {
+	dsi_LG_1080_cmd: qcom,mdss_dsi_LG_1080p_cmd {
 		compatible = "qcom,mdss-dsi-panel";
 		status = "ok";
 		qcom,cont-splash-enabled;
-		qcom,mdss-dsi-panel-name = "truly 1080p cmd mode dsi panel";
-		qcom,mdss-dsi-panel-manufacture = "truly";
+		qcom,mdss-dsi-panel-name = "LG 1080p cmd mode dsi panel";
+		qcom,mdss-dsi-panel-manufacture = "LG";
 		qcom,mdss-dsi-panel-version = "R63315";
 		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
 		qcom,mdss-dsi-panel-type = "dsi_cmd_mode";
