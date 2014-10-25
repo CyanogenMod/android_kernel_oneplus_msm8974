@@ -93,8 +93,12 @@ int __init board_rf_version_init(char *s)
 		current_rf_version_num = RF_VERSION__76;
 	else if (!strncmp(s, "77", 2))
 		current_rf_version_num = RF_VERSION__77;
+	else if (!strncmp(s, "87", 2))
+		current_rf_version_num = RF_VERSION__87;
 	else if (!strncmp(s, "88", 2))
 		current_rf_version_num = RF_VERSION__88;
+	else if (!strncmp(s, "89", 2))
+		current_rf_version_num = RF_VERSION__89;
 	else if (!strncmp(s, "98", 2))
 		current_rf_version_num = RF_VERSION__98;
 	else if (!strncmp(s, "99", 2))
