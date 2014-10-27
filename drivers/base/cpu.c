@@ -16,6 +16,12 @@
 
 #include "base.h"
 
+#define ONL_CONT_MODE_SYSFS 	0	// core online status controlled by sysfs (mpdecision)
+#define ONL_CONT_MODE_ONLINE 	1	// core is forced online
+#define ONL_CONT_MODE_OFFLINE	2	// core is forced offline 
+
+int online_control_mode[4] = {ONL_CONT_MODE_SYSFS, ONL_CONT_MODE_SYSFS, ONL_CONT_MODE_SYSFS, ONL_CONT_MODE_SYSFS};
+
 struct bus_type cpu_subsys = {
 	.name = "cpu",
 	.dev_name = "cpu",
@@ -41,6 +47,10 @@ static ssize_t __ref store_online(struct device *dev,
 	struct cpu *cpu = container_of(dev, struct cpu, dev);
 	ssize_t ret;
 
+	// AP: this sysfs only works when control mode is in sysfs-mode
+	if (online_control_mode[cpu->dev.id] != ONL_CONT_MODE_SYSFS)
+		return count;
+
 	cpu_hotplug_driver_lock();
 	switch (buf[0]) {
 	case '0':
@@ -64,9 +74,72 @@ static ssize_t __ref store_online(struct device *dev,
 }
 static DEVICE_ATTR(online, 0644, show_online, store_online);
 
+static ssize_t show_online_control(struct device *dev,
+			   struct device_attribute *attr,
+			   char *buf)
+{
+	
+	struct cpu *cpu = container_of(dev, struct cpu, dev);
+
+	switch (online_control_mode[cpu->dev.id])
+	{
+		case ONL_CONT_MODE_SYSFS:
+			return sprintf(buf, "0: sysfs controlled\n");
+			break;
+		case ONL_CONT_MODE_ONLINE:
+			return sprintf(buf, "1: forced online\n");
+			break;
+		case ONL_CONT_MODE_OFFLINE:
+			return sprintf(buf, "2: forced offline\n");
+			break;
+	}
+	
+	return sprintf(buf, "Core online control invalid status\n");
+}
+
+static ssize_t __ref store_online_control(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct cpu *cpu = container_of(dev, struct cpu, dev);
+	ssize_t ret;
+
+	cpu_hotplug_driver_lock();
+	switch (buf[0]) 
+	{
+		case '0': // control via sysfs
+			ret = cpu_down(cpu->dev.id);
+			if (!ret)
+				kobject_uevent(&dev->kobj, KOBJ_OFFLINE);
+			online_control_mode[cpu->dev.id] = ONL_CONT_MODE_SYSFS;
+			break;
+		case '1': // forced online
+			ret = cpu_up(cpu->dev.id);
+			if (!ret)
+				kobject_uevent(&dev->kobj, KOBJ_ONLINE);
+			online_control_mode[cpu->dev.id] = ONL_CONT_MODE_ONLINE;
+			break;
+		case '2': // forced offline
+			ret = cpu_down(cpu->dev.id);
+			if (!ret)
+				kobject_uevent(&dev->kobj, KOBJ_OFFLINE);
+			online_control_mode[cpu->dev.id] = ONL_CONT_MODE_OFFLINE;
+			break;
+		default:
+			ret = -EINVAL;
+	}
+	cpu_hotplug_driver_unlock();
+
+	if (ret >= 0)
+		ret = count;
+	return ret;
+}
+static DEVICE_ATTR(online_control, 0644, show_online_control, store_online_control);
+
 static void __cpuinit register_cpu_control(struct cpu *cpu)
 {
 	device_create_file(&cpu->dev, &dev_attr_online);
+	device_create_file(&cpu->dev, &dev_attr_online_control);
 }
 void unregister_cpu(struct cpu *cpu)
 {
