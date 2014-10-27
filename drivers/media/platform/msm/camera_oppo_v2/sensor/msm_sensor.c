@@ -33,6 +33,11 @@
 #endif
 /* OPPO 2013-12-18 yingpiao.lin Add modify end */
 
+#ifdef CONFIG_MACH_OPPO
+//jindian.guan@Camera, 2014/04/14, Add proc for sensor state
+static struct msm_sensor_ctrl_t *gs_ctrl_back = NULL;
+static struct msm_sensor_ctrl_t *gs_ctrl_front = NULL;
+#endif
 static int32_t msm_sensor_enable_i2c_mux(struct msm_camera_i2c_conf *i2c_conf)
 {
 	struct v4l2_subdev *i2c_mux_sd =
@@ -312,7 +317,6 @@ static int32_t msm_sensor_get_dt_vreg_data(struct device_node *of_node,
 		CDBG("%s cam_vreg[%d].type = %d\n", __func__, i,
 			sensordata->cam_vreg[i].type);
 	}
-
 	rc = of_property_read_u32_array(of_node, "qcom,cam-vreg-min-voltage",
 		vreg_array, count);
 	if (rc < 0) {
@@ -324,7 +328,6 @@ static int32_t msm_sensor_get_dt_vreg_data(struct device_node *of_node,
 		CDBG("%s cam_vreg[%d].min_voltage = %d\n", __func__,
 			i, sensordata->cam_vreg[i].min_voltage);
 	}
-
 	rc = of_property_read_u32_array(of_node, "qcom,cam-vreg-max-voltage",
 		vreg_array, count);
 	if (rc < 0) {
@@ -1313,6 +1316,120 @@ static int msm_sensor_get_af_status(struct msm_sensor_ctrl_t *s_ctrl,
 	return 0;
 }
 
+#ifdef CONFIG_MACH_OPPO
+//jindian.guan@Camera, 2014/04/14, Add proc for sensor state
+#include <linux/proc_fs.h>
+static int sensor_proc_read(char *page, char **start, off_t off, int count,
+   int *eof, void *data)
+{
+
+	int len = 0;
+
+	if (gs_ctrl_back == NULL)
+	{
+		pr_err("gs_ctrl is NULL \n");
+		return 0;
+	}
+	len = sprintf(page, "%d",gs_ctrl_back->sensor_state);
+	if (len <= off+count)
+		*eof = 1;
+	*start = page + off;
+	len -= off;
+	if (len > count)
+		len = count;
+	if (len < 0)
+		len = 0;
+	return len;
+}
+
+static int sensor_proc_write(struct file *filp, const char __user *buff,
+                        	unsigned long len, void *data)
+{
+
+	return 0;
+}
+static int sensor_proc_read_front(char *page, char **start, off_t off, int count,
+   int *eof, void *data)
+{
+
+	int len = 0;
+
+	if (gs_ctrl_front == NULL)
+	{
+		pr_err("gs_ctrl is NULL \n");
+		return 0;
+	}
+	len = sprintf(page, "%d",gs_ctrl_front->sensor_state);
+	if (len <= off+count)
+		*eof = 1;
+	*start = page + off;
+	len -= off;
+	if (len > count)
+		len = count;
+	if (len < 0)
+		len = 0;
+	return len;
+}
+
+static int sensor_proc_write_front(struct file *filp, const char __user *buff,
+                        	unsigned long len, void *data)
+{
+
+	return 0;
+}
+static int sensor_proc_init(struct msm_sensor_ctrl_t *sensor_ctl)
+{
+	int ret=0;
+	static int temp=0;
+	struct proc_dir_entry *proc_entry=NULL;
+	if(0==temp)
+	 {
+	   proc_entry= create_proc_entry( "qcom_sensor_state", 0666, NULL);
+
+	   if(proc_entry == NULL)
+	    {
+		  ret = -ENOMEM;
+	  	  pr_err("[%s]: Error! Couldn't create qcom_sensor_state proc entry\n", __func__);
+	    }
+	   else
+	    {
+	      gs_ctrl_back=sensor_ctl;
+		  proc_entry->data = sensor_ctl;
+		  proc_entry->read_proc = sensor_proc_read;
+		  proc_entry->write_proc = sensor_proc_write;
+	      temp++;
+		  pr_err("[%s]: create qcom_sensor_state proc success \n", __func__);
+	    }
+	  }
+	else if(1==temp)
+		{
+		proc_entry= create_proc_entry( "qcom_sensor_state_1", 0666, NULL);
+
+	   if(proc_entry == NULL)
+	    {
+		  ret = -ENOMEM;
+	  	  pr_err("[%s]: Error! Couldn't create qcom_sensor_state_1 proc entry\n", __func__);
+	    }
+	   else
+	    {
+	      gs_ctrl_front = sensor_ctl;
+		  proc_entry->data = sensor_ctl;
+		  proc_entry->read_proc = sensor_proc_read_front;
+		  proc_entry->write_proc = sensor_proc_write_front;
+	      temp++;
+		  pr_err("[%s]: create qcom_sensor_state_1 proc success \n", __func__);
+	    }
+	   }
+	else
+	 	{
+	 	 pr_err("[%s]: temp=%d \n", __func__,temp);
+	 	 return 0;
+	 	}
+
+	return ret;
+}
+#endif /* MACH_OPPO */
+
 static long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg)
 {
@@ -1946,6 +2063,10 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev, void *data)
 
 	s_ctrl->func_tbl->sensor_power_down(s_ctrl);
 	CDBG("%s:%d\n", __func__, __LINE__);
+#ifdef CONFIG_MACH_OPPO
+//jindian.guan@Camera, 2014/04/14, Add proc for sensor state
+      sensor_proc_init(s_ctrl);
+#endif
 	return rc;
 }
 
