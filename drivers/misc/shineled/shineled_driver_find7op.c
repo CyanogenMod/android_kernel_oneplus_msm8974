@@ -106,6 +106,29 @@ config register 04h
 #define SN3193_POWER_ON 1
 #define shine_debug 1
 
+#define LED_SPEED_MAX			12
+#define LED_SPEED_STOCK_MODE	0
+#define LED_SPEED_CONT_MODE		1
+#define LED_INTENSITY_MAX		100
+
+int led_enable_fade = 0;
+int led_intensity = 0;
+int led_speed = 0;
+int led_speed_matrix[13][4] =	{{ 0, 0, 0, 0,}, 	// led_speed = 0 (dummy record, stock speed)
+								 { 0, 0, 0, 0,},	// led_speed = 1 (dummy record, continuous light)
+								 { 5, 5, 5, 5,}, 	// led_speed = 2
+								 { 4, 5, 4, 5,}, 	// led_speed = 3
+								 { 4, 4, 4, 4,}, 	// led_speed = 4
+								 { 3, 4, 3, 4,}, 	// led_speed = 5
+								 { 3, 3, 3, 3,}, 	// led_speed = 6
+								 { 2, 3, 2, 3,}, 	// led_speed = 7
+								 { 2, 2, 2, 2,}, 	// led_speed = 8
+								 { 1, 2, 1, 2,}, 	// led_speed = 9
+								 { 1, 1, 1, 1,}, 	// led_speed = 10
+								 { 0, 1, 0, 1,}, 	// led_speed = 11
+								 { 0, 0, 0, 0,}}; 	// led_speed = 12
+								 
+
 struct SN3193_sled{
 	struct miscdevice SN3193_miscdev;
 	struct i2c_client * i2c_dev;
@@ -269,9 +292,21 @@ static int 	SN3193_TurnOffOut_sled(void)
 static int SN3193_SetBrightness(int color,u8 brightness)
 {
 	int ret=0;
+	int corrected_brightness;
+	
 	if (color == RED_SLED)
 		brightness = brightness/4;
-	SN3193_write_reg(0x04+color, brightness);
+
+	// apply brightness correction factor
+	// (if led_intensity is 0, apply standard driver behaviour)
+	if (led_intensity == 0) 
+		corrected_brightness = brightness;
+	else
+		corrected_brightness = (brightness * led_intensity) / 100;
+
+	pr_debug("Boeffla-LED %d - %d\n", brightness, corrected_brightness);
+
+	SN3193_write_reg(0x04+color, corrected_brightness);
 	return ret;
 }
 /*static int SN3193_enable_diff_color_sled(int color)
@@ -621,8 +656,14 @@ static ssize_t sled_blink_store(struct device *dev, struct device_attribute *att
 		pr_debug("shineled----%s:   totalMS = %d: onMS = %d\n", __func__, totalMS, onMS);
 
 	}
-	//if(value == 1 && totalMS && onMS)
-	if(~(~value) && totalMS && onMS)
+
+	// breathing mode only if "blink" requested AND
+	// rom fading speeds are set or custom speed control is enabled AND
+	// led speed is not set to continuous light
+	if ((value != 0) && 
+		((totalMS && onMS) || (led_speed != LED_SPEED_STOCK_MODE)) && 
+		(led_speed != LED_SPEED_CONT_MODE))
+	//if(~(~value) && totalMS && onMS)
 	{
 
 		SN3193_TurnOnRGB_sled();	//turn on the RGB color
@@ -639,10 +680,55 @@ static ssize_t sled_blink_store(struct device *dev, struct device_attribute *att
 		if(shine_debug) {
 			pr_debug("shineled----%s:   t123 = %d: t4 = %d\n", __func__, t123, t4);
 		}
-		SN3193_SetBreathTime_sled(1,0,t123,t123 + 1,t123, t4);
-		SN3193_SetBreathTime_sled(2,0,t123,t123 + 1,t123, t4);
-		SN3193_SetBreathTime_sled(3,0,t123,t123 + 1,t123, t4);
 
+		// set breathing curve based on fading and speed custom settings
+		if (led_enable_fade == 0)
+		{
+			if (led_speed == LED_SPEED_STOCK_MODE)
+			{
+				// stock blinking, stock speed
+				SN3193_SetBreathTime_sled(1,0,t123,t123 + 1,t123, t4);
+				SN3193_SetBreathTime_sled(2,0,t123,t123 + 1,t123, t4);
+				SN3193_SetBreathTime_sled(3,0,t123,t123 + 1,t123, t4);
+			}
+			else
+			{
+				// stock blinking, custom speed
+				SN3193_SetBreathTime_sled(1,0, 	0, led_speed_matrix[led_speed][1], 
+												0, led_speed_matrix[led_speed][3]);
+				SN3193_SetBreathTime_sled(2,0, 	0, led_speed_matrix[led_speed][1], 
+												0, led_speed_matrix[led_speed][3]);
+				SN3193_SetBreathTime_sled(3,0, 	0, led_speed_matrix[led_speed][1], 
+												0, led_speed_matrix[led_speed][3]);
+			}
+		}
+		else
+		{
+			if (led_speed == LED_SPEED_STOCK_MODE)
+			{
+				// fading, stock speed + fading effect fix to 0,52s
+				SN3193_SetBreathTime_sled(1,0, 3, t123 + 1, 3, t4);
+				SN3193_SetBreathTime_sled(2,0, 3, t123 + 1, 3, t4);
+				SN3193_SetBreathTime_sled(3,0, 3, t123 + 1, 3, t4);
+			}
+			else
+			{
+				// fading, custom speed
+				SN3193_SetBreathTime_sled(1,0, 	led_speed_matrix[led_speed][0],
+												led_speed_matrix[led_speed][1], 
+												led_speed_matrix[led_speed][2],
+												led_speed_matrix[led_speed][3]);
+				SN3193_SetBreathTime_sled(2,0, 	led_speed_matrix[led_speed][0],
+												led_speed_matrix[led_speed][1], 
+												led_speed_matrix[led_speed][2],
+												led_speed_matrix[led_speed][3]);
+				SN3193_SetBreathTime_sled(3,0, 	led_speed_matrix[led_speed][0],
+												led_speed_matrix[led_speed][1], 
+												led_speed_matrix[led_speed][2],
+												led_speed_matrix[led_speed][3]);
+			}
+		}
+	
 		SN3193_TimeUpdate_sled();	//start breath	
 
 		SN3193_upData_sled();		//turn on the light
@@ -842,6 +928,89 @@ static ssize_t sled_test(struct device *dev, struct device_attribute *attr,
 	return count;
 
 }
+
+
+static ssize_t show_led_fade(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+	switch(led_enable_fade) 
+	{
+		case 0:		
+			return sprintf(buf, "%d - off\n", led_enable_fade);
+		case 1:		
+			return sprintf(buf, "%d - on\n", led_enable_fade);
+		default:	
+			return sprintf(buf, "%d - undefined\n", led_enable_fade);
+	}
+}
+
+static ssize_t store_led_fade(struct device *dev,
+					struct device_attribute *devattr,
+					const char *buf, size_t count)
+{
+	int enabled = -1; /* default to not set a new value */
+
+	sscanf(buf, "%d", &enabled);
+
+	switch(enabled) /* Accept only if 0 or 1 */
+	{ 
+		case 0:
+		case 1:		
+			led_enable_fade = enabled;
+		default:	
+			return count;
+	}
+}
+
+static ssize_t show_led_intensity(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+	switch(led_intensity) 
+	{
+		case  0:	
+			return sprintf(buf, "%d - Stock intensity\n", led_intensity);
+		default:
+			return sprintf(buf, "%d - Custom intensity\n", led_intensity);
+	}
+}
+
+static ssize_t store_led_intensity(struct device *dev,
+					struct device_attribute *devattr,
+					const char *buf, size_t count)
+{
+	int new_intensity = -1; /* default to not set a new value */
+
+	sscanf(buf, "%d", &new_intensity);
+
+	/* check for valid data */
+	if (new_intensity >= 0 && new_intensity <= LED_INTENSITY_MAX)
+		led_intensity = new_intensity;
+
+	return count;
+}
+
+static ssize_t show_led_speed(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d - speed\n", led_speed);
+}
+
+static ssize_t store_led_speed(struct device *dev,
+					struct device_attribute *devattr,
+					const char *buf, size_t count)
+{
+	int new_led_speed = -1; /* default to not set a new value */
+
+	sscanf(buf, "%d", &new_led_speed);
+
+	/* check for valid data */
+	if ((new_led_speed >= 0) && (new_led_speed <= LED_SPEED_MAX))
+		led_speed = new_led_speed;
+		
+	return count;
+}
+
+
 static DEVICE_ATTR(ledtest, S_IWUSR | S_IRUGO, NULL, sled_test);
 static DEVICE_ATTR(ledreset, S_IWUSR | S_IRUGO, NULL, sled_reset);
 
@@ -855,6 +1024,11 @@ static DEVICE_ATTR(grpfreq, S_IWUSR | S_IRUGO, NULL, sled_grpfreq_store);
 
 static DEVICE_ATTR(blink, S_IWUSR | S_IRUGO, NULL, sled_blink_store);
 
+static DEVICE_ATTR(led_fade, S_IWUSR | S_IRUGO, show_led_fade, store_led_fade);
+static DEVICE_ATTR(led_intensity, S_IWUSR | S_IRUGO, show_led_intensity, store_led_intensity);
+static DEVICE_ATTR(led_speed, S_IWUSR | S_IRUGO, show_led_speed, store_led_speed);
+
+
 static struct attribute *blink_attributes[] = {
 	&dev_attr_grppwm.attr,
 	&dev_attr_grpfreq.attr,
@@ -863,6 +1037,9 @@ static struct attribute *blink_attributes[] = {
 	&dev_attr_showing.attr,
 	&dev_attr_ledreset.attr,
 	&dev_attr_ledtest.attr,
+	&dev_attr_led_fade.attr,
+	&dev_attr_led_intensity.attr,
+	&dev_attr_led_speed.attr,
 
 	NULL
 };
