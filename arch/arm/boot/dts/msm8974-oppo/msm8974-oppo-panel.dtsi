@@ -204,7 +204,7 @@
 		qcom,ulps-enabled;
 	};
 
-	dsi_LG_1080_vid: qcom,mdss_dsi_LG_1080p_video {
+	dsi_truly_1080_vid: qcom,mdss_dsi_truly_1080p_video {
 		compatible = "qcom,mdss-dsi-panel2";
 		status = "ok";
 		qcom,mdss-pan-physical-width-dimension = <68>;
@@ -288,7 +288,7 @@
 		qcom,cont-splash-enabled;
 	};
 
-	dsi_LG_1080_cmd: qcom,mdss_dsi_LG_1080p_cmd {
+	dsi_truly_1080_cmd: qcom,mdss_dsi_truly_1080p_cmd {
 		compatible = "qcom,mdss-dsi-panel";
 		status = "ok";
 		qcom,cont-splash-enabled;
