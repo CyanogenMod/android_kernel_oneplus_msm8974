@@ -146,6 +146,12 @@ static ssize_t synaptics_rmi4_open_or_close_holster_mode_store(struct device *de
 static ssize_t synaptics_rmi4_open_or_close_holster_mode_show(struct device *dev,
 		struct device_attribute *attr, char *buf);
 
+static ssize_t synaptics_rmi4_reset_on_suspend_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count);
+
+static ssize_t synaptics_rmi4_reset_on_suspend_show(struct device *dev,
+		struct device_attribute *attr, char *buf);
+
 struct synaptics_rmi4_f01_device_status {
 	union {
 		struct {
@@ -389,6 +395,9 @@ static struct device_attribute attrs[] = {
 	__ATTR(suspend, S_IWUSR,
 			synaptics_rmi4_show_error,
 			synaptics_rmi4_suspend_store),
+	__ATTR(reset_on_suspend, (S_IRUGO | S_IWUSR),
+			synaptics_rmi4_reset_on_suspend_show,
+			synaptics_rmi4_reset_on_suspend_store),
 	__ATTR(gesture, (S_IRUGO | S_IWUSR),
 			synaptics_rmi4_gesture_show,
 			synaptics_rmi4_gesture_store),
@@ -433,6 +442,34 @@ static ssize_t synaptics_rmi4_f01_reset_store(struct device *dev,
 	}
 
 	return count;
+}
+
+static ssize_t synaptics_rmi4_reset_on_suspend_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned short f01_cmd_base_addr;
+	unsigned int reset;
+	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+
+	f01_cmd_base_addr = rmi4_data->f01_cmd_base_addr;
+
+	if (sscanf(buf, "%u", &reset) != 1)
+		return -EINVAL;
+
+	if (reset != 0 && reset !=1)
+		return -EINVAL;
+
+	rmi4_data->reset_on_suspend = reset;
+
+	return count;
+}
+
+static ssize_t synaptics_rmi4_reset_on_suspend_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", rmi4_data->reset_on_suspend);
 }
 
 static ssize_t synaptics_rmi4_f01_productinfo_show(struct device *dev,
@@ -4294,6 +4331,10 @@ static int fb_notifier_callback(struct notifier_block *p,
 				break;
 
 			if (new_status == BLANK) {
+				if(syna_rmi4_data->reset_on_suspend) {
+					print_ts(TS_DEBUG, KERN_ERR "[syna]:reset tp\n");
+					synaptics_rmi4_reset_device(syna_rmi4_data, syna_rmi4_data->f01_cmd_base_addr);
+				}
 				print_ts(TS_DEBUG, KERN_ERR "[syna]:suspend tp\n");
 				synaptics_rmi4_suspend(&(syna_rmi4_data->input_dev->dev));
 			}

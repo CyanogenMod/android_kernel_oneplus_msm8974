@@ -244,6 +244,7 @@ struct synaptics_rmi4_data {
 	bool sensor_sleep;
 	bool stay_awake;
 	bool staying_awake;
+	bool reset_on_suspend;
 	int (*i2c_read)(struct synaptics_rmi4_data *pdata, unsigned short addr,
 			unsigned char *data, unsigned short length);
 	int (*i2c_write)(struct synaptics_rmi4_data *pdata, unsigned short addr,
