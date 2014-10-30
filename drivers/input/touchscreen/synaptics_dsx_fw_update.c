@@ -1430,6 +1430,7 @@ exit:
 	//pr_notice("%s: End of reflash process\n", __func__);
 
 	fwu->rmi4_data->stay_awake = false;
+	fwu->ext_data_source = NULL;
 
 	return retval;
 }
@@ -1750,7 +1751,9 @@ static ssize_t fwu_sysfs_image_size_store(struct device *dev,
 	fwu->image_size = size;
 	fwu->data_pos = 0;
 
-	kfree(fwu->ext_data_source);
+	if (fwu->ext_data_source) {
+		kfree(fwu->ext_data_source);
+	}
 	fwu->ext_data_source = kzalloc(fwu->image_size, GFP_KERNEL);
 	if (!fwu->ext_data_source) {
 		dev_err(&rmi4_data->i2c_client->dev,
