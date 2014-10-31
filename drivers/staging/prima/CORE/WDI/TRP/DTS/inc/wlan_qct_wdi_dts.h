@@ -128,7 +128,7 @@ typedef struct {
   wpt_status (*setPowerState) (void *pContext, WDTS_PowerStateType   powerState, 
                                WDTS_SetPSCbType cBack);
   void (*channelDebug)(wpt_boolean displaySnapshot,
-                       wpt_uint8   debugFlags);
+                       wpt_boolean enableStallDetect);
   wpt_status (*stop) (void *pContext);
   wpt_status (*close) (void *pContext);
   wpt_uint32 (*getFreeTxDataResNumber) (void *pContext);
@@ -239,16 +239,13 @@ wpt_status WDTS_SetPowerState(void *pContext, WDTS_PowerStateType powerState,
  * Or if host driver detects any abnormal stcuk may display
  * Parameters:
  *  displaySnapshot : Display DXE snapshot option
- *  debugFlags      : Enable stall detect features
- *                    defined by WPAL_DeviceDebugFlags
- *                    These features may effect
- *                    data performance.
- *
- *                    Not integrate till fully verification
+ *  enableStallDetect : Enable stall detect feature
+                        This feature will take effect to data performance
+                        Not integrate till fully verification
  * Return Value: NONE
  *
  */
-void WDTS_ChannelDebug(wpt_boolean displaySnapshot, wpt_uint8 debugFlags);
+void WDTS_ChannelDebug(wpt_boolean displaySnapshot, wpt_boolean toggleStallDetect);
 
 /* DTS Stop function. 
  * Stop Transport driver, ie DXE, SDIO
@@ -278,11 +275,4 @@ wpt_status WDTS_Close(void *pContext);
  */
 wpt_uint32 WDTS_GetFreeTxDataResNumber(void *pContext);
 
-/* API to fill Rate Info based on the mac efficiency passed to it
- * macEff si used to caclulate mac throughput based on each rate index/PHY rate.
- * This is eventually used by MAS to calculate RX stats periodically sent to FW
- * The start and end Rate Index are the other arguments to this API - the new mac
- * efficiency passed to this API (Arg1)  is only applied between startRateIndex (arg2) and endRateIndex (arg3).
- */
-void WDTS_FillRateInfo(wpt_uint8 macEff, wpt_int16 startRateIndex, wpt_int16 endRateIndex);
 #endif

@@ -4570,6 +4570,16 @@ HAL
 NV    RW    NP
 HAL
 0    1    1
+*
+* Oxygen network data (prop IE for IBSS)
+*
+WNI_CFG_OXYGEN_NETWORK_DATA   I    2    0
+V    RW    NP
+SCH
+0    0x2000   0x2000
+V    RW    NP
+SCH
+0    0x2000   0x2000
 
 *
 * FlexConnect Power Factor
@@ -4658,65 +4668,5 @@ HAL
 V    RW    NP
 HAL
 0    250000    90000
-*
-*
-
-* Debug p2p remain on channel
-*
-WNI_CFG_DEBUG_P2P_REMAIN_ON_CHANNEL    I    4    7
-V    RW    NP
-NONE
-0    1    0
-V    RW    NP
-NONE
-0    1    0
-*
-*
-
-* GO Link Monitor Timeout (TU)
-*
-WNI_CFG_GO_LINK_MONITOR_TIMEOUT I 4 7
-V    RW    NP
-HAL
-3    50    10
-V    RW    NP
-HAL
-3    50    10
-*
-*
-
-* RA filter enable/disable
-*
-WNI_CFG_RA_FILTER_ENABLE    I    4    7
-V    RW    NP
-HAL
-0    1     1
-V    RW    NP
-HAL
-0    1     1
-*
-*
-
-* RA filter rate interval
-*
-WNI_CFG_RA_RATE_LIMIT_INTERVAL    I    4    7
-V    RW    NP
-HAL
-0    60     60
-V    RW     NP
-HAL
-0    60     60
-*
-*
-
-* BTC CTS2S during SCO
-*
-WNI_CFG_BTC_CTS2S_DURING_SCO    I    4    7
-V    RW    NP
-HAL
-0    1     0
-V    RW    NP
-HAL
-0    1     0
 *
 *

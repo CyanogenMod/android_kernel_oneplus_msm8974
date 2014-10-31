@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -397,8 +397,8 @@ typedef enum
   /* TDLS_Indication */
   WDI_TDLS_IND,
 
-  /* LPHB Indication from FW to umac */
-  WDI_LPHB_IND,
+  /* LPHB Timeout Indication from FW to umac */
+  WDI_LPHB_WAIT_TIMEOUT_IND,
 
   /* IBSS Peer Inactivity Indication */
   WDI_IBSS_PEER_INACTIVITY_IND,
@@ -410,10 +410,6 @@ typedef enum
   /*Batch scan result indication from FW*/
   WDI_BATCH_SCAN_RESULT_IND,
 #endif
-
-#ifdef FEATURE_WLAN_CH_AVOID
-  WDI_CH_AVOID_IND,
-#endif /* FEATURE_WLAN_CH_AVOID */
 
   WDI_MAX_IND
 }WDI_LowLevelIndEnumType;
@@ -735,96 +731,6 @@ typedef struct
    wpt_macAddr staMacAddr;
 }WDI_IbssPeerInactivityIndType;
 
-#ifdef FEATURE_WLAN_CH_AVOID
-#define WDI_CH_AVOID_MAX_RANGE   4
-
-typedef struct
-{
-   wpt_uint32 startFreq;
-   wpt_uint32 endFreq;
-} WDI_ChAvoidFreqType;
-
-typedef struct
-{
-   wpt_uint32          avoidRangeCount;
-   WDI_ChAvoidFreqType avoidFreqRange[WDI_CH_AVOID_MAX_RANGE];
-} WDI_ChAvoidIndType;
-#endif /* FEATURE_WLAN_CH_AVOID */
-
-/*---------------------------------------------------------------------------
- WDI_TxRateFlags
------------------------------------------------------------------------------*/
-typedef enum
-{
-   WDI_TX_RATE_LEGACY = 0x1,    /* Legacy rates */
-   WDI_TX_RATE_HT20   = 0x2,    /* HT20 rates */
-   WDI_TX_RATE_HT40   = 0x4,    /* HT40 rates */
-   WDI_TX_RATE_SGI    = 0x8,    /* Rate with Short guard interval */
-   WDI_TX_RATE_LGI    = 0x10,   /* Rate with Long guard interval */
-   WDI_TX_RATE_VHT20  = 0x20,   /* VHT 20 rates */
-   WDI_TX_RATE_VHT40  = 0x40,   /* VHT 20 rates */
-   WDI_TX_RATE_VHT80  = 0x80,   /* VHT 20 rates */
-   WDI_TX_RATE_VIRT   = 0x100,  /* Virtual Rate */
-} WDI_TxRateFlags;
-
-/*---------------------------------------------------------------------------
- WDI_RateUpdateIndParams
------------------------------------------------------------------------------*/
-typedef struct
-{
-    /* 0 implies RA, positive value implies fixed rate, -1 implies ignore this
-     * param ucastDataRate can be used to control RA behavior of unicast data to
-     */
-    wpt_int32 ucastDataRate;
-
-    /* TX flag to differentiate between HT20, HT40 etc */
-    WDI_TxRateFlags ucastDataRateTxFlag;
-
-    /* BSSID - Optional. 00-00-00-00-00-00 implies apply to all BCAST STAs */
-    wpt_macAddr bssid;
-
-    /*
-     * 0 implies MCAST RA, positive value implies fixed rate,
-     * -1 implies ignore this param
-     */
-    wpt_int32 reliableMcastDataRate; //unit Mbpsx10
-
-    /* TX flag to differentiate between HT20, HT40 etc */
-    WDI_TxRateFlags reliableMcastDataRateTxFlag;
-
-    /*
-     * MCAST(or BCAST) fixed data rate in 2.4 GHz, unit Mbpsx10,
-     * 0 implies ignore
-     */
-    wpt_uint32 mcastDataRate24GHz;
-
-    /* TX flag to differentiate between HT20, HT40 etc */
-    WDI_TxRateFlags mcastDataRate24GHzTxFlag;
-
-    /*
-     * MCAST(or BCAST) fixed data rate in 5 GHz,
-     * unit Mbpsx10, 0 implies ignore
-     */
-    wpt_uint32 mcastDataRate5GHz;
-
-    /* TX flag to differentiate between HT20, HT40 etc */
-    WDI_TxRateFlags mcastDataRate5GHzTxFlag;
-
-    /*
-     * Request status callback offered by UMAC - it is called if the current
-     * req has returned PENDING as status; it delivers the status of sending
-     * the message over the BUS
-     */
-    WDI_ReqStatusCb   wdiReqStatusCB;
-
-    /*
-     * The user data passed in by UMAC, it will be sent back when the above
-     * function pointer will be called
-     */
-    void   *pUserData;
-
-} WDI_RateUpdateIndParams;
-
 /*---------------------------------------------------------------------------
   WDI_LowLevelIndType
     Inidcation type and information about the indication being carried
@@ -890,9 +796,6 @@ typedef struct
     void *pBatchScanResult;
 #endif
 
-#ifdef FEATURE_WLAN_CH_AVOID
-    WDI_ChAvoidIndType          wdiChAvoidInd;
-#endif /* FEATURE_WLAN_CH_AVOID */
   }  wdiIndicationData;
 }WDI_LowLevelIndType;
 
@@ -2704,49 +2607,6 @@ typedef struct
   void*             pUserData;
 }WDI_DelBAReqParamsType;
 
-/*---------------------------------------------------------------------------
-  WDI_UpdateChannelReqinfoType
----------------------------------------------------------------------------*/
-typedef struct
-{
-    /** primary 20 MHz channel frequency in mhz */
-  wpt_uint32 mhz;
-  /** Center frequency 1 in MHz*/
-  wpt_uint32 band_center_freq1;
-  /** Center frequency 2 in MHz - valid only for 11acvht 80plus80 mode*/
-  wpt_uint32 band_center_freq2;
-  /* The first 26 bits are a bit mask to indicate any channel flags,
-     (see WLAN_HAL_CHAN_FLAG*)
-     The last 6 bits indicate the mode (see tChannelPhyModeType)*/
-  wpt_uint32 channel_info;
-  /** contains min power, max power, reg power and reg class id. */
-  wpt_uint32 reg_info_1;
-  /** contains antennamax */
-  wpt_uint32 reg_info_2;
-}WDI_UpdateChannelReqinfoType;
-
-typedef struct
-{
-    wpt_uint8 numchan;
-    WDI_UpdateChannelReqinfoType *pchanParam;
-}WDI_UpdateChannelReqType;
-/*---------------------------------------------------------------------------
-  WDI_UpdateChReqParamsType
----------------------------------------------------------------------------*/
-typedef struct
-{
-  /*BA Info */
-  WDI_UpdateChannelReqType  wdiUpdateChanParams;
-
-  /*Request status callback offered by UMAC - it is called if the current
-    req has returned PENDING as status; it delivers the status of sending
-    the message over the BUS */
-  WDI_ReqStatusCb   wdiReqStatusCB;
-
-  /*The user data passed in by UMAC, it will be sent back when the above
-    function pointer will be called */
-  void*             pUserData;
-}WDI_UpdateChReqParamsType;
 
 /*---------------------------------------------------------------------------
   WDI_SwitchCHRspParamsType
@@ -3285,45 +3145,6 @@ typedef struct
 }WDI_SetMaxTxPowerParamsType;
 
 /*---------------------------------------------------------------------------
-  WDI_Band
----------------------------------------------------------------------------*/
-typedef enum
-{
-    WDI_BAND_ALL,
-    WDI_BAND_24,
-    WDI_BAND_5G,
-    WDI_BAND_MAX,
-}eWDIBand;
-
-/*---------------------------------------------------------------------------
-  WDI_MaxTxPowerPerBandInfoType
----------------------------------------------------------------------------*/
-typedef struct
-{
-  eWDIBand   bandInfo;
-  /* In request  power == MaxTxpower to be used.*/
-  wpt_uint8  ucPower;
-}WDI_MaxTxPowerPerBandInfoType;
-
-/*---------------------------------------------------------------------------
-  WDI_SetMaxTxPowerPerBandParamsType
----------------------------------------------------------------------------*/
-typedef struct
-{
-  /*Link Info*/
-  WDI_MaxTxPowerPerBandInfoType  wdiMaxTxPowerPerBandInfo;
-
-  /*Request status callback offered by UMAC - it is called if the current
-    req has returned PENDING as status; it delivers the status of sending
-    the message over the BUS */
-  WDI_ReqStatusCb   wdiReqStatusCB;
-
-  /*The user data passed in by UMAC, it will be sent back when the above
-    function pointer will be called */
-  void*             pUserData;
-}WDI_SetMaxTxPowerPerBandParamsType;
-
-/*---------------------------------------------------------------------------
   WDI_SetTxPowerParamsType
 ---------------------------------------------------------------------------*/
 typedef struct
@@ -3354,19 +3175,6 @@ typedef struct
   WDI_Status wdiStatus;
  
 }WDI_SetMaxTxPowerRspMsg;
-
-/*---------------------------------------------------------------------------
-  WDI_SetMaxTxPowerPerBandRspMsg
----------------------------------------------------------------------------*/
-typedef struct
-{
-  /* In response, power==tx power used for management frames*/
-  wpt_int8  ucPower;
-
-  /*Result of the operation*/
-  WDI_Status wdiStatus;
-
-}WDI_SetMaxTxPowerPerBandRspMsg;
 
 /*---------------------------------------------------------------------------
   WDI_SetTxPowerRspMsg
@@ -3612,21 +3420,6 @@ typedef struct
    function pointer will be called */ 
    void*                    pUserData; 
 }WDI_EnterBmpsReqParamsType;
-
-/*---------------------------------------------------------------------------
-  WDI_EnterImpsReqParamsType
-  Enter IMPS parameters passed to WDI from WDA
----------------------------------------------------------------------------*/
-typedef struct
-{
-   /*Request status callback offered by UMAC - it is called if the current req
-   has returned PENDING as status; it delivers the status of sending the message
-   over the BUS */
-   WDI_ReqStatusCb          wdiReqStatusCB;
-   /*The user data passed in by UMAC, it will be sent back when the above
-   function pointer will be called */
-   void*                    pUserData;
-}WDI_EnterImpsReqParamsType;
 
 /*---------------------------------------------------------------------------
   WDI_EnterBmpsReqParamsType
@@ -4690,8 +4483,6 @@ typedef struct
    wpt_uint16 timeout;
    wpt_uint8  session;
    wpt_uint8  gateway_mac[WDI_MAC_ADDR_LEN];
-   wpt_uint16 timePeriodSec; // in seconds
-   wpt_uint32 tcpSn;
 } WDI_LPHBTcpParamStruct;
 
 typedef struct
@@ -4988,8 +4779,9 @@ typedef struct
 
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 
-#define WDI_ROAM_SCAN_MAX_CHANNELS       80
+#define WDI_ROAM_SCAN_MAX_CHANNELS       80 /* NUM_RF_CHANNELS */
 #define WDI_ROAM_SCAN_MAX_PROBE_SIZE     450
+#define WDI_ROAM_SCAN_RESERVED_BYTES     61
 
 typedef struct
 {
@@ -5029,7 +4821,6 @@ typedef struct
   wpt_boolean RoamScanOffloadEnabled;
   wpt_boolean MAWCEnabled;
   wpt_uint8   LookupThreshold;
-  wpt_uint8   RxSensitivityThreshold;
   wpt_uint8   RoamRssiDiff;
   wpt_uint8   ChannelCacheType;
   wpt_uint8   Command;
@@ -5055,6 +4846,7 @@ typedef struct
   WDI_MobilityDomainInfo  MDID;
   wpt_uint8               nProbes;
   wpt_uint16              HomeAwayTime;
+  wpt_uint8               ReservedBytes[WDI_ROAM_SCAN_RESERVED_BYTES];
 } WDI_RoamOffloadScanInfo;
 
 typedef struct
@@ -6208,27 +6000,6 @@ typedef void (*WDA_SetMaxTxPowerRspCb)(WDI_SetMaxTxPowerRspMsg *wdiSetMaxTxPower
                                              void* pUserData);
 
 /*---------------------------------------------------------------------------
-   WDA_SetMaxTxPowerPerBandRspCb
-
-   DESCRIPTION
-
-   This callback is invoked by DAL when it has received a
-   set max Tx Power Per Band response from the underlying device.
-
-   PARAMETERS
-
-    IN
-    wdiSetMaxTxPowerPerBandRsp:  response status received from HAL
-    pUserData:  user data
-
-  RETURN VALUE
-    The result code associated with performing the operation
----------------------------------------------------------------------------*/
-typedef void (*WDA_SetMaxTxPowerPerBandRspCb)(WDI_SetMaxTxPowerPerBandRspMsg
-                                              *wdiSetMaxTxPowerPerBandRsp,
-                                              void* pUserData);
-
-/*---------------------------------------------------------------------------
    WDA_SetTxPowerRspCb
 
    DESCRIPTION
@@ -7026,9 +6797,6 @@ typedef void  (*WDI_RssiFilterCb)(WDI_Status  wdiStatus,
 typedef void  (*WDI_UpdateScanParamsCb)(WDI_Status  wdiStatus,
                                         void*       pUserData);
 #endif // FEATURE_WLAN_SCAN_PNO
-
-typedef void  (*WDI_UpdateChannelRspCb)(WDI_Status  wdiStatus,
-                                        void*       pUserData);
 
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 /*---------------------------------------------------------------------------
@@ -8062,37 +7830,6 @@ WDI_SetMaxTxPowerReq
   void*                          pUserData
 );
 
-/**
- @brief WDI_SetMaxTxPowerPerBandReq will be called when the upper
-        MAC wants to set Max Tx Power to HW for specific band. Upon the
-        call of this API the WLAN DAL will pack and send a HAL
-        Set Max Tx Power Per Band request message to the lower RIVA
-        sub-system if DAL is in state STARTED.
-
-        In state BUSY this request will be queued. Request won't
-        be allowed in any other state.
-
-
- @param WDI_SetMaxTxPowerPerBandParamsType: Max Tx Per Band Info
-
-        WDA_SetMaxTxPowerPerBandRspCb: This callback is invoked by DAL
-        when it has received a set max Tx Power Per Band response from
-        the underlying device.
-
-        pUserData: user data will be passed back with the
-        callback
-
- @see WDI_SetMaxTxPowerPerBandReq
- @return Result of the function call
-*/
-WDI_Status
-WDI_SetMaxTxPowerPerBandReq
-(
-  WDI_SetMaxTxPowerPerBandParamsType*   pwdiSetMaxTxPowerPerBandParams,
-  WDA_SetMaxTxPowerPerBandRspCb         wdiReqStatusCb,
-  void*                                 pUserData
-);
-
 #ifdef FEATURE_WLAN_CCX
 /**
  @brief WDI_TSMStatsReq will be called by the upper MAC to fetch 
@@ -8530,7 +8267,6 @@ WDI_SetPwrSaveCfgReq
 WDI_Status 
 WDI_EnterImpsReq
 (
-   WDI_EnterImpsReqParamsType *pwdiEnterImpsReqParams,
    WDI_EnterImpsRspCb  wdiEnterImpsRspCb,
    void*                   pUserData
 );
@@ -9255,34 +8991,7 @@ WDI_SwitchChReq
   void*                      pUserData
 );
 
-/**
- @brief WDI_UpdateChannelReq will be called when the upper MAC
-        wants to update the channel list on change in country code.
 
-        In state BUSY this request will be queued. Request won't
-        be allowed in any other state.
-
- WDI_UpdateChannelReq must have been called.
-
- @param wdiUpdateChannelReqParams: the updated channel parameters
-                      as specified by the Device Interface
-
-        wdiUpdateChannelRspCb: callback for passing back the
-        response of the update channel operation received from
-        the device
-
-        pUserData: user data will be passed back with the
-        callback
-
- @return Result of the function call
-*/
-WDI_Status
-WDI_UpdateChannelReq
-(
-  WDI_UpdateChReqParamsType *pwdiUpdateChannelReqParams,
-  WDI_UpdateChannelRspCb     wdiUpdateChannelRspCb,
-  void*                     pUserData
-);
 
 /**
  @brief WDI_ConfigSTAReq will be called when the upper MAC 
@@ -9555,24 +9264,6 @@ wpt_boolean WDI_IsHwFrameTxTranslationCapable
 (
   wpt_uint8 uSTAIdx
 );
-
-
-/**
- @brief WDI_IsSelfSTA - check if staid is self sta index
-
- @param  pWDICtx:   pointer to the WLAN DAL context
-         ucSTAIdx:  station index
-
- @return Result of the function call
-*/
-
-wpt_boolean
-WDI_IsSelfSTA
-(
-   void*  pWDICtx,
-   wpt_uint8 ucSTAIdx
-);
-
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
 /**
@@ -10142,26 +9833,6 @@ WDI_dhcpStopInd
   WDI_DHCPInd *wdiDHCPInd
 );
 
-/**
- @brief WDI_RateUpdateInd will be called when the upper MAC
-        requests the device to update rates.
-
-        In state BUSY this request will be queued. Request won't
-        be allowed in any other state.
-
-
- @param wdiRateUpdateIndParams
-
-
- @see WDI_Start
- @return Result of the function call
-*/
-WDI_Status
-WDI_RateUpdateInd
-(
-  WDI_RateUpdateIndParams  *wdiRateUpdateIndParams
-);
-
 #ifdef WLAN_FEATURE_GTK_OFFLOAD
 /**
  @brief WDI_GTKOffloadReq will be called when the upper MAC 
@@ -10337,17 +10008,16 @@ WDI_UpdateVHTOpModeReq
     Or if host driver detects any abnormal stcuk may display
 
  @param  displaySnapshot : Display DXE snapshot option
- @param  debugFlags      : Enable stall detect features
-                           defined by WPAL_DeviceDebugFlags
-                           These features may effect
-                           data performance.
+ @param  enableStallDetect : Enable stall detect feature
+                        This feature will take effect to data performance
+                        Not integrate till fully verification
  @see
  @return none
 */
 void WDI_TransportChannelDebug
 (
    wpt_boolean  displaySnapshot,
-   wpt_uint8    debugFlags
+   wpt_boolean  toggleStallDetect
 );
 
 /**

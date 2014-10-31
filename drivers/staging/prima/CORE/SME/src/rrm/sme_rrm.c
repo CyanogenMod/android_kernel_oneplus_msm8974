@@ -229,7 +229,6 @@ static eHalStatus sme_RrmSendBeaconReportXmitInd( tpAniSirGlobal pMac,
        pBeaconRep->messageType = eWNI_SME_BEACON_REPORT_RESP_XMIT_IND;
        pBeaconRep->length = length;
        pBeaconRep->uDialogToken = pSmeRrmContext->token;
-       pBeaconRep->duration = pSmeRrmContext->duration[0];
        pBeaconRep->regClass = pSmeRrmContext->regClass;
        vos_mem_copy( pBeaconRep->bssId, pSmeRrmContext->sessionBssId, sizeof(tSirMacAddr) );
 
@@ -250,8 +249,13 @@ static eHalStatus sme_RrmSendBeaconReportXmitInd( tpAniSirGlobal pMac,
                vos_mem_copy( &pBeaconRep->pBssDescription[msgCounter]->ieFields[0],
                              pBssDesc->ieFields, ie_len  );
                smsLog( pMac, LOG1,
-                   "...RRM Result Bssid = "MAC_ADDRESS_STR" chan= %d, rssi = -%d",
-                   MAC_ADDR_ARRAY(pBeaconRep->pBssDescription[msgCounter]->bssId),
+                   "...RRM Result Bssid = %02x-%02x-%02x-%02x-%02x-%02x chan= %d, rssi = -%d",
+                   pBeaconRep->pBssDescription[msgCounter]->bssId[ 0 ],
+                   pBeaconRep->pBssDescription[msgCounter]->bssId[ 1 ],
+                   pBeaconRep->pBssDescription[msgCounter]->bssId[ 2 ],
+                   pBeaconRep->pBssDescription[msgCounter]->bssId[ 3 ],
+                   pBeaconRep->pBssDescription[msgCounter]->bssId[ 4 ],
+                   pBeaconRep->pBssDescription[msgCounter]->bssId[ 5 ],
                    pBeaconRep->pBssDescription[msgCounter]->channelId,
                    pBeaconRep->pBssDescription[msgCounter]->rssi * (-1));
 
@@ -399,8 +403,9 @@ static eHalStatus sme_CcxSendBeaconReqScanResults(tpAniSirGlobal pMac,
                }
                pBcnReport->bcnRepBssInfo[msgCounter].ieLen = outIeLen;
 
-               smsLog( pMac, LOG1,"Bssid("MAC_ADDRESS_STR") Channel=%d Rssi=%d",
-                       MAC_ADDR_ARRAY(pBssDesc->bssId),
+               smsLog( pMac, LOG1,"Bssid(%02X:%02X:%02X:%02X:%02X:%02X) Channel=%d Rssi=%d",
+                       pBssDesc->bssId[0], pBssDesc->bssId[1], pBssDesc->bssId[2],
+                       pBssDesc->bssId[3], pBssDesc->bssId[4], pBssDesc->bssId[5],
                        pBssDesc->channelId, (-1) * pBssDesc->rssi);
 
                pBcnReport->numBss++;
@@ -702,6 +707,7 @@ eHalStatus sme_RrmIssueScanReq( tpAniSirGlobal pMac )
        vos_mem_zero( &scanRequest, sizeof(scanRequest));
 
        /* set scanType, active or passive */
+       scanRequest.bcnRptReqScan = TRUE;
        scanRequest.scanType = scanType;
 
        vos_mem_copy(scanRequest.bssid,
@@ -1163,8 +1169,13 @@ eHalStatus sme_RrmProcessNeighborReport(tpAniSirGlobal pMac, void *pMsgBuf)
                                                 sizeof(tSirNeighborBssDescription));
 
 #if defined WLAN_VOWIFI_DEBUG
-       smsLog( pMac, LOGE, "Received neighbor report with Neighbor BSSID: "MAC_ADDRESS_STR,
-                            MAC_ADDR_ARRAY(pNeighborRpt->sNeighborBssDescription[i].bssId));
+       smsLog( pMac, LOGE, "Received neighbor report with Neighbor BSSID: %02x:%02x:%02x:%02x:%02x:%02x ",
+                    pNeighborRpt->sNeighborBssDescription[i].bssId[0], 
+                    pNeighborRpt->sNeighborBssDescription[i].bssId[1], 
+                    pNeighborRpt->sNeighborBssDescription[i].bssId[2], 
+                    pNeighborRpt->sNeighborBssDescription[i].bssId[3], 
+                    pNeighborRpt->sNeighborBssDescription[i].bssId[4], 
+                    pNeighborRpt->sNeighborBssDescription[i].bssId[5]);
 #endif
 
        /* Calculate the roam score based on the BSS Capability in the BSSID Information and store it in Neighbor report Desc */
@@ -1177,8 +1188,13 @@ eHalStatus sme_RrmProcessNeighborReport(tpAniSirGlobal pMac, void *pMsgBuf)
        }
        else
        {
-           smsLog(pMac, LOGE, FL("Roam score of BSSID  "MAC_ADDRESS_STR" is 0, Ignoring.."),
-                        MAC_ADDR_ARRAY(pNeighborRpt->sNeighborBssDescription[i].bssId));
+           smsLog(pMac, LOGE, FL("Roam score of BSSID  %02x:%02x:%02x:%02x:%02x:%02x is 0, Ignoring.."),
+                        pNeighborRpt->sNeighborBssDescription[i].bssId[0],
+                        pNeighborRpt->sNeighborBssDescription[i].bssId[1],
+                        pNeighborRpt->sNeighborBssDescription[i].bssId[2],
+                        pNeighborRpt->sNeighborBssDescription[i].bssId[3],
+                        pNeighborRpt->sNeighborBssDescription[i].bssId[4],
+                        pNeighborRpt->sNeighborBssDescription[i].bssId[5]);
 
            vos_mem_free(pNeighborReportDesc->pNeighborBssDescription);
            vos_mem_free(pNeighborReportDesc);

@@ -1,5 +1,5 @@
 /*
-  * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
   *
   * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
   *
@@ -17,14 +17,13 @@
   * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
   * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
   * PERFORMANCE OF THIS SOFTWARE.
-  */
+*/
 /*
  * DO NOT EDIT - This file is generated automatically
  */
 
 /*
  * IMPORTANT:  This file is for system that supports STA mode ONLY.
-RE/MAC/src/cfg/cfgParamName.c
  */
 #include "cfgPriv.h"
 
@@ -332,6 +331,7 @@ unsigned char *gCfgParamName[] = {
     (unsigned char *)"TDLS_PUAPSD_INACT_TIME",
     (unsigned char *)"TDLS_RX_FRAME_THRESHOLD",
     (unsigned char *)"ENABLE_ADAPT_RX_DRAIN",
+    (unsigned char *)"OXYGEN_NETWORK_DATA",
     (unsigned char *)"FLEX_CONNECT_POWER_FACTOR",
     (unsigned char *)"ANTENNA_DIVESITY",
     (unsigned char *)"ATH_DISABLE",
@@ -339,11 +339,6 @@ unsigned char *gCfgParamName[] = {
     (unsigned char *)"BTC_ACTIVE_BT_LEN",
     (unsigned char *)"BTC_SAP_ACTIVE_WLAN_LEN",
     (unsigned char *)"BTC_SAP_ACTIVE_BT_LEN",
-    (unsigned char *)"DEBUG_P2P_REMAIN_ON_CHANNEL",
-    (unsigned char *)"GO_LINK_MONITOR_TIMEOUT",
-    (unsigned char *)"RA_FILTER_ENABLE",
-    (unsigned char *)"RA_RATE_LIMIT_INTERVAL",
-    (unsigned char *)"BTC_CTS2S_DURING_SCO",
 };
 
 
