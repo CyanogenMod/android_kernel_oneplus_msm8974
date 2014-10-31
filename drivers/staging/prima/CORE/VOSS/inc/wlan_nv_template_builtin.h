@@ -130,9 +130,6 @@
 
 #include "wlan_nv_types.h"
 
-int allocNvBinTable(int tblIdx, int numEntries);
-int allocNvBinEnum(int enumIdx, int numEntries);
-
 typedef enum _nvFieldSizeEnums {
    INDEX_ENUM_ALL = 0,
    INDEX_ENUM_NUM_PHY_MAX_TX_CHAINS,

@@ -110,7 +110,7 @@
 
 
 /// Start of Sirius/Host message types
-#define WNI_HOST_MSG_START             0x1500
+#define WNI_HOST_MSG_START             0x1400
 
 enum eWniMsgTypes
 {
@@ -346,6 +346,9 @@ enum eWniMsgTypes
     eWNI_SME_TDLS_DEL_STA_IND,
     eWNI_SME_TDLS_DEL_ALL_PEER_IND,
     eWNI_SME_MGMT_FRM_TX_COMPLETION_IND,
+#ifdef FEATURE_WLAN_TDLS_OXYGEN_DISAPPEAR_AP
+    eWNI_SME_TDLS_AP_DISAPPEAR_IND,
+#endif
     eWNI_SME_TDLS_LINK_ESTABLISH_REQ,
     eWNI_SME_TDLS_LINK_ESTABLISH_RSP,
 #endif
@@ -380,20 +383,17 @@ enum eWniMsgTypes
     eWNI_SME_HANDOFF_REQ,/*upper layer requested handoff to driver in STA mode*/
     eWNI_SME_ROAM_SCAN_OFFLOAD_RSP,/*Fwd the LFR scan offload rsp from FW to SME*/
 #ifdef FEATURE_WLAN_LPHB
-    eWNI_SME_LPHB_IND,
+    eWNI_SME_LPHB_WAIT_TIMEOUT_IND,
 #endif /* FEATURE_WLAN_LPHB */
 
     eWNI_SME_GET_TSM_STATS_REQ,
     eWNI_SME_GET_TSM_STATS_RSP,
     eWNI_SME_TSM_IE_IND,
 
-#ifdef FEATURE_WLAN_CH_AVOID
-   eWNI_SME_CH_AVOID_IND,
-#endif /* FEATURE_WLAN_CH_AVOID */
     eWNI_SME_MSG_TYPES_END
 };
 
-#define WNI_CFG_MSG_TYPES_BEGIN        0x1200
+#define WNI_CFG_MSG_TYPES_BEGIN        0x1100
 
 /*---------------------------------------------------------------------*/
 /* CFG Module Definitions                                              */

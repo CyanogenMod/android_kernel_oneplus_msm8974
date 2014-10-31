@@ -94,87 +94,527 @@
 #include "cfgApi.h"
 #include "wniCfgAp.h"
 
-#ifdef FEATURE_WLAN_CH_AVOID
-#include "wcnss_wlan.h"
-#endif /* FEATURE_WLAN_CH_AVOID */
-#include "wlan_hdd_trace.h"
-#include "vos_types.h"
-#include "vos_trace.h"
-
 #define    IS_UP(_dev) \
     (((_dev)->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
 #define    IS_UP_AUTO(_ic) \
     (IS_UP((_ic)->ic_dev) && (_ic)->ic_roaming == IEEE80211_ROAMING_AUTO)
 #define WE_WLAN_VERSION     1
+#define STATS_CONTEXT_MAGIC 0x53544154
 #define WE_GET_STA_INFO_SIZE 30
 /* WEXT limition: MAX allowed buf len for any *
  * IW_PRIV_TYPE_CHAR is 2Kbytes *
  */
 #define WE_SAP_MAX_STA_INFO 0x7FF
 
-#define SAP_24GHZ_CH_COUNT (14)
+#define SAP_24GHZ_CH_COUNT (14) 
 
-#ifdef FEATURE_WLAN_CH_AVOID
-/* Channle/Freqency table */
-extern const tRfChannelProps rfChannels[NUM_RF_CHANNELS];
-safeChannelType safeChannels[NUM_20MHZ_RF_CHANNELS] =
+#define SAP_MAX_GET_ASSOC_STAS_TIMEOUT    500
+/* Max possible supported rate count
+ * Legacy 14 + 11N MCS 8 + 11AC MCS 10 */
+#define SAP_MAX_SUPPORTED_RATE_COUNT      32
+#define SAP_LEGACY_RATE_MASK              0x007F
+#define SAP_GET_STAS_RATE_TIMEOUT         1000
+#define SAP_AC_MCS_MAP_MASK               0x03
+#define SAP_AC_MCS_MAP_OFFSET             7
+
+#define SAP_LEGACY_RATE_COUNT             SIR_NUM_11B_RATES + SIR_NUM_11A_RATES
+#define SAP_11N_RATE_COUNT                8
+
+#define SAP_RATE_SUPPORT_MAP_LEGACY_MASK  0x0001
+#define SAP_RATE_SUPPORT_MAP_N_MASK       0x001E
+#define SAP_RATE_SUPPORT_MAP_AC_MASK      0x07E0
+
+#define SAP_MAX_24_CHANNEL_NUMBER         14
+#define SAP_GET_STAS_COOKIE               0xC000C1EE
+
+/* Temp put here, will locate correct location
+ * work on progress with UMAC */
+/* Should syn with FW definition */
+typedef enum
 {
-  /*CH  , SAFE, default safe */
-    {1  , VOS_TRUE},      //RF_CHAN_1,
-    {2  , VOS_TRUE},      //RF_CHAN_2,
-    {3  , VOS_TRUE},      //RF_CHAN_3,
-    {4  , VOS_TRUE},      //RF_CHAN_4,
-    {5  , VOS_TRUE},      //RF_CHAN_5,
-    {6  , VOS_TRUE},      //RF_CHAN_6,
-    {7  , VOS_TRUE},      //RF_CHAN_7,
-    {8  , VOS_TRUE},      //RF_CHAN_8,
-    {9  , VOS_TRUE},      //RF_CHAN_9,
-    {10 , VOS_TRUE},      //RF_CHAN_10,
-    {11 , VOS_TRUE},      //RF_CHAN_11,
-    {12 , VOS_TRUE},      //RF_CHAN_12,
-    {13 , VOS_TRUE},      //RF_CHAN_13,
-    {14 , VOS_TRUE},      //RF_CHAN_14,
-    {240, VOS_TRUE},      //RF_CHAN_240,
-    {244, VOS_TRUE},      //RF_CHAN_244,
-    {248, VOS_TRUE},      //RF_CHAN_248,
-    {252, VOS_TRUE},      //RF_CHAN_252,
-    {208, VOS_TRUE},      //RF_CHAN_208,
-    {212, VOS_TRUE},      //RF_CHAN_212,
-    {216, VOS_TRUE},      //RF_CHAN_216,
-    {36 , VOS_TRUE},      //RF_CHAN_36,
-    {40 , VOS_TRUE},      //RF_CHAN_40,
-    {44 , VOS_TRUE},      //RF_CHAN_44,
-    {48 , VOS_TRUE},      //RF_CHAN_48,
-    {52 , VOS_TRUE},      //RF_CHAN_52,
-    {56 , VOS_TRUE},      //RF_CHAN_56,
-    {60 , VOS_TRUE},      //RF_CHAN_60,
-    {64 , VOS_TRUE},      //RF_CHAN_64,
-    {100, VOS_TRUE},      //RF_CHAN_100,
-    {104, VOS_TRUE},      //RF_CHAN_104,
-    {108, VOS_TRUE},      //RF_CHAN_108,
-    {112, VOS_TRUE},      //RF_CHAN_112,
-    {116, VOS_TRUE},      //RF_CHAN_116,
-    {120, VOS_TRUE},      //RF_CHAN_120,
-    {124, VOS_TRUE},      //RF_CHAN_124,
-    {128, VOS_TRUE},      //RF_CHAN_128,
-    {132, VOS_TRUE},      //RF_CHAN_132,
-    {136, VOS_TRUE},      //RF_CHAN_136,
-    {140, VOS_TRUE},      //RF_CHAN_140,
-    {149, VOS_TRUE},      //RF_CHAN_149,
-    {153, VOS_TRUE},      //RF_CHAN_153,
-    {157, VOS_TRUE},      //RF_CHAN_157,
-    {161, VOS_TRUE},      //RF_CHAN_161,
-    {165, VOS_TRUE},      //RF_CHAN_165,
-};
-#endif /* FEATURE_WLAN_CH_AVOID */
+   WNI_CFG_FIXED_RATE_SAP_AUTO,
+   WNI_CFG_FIXED_RATE_11B_LONG_1_MBPS,
+   WNI_CFG_FIXED_RATE_11B_LONG_2_MBPS,
+   WNI_CFG_FIXED_RATE_11B_LONG_5_5_MBPS,
+   WNI_CFG_FIXED_RATE_11B_LONG_11_MBPS,
+   WNI_CFG_FIXED_RATE_11A_6_MBPS,
+   WNI_CFG_FIXED_RATE_11A_9_MBPS,
+   WNI_CFG_FIXED_RATE_11A_12_MBPS,
+   WNI_CFG_FIXED_RATE_11A_18_MBPS,
+   WNI_CFG_FIXED_RATE_11A_24_MBPS,
+   WNI_CFG_FIXED_RATE_11A_36_MBPS,
+   WNI_CFG_FIXED_RATE_11A_48_MBPS,
+   WNI_CFG_FIXED_RATE_11A_54_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_6_5_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_13_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_19_5_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_26_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_39_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_52_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_58_5_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_65_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_7_2_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_14_4_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_21_7_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_28_9_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_43_3_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_57_8_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_65_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_72_2_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_13_5_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_27_MBPS,                     /* 30 */
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_40_5_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_54_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_81_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_108_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_121_5_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_135_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_15_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_30_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_45_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_60_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_90_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_120_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_135_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_150_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_GF_13_5_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_GF_27_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_GF_40_5_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_GF_54_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_GF_81_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_GF_108_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_GF_121_5_MBPS,
+   WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_GF_135_MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_NGI_6_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_NGI_13MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_NGI_19_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_NGI_26MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_NGI_39MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_NGI_52MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_NGI_58_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_NGI_65MBPS,                        /* 60 */
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_NGI_78MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_NGI_86_5_MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_SGI_21_667MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_SGI_28_889MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_SGI_43_333MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_SGI_57_778MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_SGI_65MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_SGI_72_222MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_SGI_86_667MBPS,
+   WNI_CFG_FIXED_RATE_VHT_SIMO_CB_SGI_96_1_MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_13_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_27MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_40_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_54MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_81MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_108MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_121_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_135MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_RESERVED,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_162MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_180MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_15MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_30MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_45MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_60MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_90MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_120MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_135MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_150MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_RESERVED,                /* 90 */
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_180MBPS,
+   WNI_CFG_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_200MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_29_25MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_58_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_87_75MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_117MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_175_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_234MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_263_25MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_292_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_RESERVED,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_351MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_390MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_32_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_65MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_97_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_130MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_195MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_260MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_292_5MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_325MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_RESERVED,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_390MBPS,
+   WNI_CFG_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_433_33MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_6_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_13MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_19_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_26MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_39MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_52MBPS,                   /* 120 */
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_58_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_65MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_78MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_86_5_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_7_2222MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_14_444MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_21_667MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_28_889MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_43_333MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_57_778MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_65MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_72_222MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_86_667MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_96_1_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_13_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_27MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_40_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_54MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_81MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_108MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_121_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_135MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_RESERVED,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_162MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_180MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_15MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_30MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_45MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_60MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_90MBPS,             /* 150 */
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_120MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_135MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_150MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_RESERVED,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_180MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_200MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_29_25MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_58_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_87_75MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_117MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_175_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_234MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_263_25MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_292_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_RESERVED,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_351MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_390MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_32_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_65MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_97_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_130MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_195MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_260MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_292_5MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_325MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_RESERVED,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_390MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_433_33MBPS,
+   WNI_CFG_FIXED_RATE_11A_DUP_6_MBPS,
+   WNI_CFG_FIXED_RATE_11A_DUP_9_MBPS,                                /* 180 */
+   WNI_CFG_FIXED_RATE_11A_DUP_12_MBPS,
+   WNI_CFG_FIXED_RATE_11A_DUP_18_MBPS,
+   WNI_CFG_FIXED_RATE_11A_DUP_24_MBPS,
+   WNI_CFG_FIXED_RATE_11A_DUP_36_MBPS,
+   WNI_CFG_FIXED_RATE_11A_DUP_48_MBPS,
+   WNI_CFG_FIXED_RATE_11A_DUP_54_MBPS,
+   WNI_CFG_FIXED_RATE_11A_80MHZ_DUP_6_MBPS,
+   WNI_CFG_FIXED_RATE_11A_80MHZDUP_9_MBPS,
+   WNI_CFG_FIXED_RATE_11A_80MHZ_DUP_12_MBPS,
+   WNI_CFG_FIXED_RATE_11A_80MHZ_DUP_18_MBPS,
+   WNI_CFG_FIXED_RATE_11A_80MHZ_DUP_24_MBPS,
+   WNI_CFG_FIXED_RATE_11A_80MHZ_DUP_36_MBPS,
+   WNI_CFG_FIXED_RATE_11A_80MHZ_DUP_48_MBPS,
+   WNI_CFG_FIXED_RATE_11A_80MHZ_DUP_54_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_6_5_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_13_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_19_5_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_26_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_39_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_52_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_58_5_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_65_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_SG_7_2_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_SG_14_4_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_SG_21_7_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_SG_28_9_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_SG_43_3_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_SG_57_8_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_SG_65_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_1NSS_MM_SG_72_2_MBPS,                 /* 210 */
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_13_5_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_27_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_40_5_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_54_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_81_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_108_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_121_5_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_135_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_15_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_30_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_45_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_60_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_90_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_120_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_135_MBPS,
+   WNI_CFG_LDPC_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_150_MBPS
+} eCfgFixedRateCfgType;
 
-/*---------------------------------------------------------------------------
+/* Legacy IDX based rate table */
+typedef struct
+{
+   v_U16_t   legacy_rate_index;
+   v_U32_t   legacy_rate;
+} supported_legacy_rate_t;
+static const supported_legacy_rate_t legacy_rate[] =
+{
+/* IDX   Rate, 100kbps */
+   {2,   10},
+   {4,   20},
+   {11,  55},
+   {12,  60},
+   {18,  90},
+   {24,  120},
+   {36,  180},
+   {48,  240},
+   {66,  330},
+   {72,  360},
+   {96,  480},
+   {108, 540}
+};
+
+/* 11N MCS based rate table */
+typedef struct
+{
+   v_U8_t   mcs_index_11n;
+   v_U32_t  rate_11n[4];
+} supported_11n_rate_t;
+static const supported_11n_rate_t mcs_rate_11n[] =
+{
+/* MCS  L20   L40   S20  S40 */
+   {0,  {65,  135,  72,  150}},
+   {1,  {130, 270,  144, 300}},
+   {2,  {195, 405,  217, 450}},
+   {3,  {260, 540,  289, 600}},
+   {4,  {390, 810,  433, 900}},
+   {5,  {520, 1080, 578, 1200}},
+   {6,  {585, 1215, 650, 1350}},
+   {7,  {650, 1350, 722, 1500}}
+};
+
+/* 11AC MCS based rate table */
+typedef struct
+{
+   v_U8_t   mcs_index_11ac;
+   v_U16_t  cb80_rate_11ac[2];
+   v_U16_t  cb40_rate_11ac[2];
+   v_U16_t  cb20_rate_11ac[2];
+} supported_11ac_rate_t;
+static const supported_11ac_rate_t mcs_rate_11ac[] =
+{
+/* MCS  L80    S80     L40   S40    L20   S40*/
+   {0,  {293,  325},  {135,  150},  {65,   72}},
+   {1,  {585,  650},  {270,  300},  {130,  144}},
+   {2,  {878,  975},  {405,  450},  {195,  217}},
+   {3,  {1170, 1300}, {540,  600},  {260,  289}},
+   {4,  {1755, 1950}, {810,  900},  {390,  433}},
+   {5,  {2340, 2600}, {1080, 1200}, {520,  578}},
+   {6,  {2633, 2925}, {1215, 1350}, {585,  650}},
+   {7,  {2925, 3250}, {1350, 1500}, {650,  722}},
+   {8,  {3510, 3900}, {1620, 1800}, {780,  867}},
+   {9,  {3900, 4333}, {1800, 2000}, {860,  867}}
+};
+
+typedef struct
+{
+   eCfgFixedRateCfgType  eRateCfg;
+   v_U16_t               rate;
+} rate_cfg_item_mapping_t;
+
+static rate_cfg_item_mapping_t legacy_rate_mapping[] =
+{
+   {WNI_CFG_FIXED_RATE_11B_LONG_1_MBPS,                               10},
+   {WNI_CFG_FIXED_RATE_11B_LONG_2_MBPS,                               20},
+   {WNI_CFG_FIXED_RATE_11B_LONG_5_5_MBPS,                             55},
+   {WNI_CFG_FIXED_RATE_11B_LONG_11_MBPS,                              110},
+   {WNI_CFG_FIXED_RATE_11A_6_MBPS,                                    60},
+   {WNI_CFG_FIXED_RATE_11A_9_MBPS,                                    90},
+   {WNI_CFG_FIXED_RATE_11A_12_MBPS,                                   120},
+   {WNI_CFG_FIXED_RATE_11A_18_MBPS,                                   180},
+   {WNI_CFG_FIXED_RATE_11A_24_MBPS,                                   240},
+   {WNI_CFG_FIXED_RATE_11A_36_MBPS,                                   360},
+   {WNI_CFG_FIXED_RATE_11A_48_MBPS,                                   480},
+   {WNI_CFG_FIXED_RATE_11A_54_MBPS,                                   540}
+};
+static rate_cfg_item_mapping_t n_l20_rate_mapping[] =
+{
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_6_5_MBPS,                          65},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_13_MBPS,                           130},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_19_5_MBPS,                         195},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_26_MBPS,                           260},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_39_MBPS,                           390},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_52_MBPS,                           520},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_58_5_MBPS,                         585},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_65_MBPS,                           650}
+};
+static rate_cfg_item_mapping_t n_s20_rate_mapping[] =
+{
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_7_2_MBPS,                       72},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_14_4_MBPS,                      144},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_21_7_MBPS,                      217},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_28_9_MBPS,                      289},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_43_3_MBPS,                      433},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_57_8_MBPS,                      578},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_65_MBPS,                        650},
+   {WNI_CFG_FIXED_RATE_MCS_1NSS_MM_SG_72_2_MBPS,                      722}
+};
+static rate_cfg_item_mapping_t n_l40_rate_mapping[] =
+{
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_13_5_MBPS,                   135},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_27_MBPS,                     270},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_40_5_MBPS,                   405},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_54_MBPS,                     540},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_81_MBPS,                     810},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_108_MBPS,                    1080},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_121_5_MBPS,                  1215},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_135_MBPS,                    1350}
+};
+static rate_cfg_item_mapping_t n_s40_rate_mapping[] =
+{
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_15_MBPS,                  150},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_30_MBPS,                  300},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_45_MBPS,                  450},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_60_MBPS,                  600},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_90_MBPS,                  900},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_120_MBPS,                 1200},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_135_MBPS,                 1350},
+   {WNI_CFG_FIXED_RATE_MCS_40MHZ_1NSS_MM_SG_150_MBPS,                 1500}
+};
+
+#ifdef WLAN_FEATURE_11AC
+static rate_cfg_item_mapping_t ac_l20_rate_mapping[] =
+{
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_6_5MBPS,                  65},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_13MBPS,                   130},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_19_5MBPS,                 195},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_26MBPS,                   260},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_39MBPS,                   390},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_52MBPS,                   520},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_58_5MBPS,                 585},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_65MBPS,                   650},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_78MBPS,                   780},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_NGI_86_5_MBPS,                865}
+};
+static rate_cfg_item_mapping_t ac_s20_rate_mapping[] =
+{
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_7_2222MBPS,               72},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_14_444MBPS,               144},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_21_667MBPS,               217},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_28_889MBPS,               289},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_43_333MBPS,               433},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_57_778MBPS,               578},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_65MBPS,                   650},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_72_222MBPS,               722},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_86_667MBPS,               867},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_SIMO_CB_SGI_96_1_MBPS,                961}
+};
+static rate_cfg_item_mapping_t ac_l40_rate_mapping[] =
+{
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_13_5MBPS,           135},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_27MBPS,             270},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_40_5MBPS,           405},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_54MBPS,             540},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_81MBPS,             810},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_108MBPS,            1080},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_121_5MBPS,          1215},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_135MBPS,            1350},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_162MBPS,            1620},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_NGI_180MBPS,            1800}
+};
+static rate_cfg_item_mapping_t ac_s40_rate_mapping[] =
+{
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_15MBPS,             150},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_30MBPS,             300},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_45MBPS,             450},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_60MBPS,             600},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_90MBPS,             900},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_120MBPS,            1200},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_135MBPS,            1350},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_150MBPS,            1500},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_180MBPS,            1800},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_40MHZ_SIMO_CB_SGI_200MBPS,            2000}
+};
+static rate_cfg_item_mapping_t ac_l80_rate_mapping[] =
+{
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_29_25MBPS,          293},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_58_5MBPS,           585},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_87_75MBPS,          878},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_117MBPS,            1170},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_175_5MBPS,          1755},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_234MBPS,            2340},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_263_25MBPS,         2633},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_292_5MBPS,          2925},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_351MBPS,            3510},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_NGI_390MBPS,            3900}
+};
+static rate_cfg_item_mapping_t ac_s80_rate_mapping[] =
+{
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_32_5MBPS,           325},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_65MBPS,             650},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_97_5MBPS,           975},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_130MBPS,            1300},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_195MBPS,            1950},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_260MBPS,            2600},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_292_5MBPS,          2925},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_325MBPS,            3250},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_390MBPS,            3900},
+   {WNI_CFG_LDPC_FIXED_RATE_VHT_80MHZ_SIMO_CB_SGI_433_33MBPS,         4333}
+};
+#endif /* WLAN_FEATURE_11AC */
+
+typedef enum
+{
+   RATE_CFG_RATE_LEGACY,
+   RATE_CFG_RATE_11N_MCS_LGI_20,
+   RATE_CFG_RATE_11N_MCS_SGI_20,
+   RATE_CFG_RATE_11N_MCS_LGI_40,
+   RATE_CFG_RATE_11N_MCS_SGI_40,
+   RATE_CFG_RATE_11AC_MCS_LGI_20,
+   RATE_CFG_RATE_11AC_MCS_SGI_20,
+   RATE_CFG_RATE_11AC_MCS_LGI_40,
+   RATE_CFG_RATE_11AC_MCS_SGI_40,
+   RATE_CFG_RATE_11AC_MCS_LGI_80,
+   RATE_CFG_RATE_11AC_MCS_SGI_80
+} rate_cfg_supported_rate_t;
+
+typedef enum
+{
+   RATE_CFG_RATE_11AC_MAX_MCS_7,
+   RATE_CFG_RATE_11AC_MAX_MCS_8,
+   RATE_CFG_RATE_11AC_MAX_MCS_9
+} rate_cfg_11ac_max_mcs_t;
+
+typedef enum
+{
+   RATE_CFG_RATE_BW_20,
+   RATE_CFG_RATE_BW_40,
+   RATE_CFG_RATE_BW_80
+} rate_cfg_supported_bw_t;
+
+typedef enum
+{
+   RATE_CFG_RATE_GI_LONG,
+   RATE_CFG_RATE_GI_SHORT
+} rate_cfg_gi_t;
+
+/*--------------------------------------------------------------------------- 
  *   Function definitions
  *-------------------------------------------------------------------------*/
 /**---------------------------------------------------------------------------
-
+  
   \brief hdd_hostapd_open() - HDD Open function for hostapd interface
-
+  
   This is called in response to ifconfig up
   
   \param  - dev Pointer to net_device structure
@@ -186,8 +626,6 @@ int hdd_hostapd_open (struct net_device *dev)
 {
    ENTER();
 
-   MTRACE(vos_trace(VOS_MODULE_ID_HDD,
-                    TRACE_CODE_HDD_HOSTAPD_OPEN_REQUEST, NO_SESSION, 0));
    //Turn ON carrier state
    netif_carrier_on(dev);
    //Enable all Tx queues  
@@ -280,23 +718,19 @@ int hdd_hostapd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
     if (NULL == pAdapter)
     {
        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-          "%s: pAdapter is Null", __func__);
+          "%s: HDD adapter context is Null", __func__);
        ret = -ENODEV;
        goto exit;
     }
 
     if ((!ifr) || (!ifr->ifr_data))
     {
-       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-          FL("ifr or ifr->ifr_data is NULL"));
         ret = -EINVAL;
         goto exit;
     }
 
     if (copy_from_user(&priv_data, ifr->ifr_data, sizeof(hdd_priv_data_t)))
     {
-       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-          FL("failed to copy data from user space"));
         ret = -EFAULT;
         goto exit;
     }
@@ -308,7 +742,7 @@ int hdd_hostapd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
          * To avoid addition overflow total_len should be
          * smaller than INT_MAX. */
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-           "%s: integer out of range", __func__);
+           "%s: integer out of range\n", __func__);
         ret = -EFAULT;
         goto exit;
     }
@@ -317,15 +751,13 @@ int hdd_hostapd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
     if (!command)
     {
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-           "%s: failed to allocate memory", __func__);
+           "%s: failed to allocate memory\n", __func__);
         ret = -ENOMEM;
         goto exit;
     }
 
     if (copy_from_user(command, priv_data.buf, priv_data.total_len))
     {
-       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-          FL("failed to copy data from user space"));
         ret = -EFAULT;
         goto exit;
     }
@@ -345,13 +777,6 @@ int hdd_hostapd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
         {
             hdd_setP2pOpps(dev, command);
         }
-
-#ifdef FEATURE_WLAN_BATCH_SCAN
-        else if( strncmp(command, "WLS_BATCHING", 12) == 0 )
-        {
-           ret = hdd_handle_batch_scan_ioctl(pAdapter, &priv_data, command);
-        }
-#endif
 
         /*
            command should be a string having format
@@ -489,7 +914,7 @@ void hdd_clear_all_sta(hdd_adapter_t *pHostapdAdapter, v_PVOID_t usrDataForCallb
     struct net_device *dev;
     dev = (struct net_device *)usrDataForCallback;
 
-    hddLog(LOGE, FL("Clearing all the STA entry...."));
+    hddLog(LOGE, FL("Clearing all the STA entry....\n"));
     for (staId = 0; staId < WLAN_MAX_STA_COUNT; staId++)
     {
         if ( pHostapdAdapter->aStaInfo[staId].isUsed && 
@@ -564,7 +989,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
     switch(sapEvent)
     {
         case eSAP_START_BSS_EVENT :
-            hddLog(LOG1, FL("BSS configured status = %s, channel = %lu, bc sta Id = %d"),
+            hddLog(LOG1, FL("BSS configured status = %s, channel = %lu, bc sta Id = %d\n"),
                             pSapEvent->sapevt.sapStartBssCompleteEvent.status ? "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS",
                             pSapEvent->sapevt.sapStartBssCompleteEvent.operatingChannel,
                               pSapEvent->sapevt.sapStartBssCompleteEvent.staId);
@@ -574,16 +999,14 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
    
             if (!VOS_IS_STATUS_SUCCESS(vos_status) || pHostapdState->vosStatus)
             {     
-                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: startbss event failed!!"));
+                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: startbss event failed!!\n"));
                 goto stopbss;
             }
             else
             {                
                 pHddApCtx->uBCStaId = pSapEvent->sapevt.sapStartBssCompleteEvent.staId;
                 //@@@ need wep logic here to set privacy bit
-                vos_status = hdd_softap_Register_BC_STA(pHostapdAdapter, pHddApCtx->uPrivacy);
-                if (!VOS_IS_STATUS_SUCCESS(vos_status))
-                    hddLog(LOGW, FL("Failed to register BC STA %d"), vos_status);
+                hdd_softap_Register_BC_STA(pHostapdAdapter, pHddApCtx->uPrivacy);
             }
             
             if (0 != (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->nAPAutoShutOff)
@@ -592,11 +1015,11 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 vos_status = vos_timer_init( &pHddApCtx->hdd_ap_inactivity_timer, VOS_TIMER_TYPE_SW, 
                                             hdd_hostapd_inactivity_timer_cb, (v_PVOID_t)dev );
                 if (!VOS_IS_STATUS_SUCCESS(vos_status))
-                   hddLog(LOGE, FL("Failed to init AP inactivity timer"));
+                   hddLog(LOGE, FL("Failed to init AP inactivity timer\n"));
 
                 vos_status = vos_timer_start( &pHddApCtx->hdd_ap_inactivity_timer, (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->nAPAutoShutOff * 1000);
                 if (!VOS_IS_STATUS_SUCCESS(vos_status))
-                   hddLog(LOGE, FL("Failed to init AP inactivity timer"));
+                   hddLog(LOGE, FL("Failed to init AP inactivity timer\n"));
 
             }
             pHddApCtx->operatingChannel = pSapEvent->sapevt.sapStartBssCompleteEvent.operatingChannel;
@@ -644,7 +1067,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             break; //Event will be sent after Switch-Case stmt 
 
         case eSAP_STOP_BSS_EVENT:
-            hddLog(LOG1, FL("BSS stop status = %s"),pSapEvent->sapevt.sapStopBssCompleteEvent.status ?
+            hddLog(LOG1, FL("BSS stop status = %s\n"),pSapEvent->sapevt.sapStopBssCompleteEvent.status ? 
                              "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS");
 
             //Free up Channel List incase if it is set
@@ -654,19 +1077,19 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             goto stopbss;
         case eSAP_STA_SET_KEY_EVENT:
             //TODO: forward the message to hostapd once implementtation is done for now just print
-            hddLog(LOG1, FL("SET Key: configured status = %s"),pSapEvent->sapevt.sapStationSetKeyCompleteEvent.status ?
+            hddLog(LOG1, FL("SET Key: configured status = %s\n"),pSapEvent->sapevt.sapStationSetKeyCompleteEvent.status ? 
                             "eSAP_STATUS_FAILURE" : "eSAP_STATUS_SUCCESS");
             return VOS_STATUS_SUCCESS;
         case eSAP_STA_DEL_KEY_EVENT:
            //TODO: forward the message to hostapd once implementtation is done for now just print
-           hddLog(LOG1, FL("Event received %s"),"eSAP_STA_DEL_KEY_EVENT");
+           hddLog(LOG1, FL("Event received %s\n"),"eSAP_STA_DEL_KEY_EVENT");
            return VOS_STATUS_SUCCESS;
         case eSAP_STA_MIC_FAILURE_EVENT:
         {
             memset(&msg, '\0', sizeof(msg));
             msg.src_addr.sa_family = ARPHRD_ETHER;
             memcpy(msg.src_addr.sa_data, &pSapEvent->sapevt.sapStationMICFailureEvent.staMac, sizeof(v_MACADDR_t));
-            hddLog(LOG1, "MIC MAC "MAC_ADDRESS_STR, MAC_ADDR_ARRAY(msg.src_addr.sa_data));
+            hddLog(LOG1, "MIC MAC "MAC_ADDRESS_STR"\n", MAC_ADDR_ARRAY(msg.src_addr.sa_data));
             if(pSapEvent->sapevt.sapStationMICFailureEvent.multicast == eSAP_TRUE)
              msg.flags = IW_MICFAILURE_GROUP;
             else 
@@ -693,7 +1116,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             wrqu.addr.sa_family = ARPHRD_ETHER;
             memcpy(wrqu.addr.sa_data, &pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staMac, 
                 sizeof(v_MACADDR_t));
-            hddLog(LOG1, " associated "MAC_ADDRESS_STR, MAC_ADDR_ARRAY(wrqu.addr.sa_data));
+            hddLog(LOG1, " associated "MAC_ADDRESS_STR"\n", MAC_ADDR_ARRAY(wrqu.addr.sa_data));
             we_event = IWEVREGISTERED;
             
             WLANSAP_Get_WPS_State((WLAN_HDD_GET_CTX(pHostapdAdapter))->pvosContext, &bWPSState);
@@ -707,7 +1130,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
 
             if (bAuthRequired || bWPSState == eANI_BOOLEAN_TRUE )
             {
-                vos_status = hdd_softap_RegisterSTA( pHostapdAdapter,
+                hdd_softap_RegisterSTA( pHostapdAdapter,
                                        TRUE,
                                        pHddApCtx->uPrivacy,
                                        pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staId,
@@ -715,14 +1138,10 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                                        0,
                                        (v_MACADDR_t *)wrqu.addr.sa_data,
                                        pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.wmmEnabled);
-
-                if (!VOS_IS_STATUS_SUCCESS(vos_status))
-                    hddLog(LOGW, FL("Failed to register STA %d "MAC_ADDRESS_STR""),
-                                     vos_status, MAC_ADDR_ARRAY(wrqu.addr.sa_data));
             }
             else
             {
-                vos_status = hdd_softap_RegisterSTA( pHostapdAdapter,
+                hdd_softap_RegisterSTA( pHostapdAdapter,
                                        FALSE,
                                        pHddApCtx->uPrivacy,
                                        pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staId,
@@ -730,9 +1149,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                                        0,
                                        (v_MACADDR_t *)wrqu.addr.sa_data,
                                        pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.wmmEnabled);
-                if (!VOS_IS_STATUS_SUCCESS(vos_status))
-                    hddLog(LOGW, FL("Failed to register STA %d "MAC_ADDRESS_STR""),
-                                     vos_status, MAC_ADDR_ARRAY(wrqu.addr.sa_data));
             }
 
             // Stop AP inactivity timer
@@ -740,7 +1156,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             {
                 vos_status = vos_timer_stop(&pHddApCtx->hdd_ap_inactivity_timer);
                 if (!VOS_IS_STATUS_SUCCESS(vos_status))
-                   hddLog(LOGE, FL("Failed to start AP inactivity timer"));
+                   hddLog(LOGE, FL("Failed to start AP inactivity timer\n"));
             }
 #ifdef WLAN_OPEN_SOURCE
             if (wake_lock_active(&pHddCtx->sap_wake_lock))
@@ -769,7 +1185,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                 }
                 else
                 {
-                    hddLog(LOGE, FL(" Assoc Ie length is too long"));
+                    hddLog(LOGE, FL(" Assoc Ie length is too long \n"));
                 }
              }
 #endif
@@ -777,14 +1193,14 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             // Lets do abort scan to ensure smooth authentication for client
             if ((pScanInfo != NULL) && pScanInfo->mScanPending)
             {
-                hdd_abort_mac_scan(pHddCtx, eCSR_SCAN_ABORT_DEFAULT);
+                hdd_abort_mac_scan(pHddCtx);
             }
 
             break;
         case eSAP_STA_DISASSOC_EVENT:
             memcpy(wrqu.addr.sa_data, &pSapEvent->sapevt.sapStationDisassocCompleteEvent.staMac,
                    sizeof(v_MACADDR_t));
-            hddLog(LOG1, " disassociated "MAC_ADDRESS_STR, MAC_ADDR_ARRAY(wrqu.addr.sa_data));
+            hddLog(LOG1, " disassociated "MAC_ADDRESS_STR"\n", MAC_ADDR_ARRAY(wrqu.addr.sa_data));
             if (pSapEvent->sapevt.sapStationDisassocCompleteEvent.reason == eSAP_USR_INITATED_DISASSOC)
                 hddLog(LOG1," User initiated disassociation");
             else
@@ -818,7 +1234,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                     {
                         vos_status = vos_timer_start(&pHddApCtx->hdd_ap_inactivity_timer, (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->nAPAutoShutOff * 1000);
                         if (!VOS_IS_STATUS_SUCCESS(vos_status))
-                            hddLog(LOGE, FL("Failed to init AP inactivity timer"));
+                            hddLog(LOGE, FL("Failed to init AP inactivity timer\n"));
                     }
                     else
                         VOS_ASSERT(vos_timer_getCurrentState(&pHddApCtx->hdd_ap_inactivity_timer) == VOS_TIMER_STATE_STOPPED);
@@ -830,12 +1246,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                             GFP_KERNEL);
 #endif
             //Update the beacon Interval if it is P2P GO
-            vos_status = hdd_change_mcc_go_beacon_interval(pHostapdAdapter);
-            if (VOS_STATUS_SUCCESS != vos_status)
-            {
-                hddLog(LOGE, "%s: failed to update Beacon interval %d",
-                        __func__, vos_status);
-            }
+            hdd_change_mcc_go_beacon_interval(pHostapdAdapter);
             break;
         case eSAP_WPS_PBC_PROBE_REQ_EVENT:
         {
@@ -849,7 +1260,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
                     pHddApCtx->WPSPBCProbeReq.probeReqIELen);
                      
                 vos_mem_copy(pHddApCtx->WPSPBCProbeReq.peerMacAddr, pSapEvent->sapevt.sapPBCProbeReqEvent.WPSPBCProbeReq.peerMacAddr, sizeof(v_MACADDR_t));
-                hddLog(LOG1, "WPS PBC probe req "MAC_ADDRESS_STR, MAC_ADDR_ARRAY(pHddApCtx->WPSPBCProbeReq.peerMacAddr));
+                hddLog(LOG1, "WPS PBC probe req "MAC_ADDRESS_STR"\n", MAC_ADDR_ARRAY(pHddApCtx->WPSPBCProbeReq.peerMacAddr));
                 memset(&wreq, 0, sizeof(wreq));
                 wreq.data.length = strlen(message); // This is length of message
                 wireless_send_event(dev, IWEVCUSTOM, &wreq, (char *)message); 
@@ -871,7 +1282,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             }
             }
             vos_mem_free(pSapEvent->sapevt.sapAssocStaListEvent.pAssocStas);// Release caller allocated memory here
-            pSapEvent->sapevt.sapAssocStaListEvent.pAssocStas = NULL;
             return VOS_STATUS_SUCCESS;
         case eSAP_INDICATE_MGMT_FRAME:
            hdd_indicateMgmtFrame( pHostapdAdapter, 
@@ -901,7 +1311,7 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             wrqu.data.pointer = unknownSTAEvent;
             wrqu.data.length = strlen(unknownSTAEvent);
             we_custom_event_generic = (v_BYTE_t *)unknownSTAEvent;
-            hddLog(LOGE,"%s", unknownSTAEvent);
+            hddLog(LOG1,"%s\n", unknownSTAEvent);
             break;
 
         case eSAP_MAX_ASSOC_EXCEEDED:
@@ -918,26 +1328,22 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             wrqu.data.pointer = maxAssocExceededEvent;
             wrqu.data.length = strlen(maxAssocExceededEvent);
             we_custom_event_generic = (v_BYTE_t *)maxAssocExceededEvent;
-            hddLog(LOG1,"%s", maxAssocExceededEvent);
+            hddLog(LOG1,"%s\n", maxAssocExceededEvent);
             break;
         case eSAP_STA_ASSOC_IND:
             return VOS_STATUS_SUCCESS;
 
         case eSAP_DISCONNECT_ALL_P2P_CLIENT:
-            hddLog(LOG1, FL(" Disconnecting all the P2P Clients...."));
+            hddLog(LOG1, FL(" Disconnecting all the P2P Clients....\n"));
             hdd_clear_all_sta(pHostapdAdapter, usrDataForCallback);
             return VOS_STATUS_SUCCESS;
 
         case eSAP_MAC_TRIG_STOP_BSS_EVENT :
-            vos_status = hdd_stop_p2p_link(pHostapdAdapter, usrDataForCallback);
-            if (!VOS_IS_STATUS_SUCCESS(vos_status))
-            {
-                hddLog(LOGW, FL("hdd_stop_p2p_link failed %d"), vos_status);
-            }
+            hdd_stop_p2p_link(pHostapdAdapter, usrDataForCallback);
             return VOS_STATUS_SUCCESS;
 
         default:
-            hddLog(LOG1,"SAP message is not handled");
+            hddLog(LOG1,"SAP message is not handled\n");
             goto stopbss;
             return VOS_STATUS_SUCCESS;
     }
@@ -977,9 +1383,7 @@ stopbss :
         hdd_hostapd_stop(dev);
 
         /* reclaim all resources allocated to the BSS */
-        vos_status = hdd_softap_stop_bss(pHostapdAdapter);
-        if (!VOS_IS_STATUS_SUCCESS(vos_status))
-             hddLog(LOGW, FL("hdd_softap_stop_bss failed %d"), vos_status);
+        hdd_softap_stop_bss(pHostapdAdapter);
 
         /* once the event is set, structure dev/pHostapdAdapter should
          * not be touched since they are now subject to being deleted
@@ -1015,7 +1419,7 @@ int hdd_softap_unpackIE(
     
     if (NULL == halHandle)
     {
-        hddLog(LOGE, FL("Error haHandle returned NULL"));
+        hddLog(LOGE, FL("Error haHandle returned NULL\n"));
         return -EINVAL;
     }
     
@@ -1042,9 +1446,9 @@ int hdd_softap_unpackIE(
                             RSNIeLen, 
                             &dot11RSNIE);
         // Copy out the encryption and authentication types 
-        hddLog(LOG1, FL("%s: pairwise cipher suite count: %d"),
+        hddLog(LOG1, FL("%s: pairwise cipher suite count: %d\n"), 
                 __func__, dot11RSNIE.pwise_cipher_suite_count );
-        hddLog(LOG1, FL("%s: authentication suite count: %d"),
+        hddLog(LOG1, FL("%s: authentication suite count: %d\n"), 
                 __func__, dot11RSNIE.akm_suite_count);
         /*Here we have followed the apple base code, 
           but probably I suspect we can do something different*/
@@ -1077,9 +1481,9 @@ int hdd_softap_unpackIE(
                             RSNIeLen, 
                             &dot11WPAIE);
         // Copy out the encryption and authentication types 
-        hddLog(LOG1, FL("%s: WPA unicast cipher suite count: %d"),
+        hddLog(LOG1, FL("%s: WPA unicast cipher suite count: %d\n"), 
                 __func__, dot11WPAIE.unicast_cipher_count );
-        hddLog(LOG1, FL("%s: WPA authentication suite count: %d"),
+        hddLog(LOG1, FL("%s: WPA authentication suite count: %d\n"), 
                 __func__, dot11WPAIE.auth_suite_count);
         //dot11WPAIE.auth_suite_count
         // Just translate the FIRST one 
@@ -1091,257 +1495,472 @@ int hdd_softap_unpackIE(
     } 
     else 
     { 
-        hddLog(LOGW, FL("%s: gen_ie[0]: %d"), __func__, gen_ie[0]);
+        hddLog(LOGW, FL("%s: gen_ie[0]: %d\n"), __func__, gen_ie[0]);
         return VOS_STATUS_E_FAILURE; 
     }
     return VOS_STATUS_SUCCESS;
 }
 
-#ifdef FEATURE_WLAN_CH_AVOID
 /**---------------------------------------------------------------------------
 
-  \brief hdd_hostapd_freq_to_chn() -
+  \brief hdd_hostapd_set_mc_rate_cb() -
 
-  Input frequency translated into channel number
+  This is called to notify associated stas information ready
 
-  \param  - freq input frequency with order of kHz
+  \param  - sapEvent Pointer to get associated stas event
+  \param  - apDriver SoftAP context
 
-  \return - corresponding channel number.
-            incannot find correct channel number, return 0
-
-  --------------------------------------------------------------------------*/
-v_U16_t hdd_hostapd_freq_to_chn
-(
-   v_U16_t   freq
-)
-{
-   int   loop;
-
-   for (loop = 0; loop < NUM_20MHZ_RF_CHANNELS; loop++)
-   {
-      if (rfChannels[loop].targetFreq == freq)
-      {
-         return rfChannels[loop].channelNum;
-      }
-   }
-
-   return (0);
-}
-
-/*==========================================================================
-  FUNCTION    sapUpdateUnsafeChannelList
-
-  DESCRIPTION
-    Function  Undate unsafe channel list table
-
-  DEPENDENCIES
-    NA.
-
-  PARAMETERS
-
-    IN
-    pSapCtx : SAP context pointer, include unsafe channel list
-
-  RETURN VALUE
-    NONE
-============================================================================*/
-void hdd_hostapd_update_unsafe_channel_list(hdd_context_t *pHddCtx,
-                        v_U16_t *unsafeChannelList, v_U16_t unsafeChannelCount)
-{
-   v_U16_t   i, j;
-
-   vos_mem_zero((void *)pHddCtx->unsafeChannelList,
-                sizeof(pHddCtx->unsafeChannelList));
-   if (0 == unsafeChannelCount)
-   {
-      pHddCtx->unsafeChannelCount = 0;
-   }
-   else
-   {
-      vos_mem_copy((void *)pHddCtx->unsafeChannelList,
-                   unsafeChannelList,
-                   unsafeChannelCount * sizeof(tANI_U16));
-      pHddCtx->unsafeChannelCount = unsafeChannelCount;
-   }
-
-   /* Flush, default set all channel safe */
-   for (i = 0; i < NUM_20MHZ_RF_CHANNELS; i++)
-   {
-      safeChannels[i].isSafe = VOS_TRUE;
-   }
-
-   /* Try to find unsafe channel */
-   for (i = 0; i < pHddCtx->unsafeChannelCount; i++)
-   {
-      for (j = 0; j < NUM_20MHZ_RF_CHANNELS; j++)
-      {
-         if(safeChannels[j].channelNumber == pHddCtx->unsafeChannelList[i])
-         {
-            /* Found unsafe channel, update it */
-            safeChannels[j].isSafe = VOS_FALSE;
-            VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO,
-                      "%s : CH %d is not safe",
-                      __func__, pHddCtx->unsafeChannelList[i]);
-            break;
-         }
-      }
-   }
-
-   return;
-}
-
-/**---------------------------------------------------------------------------
-
-  \brief hdd_hostapd_ch_avoid_cb() -
-
-  Avoid channel notification from FW handler.
-  FW will send un-safe channle list to avoid overwrapping.
-  hostapd should not use notified channel
-
-  \param  - pAdapter HDD adapter pointer
-            indParam channel avoid notification parameter
-
-  \return - None
+  \return - none
 
   --------------------------------------------------------------------------*/
-void hdd_hostapd_ch_avoid_cb
+void hdd_hostapd_set_mc_rate_cb
 (
-   void *pAdapter,
-   void *indParam
+   tSap_Event      *sapEvent,
+   void            *apDriver
 )
 {
-   hdd_adapter_t      *pHostapdAdapter = NULL;
-   hdd_context_t      *hddCtxt;
-   tSirChAvoidIndType *chAvoidInd;
-   v_U8_t              rangeLoop;
-   v_U16_t             channelLoop;
-   v_U16_t             dupCheck;
-   v_U16_t             startChannel;
-   v_U16_t             endChannel;
-   v_U16_t             unsafeChannelCount = 0;
-   v_U16_t             unsafeChannelList[NUM_20MHZ_RF_CHANNELS];
-   v_CONTEXT_t         pVosContext;
-   tHddAvoidFreqList   hddAvoidFreqList;
-   tANI_U32            i;
+   hdd_ap_ctx_t    *apCtxt;
 
-   /* Basic sanity */
-   if ((NULL == pAdapter) || (NULL == indParam))
+   if ((NULL == apDriver) || (NULL == sapEvent))
    {
       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                "%s : Invalid arguments", __func__);
+             "%s : Invalid arguments", __func__);
       return;
    }
 
-   hddCtxt     = (hdd_context_t *)pAdapter;
-   chAvoidInd  = (tSirChAvoidIndType *)indParam;
-   pVosContext = hddCtxt->pvosContext;
+   apCtxt = (hdd_ap_ctx_t *)apDriver;
 
-   /* Make unsafe channel list */
-   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-             "%s : band count %d",
-             __func__, chAvoidInd->avoidRangeCount);
-   vos_mem_zero((void *)unsafeChannelList,
-                NUM_20MHZ_RF_CHANNELS * sizeof(v_U16_t));
-   for (rangeLoop = 0; rangeLoop < chAvoidInd->avoidRangeCount; rangeLoop++)
+   /* there is a race condition that exists between this callback function
+      and the caller since the caller could time out either before or
+      while this code is executing.  we'll assume the timeout hasn't
+      occurred, but we'll verify that right before complete our work */
+   if (SAP_GET_STAS_COOKIE == apCtxt->getStasCookie)
    {
-      startChannel = hdd_hostapd_freq_to_chn(
-                      chAvoidInd->avoidFreqRange[rangeLoop].startFreq);
-      endChannel   = hdd_hostapd_freq_to_chn(
-                      chAvoidInd->avoidFreqRange[rangeLoop].endFreq);
+      vos_mem_copy((void *)&apCtxt->getStasEventBuffer,
+                   (void *)sapEvent,
+                   sizeof(tSap_Event));
+      complete(&apCtxt->sap_get_associated_stas_complete);
+   }
+   else
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s : Invalid cookie", __func__);
+   }
+   return;
+}
+
+/**---------------------------------------------------------------------------
+
+  \brief hdd_hostapd_set_mc_rate_update
+
+  This is called to find rate and send cfg command to FW
+
+  \param  - sapEvent Pointer to get associated stas event
+  \param  - pHostapdAdapter SoftAP Adapter Context
+
+  \return - int, 0 success
+                 negative fail
+
+  --------------------------------------------------------------------------*/
+static int hdd_hostapd_set_mc_rate_update
+(
+   tSap_Event      *sapEvent,
+   hdd_adapter_t   *pHostapdAdapter
+)
+{
+   tHalHandle               hHal;
+   hdd_ap_ctx_t            *apCtxt;
+   tSap_AssocMacAddr       *assocSta;
+   rate_cfg_11ac_max_mcs_t  supportedAcMaxMcs = RATE_CFG_RATE_11AC_MAX_MCS_7;
+   rate_cfg_supported_bw_t  bandWidth;
+   rate_cfg_gi_t            gi;
+   rate_cfg_item_mapping_t *nMappingTable = NULL;
+   rate_cfg_item_mapping_t *acMappingTable = NULL;
+   v_U8_t                   stasLoop, ratesLoop;
+   v_U8_t                   rateArrayOrder;
+   v_U8_t                   mcsTable11n;
+   v_U16_t                  targetCfgId = 0;
+   v_U16_t                  targetCfgValue = 0;
+   v_U16_t                  currentRate;
+   v_U16_t                  combinedSupportMap = 0xFFFF;
+   v_U16_t                  supportMap = 0x0000;
+   v_U16_t                  supportedChannelCount = 0;
+   v_U32_t                  legacyRates[SAP_LEGACY_RATE_COUNT];
+   int                      rc = 0;
+   tSirRetStatus            cfdStat;
+
+   if ((NULL == pHostapdAdapter) || (NULL == sapEvent))
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s : Invalid arguments", __func__);
+      return -1;
+   }
+
+   apCtxt = WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter);
+   hHal   = WLAN_HDD_GET_HAL_CTX(pHostapdAdapter);
+   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+             "setMcRateCB NUM SAT %d, targetMCRate %d, current channel %d",
+             sapEvent->sapevt.sapAssocStaListEvent.noOfAssocSta,
+             apCtxt->targetMCRate,
+             apCtxt->operatingChannel);
+
+   if (!sapEvent->sapevt.sapAssocStaListEvent.noOfAssocSta)
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                "Not connected any STA yet");
+      return -1;
+   }
+
+   for (stasLoop = 0;
+        stasLoop < sapEvent->sapevt.sapAssocStaListEvent.noOfAssocSta;
+        stasLoop++)
+   {
+      vos_mem_zero((v_U8_t *)legacyRates,
+                   SAP_LEGACY_RATE_COUNT * sizeof(legacyRates));
+      rateArrayOrder = 0;
+      mcsTable11n    = 0;
+      supportedChannelCount = 0;
+      assocSta = sapEvent->sapevt.sapAssocStaListEvent.pAssocStas++;
       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-                "%s : start %d : %d, end %d : %d",
-                __func__,
-                chAvoidInd->avoidFreqRange[rangeLoop].startFreq,
-                startChannel,
-                chAvoidInd->avoidFreqRange[rangeLoop].endFreq,
-                endChannel);
-      for (channelLoop = startChannel;
-           channelLoop < (endChannel + 1);
-           channelLoop++)
+                "ASSOSID %d, OPM %d, nBM %d, SGI40 %d, SGI20 %d, S40 %d",
+                assocSta->assocId,
+                assocSta->supportedRates.opRateMode,
+                assocSta->supportedRates.aniEnhancedRateBitmap,
+                assocSta->ShortGI40Mhz,
+                assocSta->ShortGI20Mhz,
+                assocSta->Support40Mhz);
+
+      /* Legacy Rate */
+      for (ratesLoop = 0; ratesLoop < SIR_NUM_11B_RATES; ratesLoop++)
       {
-         /* Channel duplicate check routine */
-         for (dupCheck = 0; dupCheck < unsafeChannelCount; dupCheck++)
+         currentRate = assocSta->supportedRates.llbRates[ratesLoop] &
+                       SAP_LEGACY_RATE_MASK;
+
+         /* To fix KW error report */
+         if (SAP_LEGACY_RATE_COUNT <= rateArrayOrder)
          {
-            if (unsafeChannelList[dupCheck] == channelLoop)
+            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                      "%s, Invalid array Size, break", __func__);
+            break;
+         }
+
+         /* Make 100kbps order */
+         legacyRates[rateArrayOrder] = (currentRate * 100) / 20;
+         rateArrayOrder++;
+         if (currentRate)
+         {
+            supportedChannelCount++;
+         }
+      }
+      for (ratesLoop = 0; ratesLoop < SIR_NUM_11A_RATES; ratesLoop++)
+      {
+         currentRate = assocSta->supportedRates.llaRates[ratesLoop] &
+                       SAP_LEGACY_RATE_MASK;
+         /* To fix KW error report */
+         if (SAP_LEGACY_RATE_COUNT <= rateArrayOrder)
+         {
+            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                      "%s, Invalid array Size, break", __func__);
+            break;
+         }
+
+         /* Make 100kbps order */
+         legacyRates[rateArrayOrder] = (currentRate * 100) / 20;
+         rateArrayOrder++;
+         if (currentRate)
+         {
+            supportedChannelCount++;
+         }
+      }
+      if (supportedChannelCount)
+      {
+         for (ratesLoop = 0; ratesLoop < SAP_LEGACY_RATE_COUNT; ratesLoop++)
+         {
+            if (legacyRates[ratesLoop] == apCtxt->targetMCRate)
             {
-               /* This channel is duplicated */
-               VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-                      "%s : found duplicated channel %d",
-                      __func__, channelLoop);
+               supportMap |= (1 << RATE_CFG_RATE_LEGACY);
                break;
             }
          }
-         if (dupCheck == unsafeChannelCount)
+      }
+
+      /* 11N */
+      if (eSTA_11n <= assocSta->supportedRates.opRateMode)
+      {
+         if (assocSta->Support40Mhz)
          {
-            unsafeChannelList[unsafeChannelCount] = channelLoop;
-            unsafeChannelCount++;
-            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-                      "%s : unsafe channel %d, count %d",
-                      __func__,
-                      channelLoop, unsafeChannelCount);
+            mcsTable11n |= 0x01;
+            if (assocSta->ShortGI40Mhz)
+            {
+               mcsTable11n |= 0x02;
+               supportMap |= (1 << RATE_CFG_RATE_11N_MCS_SGI_40);
+               nMappingTable = n_s40_rate_mapping;
+            }
+            else
+            {
+               supportMap |= (1 << RATE_CFG_RATE_11N_MCS_LGI_40);
+               nMappingTable = n_l40_rate_mapping;
+            }
          }
          else
          {
-            /* DUP, do nothing */
-            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-                      "%s : duplicated channel %d",
-                      __func__, channelLoop);
+            if (assocSta->ShortGI20Mhz)
+            {
+               mcsTable11n |= 0x02;
+               supportMap |= (1 << RATE_CFG_RATE_11N_MCS_SGI_20);
+               nMappingTable = n_s20_rate_mapping;
+            }
+            else
+            {
+               supportMap |= (1 << RATE_CFG_RATE_11N_MCS_LGI_20);
+               nMappingTable = n_l20_rate_mapping;
+            }
          }
       }
-   }
-   /* Update unsafe channel cache
-    * WCN Platform Driver cache */
-   wcnss_set_wlan_unsafe_channel(unsafeChannelList,
-                                 unsafeChannelCount);
 
-   /* Store into local cache
-    * Start with STA and later start SAP
-    * in this scenario, local cache will be used */
-   hdd_hostapd_update_unsafe_channel_list(hddCtxt,
-                                          unsafeChannelList,
-                                          unsafeChannelCount);
-
-   /* generate vendor specific event */
-   vos_mem_zero((void *)&hddAvoidFreqList, sizeof(tHddAvoidFreqList));
-   for (i = 0; i < chAvoidInd->avoidRangeCount; i++)
-   {
-      hddAvoidFreqList.avoidFreqRange[i].startFreq =
-            chAvoidInd->avoidFreqRange[i].startFreq;
-      hddAvoidFreqList.avoidFreqRange[i].endFreq =
-            chAvoidInd->avoidFreqRange[i].endFreq;
-   }
-   hddAvoidFreqList.avoidFreqRangeCount = chAvoidInd->avoidRangeCount;
-
-   wlan_hdd_send_avoid_freq_event(hddCtxt, &hddAvoidFreqList);
-
-   /* Get SAP context first
-    * SAP and P2PGO would not concurrent */
-   pHostapdAdapter = hdd_get_adapter(hddCtxt, WLAN_HDD_SOFTAP);
-   if ((pHostapdAdapter) && (unsafeChannelCount))
-   {
-      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-                "%s : Current operation channel %d",
-                __func__,
-                pHostapdAdapter->sessionCtx.ap.operatingChannel);
-      for (channelLoop = 0; channelLoop < unsafeChannelCount; channelLoop++)
+#ifdef WLAN_FEATURE_11AC
+      /* 11AC */
+      if (eSTA_11ac <= assocSta->supportedRates.opRateMode)
       {
-         if (((unsafeChannelList[channelLoop] ==
-               pHostapdAdapter->sessionCtx.ap.operatingChannel)) &&
-             (AUTO_CHANNEL_SELECT ==
-               pHostapdAdapter->sessionCtx.ap.sapConfig.channel))
+         /* Find supported MAX MCS */
+         supportedAcMaxMcs = assocSta->supportedRates.vhtRxMCSMap &
+                             SAP_AC_MCS_MAP_MASK;
+         supportedAcMaxMcs += SAP_AC_MCS_MAP_OFFSET;
+         /* Find channel characteristics from MAX rate */
+         if (mcs_rate_11ac[supportedAcMaxMcs].cb80_rate_11ac[0] ==
+             assocSta->supportedRates.vhtRxHighestDataRate)
          {
-            /* current operating channel is un-safe channel
-             * restart driver */
-            hdd_hostapd_stop(pHostapdAdapter->dev);
+            supportMap |= (1 << RATE_CFG_RATE_11AC_MCS_LGI_80);
+            bandWidth = RATE_CFG_RATE_BW_80;
+            gi = RATE_CFG_RATE_GI_LONG;
+            acMappingTable = ac_l80_rate_mapping;
+         }
+         else if (mcs_rate_11ac[supportedAcMaxMcs].cb80_rate_11ac[1] ==
+                  assocSta->supportedRates.vhtRxHighestDataRate)
+         {
+            supportMap |= (1 << RATE_CFG_RATE_11AC_MCS_SGI_80);
+            bandWidth = RATE_CFG_RATE_BW_80;
+            gi = RATE_CFG_RATE_GI_SHORT;
+            acMappingTable = ac_s80_rate_mapping;
+         }
+         else if (mcs_rate_11ac[supportedAcMaxMcs].cb40_rate_11ac[0] ==
+                  assocSta->supportedRates.vhtRxHighestDataRate)
+         {
+            supportMap |= (1 << RATE_CFG_RATE_11AC_MCS_LGI_40);
+            bandWidth = RATE_CFG_RATE_BW_40;
+            gi = RATE_CFG_RATE_GI_LONG;
+            acMappingTable = ac_l40_rate_mapping;
+         }
+         else if (mcs_rate_11ac[supportedAcMaxMcs].cb40_rate_11ac[1] ==
+                  assocSta->supportedRates.vhtRxHighestDataRate)
+         {
+            supportMap |= (1 << RATE_CFG_RATE_11AC_MCS_SGI_40);
+            bandWidth = RATE_CFG_RATE_BW_40;
+            gi = RATE_CFG_RATE_GI_SHORT;
+            acMappingTable = ac_s40_rate_mapping;
+         }
+         else if (mcs_rate_11ac[supportedAcMaxMcs].cb20_rate_11ac[0] ==
+                  assocSta->supportedRates.vhtRxHighestDataRate)
+         {
+            supportMap |= (1 << RATE_CFG_RATE_11AC_MCS_LGI_20);
+            bandWidth = RATE_CFG_RATE_BW_20;
+            gi = RATE_CFG_RATE_GI_LONG;
+            acMappingTable = ac_l20_rate_mapping;
+         }
+         else if (mcs_rate_11ac[supportedAcMaxMcs].cb20_rate_11ac[1] ==
+                  assocSta->supportedRates.vhtRxHighestDataRate)
+         {
+            supportMap |= (1 << RATE_CFG_RATE_11AC_MCS_SGI_20);
+            bandWidth = RATE_CFG_RATE_BW_20;
+            gi = RATE_CFG_RATE_GI_SHORT;
+            acMappingTable = ac_s20_rate_mapping;
+         }
+      }
+#endif /* WLAN_FEATURE_11AC */
+      combinedSupportMap &= supportMap;
+   }
+
+   if ((!combinedSupportMap) &&
+       (!sapEvent->sapevt.sapAssocStaListEvent.noOfAssocSta))
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                "%s, No Common supported rate, discard", __func__);
+      return -1;
+   }
+
+   /* Select target band */
+   if (apCtxt->operatingChannel <=
+       SAP_MAX_24_CHANNEL_NUMBER)
+   {
+      targetCfgId = WNI_CFG_FIXED_RATE_MULTICAST_24GHZ;
+   }
+   else
+   {
+      targetCfgId = WNI_CFG_FIXED_RATE_MULTICAST_5GHZ;
+   }
+
+   /* First find from legacy */
+   if (combinedSupportMap & SAP_RATE_SUPPORT_MAP_LEGACY_MASK)
+   {
+      for (ratesLoop = 0; ratesLoop < SAP_LEGACY_RATE_COUNT; ratesLoop++)
+      {
+         if (apCtxt->targetMCRate ==
+             legacy_rate_mapping[ratesLoop].rate)
+         {
+            targetCfgValue = legacy_rate_mapping[ratesLoop].eRateCfg;
             break;
          }
       }
    }
 
-   return;
-}
+   /* If available same on 11N, update target rate */
+   if ((combinedSupportMap & SAP_RATE_SUPPORT_MAP_N_MASK) &&
+       (NULL != nMappingTable))
+   {
+      for (ratesLoop = 0; ratesLoop < SAP_11N_RATE_COUNT; ratesLoop++)
+      {
+         if (apCtxt->targetMCRate == nMappingTable[ratesLoop].rate)
+         {
+            targetCfgValue = nMappingTable[ratesLoop].eRateCfg;
+            break;
+         }
+      }
+   }
 
-#endif /* FEATURE_WLAN_CH_AVOID */
+#ifdef WLAN_FEATURE_11AC
+   /* If available same on 11AC, update target rate */
+   if ((combinedSupportMap & SAP_RATE_SUPPORT_MAP_AC_MASK) &&
+       (NULL != acMappingTable))
+   {
+      for (ratesLoop = 0; ratesLoop < supportedAcMaxMcs; ratesLoop++)
+      {
+         if (apCtxt->targetMCRate == acMappingTable[ratesLoop].rate)
+         {
+            targetCfgValue = acMappingTable[ratesLoop].eRateCfg;
+            break;
+         }
+      }
+   }
+#endif /* WLAN_FEATURE_11AC */
+
+   /* Finally send config to FW */
+   if (targetCfgId && targetCfgValue)
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                "%s, Target Band %d, cfg value %d",
+                __func__, targetCfgId, targetCfgValue);
+      cfdStat = cfgSetInt((tpAniSirGlobal)hHal,
+                          targetCfgId,
+                          targetCfgValue);
+      if (eSIR_SUCCESS != cfdStat)
+      {
+         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                   "%s, CFG Fail %d",
+                   __func__, cfdStat);
+         rc = -1;
+      }
+   }
+
+   return rc;
+};
+
+/**---------------------------------------------------------------------------
+
+  \brief hdd_hostapd_set_mc_rate() -
+
+  This is called user application set forcefully MC rate
+
+  \param  - pHostapdAdapter Pointer to adapter structure
+  \param  - targetRateHkbps MC rate to set, hundreds kbps order
+
+  \return - int, 0 success
+                 negative fail
+
+  --------------------------------------------------------------------------*/
+int hdd_hostapd_set_mc_rate
+(
+   hdd_adapter_t *pHostapdAdapter,
+   int            targetRateHkbps
+)
+{
+   tHalHandle      hHal;
+   hdd_ap_ctx_t   *apCtxt;
+   eHalStatus      smeStatus;
+   int             rc;
+
+   if ((NULL == pHostapdAdapter) || (0 == targetRateHkbps))
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s : Invalid arguments", __func__);
+      return -1;
+   }
+
+   apCtxt = WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter);
+   hHal = WLAN_HDD_GET_HAL_CTX(pHostapdAdapter);
+   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+             "hdd_hostapd_setMcRate %d", targetRateHkbps);
+
+   init_completion(&apCtxt->sap_get_associated_stas_complete);
+
+   apCtxt->getStasCookie = SAP_GET_STAS_COOKIE;
+   apCtxt->targetMCRate = targetRateHkbps;
+   apCtxt->getStasEventBuffer.sapevt.sapAssocStaListEvent.noOfAssocSta = 0;
+   apCtxt->assocStasBuffer = (tSap_AssocMacAddr *)vos_mem_malloc(
+                    sizeof(tSap_AssocMacAddr) * HAL_NUM_ASSOC_STA);
+   if (NULL == apCtxt->assocStasBuffer)
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s : Buffer Alloc fail", __func__);
+      return -1;
+   }
+   smeStatus = sme_RoamGetAssociatedStas(hHal,
+                             pHostapdAdapter->sessionId,
+                             VOS_MODULE_ID_HDD,
+                             (void *)apCtxt,
+                             hdd_hostapd_set_mc_rate_cb,
+                             (tANI_U8 *)apCtxt->assocStasBuffer);
+   if (smeStatus)
+   {
+      apCtxt->getStasCookie = 0;
+      vos_mem_free(apCtxt->assocStasBuffer);
+      apCtxt->assocStasBuffer = NULL;
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s : SME Issue fail", __func__);
+      return -1;
+   }
+
+   /* Wait for completion */
+   rc = wait_for_completion_interruptible_timeout(
+                       &apCtxt->sap_get_associated_stas_complete,
+                       msecs_to_jiffies(SAP_MAX_GET_ASSOC_STAS_TIMEOUT));
+
+   /* either we have a response or we timed out
+      either way, first invalidate our cookie */
+   apCtxt->getStasCookie = 0;
+   if (0 >= rc)
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+             "%s : Wait timeout or interrupted", __func__);
+
+      /* there is a race condition such that the callback
+         function could be executing at the same time we are. of
+         primary concern is if the callback function had already
+         verified the "magic" but hasn't yet set the completion
+         variable. Since the completion variable is on our
+         stack, we'll delay just a bit to make sure the data is
+         still valid if that is the case */
+      vos_sleep(50);
+      /* we'll now try to test memory */
+   }
+
+   rc = hdd_hostapd_set_mc_rate_update(
+         &apCtxt->getStasEventBuffer,
+         pHostapdAdapter);
+   vos_mem_free(apCtxt->assocStasBuffer);
+   apCtxt->assocStasBuffer = NULL;
+
+   return rc;
+}
 
 int
 static iw_softap_setparam(struct net_device *dev, 
@@ -1421,33 +2040,10 @@ static iw_softap_setparam(struct net_device *dev,
 
         case QCSAP_PARAM_SET_MC_RATE:
             {
-                tSirRateUpdateInd *rateUpdate;
-
-                rateUpdate = (tSirRateUpdateInd *)
-                             vos_mem_malloc(sizeof(tSirRateUpdateInd));
-                if (NULL == rateUpdate)
+                if (hdd_hostapd_set_mc_rate(pHostapdAdapter, set_value))
                 {
                    hddLog(VOS_TRACE_LEVEL_ERROR,
-                          "%s: SET_MC_RATE indication alloc fail", __func__);
-                   ret = -1;
-                   break;
-                }
-                vos_mem_zero(rateUpdate, sizeof(tSirRateUpdateInd ));
-
-                hddLog(VOS_TRACE_LEVEL_INFO, "MC Target rate %d", set_value);
-                /* Ignore unicast */
-                rateUpdate->ucastDataRate = -1;
-                rateUpdate->mcastDataRate24GHz = set_value;
-                rateUpdate->mcastDataRate5GHz = set_value;
-                rateUpdate->mcastDataRate24GHzTxFlag = 0;
-                rateUpdate->mcastDataRate5GHzTxFlag = 0;
-                status = sme_SendRateUpdateInd(hHal, rateUpdate);
-                if (eHAL_STATUS_SUCCESS != status)
-                {
-                    hddLog(VOS_TRACE_LEVEL_ERROR,
-                            "%s: SET_MC_RATE failed", __func__);
-                    vos_mem_free(rateUpdate);
-                    ret = -1;
+                          "%s: SET_MC_RATE failed", __func__);
                 }
                 break;
             }
@@ -1482,8 +2078,6 @@ static iw_softap_getparam(struct net_device *dev,
         status = ccmCfgGetInt(hHal, WNI_CFG_ASSOC_STA_LIMIT, (tANI_U32 *)value);
         if (eHAL_STATUS_SUCCESS != status)
         {
-            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                FL("failed to get WNI_CFG_ASSOC_STA_LIMIT from cfg %d"),status);
             ret = -EIO;
         }
         break;
@@ -1491,8 +2085,6 @@ static iw_softap_getparam(struct net_device *dev,
     case QCSAP_PARAM_CLR_ACL:
         if ( VOS_STATUS_SUCCESS != WLANSAP_ClearACL( pVosContext ))
         {
-            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                FL("WLANSAP_ClearACL failed"));
                ret = -EIO;            
         }               
         *value = 0;
@@ -1574,13 +2166,14 @@ int iw_softap_modify_acl(struct net_device *dev, struct iw_request_info *info,
     i++;
     cmd = (int)(*(value+i));
 
-    hddLog(LOG1, "%s: SAP Modify ACL arg0 " MAC_ADDRESS_STR " arg1 %d arg2 %d",
-            __func__, MAC_ADDR_ARRAY(pPeerStaMac), listType, cmd);
+    hddLog(LOG1, "%s: SAP Modify ACL arg0 %02x:%02x:%02x:%02x:%02x:%02x arg1 %d arg2 %d\n",
+            __func__, pPeerStaMac[0], pPeerStaMac[1], pPeerStaMac[2], 
+            pPeerStaMac[3], pPeerStaMac[4], pPeerStaMac[5], listType, cmd);
 
     if (WLANSAP_ModifyACL(pVosContext, pPeerStaMac,(eSapACLType)listType,(eSapACLCmdType)cmd)
             != VOS_STATUS_SUCCESS)
     {
-        hddLog(LOGE, FL("Modify ACL failed"));
+        hddLog(LOGE, FL("Modify ACL failed\n"));
         ret = -EIO;
     }
     EXIT();
@@ -1764,67 +2357,45 @@ static iw_softap_getassoc_stamacaddr(struct net_device *dev,
                         union iwreq_data *wrqu, char *extra)
 {
     hdd_adapter_t *pHostapdAdapter = (netdev_priv(dev));
+    unsigned int maclist_index;
     hdd_station_info_t *pStaInfo = pHostapdAdapter->aStaInfo;
-    char *buf;
-    int cnt = 0;
-    int left;
-    int ret = 0;
-    /* maclist_index must be u32 to match userspace */
-    u32 maclist_index;
+    char maclist_null = '\0';
+    int cnt = 0, len;
 
-    /*
-     * NOTE WELL: this is a "get" ioctl but it uses an even ioctl
-     * number, and even numbered iocts are supposed to have "set"
-     * semantics.  Hence the wireless extensions support in the kernel
-     * won't correctly copy the result to userspace, so the ioctl
-     * handler itself must copy the data.  Output format is 32-bit
-     * record length, followed by 0 or more 6-byte STA MAC addresses.
-     *
-     * Further note that due to the incorrect semantics, the "iwpriv"
-     * userspace application is unable to correctly invoke this API,
-     * hence it is not registered in the hostapd_private_args.  This
-     * API can only be invoked by directly invoking the ioctl() system
-     * call.
-     */
 
-    /* make sure userspace allocated a reasonable buffer size */
-    if (wrqu->data.length < sizeof(maclist_index)) {
-        hddLog(LOG1, "%s: invalid userspace buffer", __func__);
-        return -EINVAL;
-    }
+    maclist_index = sizeof(unsigned long int);
+    len = wrqu->data.length;
 
-    /* allocate local buffer to build the response */
-    buf = kmalloc(wrqu->data.length, GFP_KERNEL);
-    if (!buf) {
-        hddLog(LOG1, "%s: failed to allocate response buffer", __func__);
-        return -ENOMEM;
-    }
-
-    /* start indexing beyond where the record count will be written */
-    maclist_index = sizeof(maclist_index);
-    left = wrqu->data.length - maclist_index;
-
-    spin_lock_bh(&pHostapdAdapter->staInfo_lock);
-    while ((cnt < WLAN_MAX_STA_COUNT) && (left >= VOS_MAC_ADDR_SIZE)) {
-        if ((pStaInfo[cnt].isUsed) &&
-            (!IS_BROADCAST_MAC(pStaInfo[cnt].macAddrSTA.bytes))) {
-            memcpy(&buf[maclist_index], &(pStaInfo[cnt].macAddrSTA),
-                   VOS_MAC_ADDR_SIZE);
-            maclist_index += VOS_MAC_ADDR_SIZE;
-            left -= VOS_MAC_ADDR_SIZE;
+    spin_lock_bh( &pHostapdAdapter->staInfo_lock );
+    while((cnt < WLAN_MAX_STA_COUNT) && (len > (sizeof(v_MACADDR_t)+1))) {
+        if (TRUE == pStaInfo[cnt].isUsed) {
+            
+            if(!IS_BROADCAST_MAC(pStaInfo[cnt].macAddrSTA.bytes)) {
+                if (copy_to_user((void *)wrqu->data.pointer + maclist_index,
+                    (void *)&(pStaInfo[cnt].macAddrSTA), sizeof(v_MACADDR_t)))
+                {
+                    hddLog(LOG1, "%s: failed to copy data to user buffer", __func__);
+                    return -EFAULT;
+                }
+                maclist_index += sizeof(v_MACADDR_t);
+                len -= sizeof(v_MACADDR_t);
+            }
         }
         cnt++;
-    }
-    spin_unlock_bh(&pHostapdAdapter->staInfo_lock);
+    } 
+    spin_unlock_bh( &pHostapdAdapter->staInfo_lock );
 
-    *((u32 *)buf) = maclist_index;
-    wrqu->data.length = maclist_index;
-    if (copy_to_user(wrqu->data.pointer, buf, maclist_index)) {
-        hddLog(LOG1, "%s: failed to copy response to user buffer", __func__);
-        ret = -EFAULT;
+    if (copy_to_user((void *)wrqu->data.pointer + maclist_index,
+                     (void *)&maclist_null, sizeof(maclist_null)) ||
+        copy_to_user((void *)wrqu->data.pointer,
+                     (void *)&wrqu->data.length, sizeof(wrqu->data.length)))
+    {
+        hddLog(LOG1, "%s: failed to copy data to user buffer", __func__);
+        return -EFAULT;
     }
-    kfree(buf);
-    return ret;
+    wrqu->data.length -= len;
+
+    return 0;
 }
 
 /* Usage:
@@ -1854,8 +2425,9 @@ static iw_softap_disassoc_sta(struct net_device *dev,
      */
     peerMacAddr = (v_U8_t *)(extra);
 
-    hddLog(LOG1, "%s data "  MAC_ADDRESS_STR,
-           __func__, MAC_ADDR_ARRAY(peerMacAddr));
+    hddLog(LOG1, "data %02x:%02x:%02x:%02x:%02x:%02x",
+            peerMacAddr[0], peerMacAddr[1], peerMacAddr[2],
+            peerMacAddr[3], peerMacAddr[4], peerMacAddr[5]);
     hdd_softap_sta_disassoc(pHostapdAdapter, peerMacAddr);
     EXIT();
     return 0;
@@ -1926,9 +2498,9 @@ static iw_softap_commit(struct net_device *dev,
     pHostapdState = WLAN_HDD_GET_HOSTAP_STATE_PTR(pHostapdAdapter);
     pCommitConfig = (s_CommitConfig_t *)extra;
     
-    pConfig = (tsap_Config_t *)vos_mem_malloc(sizeof(tsap_Config_t));
+    pConfig = kmalloc(sizeof(tsap_Config_t), GFP_KERNEL);
     if(NULL == pConfig) {
-        hddLog(LOGE, FL("VOS unable to allocate memory"));
+        hddLog(LOG1, "VOS unable to allocate memory\n");
         return -ENOMEM;
     }
     pConfig->beacon_int =  pCommitConfig->beacon_int;
@@ -1997,7 +2569,7 @@ static iw_softap_commit(struct net_device *dev,
                  //TODO: Need to handle mixed mode     
                  pConfig->RSNEncryptType = RSNEncryptType; // Use the cipher type in the RSN IE
                  pConfig->mcRSNEncryptType = mcRSNEncryptType;
-                 hddLog( LOG1, FL("CSR AuthType = %d, EncryptionType = %d mcEncryptionType = %d"),
+                 hddLog( LOG1, FL("CSR AuthType = %d, EncryptionType = %d mcEncryptionType = %d\n"),
                                   RSNAuthType, RSNEncryptType, mcRSNEncryptType);
              } 
         }
@@ -2007,7 +2579,7 @@ static iw_softap_commit(struct net_device *dev,
         /* If no RSNIE, set encrypt type to NONE*/
         pConfig->RSNEncryptType = eCSR_ENCRYPT_TYPE_NONE;
         pConfig->mcRSNEncryptType =  eCSR_ENCRYPT_TYPE_NONE;
-        hddLog( LOG1, FL("EncryptionType = %d mcEncryptionType = %d"),
+        hddLog( LOG1, FL("EncryptionType = %d mcEncryptionType = %d\n"), 
                          pConfig->RSNEncryptType, pConfig->mcRSNEncryptType);
     }
 
@@ -2053,23 +2625,21 @@ static iw_softap_commit(struct net_device *dev,
     pConfig->obssProtEnabled = (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->apOBSSProtEnabled; 
     (WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter))->apDisableIntraBssFwd = (WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->apDisableIntraBssFwd;
     
-    hddLog(LOGW, FL("SOftAP macaddress : "MAC_ADDRESS_STR), MAC_ADDR_ARRAY(pHostapdAdapter->macAddressCurrent.bytes));
-    hddLog(LOGW,FL("ssid =%s, beaconint=%d, channel=%d"),
-                    pConfig->SSIDinfo.ssid.ssId,
-                    (int)pConfig->beacon_int, (int)pConfig->channel);
-    hddLog(LOGW,FL("hw_mode=%x, privacy=%d, authType=%d"),
-                    pConfig->SapHw_mode, pConfig->privacy, pConfig->authType);
-    hddLog(LOGW,FL("RSN/WPALen=%d, Uapsd = %d"),
-                    (int)pConfig->RSNWPAReqIELength, pConfig->UapsdEnable);
-    hddLog(LOGW,FL("ProtEnabled = %d, OBSSProtEnabled = %d, DisableIntraBssFwd = %d"),
-                    pConfig->protEnabled, pConfig->obssProtEnabled,
-                    (WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter))->apDisableIntraBssFwd);
+    hddLog(LOGW, FL("SOftAP macaddress : "MAC_ADDRESS_STR"\n"), MAC_ADDR_ARRAY(pHostapdAdapter->macAddressCurrent.bytes));
+    hddLog(LOGW,FL("ssid =%s\n"), pConfig->SSIDinfo.ssid.ssId);  
+    hddLog(LOGW,FL("beaconint=%d, channel=%d\n"), (int)pConfig->beacon_int, (int)pConfig->channel);
+    hddLog(LOGW,FL("hw_mode=%x\n"),  pConfig->SapHw_mode);
+    hddLog(LOGW,FL("privacy=%d, authType=%d\n"), pConfig->privacy, pConfig->authType); 
+    hddLog(LOGW,FL("RSN/WPALen=%d, \n"),(int)pConfig->RSNWPAReqIELength);
+    hddLog(LOGW,FL("Uapsd = %d\n"),pConfig->UapsdEnable); 
+    hddLog(LOGW,FL("ProtEnabled = %d, OBSSProtEnabled = %d\n"),pConfig->protEnabled, pConfig->obssProtEnabled); 
+    hddLog(LOGW,FL("DisableIntraBssFwd = %d\n"),(WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter))->apDisableIntraBssFwd); 
             
     pSapEventCallback = hdd_hostapd_SAPEventCB;
     pConfig->persona = pHostapdAdapter->device_mode;
     if(WLANSAP_StartBss(pVosContext, pSapEventCallback, pConfig,(v_PVOID_t)dev) != VOS_STATUS_SUCCESS)
     {
-           hddLog(LOGE,FL("SAP Start Bss fail"));
+           hddLog(LOGE,FL("SAP Start Bss fail\n"));
     }
     
     kfree(pConfig);
@@ -2079,15 +2649,13 @@ static iw_softap_commit(struct net_device *dev,
    
     if (!VOS_IS_STATUS_SUCCESS(vos_status))
     {  
-       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: HDD vos wait for single_event failed!!"));
+       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: HDD vos wait for single_event failed!!\n"));
        VOS_ASSERT(0);
     }
  
     pHostapdState->bCommit = TRUE;
     if(pHostapdState->vosStatus)
     {
-      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-           FL("pHostapdState->vosStatus: %d"), pHostapdState->vosStatus);
       return -EIO;
     }
     else
@@ -2153,7 +2721,7 @@ static int iw_softap_set_channel_range(struct net_device *dev,
     status = WLANSAP_SetChannelRange(hHal,startChannel,endChannel,band);
     if(status != VOS_STATUS_SUCCESS)
     {
-      hddLog( LOGE, FL("iw_softap_set_channel_range:  startChannel = %d, endChannel = %d band = %d"),
+      hddLog( LOGE, FL("iw_softap_set_channel_range:  startChannel = %d, endChannel = %d band = %d\n"), 
                                   startChannel,endChannel, band);
       ret = -EINVAL;
     }
@@ -2180,7 +2748,7 @@ int iw_softap_get_channel_list(struct net_device *dev,
 
     if (eHAL_STATUS_SUCCESS != sme_GetFreqBand(hHal, &curBand))
     {
-        hddLog(LOGE,FL("not able get the current frequency band"));
+        hddLog(LOGE,FL("not able get the current frequency band\n"));
         return -EIO;
     }
     wrqu->data.length = sizeof(tChannelListInfo);
@@ -2197,7 +2765,7 @@ int iw_softap_get_channel_list(struct net_device *dev,
         bandEndChannel = RF_CHAN_165;
     }
 
-    hddLog(LOG1, FL("curBand = %d, bandStartChannel = %hu, "
+    hddLog(LOG1, FL("\n curBand = %d, bandStartChannel = %hu, "
                 "bandEndChannel = %hu "), curBand,
                 bandStartChannel, bandEndChannel );
 
@@ -2216,7 +2784,7 @@ int iw_softap_get_channel_list(struct net_device *dev,
 
     if(eHAL_STATUS_SUCCESS != sme_getSoftApDomain(hHal,(v_REGDOMAIN_t *) &domainIdCurrentSoftap))
     {
-        hddLog(LOGE,FL("Failed to get Domain ID, %d"),domainIdCurrentSoftap);
+        hddLog(LOG1,FL("Failed to get Domain ID, %d \n"),domainIdCurrentSoftap);
         return -EIO;
     }
 
@@ -2238,7 +2806,7 @@ int iw_softap_get_channel_list(struct net_device *dev,
         }
     }
 
-    hddLog(LOG1,FL(" number of channels %d"), num_channels);
+    hddLog(LOG1,FL(" number of channels %d\n"), num_channels); 
 
     if (num_channels > IW_MAX_FREQUENCIES)
     {
@@ -2262,7 +2830,7 @@ int iw_get_genie(struct net_device *dev,
     v_U32_t length = DOT11F_IE_RSN_MAX_LEN;
     v_U8_t genIeBytes[DOT11F_IE_RSN_MAX_LEN];
     ENTER();
-    hddLog(LOG1,FL("getGEN_IE ioctl"));
+    hddLog(LOG1,FL("getGEN_IE ioctl\n"));
     // Actually retrieve the RSN IE from CSR.  (We previously sent it down in the CSR Roam Profile.)
     status = WLANSap_getstationIE_information(pVosContext, 
                                    &length,
@@ -2277,7 +2845,7 @@ int iw_get_genie(struct net_device *dev,
     }
     wrqu->data.length = length;
     
-    hddLog(LOG1,FL(" RSN IE of %d bytes returned"), wrqu->data.length );
+    hddLog(LOG1,FL(" RSN IE of %d bytes returned\n"), wrqu->data.length ); 
     
    
     EXIT();
@@ -2293,7 +2861,7 @@ int iw_get_WPSPBCProbeReqIEs(struct net_device *dev,
     hdd_ap_ctx_t *pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter);
     ENTER();
 
-    hddLog(LOG1,FL("get_WPSPBCProbeReqIEs ioctl"));
+    hddLog(LOG1,FL("get_WPSPBCProbeReqIEs ioctl\n"));
     memset((void*)&WPSPBCProbeReqIEs, 0, sizeof(WPSPBCProbeReqIEs));
 
     WPSPBCProbeReqIEs.probeReqIELen = pHddApCtx->WPSPBCProbeReq.probeReqIELen;
@@ -2311,7 +2879,7 @@ int iw_get_WPSPBCProbeReqIEs(struct net_device *dev,
          return -EFAULT;
     }
     wrqu->data.length = 12 + WPSPBCProbeReqIEs.probeReqIELen;
-    hddLog(LOG1, FL("Macaddress : "MAC_ADDRESS_STR),
+    hddLog(LOG1, FL("Macaddress : "MAC_ADDRESS_STR"\n"),
            MAC_ADDR_ARRAY(WPSPBCProbeReqIEs.macaddr));
     up(&pHddApCtx->semWpsPBCOverlapInd);
     EXIT();
@@ -2427,9 +2995,9 @@ static int iw_set_ap_encodeext(struct net_device *dev,
               RemoveKey.encType = eCSR_ENCRYPT_TYPE_NONE;
               break;
          }
-         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: Remove key cipher_alg:%d key_len%d *pEncryptionType :%d",
+         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: Remove key cipher_alg:%d key_len%d *pEncryptionType :%d \n",
                     __func__,(int)ext->alg,(int)ext->key_len,RemoveKey.encType);
-         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: Peer Mac = "MAC_ADDRESS_STR,
+         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: Peer Mac = "MAC_ADDRESS_STR"\n",
                     __func__, MAC_ADDR_ARRAY(RemoveKey.peerMac));
           );
          vstatus = WLANSAP_DelKeySta( pVosContext, &RemoveKey);
@@ -2534,6 +3102,8 @@ static int iw_set_ap_encodeext(struct net_device *dev,
     for(i=0; i< ext->key_len; i++)
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
           ("%02x"), setKey.Key[i]);    
+    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+          ("\n"));
 
     vstatus = WLANSAP_SetKeySta( pVosContext, &setKey);
     if ( vstatus != VOS_STATUS_SUCCESS )
@@ -2575,7 +3145,7 @@ static int iw_set_ap_mlme(struct net_device *dev,
                 //clear all the reason codes
                 if (status != 0)
                 {
-                    hddLog(LOGE,"%s %d Command Disassociate/Deauthenticate : csrRoamDisconnect failure returned %d", __func__, (int)mlme->cmd, (int)status);
+                    hddLog(LOGE,"%s %d Command Disassociate/Deauthenticate : csrRoamDisconnect failure returned %d \n", __func__, (int)mlme->cmd, (int)status );
                 }
                 
                netif_stop_queue(dev);
@@ -2583,10 +3153,10 @@ static int iw_set_ap_mlme(struct net_device *dev,
             }
             else
             {
-                hddLog(LOGE,"%s %d Command Disassociate/Deauthenticate called but station is not in associated state", __func__, (int)mlme->cmd);
+                hddLog(LOGE,"%s %d Command Disassociate/Deauthenticate called but station is not in associated state \n", __func__, (int)mlme->cmd );
             }
         default:
-            hddLog(LOGE,"%s %d Command should be Disassociate/Deauthenticate", __func__, (int)mlme->cmd);
+            hddLog(LOGE,"%s %d Command should be Disassociate/Deauthenticate \n", __func__, (int)mlme->cmd );
             return -EINVAL;
     }//end of switch
     EXIT();
@@ -2644,8 +3214,6 @@ static int iw_get_ap_freq(struct net_device *dev, struct iw_request_info *info,
        if (ccmCfgGetInt(hHal, WNI_CFG_CURRENT_CHANNEL, &channel)
                                                   != eHAL_STATUS_SUCCESS)
        {
-            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                FL("failed to get WNI_CFG_CURRENT_CHANNEL from cfg"));
            return -EIO;
        }
        else
@@ -2727,13 +3295,13 @@ static int iw_softap_setwpsie(struct net_device *dev,
    pSap_WPSIe = vos_mem_malloc(sizeof(tSap_WPSIE));
    if (NULL == pSap_WPSIe) 
    {
-      hddLog(LOGE, "VOS unable to allocate memory");
+      hddLog(LOGE, "VOS unable to allocate memory\n");
       kfree(fwps_genie);
       return -ENOMEM;
    }
    vos_mem_zero(pSap_WPSIe, sizeof(tSap_WPSIE));
  
-   hddLog(LOG1,"%s WPS IE type[0x%X] IE[0x%X], LEN[%d]", __func__, wps_genie[0], wps_genie[1], wps_genie[2]);
+   hddLog(LOG1,"%s WPS IE type[0x%X] IE[0x%X], LEN[%d]\n", __func__, wps_genie[0], wps_genie[1], wps_genie[2]);
    WPSIeType = wps_genie[0];
    if ( wps_genie[0] == eQC_WPS_BEACON_IE)
    {
@@ -2759,7 +3327,7 @@ static int iw_softap_setwpsie(struct net_device *dev,
                    case HDD_WPS_ELEM_VERSION:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.Version = *pos;   
-                      hddLog(LOG1, "WPS version %d", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.Version);
+                      hddLog(LOG1, "WPS version %d\n", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.Version);
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.FieldPresent |= WPS_BEACON_VER_PRESENT;   
                       pos += 1;
                       break;
@@ -2767,35 +3335,35 @@ static int iw_softap_setwpsie(struct net_device *dev,
                    case HDD_WPS_ELEM_WPS_STATE:
                       pos +=4;
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.wpsState = *pos;
-                      hddLog(LOG1, "WPS State %d", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.wpsState);
+                      hddLog(LOG1, "WPS State %d\n", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.wpsState);
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.FieldPresent |= WPS_BEACON_STATE_PRESENT;
                       pos += 1;
                       break;
                    case HDD_WPS_ELEM_APSETUPLOCK:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.APSetupLocked = *pos;
-                      hddLog(LOG1, "AP setup lock %d", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.APSetupLocked);
+                      hddLog(LOG1, "AP setup lock %d\n", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.APSetupLocked);
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.FieldPresent |= WPS_BEACON_APSETUPLOCK_PRESENT;
                       pos += 1;
                       break;
                    case HDD_WPS_ELEM_SELECTEDREGISTRA:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.SelectedRegistra = *pos;
-                      hddLog(LOG1, "Selected Registra %d", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.SelectedRegistra);
+                      hddLog(LOG1, "Selected Registra %d\n", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.SelectedRegistra);
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.FieldPresent |= WPS_BEACON_SELECTEDREGISTRA_PRESENT;
                       pos += 1;
                       break;
                    case HDD_WPS_ELEM_DEVICE_PASSWORD_ID:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.DevicePasswordID = (*pos<<8) | *(pos+1);
-                      hddLog(LOG1, "Password ID: %x", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.DevicePasswordID);
+                      hddLog(LOG1, "Password ID: %x\n", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.DevicePasswordID);
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.FieldPresent |= WPS_BEACON_DEVICEPASSWORDID_PRESENT;
                       pos += 2; 
                       break;
                    case HDD_WPS_ELEM_REGISTRA_CONF_METHODS:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.SelectedRegistraCfgMethod = (*pos<<8) | *(pos+1);
-                      hddLog(LOG1, "Select Registra Config Methods: %x", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.SelectedRegistraCfgMethod);
+                      hddLog(LOG1, "Select Registra Config Methods: %x\n", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.SelectedRegistraCfgMethod);
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.FieldPresent |= WPS_BEACON_SELECTEDREGISTRACFGMETHOD_PRESENT;
                       pos += 2; 
                       break;
@@ -2811,13 +3379,13 @@ static int iw_softap_setwpsie(struct net_device *dev,
                    case HDD_WPS_ELEM_RF_BANDS:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.RFBand = *pos;
-                      hddLog(LOG1, "RF band: %d", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.RFBand);
+                      hddLog(LOG1, "RF band: %d\n", pSap_WPSIe->sapwpsie.sapWPSBeaconIE.RFBand);
                       pSap_WPSIe->sapwpsie.sapWPSBeaconIE.FieldPresent |= WPS_BEACON_RF_BANDS_PRESENT;
                       pos += 1;
                       break;
                    
                    default:
-                      hddLog (LOGW, "UNKNOWN TLV in WPS IE(%x)", (*pos<<8 | *(pos+1)));
+                      hddLog (LOGW, "UNKNOWN TLV in WPS IE(%x)\n", (*pos<<8 | *(pos+1)));
                       vos_mem_free(pSap_WPSIe);
                       kfree(fwps_genie);
                       return -EINVAL; 
@@ -2861,7 +3429,7 @@ static int iw_softap_setwpsie(struct net_device *dev,
                    case HDD_WPS_ELEM_VERSION:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.Version = *pos;   
-                      hddLog(LOG1, "WPS version %d", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.Version);
+                      hddLog(LOG1, "WPS version %d\n", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.Version); 
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_VER_PRESENT;   
                       pos += 1;
                       break;
@@ -2869,42 +3437,42 @@ static int iw_softap_setwpsie(struct net_device *dev,
                    case HDD_WPS_ELEM_WPS_STATE:
                       pos +=4;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.wpsState = *pos;
-                      hddLog(LOG1, "WPS State %d", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.wpsState);
+                      hddLog(LOG1, "WPS State %d\n", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.wpsState);
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_STATE_PRESENT;
                       pos += 1;
                       break;
                    case HDD_WPS_ELEM_APSETUPLOCK:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.APSetupLocked = *pos;
-                      hddLog(LOG1, "AP setup lock %d", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.APSetupLocked);
+                      hddLog(LOG1, "AP setup lock %d\n", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.APSetupLocked);
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_APSETUPLOCK_PRESENT;
                       pos += 1;
                       break;
                    case HDD_WPS_ELEM_SELECTEDREGISTRA:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.SelectedRegistra = *pos;
-                      hddLog(LOG1, "Selected Registra %d", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.SelectedRegistra);
+                      hddLog(LOG1, "Selected Registra %d\n", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.SelectedRegistra);
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_SELECTEDREGISTRA_PRESENT;                      
                       pos += 1;
                       break;
                    case HDD_WPS_ELEM_DEVICE_PASSWORD_ID:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.DevicePasswordID = (*pos<<8) | *(pos+1);
-                      hddLog(LOG1, "Password ID: %d", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.DevicePasswordID);
+                      hddLog(LOG1, "Password ID: %d\n", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.DevicePasswordID);
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_DEVICEPASSWORDID_PRESENT;
                       pos += 2; 
                       break;
                    case HDD_WPS_ELEM_REGISTRA_CONF_METHODS:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.SelectedRegistraCfgMethod = (*pos<<8) | *(pos+1);
-                      hddLog(LOG1, "Select Registra Config Methods: %x", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.SelectedRegistraCfgMethod);
+                      hddLog(LOG1, "Select Registra Config Methods: %x\n", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.SelectedRegistraCfgMethod);
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_SELECTEDREGISTRACFGMETHOD_PRESENT;
                       pos += 2; 
                       break;
                   case HDD_WPS_ELEM_RSP_TYPE:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.ResponseType = *pos;
-                      hddLog(LOG1, "Config Methods: %d", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.ResponseType);
+                      hddLog(LOG1, "Config Methods: %d\n", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.ResponseType);
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_RESPONSETYPE_PRESENT;
                       pos += 1;
                       break;
@@ -2957,14 +3525,14 @@ static int iw_softap_setwpsie(struct net_device *dev,
                    case HDD_WPS_ELEM_PRIMARY_DEVICE_TYPE:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.PrimaryDeviceCategory = (*pos<<8 | *(pos+1));
-                      hddLog(LOG1, "primary dev category: %d", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.PrimaryDeviceCategory);
+                      hddLog(LOG1, "primary dev category: %d\n", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.PrimaryDeviceCategory);  
                       pos += 2;
                       
                       vos_mem_copy(pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.PrimaryDeviceOUI, pos, HDD_WPS_DEVICE_OUI_LEN);
-                      hddLog(LOG1, "primary dev oui: %02x, %02x, %02x, %02x", pos[0], pos[1], pos[2], pos[3]);
+                      hddLog(LOG1, "primary dev oui: %02x, %02x, %02x, %02x\n", pos[0], pos[1], pos[2], pos[3]);
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.DeviceSubCategory = (*pos<<8 | *(pos+1));
-                      hddLog(LOG1, "primary dev sub category: %d", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.DeviceSubCategory);
+                      hddLog(LOG1, "primary dev sub category: %d\n", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.DeviceSubCategory);  
                       pos += 2;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_PRIMARYDEVICETYPE_PRESENT;                      
                       break;
@@ -2980,7 +3548,7 @@ static int iw_softap_setwpsie(struct net_device *dev,
                    case HDD_WPS_ELEM_CONFIG_METHODS:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.ConfigMethod = (*pos<<8) | *(pos+1);
-                      hddLog(LOG1, "Config Methods: %d", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.SelectedRegistraCfgMethod);
+                      hddLog(LOG1, "Config Methods: %d\n", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.SelectedRegistraCfgMethod);
                       pos += 2; 
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_CONFIGMETHODS_PRESENT;
                       break;
@@ -2988,7 +3556,7 @@ static int iw_softap_setwpsie(struct net_device *dev,
                    case HDD_WPS_ELEM_RF_BANDS:
                       pos += 4;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.RFBand = *pos;
-                      hddLog(LOG1, "RF band: %d", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.RFBand);
+                      hddLog(LOG1, "RF band: %d\n", pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.RFBand);
                       pos += 1;
                       pSap_WPSIe->sapwpsie.sapWPSProbeRspIE.FieldPresent |= WPS_PROBRSP_RF_BANDS_PRESENT;
                       break;
@@ -3036,7 +3604,7 @@ static int iw_softap_stopbss(struct net_device *dev,
             if (!VOS_IS_STATUS_SUCCESS(status))
             {  
                 VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, 
-                         ("ERROR: HDD vos wait for single_event failed!!"));
+                         ("ERROR: HDD vos wait for single_event failed!!\n"));
                 VOS_ASSERT(0);
             }
         }
@@ -3103,7 +3671,7 @@ static int iw_softap_get_sta_info(struct net_device *dev,
     ENTER();
     status = hdd_softap_get_sta_info(pHostapdAdapter, extra, WE_SAP_MAX_STA_INFO);
     if ( !VOS_IS_STATUS_SUCCESS( status ) ) {
-       hddLog(VOS_TRACE_LEVEL_ERROR, "%s Failed!!!",__func__);
+       hddLog(VOS_TRACE_LEVEL_ERROR, "%s Failed!!!\n",__func__);
        return -EINVAL;
     }
     wrqu->data.length = strlen(extra);
@@ -3160,7 +3728,7 @@ static VOS_STATUS  wlan_hdd_get_classAstats_for_station(hdd_adapter_t *pAdapter,
 
    if (NULL == pAdapter)
    {
-      hddLog(VOS_TRACE_LEVEL_ERROR,"%s: pAdapter is NULL", __func__);
+      hddLog(VOS_TRACE_LEVEL_ERROR,"%s: Padapter is NULL", __func__);
       return VOS_STATUS_E_FAULT;
    }
 
@@ -3185,29 +3753,15 @@ static VOS_STATUS  wlan_hdd_get_classAstats_for_station(hdd_adapter_t *pAdapter,
    {
       lrc = wait_for_completion_interruptible_timeout(&context.completion,
             msecs_to_jiffies(WLAN_WAIT_TIME_STATS));
+      context.magic = 0;
       if (lrc <= 0)
       {
          hddLog(VOS_TRACE_LEVEL_ERROR,
                "%s: SME %s while retrieving link speed",
               __func__, (0 == lrc) ? "timeout" : "interrupt");
+         msleep(50);
       }
    }
-
-   /* either we never sent a request, we sent a request and received a
-      response or we sent a request and timed out.  if we never sent a
-      request or if we sent a request and got a response, we want to
-      clear the magic out of paranoia.  if we timed out there is a
-      race condition such that the callback function could be
-      executing at the same time we are. of primary concern is if the
-      callback function had already verified the "magic" but had not
-      yet set the completion variable when a timeout occurred. we
-      serialize these activities by invalidating the magic while
-      holding a shared spinlock which will cause us to block if the
-      callback is currently executing */
-   spin_lock(&hdd_context_lock);
-   context.magic = 0;
-   spin_unlock(&hdd_context_lock);
-
    return VOS_STATUS_SUCCESS;
 }
 
@@ -3225,7 +3779,7 @@ int iw_get_softap_linkspeed(struct net_device *dev,
    unsigned short staId;
    int len = sizeof(v_U32_t)+1;
    v_BYTE_t macAddress[VOS_MAC_ADDR_SIZE];
-   VOS_STATUS status = VOS_STATUS_E_FAILURE;
+   VOS_STATUS status;
    int rc, valid;
 
    pHddCtx = WLAN_HDD_GET_CTX(pHostapdAdapter);
@@ -3238,36 +3792,37 @@ int iw_get_softap_linkspeed(struct net_device *dev,
        return valid;
    }
 
-   hddLog(VOS_TRACE_LEVEL_INFO, "%s wrqu->data.length= %d", __func__, wrqu->data.length);
-
-   if (wrqu->data.length >= MAC_ADDRESS_STR_LEN - 1)
+   hddLog(VOS_TRACE_LEVEL_INFO, "%s wrqu->data.length= %d\n", __func__, wrqu->data.length);
+   if (wrqu->data.length != MAC_ADDRESS_STR_LEN)
    {
-       pmacAddress = kmalloc(MAC_ADDRESS_STR_LEN, GFP_KERNEL);
-       if (NULL == pmacAddress) {
-           hddLog(LOG1, "unable to allocate memory");
-           return -ENOMEM;
-       }
-       if (copy_from_user((void *)pmacAddress,
-          wrqu->data.pointer, MAC_ADDRESS_STR_LEN))
-       {
-           hddLog(LOG1, "%s: failed to copy data to user buffer", __func__);
-           kfree(pmacAddress);
-           return -EFAULT;
-       }
-       pmacAddress[MAC_ADDRESS_STR_LEN] = '\0';
-
-       status = hdd_string_to_hex (pmacAddress, MAC_ADDRESS_STR_LEN, macAddress );
-       kfree(pmacAddress);
-
-       if (!VOS_IS_STATUS_SUCCESS(status ))
-       {
-           hddLog(VOS_TRACE_LEVEL_ERROR, FL("String to Hex conversion Failed"));
-       }
+       hddLog(LOG1, "Invalid length");
+       return -EINVAL;
    }
+   pmacAddress = kmalloc(MAC_ADDRESS_STR_LEN, GFP_KERNEL);
+   if(NULL == pmacAddress) {
+       hddLog(LOG1, "unable to allocate memory");
+       return -ENOMEM;
+   }
+   if (copy_from_user((void *)pmacAddress,
+       wrqu->data.pointer, wrqu->data.length))
+   {
+       hddLog(LOG1, "%s: failed to copy data to user buffer", __func__);
+       kfree(pmacAddress);
+       return -EFAULT;
+   }
+
+   status = hdd_string_to_hex (pmacAddress, wrqu->data.length, macAddress );
+   kfree(pmacAddress);
+
+   if (!VOS_IS_STATUS_SUCCESS(status ))
+   {
+      hddLog(VOS_TRACE_LEVEL_ERROR, FL("String to Hex conversion Failed"));
+   }
+
    /* If no mac address is passed and/or its length is less than 17,
     * link speed for first connected client will be returned.
     */
-   if (wrqu->data.length < 17 || !VOS_IS_STATUS_SUCCESS(status ))
+   if (!VOS_IS_STATUS_SUCCESS(status ) || wrqu->data.length < 17)
    {
       status = hdd_softap_GetConnectedStaId(pHostapdAdapter, (void *)(&staId));
    }
@@ -3380,12 +3935,9 @@ static const iw_handler      hostapd_handler[] =
    (iw_handler) NULL,           /* SIOCSIWPMKSA */
 };
 
-/*
- * Note that the following ioctls were defined with semantics which
- * cannot be handled by the "iwpriv" userspace application and hence
- * they are not included in the hostapd_private_args array
- *     QCSAP_IOCTL_ASSOC_STA_MACADDR
- */
+#define    IW_PRIV_TYPE_OPTIE    (IW_PRIV_TYPE_BYTE | QCSAP_MAX_OPT_IE)
+#define    IW_PRIV_TYPE_MLME \
+  (IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_mlme))
 
 static const struct iw_priv_args hostapd_private_args[] = {
   { QCSAP_IOCTL_SETPARAM,
@@ -3430,10 +3982,12 @@ static const struct iw_priv_args hostapd_private_args[] = {
   { QCSAP_IOCTL_GET_STA_INFO, 0,
       IW_PRIV_TYPE_CHAR | WE_SAP_MAX_STA_INFO, "get_sta_info" },
   { QCSAP_IOCTL_GET_WPS_PBC_PROBE_REQ_IES,
-      IW_PRIV_TYPE_BYTE | sizeof(sQcSapreq_WPSPBCProbeReqIES_t) | IW_PRIV_SIZE_FIXED, 0, "getProbeReqIEs" },
+      IW_PRIV_TYPE_BYTE | sizeof(sQcSapreq_WPSPBCProbeReqIES_t) | IW_PRIV_SIZE_FIXED | 1, 0, "getProbeReqIEs" },
   { QCSAP_IOCTL_GET_CHANNEL, 0,
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "getchannel" },
-  { QCSAP_IOCTL_DISASSOC_STA,
+  { QCSAP_IOCTL_ASSOC_STA_MACADDR, 0,
+      IW_PRIV_TYPE_BYTE | /*((WLAN_MAX_STA_COUNT*6)+100)*/1 , "get_assoc_stamac" },
+    { QCSAP_IOCTL_DISASSOC_STA,
         IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 6 , 0, "disassoc_sta" },
   { QCSAP_IOCTL_AP_STATS,
         IW_PRIV_TYPE_BYTE | QCSAP_MAX_WSC_IE, 0, "ap_stats" },
@@ -3591,30 +4145,11 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
     struct net_device *dev = pAdapter->dev;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     VOS_STATUS status;
-#ifdef FEATURE_WLAN_CH_AVOID
-    v_CONTEXT_t pVosContext = (WLAN_HDD_GET_CTX(pAdapter))->pvosContext;
-    v_U16_t unsafeChannelList[NUM_20MHZ_RF_CHANNELS];
-    v_U16_t unsafeChannelCount;
-#endif /* FEATURE_WLAN_CH_AVOID */
-
     ENTER();
        // Allocate the Wireless Extensions state structure   
     phostapdBuf = WLAN_HDD_GET_HOSTAP_STATE_PTR( pAdapter );
  
     sme_SetCurrDeviceMode(pHddCtx->hHal, pAdapter->device_mode);
-
-#ifdef FEATURE_WLAN_CH_AVOID
-    /* Get unsafe cahnnel list from cached location */
-    wcnss_get_wlan_unsafe_channel(unsafeChannelList,
-                                  sizeof(unsafeChannelList),
-                                  &unsafeChannelCount);
-    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-              "%s : Unsafe Channel count %d",
-              __func__, unsafeChannelCount);
-    hdd_hostapd_update_unsafe_channel_list(pVosContext,
-                                  unsafeChannelList,
-                                  unsafeChannelCount);
-#endif /* FEATURE_WLAN_CH_AVOID */
 
     // Zero the memory.  This zeros the profile structure.
     memset(phostapdBuf, 0,sizeof(hdd_hostapd_state_t));
@@ -3623,14 +4158,14 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
     // NOP
     status = hdd_set_hostapd(pAdapter);
     if(!VOS_IS_STATUS_SUCCESS(status)) {
-         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: hdd_set_hostapd failed!!"));
+         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: hdd_set_hostapd failed!!\n"));
          return status;
     }
  
     status = vos_event_init(&phostapdBuf->vosEvent);
     if (!VOS_IS_STATUS_SUCCESS(status))
     {
-         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: Hostapd HDD vos event init failed!!"));
+         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, ("ERROR: Hostapd HDD vos event init failed!!\n"));
          return status;
     }
     
@@ -3715,7 +4250,6 @@ hdd_adapter_t* hdd_wlan_create_ap_dev( hdd_context_t *pHddCtx, tSirMacAddr macAd
         init_completion(&pHostapdAdapter->tx_action_cnf_event);
         init_completion(&pHostapdAdapter->cancel_rem_on_chan_var);
         init_completion(&pHostapdAdapter->rem_on_chan_ready_event);
-        init_completion(&pHostapdAdapter->ula_complete);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
         init_completion(&pHostapdAdapter->offchannel_tx_event);
 #endif

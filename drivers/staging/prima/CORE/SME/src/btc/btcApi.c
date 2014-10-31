@@ -952,10 +952,13 @@ static VOS_STATUS btcDeferAclComplete( tpAniSirGlobal pMac, tpSmeBtEvent pEvent 
         }
         else
         {
-            smsLog(pMac, LOGE, FL(" cannot find match for failed "
-                   "BT_EVENT_ACL_CONNECTION_COMPLETE of bdAddr "
-                   MAC_ADDRESS_STR),
-                   MAC_ADDR_ARRAY(pEvent->uEventParam.btAclConnection.bdAddr));
+            smsLog( pMac, LOGE, FL(" cannot find match for failed BT_EVENT_ACL_CONNECTION_COMPLETE of bdAddr (%02X-%02X-%02X-%02X-%02X-%02X)"),
+                pEvent->uEventParam.btAclConnection.bdAddr[0],
+                pEvent->uEventParam.btAclConnection.bdAddr[1],
+                pEvent->uEventParam.btAclConnection.bdAddr[2],
+                pEvent->uEventParam.btAclConnection.bdAddr[3],
+                pEvent->uEventParam.btAclConnection.bdAddr[4],
+                pEvent->uEventParam.btAclConnection.bdAddr[5]);
             status = VOS_STATUS_E_EMPTY;
         }
     }while(0);
@@ -1117,10 +1120,13 @@ static VOS_STATUS btcDeferSyncComplete( tpAniSirGlobal pMac, tpSmeBtEvent pEvent
         }
         else
         {
-            smsLog(pMac, LOGE, FL(" cannot find match for "
-                   "BT_EVENT_SYNC_CONNECTION_COMPLETE of bdAddr "
-                   MAC_ADDRESS_STR),
-                   MAC_ADDR_ARRAY(pEvent->uEventParam.btSyncConnection.bdAddr));
+            smsLog( pMac, LOGE, FL(" cannot find match for BT_EVENT_SYNC_CONNECTION_COMPLETE of bdAddr (%02X-%02X-%02X-%02X-%02X-%02X)"),
+                pEvent->uEventParam.btSyncConnection.bdAddr[0],
+                pEvent->uEventParam.btSyncConnection.bdAddr[1],
+                pEvent->uEventParam.btSyncConnection.bdAddr[2],
+                pEvent->uEventParam.btSyncConnection.bdAddr[3],
+                pEvent->uEventParam.btSyncConnection.bdAddr[4],
+                pEvent->uEventParam.btSyncConnection.bdAddr[5]);
             status = VOS_STATUS_E_EMPTY;
         }
     }while(0);
@@ -1672,7 +1678,6 @@ static void btcPowerStateCB( v_PVOID_t pContext, tPmcState pmcState )
   ---------------------------------------------------------------------------*/
 static void btcLogEvent (tHalHandle hHal, tpSmeBtEvent pBtEvent)
 {
-   v_U8_t bdAddrRev[6];
    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: "
                "Bluetooth Event %d received", __func__, pBtEvent->btEventType);
    switch(pBtEvent->btEventType)
@@ -1689,16 +1694,14 @@ static void btcLogEvent (tHalHandle hHal, tpSmeBtEvent pBtEvent)
                pBtEvent->uEventParam.btSyncConnection.scoInterval,
                pBtEvent->uEventParam.btSyncConnection.scoWindow,
                pBtEvent->uEventParam.btSyncConnection.retransmisisonWindow);
-
-          bdAddrRev[0] = pBtEvent->uEventParam.btSyncConnection.bdAddr[5];
-          bdAddrRev[1] = pBtEvent->uEventParam.btSyncConnection.bdAddr[4];
-          bdAddrRev[2] = pBtEvent->uEventParam.btSyncConnection.bdAddr[3];
-          bdAddrRev[3] = pBtEvent->uEventParam.btSyncConnection.bdAddr[2];
-          bdAddrRev[4] = pBtEvent->uEventParam.btSyncConnection.bdAddr[1];
-          bdAddrRev[5] = pBtEvent->uEventParam.btSyncConnection.bdAddr[0];
-
           VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "BD ADDR = "
-                    MAC_ADDRESS_STR, MAC_ADDR_ARRAY(bdAddrRev));
+               "0x%x 0x%x 0x%x 0x%x 0x%x 0x%x",
+               pBtEvent->uEventParam.btSyncConnection.bdAddr[5],
+               pBtEvent->uEventParam.btSyncConnection.bdAddr[4],
+               pBtEvent->uEventParam.btSyncConnection.bdAddr[3],
+               pBtEvent->uEventParam.btSyncConnection.bdAddr[2],
+               pBtEvent->uEventParam.btSyncConnection.bdAddr[1],
+               pBtEvent->uEventParam.btSyncConnection.bdAddr[0]);
           break;
       case BT_EVENT_CREATE_ACL_CONNECTION:
       case BT_EVENT_ACL_CONNECTION_COMPLETE:
@@ -1706,16 +1709,14 @@ static void btcLogEvent (tHalHandle hHal, tpSmeBtEvent pBtEvent)
                "connectionHandle = %d status = %d ",
                pBtEvent->uEventParam.btAclConnection.connectionHandle,
                pBtEvent->uEventParam.btAclConnection.status);
-
-          bdAddrRev[0] = pBtEvent->uEventParam.btAclConnection.bdAddr[5];
-          bdAddrRev[1] = pBtEvent->uEventParam.btAclConnection.bdAddr[4];
-          bdAddrRev[2] = pBtEvent->uEventParam.btAclConnection.bdAddr[3];
-          bdAddrRev[3] = pBtEvent->uEventParam.btAclConnection.bdAddr[2];
-          bdAddrRev[4] = pBtEvent->uEventParam.btAclConnection.bdAddr[1];
-          bdAddrRev[5] = pBtEvent->uEventParam.btAclConnection.bdAddr[0];
-
           VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "BD ADDR = "
-                    MAC_ADDRESS_STR, MAC_ADDR_ARRAY(bdAddrRev));
+               "0x%x 0x%x 0x%x 0x%x 0x%x 0x%x",
+               pBtEvent->uEventParam.btAclConnection.bdAddr[5],
+               pBtEvent->uEventParam.btAclConnection.bdAddr[4],
+               pBtEvent->uEventParam.btAclConnection.bdAddr[3],
+               pBtEvent->uEventParam.btAclConnection.bdAddr[2],
+               pBtEvent->uEventParam.btAclConnection.bdAddr[1],
+               pBtEvent->uEventParam.btAclConnection.bdAddr[0]);
           break;
       case BT_EVENT_MODE_CHANGED:
           VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "ACL Mode change : "
@@ -1971,10 +1972,13 @@ eHalStatus btcHandleCoexInd(tHalHandle hHal, void* pMsg)
              pMac->btc.btcBssfordisableaggr[3] = pSmeCoexInd->coexIndData[1]  >> 8;
              pMac->btc.btcBssfordisableaggr[4] = pSmeCoexInd->coexIndData[2] & 0xFF;
              pMac->btc.btcBssfordisableaggr[5] = pSmeCoexInd->coexIndData[2] >> 8;
-             smsLog(pMac, LOGW, "Coex indication in %s(), "
-                    "type - SIR_COEX_IND_TYPE_DISABLE_AGGREGATION_IN_2p4 "
-                    "for BSSID "MAC_ADDRESS_STR,__func__,
-                    MAC_ADDR_ARRAY(pMac->btc.btcBssfordisableaggr));
+             smsLog(pMac, LOGW,
+             "Coex indication in %s(), \
+              type - SIR_COEX_IND_TYPE_DISABLE_AGGREGATION_IN_2p4 \
+              for BSSID %02x:%02x:%02x:%02x:%02x:%02x",__func__,
+              pMac->btc.btcBssfordisableaggr[0],pMac->btc.btcBssfordisableaggr[1],
+              pMac->btc.btcBssfordisableaggr[2],pMac->btc.btcBssfordisableaggr[3],
+              pMac->btc.btcBssfordisableaggr[4],pMac->btc.btcBssfordisableaggr[5]);
          }
      }
      else if (pSmeCoexInd->coexIndType == SIR_COEX_IND_TYPE_ENABLE_AGGREGATION_IN_2p4)

@@ -78,7 +78,7 @@ wpt_status wpalMutexInit(wpt_mutex *pMutex)
    if( vos_lock_init( (vos_lock_t*)pMutex  ) != VOS_STATUS_SUCCESS )
    {
       WPAL_TRACE(eWLAN_MODULE_PAL, eWLAN_PAL_TRACE_LEVEL_ERROR, 
-                 " mutex init fail");
+                 " mutex init fail\n");
       return eWLAN_PAL_STATUS_E_FAILURE;
    }
 
@@ -99,7 +99,7 @@ wpt_status wpalMutexDelete(wpt_mutex *pMutex)
    if( vos_lock_destroy( (vos_lock_t*)pMutex  ) != VOS_STATUS_SUCCESS )
    {
       WPAL_TRACE(eWLAN_MODULE_PAL, eWLAN_PAL_TRACE_LEVEL_ERROR, 
-                 " mutex delete fail");
+                 " mutex delete fail\n");
       return eWLAN_PAL_STATUS_E_FAILURE;
    }
 
@@ -120,7 +120,7 @@ wpt_status wpalMutexAcquire(wpt_mutex *pMutex)
    if( vos_lock_acquire( (vos_lock_t*)pMutex  ) != VOS_STATUS_SUCCESS )
    {
       WPAL_TRACE(eWLAN_MODULE_PAL, eWLAN_PAL_TRACE_LEVEL_ERROR, 
-                 " mutex acquire fail");
+                 " mutex acquire fail\n");
       return eWLAN_PAL_STATUS_E_FAILURE;
    }
 
@@ -141,7 +141,7 @@ wpt_status wpalMutexRelease(wpt_mutex *pMutex)
    if( vos_lock_release( (vos_lock_t*)pMutex ) != VOS_STATUS_SUCCESS )
    {
       WPAL_TRACE(eWLAN_MODULE_PAL, eWLAN_PAL_TRACE_LEVEL_ERROR, 
-                 " mutex release");
+                 " mutex release\n");
       return eWLAN_PAL_STATUS_E_FAILURE;
    }
 
@@ -162,7 +162,7 @@ wpt_status wpalEventInit(wpt_event *pEvent)
    if( vos_event_init( (vos_event_t*)pEvent ) != VOS_STATUS_SUCCESS )
    {
       WPAL_TRACE(eWLAN_MODULE_PAL, eWLAN_PAL_TRACE_LEVEL_ERROR, 
-                 " create event fail");
+                 " create event fail\n");
       return eWLAN_PAL_STATUS_E_FAILURE;
    }
 
@@ -184,7 +184,7 @@ wpt_status wpalEventDelete(wpt_event *pEvent)
    if( vos_event_destroy( (vos_event_t*)pEvent ) != VOS_STATUS_SUCCESS )
    {
       WPAL_TRACE(eWLAN_MODULE_PAL, eWLAN_PAL_TRACE_LEVEL_ERROR, 
-                 " delete event fail");
+                 " delete event fail\n");
       return eWLAN_PAL_STATUS_E_FAILURE;
    }
 

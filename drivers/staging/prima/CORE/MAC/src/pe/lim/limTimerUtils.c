@@ -694,6 +694,21 @@ limCreateTimers(tpAniSirGlobal pMac)
 
     cfgValue = 1000;
     cfgValue = SYS_MS_TO_TICKS(cfgValue);
+    if (tx_timer_create(&pMac->lim.limTimers.gLimRemainOnChannelTimer,
+                                    "FT PREAUTH RSP TIMEOUT",
+                                    limTimerHandler, SIR_LIM_REMAIN_CHN_TIMEOUT,
+                                    cfgValue, 0,
+                                    TX_NO_ACTIVATE) != TX_SUCCESS)
+    {
+        // Could not create Join failure timer.
+        // Log error
+        limLog(pMac, LOGP, FL("could not create Join failure timer"));
+        goto err_timer;
+    }
+
+
+    cfgValue = 1000;
+    cfgValue = SYS_MS_TO_TICKS(cfgValue);
     if (tx_timer_create(&pMac->lim.limTimers.gLimDisassocAckTimer,
                                     "DISASSOC ACK TIMEOUT",
                                     limTimerHandler, SIR_LIM_DISASSOC_ACK_TIMEOUT,
@@ -745,6 +760,7 @@ limCreateTimers(tpAniSirGlobal pMac)
     err_timer:
         tx_timer_delete(&pMac->lim.limTimers.gLimDeauthAckTimer);
         tx_timer_delete(&pMac->lim.limTimers.gLimDisassocAckTimer);
+        tx_timer_delete(&pMac->lim.limTimers.gLimRemainOnChannelTimer);
 #if defined(FEATURE_WLAN_CCX) && !defined(FEATURE_WLAN_CCX_UPLOAD)
         tx_timer_delete(&pMac->lim.limTimers.gLimCcxTsmTimer);
 #endif /* FEATURE_WLAN_CCX && !FEATURE_WLAN_CCX_UPLOAD */
@@ -775,10 +791,7 @@ limCreateTimers(tpAniSirGlobal pMac)
         tx_timer_delete(&pMac->lim.limTimers.gLimActiveToPassiveChannelTimer);
 
         if(NULL != pMac->lim.gLimPreAuthTimerTable.pTable)
-        {
             vos_mem_free(pMac->lim.gLimPreAuthTimerTable.pTable);
-            pMac->lim.gLimPreAuthTimerTable.pTable = NULL;
-        }
 
         return TX_TIMER_ERROR;
 
@@ -937,8 +950,7 @@ limAssocFailureTimerHandler(void *pMacGlobal, tANI_U32 param)
 
 #if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
     if((LIM_REASSOC == param) &&
-       (NULL != pMac->lim.pSessionEntry) &&
-       (pMac->lim.pSessionEntry->limMlmState == eLIM_MLM_WT_FT_REASSOC_RSP_STATE))
+       (NULL != pMac->lim.pSessionEntry))
     {
         limLog(pMac, LOGE, FL("Reassoc timeout happened"));
         if(pMac->lim.reAssocRetryAttempt < LIM_MAX_REASSOC_RETRY_LIMIT)
@@ -1423,7 +1435,7 @@ limDeactivateAndChangeTimer(tpAniSirGlobal pMac, tANI_U32 timerId)
             }
             else
             {
-                limLog(pMac, LOG1, FL("Deactivated probe after hb timer"));
+                limLog(pMac, LOGE, FL("Deactivated probe after hb timer"));
             }
 
             if (wlan_cfgGetInt(pMac, WNI_CFG_PROBE_AFTER_HB_FAIL_TIMEOUT,
@@ -1668,6 +1680,30 @@ limDeactivateAndChangeTimer(tpAniSirGlobal pMac, tANI_U32 timerId)
              }
              break;
 #endif /* FEATURE_WLAN_CCX && !FEATURE_WLAN_CCX_UPLOAD */
+        case eLIM_REMAIN_CHN_TIMER:
+            if (tx_timer_deactivate(&pMac->lim.limTimers.gLimRemainOnChannelTimer) != TX_SUCCESS)
+            {
+                /**
+                ** Could not deactivate Join Failure
+                ** timer. Log error.
+                **/
+                limLog(pMac, LOGP, FL("Unable to deactivate Remain on Chn timer"));
+                return;
+            }
+            val = 1000;
+            val = SYS_MS_TO_TICKS(val);
+            if (tx_timer_change(&pMac->lim.limTimers.gLimRemainOnChannelTimer,
+                                                val, 0) != TX_SUCCESS)
+            {
+                /**
+                * Could not change Join Failure
+                * timer. Log error.
+                */
+                limLog(pMac, LOGP, FL("Unable to change timer"));
+                return;
+            }
+            break;
+
     case eLIM_CONVERT_ACTIVE_CHANNEL_TO_PASSIVE:
             if (tx_timer_deactivate(&pMac->lim.limTimers.gLimActiveToPassiveChannelTimer) != TX_SUCCESS)
             {

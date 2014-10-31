@@ -176,7 +176,7 @@ static tANI_U8* smeTraceGetCommandString( tANI_U32 command )
             break;
     }
 }
-static void smeTraceDump(tpAniSirGlobal pMac, tpvosTraceRecord pRecord,
+static void smeTraceDump(tpAniSirGlobal pMac, tpTraceRecord pRecord,
                                                             tANI_U16 recIndex)
 {
     if (TRACE_CODE_SME_COMMAND == pRecord->code)
@@ -195,6 +195,6 @@ static void smeTraceDump(tpAniSirGlobal pMac, tpvosTraceRecord pRecord,
 
 void smeTraceInit(tpAniSirGlobal pMac)
 {
-    vosTraceRegister(VOS_MODULE_ID_SME, (tpvosTraceCb)&smeTraceDump);
+    macTraceRegister(pMac,  VOS_MODULE_ID_SME, smeTraceDump);
 }
 #endif
