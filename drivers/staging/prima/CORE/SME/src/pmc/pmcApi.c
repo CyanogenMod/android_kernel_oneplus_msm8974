@@ -1655,13 +1655,6 @@ tANI_BOOLEAN pmcValidateConnectState( tHalHandle hHal )
       pmcLog(pMac, LOGW, "PMC: Multiple active sessions exists. BMPS cannot be entered");
       return eANI_BOOLEAN_FALSE;
    }
-#ifdef FEATURE_WLAN_TDLS
-   if (pMac->isTdlsPowerSaveProhibited)
-   {
-      pmcLog(pMac, LOGE, FL("TDLS peer(s) connected/discovery sent. Dont enter BMPS"));
-      return eANI_BOOLEAN_FALSE;
-   }
-#endif
    return eANI_BOOLEAN_TRUE;
 }
 
@@ -3037,7 +3030,7 @@ eHalStatus pmcSetRssiFilter(tHalHandle hHal,   v_U8_t        rssiThreshold)
     vos_msg_t msg;
 
 
-    pRequestBuf = vos_mem_malloc(sizeof(tSirSetRSSIFilterReq));
+    pRequestBuf = vos_mem_malloc(sizeof(tpSirSetRSSIFilterReq));
     if (NULL == pRequestBuf)
     {
         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: Not able to allocate memory for PNO request", __func__);

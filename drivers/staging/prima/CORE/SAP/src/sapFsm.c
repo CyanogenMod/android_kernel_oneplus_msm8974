@@ -100,9 +100,7 @@
 /*----------------------------------------------------------------------------
  *  External declarations for global context
  * -------------------------------------------------------------------------*/
-#ifdef FEATURE_WLAN_CH_AVOID
-extern safeChannelType safeChannels[];
-#endif /* FEATURE_WLAN_CH_AVOID */
+
 /*----------------------------------------------------------------------------
  * Static Variable Definitions
  * -------------------------------------------------------------------------*/
@@ -858,7 +856,7 @@ sapFsm
              else if (msg == eSAP_MAC_START_FAILS)
              {
                  /*Transition from STARTING to DISCONNECTED (both without substates)*/
-                 VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR, "In %s, from state %s => %s",
+                 VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "In %s, from state %s => %s",
                             __func__, "eSAP_STARTING", "eSAP_DISCONNECTED");
 
                  /*Action code for transition */
@@ -1234,15 +1232,14 @@ sapRemoveMacFromACL(v_MACADDR_t *macList, v_U8_t *size, v_U8_t index)
 void sapPrintACL(v_MACADDR_t *macList, v_U8_t size)
 {
     int i;
-    v_BYTE_t *macArray;
     VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,"print acl entered");
     if (size==0) return;
     for (i=0; i<size; i++)
     {
-        macArray = (macList+i)->bytes;
         VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
-                "** ACL entry %i - "MAC_ADDRESS_STR, i,
-                MAC_ADDR_ARRAY(macArray));
+                "** ACL entry %i - %02x:%02x:%02x:%02x:%02x:%02x", i,
+                (macList+i)->bytes[0], (macList+i)->bytes[1], (macList+i)->bytes[2],
+                (macList+i)->bytes[3], (macList+i)->bytes[4], (macList+i)->bytes[5]);
     }
     return;
 }
@@ -1258,9 +1255,8 @@ sapIsPeerMacAllowed(ptSapContext sapContext, v_U8_t *peerMac)
 
     if (sapSearchMacList(sapContext->denyMacList, sapContext->nDenyMac, peerMac, NULL))
     {
-        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
-                  "In %s, Peer "MAC_ADDRESS_STR" in deny list",
-                  __func__, MAC_ADDR_ARRAY(peerMac));
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "In %s, Peer %02x:%02x:%02x:%02x:%02x:%02x in deny list",
+                __func__, *peerMac, *(peerMac + 1), *(peerMac + 2), *(peerMac + 3), *(peerMac + 4), *(peerMac + 5));
         return VOS_STATUS_E_FAILURE;
     }
 
@@ -1271,9 +1267,8 @@ sapIsPeerMacAllowed(ptSapContext sapContext, v_U8_t *peerMac)
     // A new station CANNOT associate, unless in accept list. More stringent mode
     if (eSAP_DENY_UNLESS_ACCEPTED == sapContext->eSapMacAddrAclMode)
     {
-        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
-                  "In %s, Peer "MAC_ADDRESS_STR" denied, Mac filter mode is eSAP_DENY_UNLESS_ACCEPTED",
-                  __func__,  MAC_ADDR_ARRAY(peerMac));
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "In %s, Peer %02x:%02x:%02x:%02x:%02x:%02x denied, Mac filter mode is eSAP_DENY_UNLESS_ACCEPTED",
+                __func__,  *peerMac, *(peerMac + 1), *(peerMac + 2), *(peerMac + 3), *(peerMac + 4), *(peerMac + 5));
         return VOS_STATUS_E_FAILURE;
     }
 
@@ -1283,9 +1278,8 @@ sapIsPeerMacAllowed(ptSapContext sapContext, v_U8_t *peerMac)
     if (eSAP_SUPPORT_ACCEPT_AND_DENY == sapContext->eSapMacAddrAclMode)
     {
         sapSignalHDDevent(sapContext, NULL, eSAP_UNKNOWN_STA_JOIN, (v_PVOID_t)peerMac);
-        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH,
-                  "In %s, Peer "MAC_ADDRESS_STR" denied, Mac filter mode is eSAP_SUPPORT_ACCEPT_AND_DENY",
-                  __func__, MAC_ADDR_ARRAY(peerMac));
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_INFO_HIGH, "In %s, Peer %02x:%02x:%02x:%02x:%02x:%02x denied, Mac filter mode is eSAP_SUPPORT_ACCEPT_AND_DENY",
+                __func__,  *peerMac, *(peerMac + 1), *(peerMac + 2), *(peerMac + 3), *(peerMac + 4), *(peerMac + 5));
         return VOS_STATUS_E_FAILURE;
     }
     return VOS_STATUS_SUCCESS;
@@ -1305,10 +1299,6 @@ static VOS_STATUS sapGetChannelList(ptSapContext sapContext,
     v_U8_t bandEndChannel ;
     v_U32_t enableLTECoex;
     tHalHandle hHal = VOS_GET_HAL_CB(sapContext->pvosGCtx);
-#ifdef FEATURE_WLAN_CH_AVOID
-    v_U8_t i;
-#endif
-
 
     if (NULL == hHal)
     {
@@ -1342,11 +1332,7 @@ static VOS_STATUS sapGetChannelList(ptSapContext sapContext,
 
         case RF_SUBBAND_5_MID_GHZ:
            bandStartChannel = RF_CHAN_100;
-#ifndef FEATURE_WLAN_CH144
            bandEndChannel = RF_CHAN_140;
-#else
-           bandEndChannel = RF_CHAN_144;
-#endif /* FEATURE_WLAN_CH144 */
            break;
 
         case RF_SUBBAND_5_HIGH_GHZ:
@@ -1389,25 +1375,8 @@ static VOS_STATUS sapGetChannelList(ptSapContext sapContext,
         {
             if( regChannels[loopCount].enabled )
             {
-#ifdef FEATURE_WLAN_CH_AVOID
-                for( i = 0; i < NUM_20MHZ_RF_CHANNELS; i++ )
-                {
-                    if( (safeChannels[i].channelNumber ==
-                                rfChannels[loopCount].channelNum) )
-                    {
-                        /* Check if channel is safe */
-                        if(VOS_TRUE == safeChannels[i].isSafe)
-                        {
-#endif
-                            list[channelCount] =
-                                     rfChannels[loopCount].channelNum;
-                            channelCount++;
-#ifdef FEATURE_WLAN_CH_AVOID
-                        }
-                        break;
-                    }
-                }
-#endif
+                list[channelCount] = rfChannels[loopCount].channelNum;
+                channelCount++;
             }
         }
     }

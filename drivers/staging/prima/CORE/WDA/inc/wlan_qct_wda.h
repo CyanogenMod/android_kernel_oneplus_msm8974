@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -143,7 +143,6 @@ typedef enum
   eWDA_AUTH_TYPE_UNKNOWN = eCSR_AUTH_TYPE_FAILED,
 }WDA_AuthType;
 
-#define IS_FW_IN_TX_PATH_FEATURE_ENABLE ((WDI_getHostWlanFeatCaps(FW_IN_TX_PATH)) & (WDA_getFwWlanFeatCaps(FW_IN_TX_PATH)))
 /*--------------------------------------------------------------------------
   Utilities
  --------------------------------------------------------------------------*/
@@ -171,74 +170,6 @@ typedef enum
 
 /* Check if heartbeat offload is enabled */
 #define IS_IBSS_HEARTBEAT_OFFLOAD_FEATURE_ENABLE ((WDI_getHostWlanFeatCaps(IBSS_HEARTBEAT_OFFLOAD)) & (WDA_getFwWlanFeatCaps(IBSS_HEARTBEAT_OFFLOAD)))
-
-#ifdef FEATURE_WLAN_TDLS
-#define IS_ADVANCE_TDLS_ENABLE ((WDI_getHostWlanFeatCaps(ADVANCE_TDLS)) & (WDA_getFwWlanFeatCaps(ADVANCE_TDLS)))
-#else
-#define IS_ADVANCE_TDLS_ENABLE 0
-#endif
-#define IS_HT40_OBSS_SCAN_FEATURE_ENABLE ((WDA_getFwWlanFeatCaps(HT40_OBSS_SCAN)) & (WDI_getHostWlanFeatCaps(HT40_OBSS_SCAN)))
-
-typedef enum {
-    MODE_11A        = 0,   /* 11a Mode */
-    MODE_11G        = 1,   /* 11b/g Mode */
-    MODE_11B        = 2,   /* 11b Mode */
-    MODE_11GONLY    = 3,   /* 11g only Mode */
-    MODE_11NA_HT20   = 4,  /* 11a HT20 mode */
-    MODE_11NG_HT20   = 5,  /* 11g HT20 mode */
-    MODE_11NA_HT40   = 6,  /* 11a HT40 mode */
-    MODE_11NG_HT40   = 7,  /* 11g HT40 mode */
-    MODE_11AC_VHT20 = 8,
-    MODE_11AC_VHT40 = 9,
-    MODE_11AC_VHT80 = 10,
-//    MODE_11AC_VHT160 = 11,
-    MODE_11AC_VHT20_2G = 11,
-    MODE_11AC_VHT40_2G = 12,
-    MODE_11AC_VHT80_2G = 13,
-    MODE_UNKNOWN    = 14,
-    MODE_MAX        = 14
-} WLAN_PHY_MODE;
-
-#define WLAN_HAL_CHAN_FLAG_HT40_PLUS   6
-#define WLAN_HAL_CHAN_FLAG_PASSIVE     7
-#define WLAN_HAL_CHAN_ADHOC_ALLOWED    8
-#define WLAN_HAL_CHAN_AP_DISABLED      9
-#define WLAN_HAL_CHAN_FLAG_DFS         10
-#define WLAN_HAL_CHAN_FLAG_ALLOW_HT    11  /* HT is allowed on this channel */
-#define WLAN_HAL_CHAN_FLAG_ALLOW_VHT   12  /* VHT is allowed on this channel */
-
-#define WDA_SET_CHANNEL_FLAG(pwda_channel,flag) do { \
-        (pwda_channel)->channel_info |=  (1 << flag);      \
-     } while(0)
-
-#define WDA_SET_CHANNEL_MODE(pwda_channel,val) do { \
-     (pwda_channel)->channel_info &= 0xffffffc0;            \
-     (pwda_channel)->channel_info |= (val);                 \
-     } while(0)
-
-#define WDA_SET_CHANNEL_MAX_POWER(pwda_channel,val) do { \
-     (pwda_channel)->reg_info_1 &= 0xffff00ff;           \
-     (pwda_channel)->reg_info_1 |= ((val&0xff) << 8);    \
-     } while(0)
-
-#define WDA_SET_CHANNEL_REG_POWER(pwda_channel,val) do { \
-     (pwda_channel)->reg_info_1 &= 0xff00ffff;           \
-     (pwda_channel)->reg_info_1 |= ((val&0xff) << 16);   \
-     } while(0)
-#define WDA_SET_CHANNEL_MIN_POWER(pwlan_hal_update_channel,val) do { \
-     (pwlan_hal_update_channel)->reg_info_1 &= 0xffffff00;           \
-     (pwlan_hal_update_channel)->reg_info_1 |= (val&0xff);           \
-     } while(0)
-#define WDA_SET_CHANNEL_ANTENNA_MAX(pwlan_hal_update_channel,val) do { \
-     (pwlan_hal_update_channel)->reg_info_2 &= 0xffffff00;             \
-     (pwlan_hal_update_channel)->reg_info_2 |= (val&0xff);             \
-     } while(0)
-#define WDA_SET_CHANNEL_REG_CLASSID(pwlan_hal_update_channel,val) do { \
-     (pwlan_hal_update_channel)->reg_info_1 &= 0x00ffffff;             \
-     (pwlan_hal_update_channel)->reg_info_1 |= ((val&0xff) << 24);     \
-     } while(0)
-
-#define WDA_IS_MCAST_FLT_ENABLE_IN_FW (WDA_getFwWlanFeatCaps(WLAN_MCADDR_FLT))
 
 /*--------------------------------------------------------------------------
   Definitions for Data path APIs
@@ -573,7 +504,7 @@ VOS_STATUS WDA_TxPacket(tWDA_CbContext *pWDA,
                                     pWDATxRxCompFunc pCompFunc,
                                     void *pData,
                                     pWDAAckFnTxComp pAckTxComp, 
-                                    tANI_U32 txFlag);
+                                    tANI_U8 txFlag);
 
 /*
  * FUNCTION: WDA_PostMsgApi
@@ -1071,11 +1002,6 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_SET_MAX_TX_POWER_REQ       SIR_HAL_SET_MAX_TX_POWER_REQ
 #define WDA_SET_MAX_TX_POWER_RSP       SIR_HAL_SET_MAX_TX_POWER_RSP
 
-#define WDA_SET_MAX_TX_POWER_PER_BAND_REQ \
-        SIR_HAL_SET_MAX_TX_POWER_PER_BAND_REQ
-#define WDA_SET_MAX_TX_POWER_PER_BAND_RSP \
-        SIR_HAL_SET_MAX_TX_POWER_PER_BAND_RSP
-
 #define WDA_SEND_MSG_COMPLETE          SIR_HAL_SEND_MSG_COMPLETE 
 
 /// PE <-> HAL Host Offload message
@@ -1183,12 +1109,9 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_TRIGGER_BATCH_SCAN_RESULT_IND SIR_HAL_TRIGGER_BATCH_SCAN_RESULT_IND
 #endif
 
-#define WDA_RATE_UPDATE_IND         SIR_HAL_RATE_UPDATE_IND
-
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 
-eHalStatus WDA_SetRegDomain(void * clientCtxt, v_REGDOMAIN_t regId,
-                                               tAniBool sendRegHint);
+eHalStatus WDA_SetRegDomain(void * clientCtxt, v_REGDOMAIN_t regId);
 
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40 // Bit 6 will be used to control BD rate for Management frames
 
@@ -1224,8 +1147,6 @@ eHalStatus WDA_SetRegDomain(void * clientCtxt, v_REGDOMAIN_t regId,
 
 v_BOOL_t WDA_IsHwFrameTxTranslationCapable(v_PVOID_t pVosGCtx, 
                                                       tANI_U8 staIdx);
-
-v_BOOL_t WDA_IsSelfSTA(v_PVOID_t pVosGCtx,tANI_U8 staIdx);
 
 #  define WDA_EnableUapsdAcParams(vosGCtx, staId, uapsdInfo) \
          WDA_SetUapsdAcParamsReq(vosGCtx, staId, uapsdInfo)
@@ -1460,7 +1381,7 @@ WDA_DS_BuildTxPacketInfo
   v_U8_t          typeSubtype,
   v_PVOID_t       pAddr2,
   v_U8_t          uTid,
-  v_U32_t          txFlag,
+  v_U8_t          txFlag,
   v_U32_t         timeStamp,
   v_U8_t          ucIsEapol,
   v_U8_t          ucUP
@@ -1939,10 +1860,9 @@ tANI_U8 WDA_getFwWlanFeatCaps(tANI_U8 featEnumValue);
   PARAMETERS
     pMac : upper MAC context pointer
     displaySnapshot : Display DXE snapshot option
-    debugFlags      : Enable stall detect features
-                      defined by WPAL_DeviceDebugFlags
-                      These features may effect
-                      data performance.
+    enableStallDetect : Enable stall detect feature
+                        This feature will take effect to data performance
+                        Not integrate till fully verification
 
   RETURN VALUE
     NONE
@@ -1952,7 +1872,7 @@ void WDA_TransportChannelDebug
 (
   tpAniSirGlobal pMac,
   v_BOOL_t       displaySnapshot,
-  v_U8_t         debugFlags
+  v_BOOL_t       toggleStallDetect
 );
 
 /*==========================================================================
