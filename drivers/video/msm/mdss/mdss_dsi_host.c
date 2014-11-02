@@ -1375,7 +1375,15 @@ static int dsi_event_thread(void *data)
 	spin_lock_init(&ev->event_lock);
 
 	while (1) {
-		wait_event(ev->event_q, (ev->event_pndx != ev->event_gndx));
+		ret = wait_event_interruptible(ev->event_q,
+				(ev->event_pndx != ev->event_gndx) ||
+				kthread_should_stop());
+
+		if (ret) {
+			pr_info("%s: interrupted", __func__);
+			continue;
+		}
+
 		spin_lock_irqsave(&ev->event_lock, flag);
 		evq = &ev->todo_list[ev->event_gndx++];
 		todo = evq->todo;
