@@ -639,7 +639,6 @@ static const struct intr_data intr_tbl_v2[] = {
 	{WCD9XXX_IRQ_SPEAKER_CLIPPING, false},
 	{WCD9XXX_IRQ_VBAT_MONITOR_ATTACK, false},
 	{WCD9XXX_IRQ_VBAT_MONITOR_RELEASE, false},
-	{WCD9XXX_IRQ_RESERVED_2, false},
 };
 
 static int wcd9xxx_device_init(struct wcd9xxx *wcd9xxx)

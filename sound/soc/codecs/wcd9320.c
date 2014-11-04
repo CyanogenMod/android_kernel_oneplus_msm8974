@@ -36,6 +36,7 @@
 #include <linux/kernel.h>
 #include <linux/gpio.h>
 #include <linux/pm_qos.h>
+#include <linux/pm.h>
 #include <mach/cpuidle.h>
 #include "wcd9320.h"
 #include "wcd9xxx-resmgr.h"
@@ -459,6 +460,7 @@ struct taiko_priv {
 	 * end of impedance measurement
 	 */
 	struct list_head reg_save_restore;
+
 	struct pm_qos_request pm_qos_req;
 
 	/* UHQA (class AB) mode */
@@ -2945,9 +2947,13 @@ static int taiko_codec_config_mad(struct snd_soc_codec *codec)
 	struct mad_audio_cal *mad_cal;
 	const char *filename = TAIKO_MAD_AUDIO_FIRMWARE_PATH;
 	struct taiko_priv *taiko = snd_soc_codec_get_drvdata(codec);
+	int i = 0;
 
 	pr_debug("%s: enter\n", __func__);
 	/* wakeup for codec calibration access */
+	pm_qos_add_request(&taiko->pm_qos_req,
+			   PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_DEFAULT_VALUE);
 	pm_qos_update_request(&taiko->pm_qos_req,
 			      msm_cpuidle_get_deep_idle_latency());
 	ret = request_firmware(&fw, filename, codec->dev);
@@ -2989,7 +2995,15 @@ static int taiko_codec_config_mad(struct snd_soc_codec *codec)
 		      mad_cal->audio_info.rms_threshold_lsb);
 	snd_soc_write(codec, TAIKO_A_CDC_MAD_AUDIO_CTL_6,
 		      mad_cal->audio_info.rms_threshold_msb);
-
+	for (i = 0; i < ARRAY_SIZE(mad_cal->audio_info.iir_coefficients);
+	     i++) {
+		snd_soc_update_bits(codec, TAIKO_A_CDC_MAD_AUDIO_IIR_CTL_PTR,
+				    0x3F, i);
+		snd_soc_write(codec, TAIKO_A_CDC_MAD_AUDIO_IIR_CTL_VAL,
+			      mad_cal->audio_info.iir_coefficients[i]);
+		dev_dbg(codec->dev, "%s:MAD Audio IIR Coef[%d] = 0X%x",
+			__func__, i, mad_cal->audio_info.iir_coefficients[i]);
+	}
 
 	/* Beacon */
 	snd_soc_write(codec, TAIKO_A_CDC_MAD_BEACON_CTL_8,
@@ -3021,6 +3035,7 @@ static int taiko_codec_config_mad(struct snd_soc_codec *codec)
 	pr_debug("%s: leave ret %d\n", __func__, ret);
 	pm_qos_update_request(&taiko->pm_qos_req,
 			      PM_QOS_DEFAULT_VALUE);
+	pm_qos_remove_request(&taiko->pm_qos_req);
 	return ret;
 }
 
@@ -3555,6 +3570,7 @@ static int taiko_hphl_dac_event(struct snd_soc_dapm_widget *w,
 						 WCD9XXX_CLSH_EVENT_PRE_DAC);
 		} else {
 			wcd9xxx_enable_high_perf_mode(codec, &taiko_p->clsh_d,
+						WCD9XXX_NON_UHQA_MODE,
 						WCD9XXX_CLSAB_STATE_HPHL,
 						WCD9XXX_CLSAB_REQ_ENABLE);
 		}
@@ -3604,6 +3620,7 @@ static int taiko_hphr_dac_event(struct snd_soc_dapm_widget *w,
 						 WCD9XXX_CLSH_EVENT_PRE_DAC);
 		} else {
 			wcd9xxx_enable_high_perf_mode(codec, &taiko_p->clsh_d,
+						WCD9XXX_NON_UHQA_MODE,
 						WCD9XXX_CLSAB_STATE_HPHR,
 						WCD9XXX_CLSAB_REQ_ENABLE);
 		}
@@ -3790,6 +3807,7 @@ static int taiko_hph_pa_event(struct snd_soc_dapm_widget *w,
 						 WCD9XXX_CLSH_EVENT_POST_PA);
 		} else {
 			wcd9xxx_enable_high_perf_mode(codec, &taiko->clsh_d,
+						WCD9XXX_NON_UHQA_MODE,
 						req_clsab_state,
 						WCD9XXX_CLSAB_REQ_DISABLE);
 		}

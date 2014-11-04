@@ -523,6 +523,10 @@ out_list:
 /* slim_remove_device: Remove the effect of slim_add_device() */
 void slim_remove_device(struct slim_device *sbdev)
 {
+	struct slim_controller *ctrl = sbdev->ctrl;
+	mutex_lock(&ctrl->m_ctrl);
+	list_del_init(&sbdev->dev_list);
+	mutex_unlock(&ctrl->m_ctrl);
 	device_unregister(&sbdev->dev);
 }
 EXPORT_SYMBOL_GPL(slim_remove_device);
@@ -1100,7 +1104,7 @@ int slim_xfer_msg(struct slim_controller *ctrl, struct slim_device *sbdev,
 	} else
 		ret = slim_processtxn(ctrl, SLIM_MSG_DEST_LOGICALADDR, mc, ec,
 				SLIM_MSG_MT_CORE, rbuf, wbuf, len, mlen,
-				NULL, sbdev->laddr, NULL);
+				msg->comp, sbdev->laddr, NULL);
 xfer_err:
 	return ret;
 }
