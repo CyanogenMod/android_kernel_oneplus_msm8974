@@ -367,6 +367,13 @@ config BACKLIGHT_LM3630
 	help
 	  Support for Oppo LM3630 backlight driver
 
+config BACKLIGHT_EXT_CONTROL
+	tristate "Backlight external control in LM3630 driver"
+	depends on I2C
+	help
+	  Control suspend/resume events via external hooks to functions in LM3630
+	  backlight driver.
+
 endif # BACKLIGHT_CLASS_DEVICE
 
 endif # BACKLIGHT_LCD_SUPPORT

@@ -31,6 +31,9 @@
 #ifdef CONFIG_MACH_OPPO
 #include <linux/boot_mode.h>
 #endif //CONFIG_MACH_OPPO
+#ifdef CONFIG_BACKLIGHT_EXT_CONTROL
+#include <linux/backlight_ext_control.h>
+#endif
 #define REG_CTRL	0x00
 #define REG_CONFIG	0x01
 #define REG_BRT_A	0x03
@@ -53,6 +56,9 @@
 #ifdef CONFIG_STATE_NOTIFIER
 #include <linux/state_notifier.h>
 #endif /*CONFIG_STATE_NOTIFIER*/
+#ifdef CONFIG_BACKLIGHT_EXT_CONTROL
+bool backlight_on = false;
+#endif
 
 static struct lm3630_chip_data *lm3630_pchip;
 
@@ -205,6 +211,26 @@ static int lm3630_intr_config(struct lm3630_chip_data *pchip)
 	int ret;
 	struct lm3630_chip_data *pchip = lm3630_pchip;
 	pr_debug("%s: bl=%d\n", __func__,bl_level);
+
+#ifdef CONFIG_BACKLIGHT_EXT_CONTROL
+	// if display is switched off
+	if (bl_level == 0) 
+	{
+		// write status to external var for further usage
+		backlight_on = false;
+
+		// Add external function calls here...
+	}
+	// if display is switched on
+	if (bl_level != 0 && pre_brightness == 0) 
+	{
+		// write status to external var for further usage
+		backlight_on = true;
+
+		// Add external function calls here...
+	}
+#endif
+
 #ifdef CONFIG_MACH_OPPO
 
 #ifdef CONFIG_STATE_NOTIFIER
