@@ -1187,9 +1187,9 @@ void msm_isp_do_tasklet(unsigned long data)
 			irq_status0, irq_status1);
 		irq_ops->process_camif_irq(vfe_dev,
 			irq_status0, irq_status1, &ts);
-		irq_ops->process_axi_irq(vfe_dev,
-			irq_status0, irq_status1, &ts);
 		irq_ops->process_stats_irq(vfe_dev,
+			irq_status0, irq_status1, &ts);
+		irq_ops->process_axi_irq(vfe_dev,
 			irq_status0, irq_status1, &ts);
 		irq_ops->process_reg_update(vfe_dev,
 			irq_status0, irq_status1, &ts);
