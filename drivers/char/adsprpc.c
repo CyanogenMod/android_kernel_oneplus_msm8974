@@ -571,7 +571,7 @@ static int get_args(uint32_t kernel, struct smq_invoke_ctx *ctx,
 	int outbufs = REMOTE_SCALARS_OUTBUFS(sc);
 	int *fds = ctx->fds, idx, num;
 	unsigned long len;
-	dma_addr_t iova;
+	ion_phys_addr_t iova;
 
 	list = smq_invoke_buf_start(rpra, sc);
 	pages = smq_phy_page_start(sc, list);
