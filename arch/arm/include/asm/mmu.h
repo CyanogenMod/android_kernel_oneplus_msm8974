@@ -6,6 +6,8 @@
 typedef struct {
 #ifdef CONFIG_CPU_HAS_ASID
 	atomic64_t	id;
+#else
+	int		switch_pending;
 #endif
 	unsigned int kvm_seq;
 	unsigned long	sigpage;
@@ -30,15 +32,6 @@ typedef struct {
 	unsigned long	end_brk;
 } mm_context_t;
 
-#endif
-
-/*
- * switch_mm() may do a full cache flush over the context switch,
- * so enable interrupts over the context switch to avoid high
- * latency.
- */
-#ifndef CONFIG_CPU_HAS_ASID
-#define __ARCH_WANT_INTERRUPTS_ON_CTXSW
 #endif
 
 #endif

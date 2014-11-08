@@ -18,6 +18,7 @@
 
 #include <linux/ioctl.h>
 #include <linux/time.h>
+#include <linux/compat.h>
 
 enum android_alarm_type {
 	/* return code bit numbers or set alarm arg */
@@ -25,6 +26,7 @@ enum android_alarm_type {
 	ANDROID_ALARM_RTC,
 	ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP,
 	ANDROID_ALARM_ELAPSED_REALTIME,
+	ANDROID_ALARM_RTC_POWEROFF_WAKEUP,
 	ANDROID_ALARM_SYSTEMTIME,
 
 	ANDROID_ALARM_TYPE_COUNT,
@@ -40,6 +42,8 @@ enum android_alarm_return_flags {
 				1U << ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP,
 	ANDROID_ALARM_ELAPSED_REALTIME_MASK =
 				1U << ANDROID_ALARM_ELAPSED_REALTIME,
+	ANDROID_ALARM_RTC_POWEROFF_WAKEUP_MASK =
+				1U << ANDROID_ALARM_RTC_POWEROFF_WAKEUP,
 	ANDROID_ALARM_SYSTEMTIME_MASK = 1U << ANDROID_ALARM_SYSTEMTIME,
 	ANDROID_ALARM_TIME_CHANGE_MASK = 1U << 16
 };
@@ -58,5 +62,23 @@ enum android_alarm_return_flags {
 #define ANDROID_ALARM_SET_RTC               _IOW('a', 5, struct timespec)
 #define ANDROID_ALARM_BASE_CMD(cmd)         (cmd & ~(_IOC(0, 0, 0xf0, 0)))
 #define ANDROID_ALARM_IOCTL_TO_TYPE(cmd)    (_IOC_NR(cmd) >> 4)
+
+
+#ifdef CONFIG_COMPAT
+#define ANDROID_ALARM_SET_COMPAT(type)		ALARM_IOW(2, type, \
+							struct compat_timespec)
+#define ANDROID_ALARM_SET_AND_WAIT_COMPAT(type)	ALARM_IOW(3, type, \
+							struct compat_timespec)
+#define ANDROID_ALARM_GET_TIME_COMPAT(type)	ALARM_IOW(4, type, \
+							struct compat_timespec)
+#define ANDROID_ALARM_SET_RTC_COMPAT		_IOW('a', 5, \
+							struct compat_timespec)
+#define ANDROID_ALARM_IOCTL_NR(cmd)		(_IOC_NR(cmd) & ((1<<4)-1))
+#define ANDROID_ALARM_COMPAT_TO_NORM(cmd)  \
+				ALARM_IOW(ANDROID_ALARM_IOCTL_NR(cmd), \
+					ANDROID_ALARM_IOCTL_TO_TYPE(cmd), \
+					struct timespec)
+
+#endif
 
 #endif

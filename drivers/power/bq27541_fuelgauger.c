@@ -32,6 +32,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/regulator/machine.h>
 #include <linux/err.h>
+#include <linux/pm.h>
 #ifdef CONFIG_MACH_OPPO
 #include <linux/qpnp-charger.h>
 #else
@@ -164,7 +165,7 @@ struct bq27541_device_info {
 
 	bool alow_reading;
 	struct timer_list watchdog;
-	struct wake_lock fastchg_wake_lock;
+	struct wakeup_source fastchg_wakeup_source;
 	bool fast_chg_allow;
 	bool fast_low_temp_full;
 /* jingchun.wang@Onlinerd.Driver, 2014/02/12  Add for retry when config fail */
@@ -1088,7 +1089,7 @@ static void fastcg_work_func(struct work_struct *work)
 
 	if(data == 0x52) {
 		//request fast charging
-		wake_lock(&bq27541_di->fastchg_wake_lock);
+		__pm_stay_awake(&bq27541_di->fastchg_wakeup_source);
 		pic_need_to_up_fw = 0;
 		fw_ver_info = 0;
 		bq27541_di->alow_reading = false;
@@ -1311,13 +1312,13 @@ out:
 	if(data == 0x53){
 		if(bq27541_di->battery_type == BATTERY_3000MA){
 			power_supply_changed(bq27541_di->batt_psy);
-			wake_unlock(&bq27541_di->fastchg_wake_lock);
+			__pm_relax(&bq27541_di->fastchg_wakeup_source);
 		}
 	}
 		
 	if((data == 0x54) || (data == 0x5a) || (data == 0x59) || (data == 0x5c)){
 		power_supply_changed(bq27541_di->batt_psy);
-		wake_unlock(&bq27541_di->fastchg_wake_lock);
+		__pm_relax(&bq27541_di->fastchg_wakeup_source);
 	}
 	
 	
@@ -1344,7 +1345,7 @@ void di_watchdog(unsigned long data)
 	if (ret) {
 		pr_info("%s switch usb error %d\n", __func__, ret);
 	}
-	wake_unlock(&bq27541_di->fastchg_wake_lock);
+	__pm_relax(&bq27541_di->fastchg_wakeup_source);
 }
 /* OPPO 2013-12-12 liaofuchun add for fastchg */
 #endif
@@ -1445,8 +1446,7 @@ static int bq27541_battery_probe(struct i2c_client *client,
 	init_timer(&di->watchdog);
 	di->watchdog.data = (unsigned long)di;
 	di->watchdog.function = di_watchdog;
-	wake_lock_init(&di->fastchg_wake_lock,
-		WAKE_LOCK_SUSPEND, "fastcg_wake_lock");
+	wakeup_source_init(&di->fastchg_wakeup_source, "fastcg_wakeup_source");
 	INIT_WORK(&di->fastcg_work,fastcg_work_func);
 	gpio_request(1, "mcu_clk");
 	gpio_tlmm_config(GPIO_CFG(1,0,GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
@@ -1502,20 +1502,11 @@ static int bq27541_battery_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_MACH_OPPO
-extern int msmrtc_alarm_read_time(struct rtc_time *tm);
 static int bq27541_battery_suspend(struct i2c_client *client, pm_message_t message)
 {
-	int ret=0;
-	struct rtc_time	rtc_suspend_rtc_time;
 	struct bq27541_device_info *di = i2c_get_clientdata(client);
 	
 	atomic_set(&di->suspended, 1);
-	ret = msmrtc_alarm_read_time(&rtc_suspend_rtc_time);
-	if (ret < 0) {
-		pr_err("%s: Failed to read RTC time\n", __func__);
-		return 0;
-	}
-	rtc_tm_to_time(&rtc_suspend_rtc_time, &di->rtc_suspend_time);
 	
 	return 0;
 }
@@ -1524,22 +1515,11 @@ static int bq27541_battery_suspend(struct i2c_client *client, pm_message_t messa
 #define RESUME_TIME  1*60 
 static int bq27541_battery_resume(struct i2c_client *client)
 {
-	int ret=0;
-	struct rtc_time	rtc_resume_rtc_time;
 	struct bq27541_device_info *di = i2c_get_clientdata(client);
 			
 	atomic_set(&di->suspended, 0);
-	ret = msmrtc_alarm_read_time(&rtc_resume_rtc_time);
-	if (ret < 0) {
-		pr_err("%s: Failed to read RTC time\n", __func__);
-		return 0;
-	}
-	rtc_tm_to_time(&rtc_resume_rtc_time, &di->rtc_resume_time);
 	
-	if((di->rtc_resume_time - di->rtc_suspend_time)>= RESUME_TIME){
-		/*update pre capacity when sleep time more than 1minutes*/
-		bq27541_battery_soc(bq27541_di, true); 
-	}
+	bq27541_battery_soc(bq27541_di, true); 
 
 	return 0;
 }

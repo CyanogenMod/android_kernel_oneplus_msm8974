@@ -1989,7 +1989,7 @@ static int rmnet_smd_sdio_function_add(struct usb_configuration *c)
 
 	dev->function.name = "rmnet_smd_sdio";
 	dev->function.strings = rmnet_mux_strings;
-	dev->function.descriptors = rmnet_mux_fs_function;
+	dev->function.fs_descriptors = rmnet_mux_fs_function;
 	dev->function.hs_descriptors = rmnet_mux_hs_function;
 	dev->function.bind = rmnet_mux_bind;
 	dev->function.unbind = rmnet_mux_unbind;
