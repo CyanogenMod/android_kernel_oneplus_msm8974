@@ -164,9 +164,23 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 		if (cpu_clk[cpu] == cpu_clk[policy->cpu])
 			cpumask_set_cpu(cpu, policy->cpus);
 
-	if (cpufreq_frequency_table_cpuinfo(policy, table))
+	if (cpufreq_frequency_table_cpuinfo(policy, table)) {
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+		policy->cpuinfo.min_freq = CONFIG_MSM_CPU_FREQ_MIN;
+		policy->cpuinfo.max_freq = CONFIG_MSM_CPU_FREQ_MAX;
+#endif
 		pr_err("cpufreq: failed to get policy min/max\n");
-
+	}
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+	policy->min = CONFIG_MSM_CPU_FREQ_MIN;
+	policy->max = CONFIG_MSM_CPU_FREQ_MAX;
+#else
+#ifdef CONFIG_ARCH_MSM8974
+	/* Predefine max/min frequencies used for device boot */
+	policy->max = 2457600;
+	policy->min = 300000;
+#endif
+#endif
 	cur_freq = clk_get_rate(cpu_clk[policy->cpu])/1000;
 
 	if (cpufreq_frequency_table_target(policy, table, cur_freq,
@@ -185,11 +199,21 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 			   table[index].index);
 	if (ret)
 		return ret;
+	/* Use user max frequency instead of max available frequency */
 	pr_debug("cpufreq: cpu%d init at %d switching to %d\n",
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+			policy->cpu, cur_freq, policy->max);
+	policy->cur = policy->max;
+#else
 			policy->cpu, cur_freq, table[index].frequency);
 	policy->cur = table[index].frequency;
+#endif
 	cpufreq_frequency_table_get_attr(table, policy->cpu);
-
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+	/* set safe default min and max speeds */
+	policy->max = CONFIG_MSM_CPU_FREQ_MAX;
+	policy->min = CONFIG_MSM_CPU_FREQ_MIN;
+#endif
 	return 0;
 }
 
