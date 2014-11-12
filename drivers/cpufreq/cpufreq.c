@@ -52,6 +52,8 @@ static DEFINE_PER_CPU(struct cpufreq_cpu_save_data, cpufreq_policy_save);
 #endif
 static DEFINE_SPINLOCK(cpufreq_driver_lock);
 
+static unsigned int min_freq_hardlimit = 0;
+
 /*
  * cpu_policy_rwsem is a per CPU reader-writer semaphore designed to cure
  * all cpufreq/hotplug/workqueue/etc related lock issues.
@@ -488,8 +490,85 @@ static ssize_t store_##file_name					\
 	return ret ? ret : count;					\
 }
 
-store_one(scaling_min_freq, min);
+// store_one(scaling_min_freq, min);
 store_one(scaling_max_freq, max);
+
+
+/**
+ * show_scaling_min_freq_hardlimit - minimum scaling frequency hard limit 
+ */
+static ssize_t show_scaling_min_freq_hardlimit(struct cpufreq_policy *policy, char *buf)
+{							\
+	return sprintf(buf, "%u\n", min_freq_hardlimit);
+}
+
+
+/**
+ * store_scaling_min_freq_hardlimit() - minimum scaling frequency hard limit
+ */
+static ssize_t store_scaling_min_freq_hardlimit(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;
+	unsigned int input;
+	int i;
+	struct cpufreq_frequency_table *table;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	// Get system frequency table
+	table = cpufreq_frequency_get_table(0);	
+
+	if (!table) 
+	{
+		pr_err("cpufreq : could not retrieve cpu freq table\n");
+		return -EINVAL;
+	} 
+
+	// Allow only frequencies in the system table
+	for (i = 0; (table[i].frequency != CPUFREQ_TABLE_END); i++) 
+		if (table[i].frequency == input) 
+		{
+			pr_debug("cpufreq : frequency for minimum scaling freq hard limit found\n");
+			min_freq_hardlimit = input;
+			return count;
+		}
+
+	pr_err("cpufreq : invalid frequency requested for minimum scaling freq hard limit\n");
+	return -EINVAL;
+}
+
+/**
+ * store_scaling_min_freq() - minimum scaling frequency
+ */
+static ssize_t store_scaling_min_freq(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;
+	struct cpufreq_policy new_policy;
+
+	ret = cpufreq_get_policy(&new_policy, policy->cpu);
+	if (ret)
+		return -EINVAL;
+
+	ret = sscanf(buf, "%u", &new_policy.min);
+	if (ret != 1)
+		return -EINVAL;
+
+	// if new min frequency is below hard limit, overwrite with hard limit
+	if (new_policy.min < min_freq_hardlimit)
+		new_policy.min = min_freq_hardlimit;
+
+	ret = cpufreq_driver->verify(&new_policy);
+	if (ret)
+		pr_err("cpufreq: Frequency verification failed\n");
+
+	policy->user_policy.min = new_policy.min;
+	ret = __cpufreq_set_policy(policy, &new_policy);
+
+	return ret ? ret : count;
+}
+
 
 /**
  * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
@@ -682,6 +761,7 @@ cpufreq_freq_attr_ro(related_cpus);
 cpufreq_freq_attr_ro(affected_cpus);
 cpufreq_freq_attr_ro(cpu_utilization);
 cpufreq_freq_attr_rw(scaling_min_freq);
+cpufreq_freq_attr_rw(scaling_min_freq_hardlimit);
 #ifdef CONFIG_CPU_VOLTAGE_TABLE
 cpufreq_freq_attr_rw(UV_mV_table);
 #endif
@@ -694,6 +774,7 @@ static struct attribute *default_attrs[] = {
 	&cpuinfo_max_freq.attr,
 	&cpuinfo_transition_latency.attr,
 	&scaling_min_freq.attr,
+	&scaling_min_freq_hardlimit.attr,
 	&scaling_max_freq.attr,
 	&affected_cpus.attr,
 	&cpu_utilization.attr,
@@ -1937,6 +2018,7 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 {
 	unsigned long flags;
 	int ret;
+	struct cpufreq_frequency_table *table;
 
 	if (cpufreq_disabled())
 		return -ENODEV;
@@ -1983,6 +2065,19 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 
 	register_hotcpu_notifier(&cpufreq_cpu_notifier);
 	pr_debug("driver %s up and running\n", driver_data->name);
+
+	// Initialize min scaling freq hard limit
+	table = cpufreq_frequency_get_table(0);	
+	if (!table) 
+	{
+		min_freq_hardlimit = 0;
+		pr_err("cpufreq : could not retrieve cpu freq table\n");
+	} 
+	else
+	{
+		min_freq_hardlimit = table[0].frequency;
+		pr_info("cpufreq : minimum scaling freq hard limit set to: %u\n", min_freq_hardlimit);
+	}
 
 	return 0;
 err_if_unreg:
