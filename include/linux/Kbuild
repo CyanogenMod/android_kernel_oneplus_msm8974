@@ -460,3 +460,5 @@ header-y += avtimer.h
 header-y += msm_ipa.h
 header-y += msm_pft.h
 header-y += msm_thermal_ioctl.h
+
+header-y += nfc/
