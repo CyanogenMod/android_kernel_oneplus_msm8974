@@ -53,6 +53,7 @@ static DEFINE_PER_CPU(struct cpufreq_cpu_save_data, cpufreq_policy_save);
 static DEFINE_SPINLOCK(cpufreq_driver_lock);
 
 static unsigned int min_freq_hardlimit[4] = {0, 0, 0, 0};
+static unsigned int max_freq_hardlimit[4] = {0, 0, 0, 0};
 
 /*
  * cpu_policy_rwsem is a per CPU reader-writer semaphore designed to cure
@@ -491,7 +492,7 @@ static ssize_t store_##file_name					\
 }
 
 // store_one(scaling_min_freq, min);
-store_one(scaling_max_freq, max);
+// store_one(scaling_max_freq, max);
 
 
 /**
@@ -539,6 +540,53 @@ static ssize_t store_scaling_min_freq_hardlimit(struct cpufreq_policy *policy, c
 	return -EINVAL;
 }
 
+
+/**
+ * show_scaling_max_freq_hardlimit - maximum scaling frequency hard limit 
+ */
+static ssize_t show_scaling_max_freq_hardlimit(struct cpufreq_policy *policy, char *buf)
+{							\
+	return sprintf(buf, "%u\n", max_freq_hardlimit[policy->cpu]);
+}
+
+
+/**
+ * store_scaling_max_freq_hardlimit() - maximum scaling frequency hard limit
+ */
+static ssize_t store_scaling_max_freq_hardlimit(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;
+	unsigned int input;
+	int i;
+	struct cpufreq_frequency_table *table;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	// Get system frequency table
+	table = cpufreq_frequency_get_table(0);	
+
+	if (!table) 
+	{
+		pr_err("cpufreq : could not retrieve cpu freq table\n");
+		return -EINVAL;
+	} 
+
+	// Allow only frequencies in the system table
+	for (i = 0; (table[i].frequency != CPUFREQ_TABLE_END); i++) 
+		if (table[i].frequency == input) 
+		{
+			pr_debug("cpufreq : frequency for maximum scaling freq hard limit found\n");
+			max_freq_hardlimit[policy->cpu] = input;
+			return count;
+		}
+
+	pr_err("cpufreq : invalid frequency requested for maximum scaling freq hard limit\n");
+	return -EINVAL;
+}
+
+
 /**
  * store_scaling_min_freq() - minimum scaling frequency
  */
@@ -564,6 +612,37 @@ static ssize_t store_scaling_min_freq(struct cpufreq_policy *policy, const char 
 		pr_err("cpufreq: Frequency verification failed\n");
 
 	policy->user_policy.min = new_policy.min;
+	ret = __cpufreq_set_policy(policy, &new_policy);
+
+	return ret ? ret : count;
+}
+
+
+/**
+ * store_scaling_max_freq() - maximum scaling frequency
+ */
+static ssize_t store_scaling_max_freq(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;
+	struct cpufreq_policy new_policy;
+
+	ret = cpufreq_get_policy(&new_policy, policy->cpu);
+	if (ret)
+		return -EINVAL;
+
+	ret = sscanf(buf, "%u", &new_policy.max);
+	if (ret != 1)
+		return -EINVAL;
+
+	// if new max frequency is above hard limit, overwrite with hard limit
+	if (new_policy.max > max_freq_hardlimit[policy->cpu])
+		new_policy.max = max_freq_hardlimit[policy->cpu];
+
+	ret = cpufreq_driver->verify(&new_policy);
+	if (ret)
+		pr_err("cpufreq: Frequency verification failed\n");
+
+	policy->user_policy.max = new_policy.max;
 	ret = __cpufreq_set_policy(policy, &new_policy);
 
 	return ret ? ret : count;
@@ -766,6 +845,7 @@ cpufreq_freq_attr_rw(scaling_min_freq_hardlimit);
 cpufreq_freq_attr_rw(UV_mV_table);
 #endif
 cpufreq_freq_attr_rw(scaling_max_freq);
+cpufreq_freq_attr_rw(scaling_max_freq_hardlimit);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
 
@@ -776,6 +856,7 @@ static struct attribute *default_attrs[] = {
 	&scaling_min_freq.attr,
 	&scaling_min_freq_hardlimit.attr,
 	&scaling_max_freq.attr,
+	&scaling_max_freq_hardlimit.attr,
 	&affected_cpus.attr,
 	&cpu_utilization.attr,
 	&related_cpus.attr,
@@ -2066,7 +2147,7 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	register_hotcpu_notifier(&cpufreq_cpu_notifier);
 	pr_debug("driver %s up and running\n", driver_data->name);
 
-	// Initialize min scaling freq hard limit
+	// Initialize min and max scaling freq hard limits
 	table = cpufreq_frequency_get_table(0);	
 	if (!table) 
 	{
@@ -2076,16 +2157,19 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	{
 		int i;
 		for (i = 0; i < nr_cpu_ids; i++)
+		{
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 			min_freq_hardlimit[i] = CONFIG_MSM_CPU_FREQ_MIN;
+			max_freq_hardlimit[i] = CONFIG_MSM_CPU_FREQ_MAX;
 #else
 			min_freq_hardlimit[i] = table[0].frequency;
+			max_freq_hardlimit[i] = CPUFREQ_TABLE_END;
 #endif			
-
+		}
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
-		pr_info("cpufreq : minimum scaling freq hard limit set to: %u\n", CONFIG_MSM_CPU_FREQ_MIN);
+		pr_info("cpufreq : minimum/maximum scaling freq hard limit set to: %u %u\n", CONFIG_MSM_CPU_FREQ_MIN, CONFIG_MSM_CPU_FREQ_MAX);
 #else
-		pr_info("cpufreq : minimum scaling freq hard limit set to: %u\n", table[0].frequency);
+		pr_info("cpufreq : minimum/maximum scaling freq hard limit set to: %u %u\n", table[0].frequency, CPUFREQ_TABLE_END);
 #endif			
 	}
 
