@@ -2262,8 +2262,17 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	{
 		int i;
 		for (i = 0; i < nr_cpu_ids; i++)
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+			min_freq_hardlimit[i] = CONFIG_MSM_CPU_FREQ_MIN;
+#else
 			min_freq_hardlimit[i] = table[0].frequency;
+#endif			
+
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+		pr_info("cpufreq : minimum scaling freq hard limit set to: %u\n", CONFIG_MSM_CPU_FREQ_MIN);
+#else
 		pr_info("cpufreq : minimum scaling freq hard limit set to: %u\n", table[0].frequency);
+#endif			
 	}
 
 	return 0;
