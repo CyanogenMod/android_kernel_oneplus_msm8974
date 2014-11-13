@@ -58,6 +58,7 @@ static struct kset *cpufreq_kset;
 static struct kset *cpudev_kset;
 
 static unsigned int min_freq_hardlimit[4] = {0, 0, 0, 0};
+static unsigned int max_freq_hardlimit[4] = {0, 0, 0, 0};
 
 /*
  * cpu_policy_rwsem is a per CPU reader-writer semaphore designed to cure
@@ -505,7 +506,7 @@ static ssize_t store_##file_name					\
 }
 
 // store_one(scaling_min_freq, min);
-store_one(scaling_max_freq, max);
+// store_one(scaling_max_freq, max);
 
 
 /**
@@ -665,11 +666,9 @@ static ssize_t store_scaling_max_freq(struct cpufreq_policy *policy, const char 
 	if (ret != 1)
 		return -EINVAL;
 
-	// if hard limit check is enabled + if new max frequency is above hard limit,
-	// overwrite with hard limit
-	if (max_freq_hardlimit[policy->cpu] != 0)
-		if (new_policy.max > max_freq_hardlimit[policy->cpu])
-			new_policy.max = max_freq_hardlimit[policy->cpu];
+	// if new max frequency is above hard limit, overwrite with hard limit
+	if (new_policy.max > max_freq_hardlimit[policy->cpu])
+		new_policy.max = max_freq_hardlimit[policy->cpu];
 
 	ret = cpufreq_driver->verify(&new_policy);
 	if (ret)
@@ -878,6 +877,7 @@ cpufreq_freq_attr_rw(UV_mV_table);
 #endif
 cpufreq_freq_attr_rw(scaling_min_freq_hardlimit);
 cpufreq_freq_attr_rw(scaling_max_freq);
+cpufreq_freq_attr_rw(scaling_max_freq_hardlimit);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
 cpufreq_freq_attr_ro(policy_min_freq);
@@ -890,6 +890,7 @@ static struct attribute *default_attrs[] = {
 	&scaling_min_freq.attr,
 	&scaling_min_freq_hardlimit.attr,
 	&scaling_max_freq.attr,
+	&scaling_max_freq_hardlimit.attr,
 	&affected_cpus.attr,
 	&cpu_utilization.attr,
 	&related_cpus.attr,
@@ -2350,7 +2351,7 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	register_hotcpu_notifier(&cpufreq_cpu_notifier);
 	pr_debug("driver %s up and running\n", driver_data->name);
 
-	// Initialize min scaling freq hard limit
+	// Initialize min and max scaling freq hard limits
 	table = cpufreq_frequency_get_table(0);	
 	if (!table) 
 	{
@@ -2360,16 +2361,19 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	{
 		int i;
 		for (i = 0; i < nr_cpu_ids; i++)
+		{
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 			min_freq_hardlimit[i] = CONFIG_MSM_CPU_FREQ_MIN;
+			max_freq_hardlimit[i] = CONFIG_MSM_CPU_FREQ_MAX;
 #else
 			min_freq_hardlimit[i] = table[0].frequency;
+			max_freq_hardlimit[i] = CPUFREQ_TABLE_END;
 #endif			
-
+		}
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
-		pr_info("cpufreq : minimum scaling freq hard limit set to: %u\n", CONFIG_MSM_CPU_FREQ_MIN);
+		pr_info("cpufreq : minimum/maximum scaling freq hard limit set to: %u %u\n", CONFIG_MSM_CPU_FREQ_MIN, CONFIG_MSM_CPU_FREQ_MAX);
 #else
-		pr_info("cpufreq : minimum scaling freq hard limit set to: %u\n", table[0].frequency);
+		pr_info("cpufreq : minimum/maximum scaling freq hard limit set to: %u %u\n", table[0].frequency, CPUFREQ_TABLE_END);
 #endif			
 	}
 
