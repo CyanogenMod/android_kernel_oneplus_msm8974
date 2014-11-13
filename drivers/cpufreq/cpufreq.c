@@ -2167,6 +2167,29 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	register_hotcpu_notifier(&cpufreq_cpu_notifier);
 	pr_debug("driver %s up and running\n", driver_data->name);
 
+	// Initialize min scaling freq hard limit
+	table = cpufreq_frequency_get_table(0);	
+	if (!table) 
+	{
+		pr_err("cpufreq : could not retrieve cpu freq table\n");
+	} 
+	else
+	{
+		int i;
+		for (i = 0; i < nr_cpu_ids; i++)
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+			min_freq_hardlimit[i] = CONFIG_MSM_CPU_FREQ_MIN;
+#else
+			min_freq_hardlimit[i] = table[0].frequency;
+#endif			
+
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+		pr_info("cpufreq : minimum scaling freq hard limit set to: %u\n", CONFIG_MSM_CPU_FREQ_MIN);
+#else
+		pr_info("cpufreq : minimum scaling freq hard limit set to: %u\n", table[0].frequency);
+#endif			
+	}
+
 	return 0;
 err_if_unreg:
 	subsys_interface_unregister(&cpufreq_interface);
