@@ -3059,6 +3059,12 @@ config HAS_MACH_MEMUTILS
 	bool "Motorola MSM memcpy enhancements"
 	help
 	Faster memcpy performance for Krait
+
+config SPEED_LEVEL_INTERFACE
+        bool "Expose SPEED level information in sys fs"
+        help
+         Allow SPEED level to be shown into specific kernel apps
+
 endif
 
 config KERNEL_TEXT_MPU_PROT
