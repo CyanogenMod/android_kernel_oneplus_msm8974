@@ -832,7 +832,7 @@ static void mdss_mdp_cmd_stop_sub(struct mdss_mdp_ctl *ctl,
 		 * next vsync if there has no kickoff pending
 		 */
 		ctx->rdptr_enabled = 1;
-		if (sctx)
+		if (sctx && sctx->rdptr_enabled)
 			sctx->rdptr_enabled = 1;
 	}
 	spin_unlock_irqrestore(&ctx->clk_lock, flags);
