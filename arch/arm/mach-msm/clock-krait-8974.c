@@ -478,7 +478,7 @@ static void get_krait_bin_format_b(struct platform_device *pdev,
 		*speed = 0;
 	}
 
-#ifdef CONFIG_PVS_LEVEL_INTERFACE
+#ifdef CONFIG_SPEED_LEVEL_INTERFACE
         speed_level = *speed;
 #endif
 
