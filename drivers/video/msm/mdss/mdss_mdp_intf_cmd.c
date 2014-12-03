@@ -796,6 +796,7 @@ static void mdss_mdp_cmd_stop_sub(struct mdss_mdp_ctl *ctl,
 	struct mdss_mdp_cmd_ctx *ctx;
 	unsigned long flags;
 	struct mdss_mdp_vsync_handler *tmp, *handle;
+	unsigned long sflags;
 	int need_wait = 0;
 	int hz;
 
@@ -832,8 +833,12 @@ static void mdss_mdp_cmd_stop_sub(struct mdss_mdp_ctl *ctl,
 		 * next vsync if there has no kickoff pending
 		 */
 		ctx->rdptr_enabled = 1;
-		if (sctx && sctx->rdptr_enabled)
-			sctx->rdptr_enabled = 1;
+		if (sctx) {
+			spin_lock_irqsave(&sctx->clk_lock, sflags);
+			if (sctx->rdptr_enabled)
+				sctx->rdptr_enabled = 1;
+			spin_unlock_irqrestore(&sctx->clk_lock, sflags);
+		}
 	}
 	spin_unlock_irqrestore(&ctx->clk_lock, flags);
 
