@@ -531,6 +531,14 @@ static ssize_t store_scaling_min_freq_hardlimit(struct cpufreq_policy *policy, c
 	if (ret != 1)
 		return -EINVAL;
 
+	// zero is an allowed value to disable the hard limit check
+	if (input == 0)
+	{
+		min_freq_hardlimit[policy->cpu] = 0;
+		pr_debug("cpufreq : min frequency hard limit check disabled\n");
+		return count;
+	}
+
 	// Get system frequency table
 	table = cpufreq_frequency_get_table(0);	
 
@@ -553,6 +561,61 @@ static ssize_t store_scaling_min_freq_hardlimit(struct cpufreq_policy *policy, c
 	return -EINVAL;
 }
 
+
+/**
+ * show_scaling_max_freq_hardlimit - maximum scaling frequency hard limit 
+ */
+static ssize_t show_scaling_max_freq_hardlimit(struct cpufreq_policy *policy, char *buf)
+{							\
+	return sprintf(buf, "%u\n", max_freq_hardlimit[policy->cpu]);
+}
+
+
+/**
+ * store_scaling_max_freq_hardlimit() - maximum scaling frequency hard limit
+ */
+static ssize_t store_scaling_max_freq_hardlimit(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;
+	unsigned int input;
+	int i;
+	struct cpufreq_frequency_table *table;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	// zero is an allowed value to disable the hard limit check
+	if (input == 0)
+	{
+		max_freq_hardlimit[policy->cpu] = 0;
+		pr_debug("cpufreq : max frequency hard limit check disabled\n");
+		return count;
+	}
+
+	// Get system frequency table
+	table = cpufreq_frequency_get_table(0);	
+
+	if (!table) 
+	{
+		pr_err("cpufreq : could not retrieve cpu freq table\n");
+		return -EINVAL;
+	} 
+
+	// Allow only frequencies in the system table
+	for (i = 0; (table[i].frequency != CPUFREQ_TABLE_END); i++) 
+		if (table[i].frequency == input) 
+		{
+			pr_debug("cpufreq : frequency for maximum scaling freq hard limit found\n");
+			max_freq_hardlimit[policy->cpu] = input;
+			return count;
+		}
+
+	pr_err("cpufreq : invalid frequency requested for maximum scaling freq hard limit\n");
+	return -EINVAL;
+}
+
+
 /**
  * store_scaling_min_freq() - minimum scaling frequency
  */
@@ -569,15 +632,50 @@ static ssize_t store_scaling_min_freq(struct cpufreq_policy *policy, const char 
 	if (ret != 1)
 		return -EINVAL;
 
-	// if new min frequency is below hard limit, overwrite with hard limit
-	if (new_policy.min < min_freq_hardlimit[policy->cpu])
-		new_policy.min = min_freq_hardlimit[policy->cpu];
+	// if hard limit check is enabled + if new min frequency is below hard limit,
+	// overwrite with hard limit
+	if (min_freq_hardlimit[policy->cpu] != 0)
+		if (new_policy.min < min_freq_hardlimit[policy->cpu])
+			new_policy.min = min_freq_hardlimit[policy->cpu];
 
 	ret = cpufreq_driver->verify(&new_policy);
 	if (ret)
 		pr_err("cpufreq: Frequency verification failed\n");
 
 	policy->user_policy.min = new_policy.min;
+	ret = __cpufreq_set_policy(policy, &new_policy);
+
+	return ret ? ret : count;
+}
+
+
+/**
+ * store_scaling_max_freq() - maximum scaling frequency
+ */
+static ssize_t store_scaling_max_freq(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;
+	struct cpufreq_policy new_policy;
+
+	ret = cpufreq_get_policy(&new_policy, policy->cpu);
+	if (ret)
+		return -EINVAL;
+
+	ret = sscanf(buf, "%u", &new_policy.max);
+	if (ret != 1)
+		return -EINVAL;
+
+	// if hard limit check is enabled + if new max frequency is above hard limit,
+	// overwrite with hard limit
+	if (max_freq_hardlimit[policy->cpu] != 0)
+		if (new_policy.max > max_freq_hardlimit[policy->cpu])
+			new_policy.max = max_freq_hardlimit[policy->cpu];
+
+	ret = cpufreq_driver->verify(&new_policy);
+	if (ret)
+		pr_err("cpufreq: Frequency verification failed\n");
+
+	policy->user_policy.max = new_policy.max;
 	ret = __cpufreq_set_policy(policy, &new_policy);
 
 	return ret ? ret : count;
