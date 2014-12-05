@@ -541,6 +541,14 @@ static ssize_t store_scaling_min_freq_hardlimit(struct cpufreq_policy *policy, c
 	if (ret != 1)
 		return -EINVAL;
 
+	// zero is an allowed value to disable the hard limit check
+	if (input == 0)
+	{
+		min_freq_hardlimit[policy->cpu] = 0;
+		pr_debug("cpufreq : min frequency hard limit check disabled\n");
+		return count;
+	}
+
 	// Get system frequency table
 	table = cpufreq_frequency_get_table(0);	
 
@@ -587,6 +595,14 @@ static ssize_t store_scaling_max_freq_hardlimit(struct cpufreq_policy *policy, c
 	if (ret != 1)
 		return -EINVAL;
 
+	// zero is an allowed value to disable the hard limit check
+	if (input == 0)
+	{
+		max_freq_hardlimit[policy->cpu] = 0;
+		pr_debug("cpufreq : max frequency hard limit check disabled\n");
+		return count;
+	}
+
 	// Get system frequency table
 	table = cpufreq_frequency_get_table(0);	
 
@@ -626,9 +642,11 @@ static ssize_t store_scaling_min_freq(struct cpufreq_policy *policy, const char 
 	if (ret != 1)
 		return -EINVAL;
 
-	// if new min frequency is below hard limit, overwrite with hard limit
-	if (new_policy.min < min_freq_hardlimit[policy->cpu])
-		new_policy.min = min_freq_hardlimit[policy->cpu];
+	// if hard limit check is enabled + if new min frequency is below hard limit,
+	// overwrite with hard limit
+	if (min_freq_hardlimit[policy->cpu] != 0)
+		if (new_policy.min < min_freq_hardlimit[policy->cpu])
+			new_policy.min = min_freq_hardlimit[policy->cpu];
 
 	ret = cpufreq_driver->verify(&new_policy);
 	if (ret)
@@ -657,9 +675,11 @@ static ssize_t store_scaling_max_freq(struct cpufreq_policy *policy, const char 
 	if (ret != 1)
 		return -EINVAL;
 
-	// if new max frequency is above hard limit, overwrite with hard limit
-	if (new_policy.max > max_freq_hardlimit[policy->cpu])
-		new_policy.max = max_freq_hardlimit[policy->cpu];
+	// if hard limit check is enabled + if new max frequency is above hard limit,
+	// overwrite with hard limit
+	if (max_freq_hardlimit[policy->cpu] != 0)
+		if (new_policy.max > max_freq_hardlimit[policy->cpu])
+			new_policy.max = max_freq_hardlimit[policy->cpu];
 
 	ret = cpufreq_driver->verify(&new_policy);
 	if (ret)
