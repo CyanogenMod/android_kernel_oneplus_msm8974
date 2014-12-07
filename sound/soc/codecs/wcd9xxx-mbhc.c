@@ -108,8 +108,6 @@
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV 265
 #endif
 
-#define HPH_TRANS_THRESHOLD 2
-
 /*
  * Threshold used to detect euro headset
  * with current source
@@ -3051,7 +3049,6 @@ static void wcd9xxx_correct_swch_plug(struct work_struct *work)
 	unsigned long timeout;
 	int retry = 0, pt_gnd_mic_swap_cnt = 0;
 	int highhph_cnt = 0;
-	int hph_trans_cnt = 0;
 	bool correction = false;
 	bool current_source_enable;
 	bool wrk_complete = true, highhph = false;
@@ -3180,13 +3177,6 @@ static void wcd9xxx_correct_swch_plug(struct work_struct *work)
 				}
 			} else
 				pt_gnd_mic_swap_cnt = 0;
-
-			if (plug_type == PLUG_TYPE_HEADSET) {
-				hph_trans_cnt++;
-				if (hph_trans_cnt < HPH_TRANS_THRESHOLD)
-					continue;
-			} else
-				hph_trans_cnt = 0;
 
 			WCD9XXX_BCL_LOCK(mbhc->resmgr);
 			/* Turn off override/current source */
