@@ -284,6 +284,7 @@ struct synaptics_rmi4_data {
 	atomic_t camera_enable;
 	atomic_t music_enable;
 	atomic_t flashlight_enable;
+	atomic_t sweep_wake_enable;
 	unsigned char glove_enable;  //glove mode
 	unsigned char pdoze_enable;  //pdoze mode
 	unsigned char smartcover_enable;  //smartcover mode

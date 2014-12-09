@@ -484,6 +484,7 @@ struct input_keymap_entry {
 #define KEY_GESTURE_LTR		253
 #define KEY_GESTURE_GTR		254
 #define KEY_DOUBLE_TAP      255
+#define KEY_SWEEP_WAKE		255
 
 /* Code 255 is reserved for special needs of AT keyboard driver */
 

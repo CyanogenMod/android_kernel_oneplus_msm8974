@@ -16,6 +16,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -942,12 +943,12 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define SYNA_ONE_FINGER_DIRECTION		0x0a
 #define SYNA_ONE_FINGER_W_OR_M			0x0b
 
-#define KEY_F3			61   //Ë«»÷»½ÐÑÆÁÄ»,
-#define KEY_F4			62   //Æô¶¯Ïà»ú£¬»®È¦
-#define KEY_F5			63   // Æô¶¯ÊÖµçÍ²£¬ÕýV
-#define KEY_F6			64   // ÔÝÍ£¸èÇú£¬Á½Ø­Ø­
-#define KEY_F7			65  // ÉÏÒ»Ê×£¬<
-#define KEY_F8			66  // ÏÂÒ»Ê×, >
+#define KEY_F3			61   //Ë«\BB\F7\BB\BD\D0\D1\C6\C1Ä»,
+#define KEY_F4			62   //\C6\F4\B6\AF\CF\E0\BB\FA\A3\AC\BB\AEÈ¦
+#define KEY_F5			63   // \C6\F4\B6\AF\CAÖµ\E7Í²\A3\AC\D5\FDV
+#define KEY_F6			64   // \D4\DDÍ£\B8\E8\C7\FA\A3\AC\C1\BDØ­Ø­
+#define KEY_F7			65  // \C9\CFÒ»\CA×£\AC<
+#define KEY_F8			66  // \CF\C2Ò»\CA\D7, >
 #define KEY_F9			67  // M or W
 
 #define UnknownGesture      0
@@ -968,7 +969,7 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define SYNA_SMARTCOVER_MIN	0
 #define SYNA_SMARTCOVER_MAN	750
 
-//ÒÔÏÂ¼Ä´æÆ÷×ÜÊÇÐÞ¸Ä£¬Òò´Ë³é³öÀ´¶¨ÒåÔÚÕâÀï
+//\D2\D4\CFÂ¼Ä´\E6\C6\F7\D7\DC\CA\C7\D0Þ¸Ä£\AC\D2\F2\B4Ë³\E9\B3\F6\C0\B4\B6\A8\D2\E5\D4\DA\D5\E2\C0\EF
 #define SYNA_ADDR_REPORT_FLAG        0x1b  //report mode register
 #define SYNA_ADDR_GESTURE_FLAG       0x20  //gesture enable register
 #define SYNA_ADDR_GLOVE_FLAG         0x1f  //glove enable register
@@ -1396,6 +1397,33 @@ static int synaptics_rmi4_proc_flashlight_write(struct file *filp, const char __
 	return len;
 }
 
+static int synaptics_rmi4_proc_sweep_wake_read(char *page, char **start, off_t off,
+		int count, int *eof, void *data)
+{
+	return sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->sweep_wake_enable));
+}
+
+static int synaptics_rmi4_proc_sweep_wake_write(struct file *filp, const char __user *buff,
+		unsigned long len, void *data)
+{
+	int enable;
+	char buf[2];
+
+	if (len > 2)
+		return 0;
+
+	if (copy_from_user(buf, buff, len)) {
+		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
+		return -EFAULT;
+	}
+
+	enable = (buf[0] == '0') ? 0 : 1;
+
+	atomic_set(&syna_rmi4_data->sweep_wake_enable, enable);
+
+	return len;
+}
+
 //smartcover proc read function
 static int synaptics_rmi4_proc_smartcover_read(char *page, char **start, off_t off,
 		int count, int *eof, void *data) {
@@ -1666,6 +1694,13 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_flashlight_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_flashlight_read;
+	}
+
+	// sweep wake
+	proc_entry = create_proc_entry("sweep_wake_enable", 0664, procdir);
+	if (proc_entry) {
+		proc_entry->write_proc = synaptics_rmi4_proc_sweep_wake_write;
+		proc_entry->read_proc = synaptics_rmi4_proc_sweep_wake_read;
 	}
 
 	//for pdoze enable/disable interface
@@ -1991,7 +2026,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 	synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1);
 	wait_test_cmd_finished();
 
-	//¿¿¿¿¿¿¿¿¿¿¿¿¿¿3¿WORD¿¿¿¿¿¿¿¿¿1000¿¿ Limit ¿¿¿¿¿-1,0.45¿¿¿-1,0.45¿¿¿-0.42,0.02¿
+	//\BF\BF\BF\BF\BF\BF\BF\BF\BF\BF\BF\BF\BF\BF3\BFWORD\BF\BF\BF\BF\BF\BF\BF\BF\BF1000\BF\BF Limit \BF\BF\BF\BF\BF-1,0.45\BF\BF\BF-1,0.45\BF\BF\BF-0.42,0.02\BF
 	for (i = 0;i < 3; i++) {
 		int iTemp[2];
 		ret = i2c_smbus_read_word_data(client, F54_DATA_BASE_ADDR + 3); // is F54_DATA_BASE_ADDR+3   not F54_DATA_BASE_ADDR+i
@@ -2388,6 +2423,11 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 				(gestureext[24] == 0x48) ? Down2UpSwip      :
 				(gestureext[24] == 0x80) ? DouSwip          :
 				UnknownGesture;
+			if (gesturemode == Left2RightSwip ||
+					gesturemode == Right2LeftSwip) {
+				if (atomic_read(&syna_rmi4_data->sweep_wake_enable))
+					keyvalue = KEY_SWEEP_WAKE;
+			}
 			if (gesturemode == DouSwip ||
 					gesturemode == Down2UpSwip ||
 					gesturemode == Up2DownSwip) {
@@ -3820,6 +3860,7 @@ static void synaptics_rmi4_set_params(struct synaptics_rmi4_data *rmi4_data)
 	set_bit(KEY_GESTURE_CIRCLE, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_SWIPE_DOWN, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_V, rmi4_data->input_dev->keybit);
+	set_bit(KEY_SWEEP_WAKE, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_LTR, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_GTR, rmi4_data->input_dev->keybit);
 	synaptics_ts_init_virtual_key(rmi4_data);
@@ -3907,6 +3948,7 @@ static int synaptics_rmi4_set_input_dev(struct synaptics_rmi4_data *rmi4_data)
 	atomic_set(&rmi4_data->camera_enable, 0);
 	atomic_set(&rmi4_data->music_enable, 0);
 	atomic_set(&rmi4_data->flashlight_enable, 0);
+	atomic_set(&rmi4_data->sweep_wake_enable, 0);
 
 	rmi4_data->glove_enable = 0;
 	rmi4_data->pdoze_enable = 0;
@@ -4371,7 +4413,8 @@ static void synaptics_rmi4_init_work(struct work_struct *work)
 			atomic_read(&rmi4_data->double_tap_enable) ||
 			atomic_read(&rmi4_data->camera_enable) ||
 			atomic_read(&rmi4_data->music_enable) ||
-			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
+			atomic_read(&rmi4_data->flashlight_enable) ||
+                        atomic_read(&rmi4_data->sweep_wake_enable) ? 1 : 0);
 		goto out;
 	}
 
@@ -4777,7 +4820,8 @@ static int synaptics_rmi4_suspend(struct device *dev)
 			atomic_read(&rmi4_data->double_tap_enable) ||
 			atomic_read(&rmi4_data->camera_enable) ||
 			atomic_read(&rmi4_data->music_enable) ||
-			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
+			atomic_read(&rmi4_data->flashlight_enable) ||
+			atomic_read(&rmi4_data->sweep_wake_enable) ? 1 : 0);
 
 	if (atomic_read(&rmi4_data->syna_use_gesture) || rmi4_data->pdoze_enable) {
 		synaptics_enable_gesture(rmi4_data,true);
