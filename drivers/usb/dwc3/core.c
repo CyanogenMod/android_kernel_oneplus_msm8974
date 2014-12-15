@@ -564,6 +564,7 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 
 	u8			mode;
 	bool			host_only_mode;
+	const char		*str = NULL;
 
 	mem = devm_kzalloc(dev, sizeof(*dwc) + DWC3_ALIGN_MASK, GFP_KERNEL);
 	if (!mem) {
@@ -625,6 +626,10 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 	dwc->regs	= regs;
 	dwc->regs_size	= resource_size(res);
 	dwc->dev	= dev;
+
+	if (!of_property_read_string(node, "maximum-speed", &str))
+		maximum_speed = (char *)str;
+	dev_info(dev, "maximum speed: %s\n", maximum_speed);
 
 	if (!strncmp("super", maximum_speed, 5))
 		dwc->maximum_speed = DWC3_DCFG_SUPERSPEED;
