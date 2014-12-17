@@ -652,7 +652,6 @@ unsigned long dma_alloc_from_contiguous(struct device *dev, int count,
 		if (ret == 0) {
 			break;
 		} else if (ret != -EBUSY) {
-			pfn = 0;
 			clear_cma_bitmap(cma, pfn, count);
 			pfn = 0;
 			break;
