@@ -1971,6 +1971,18 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 	memcpy(&policy->cpuinfo, &data->cpuinfo,
 				sizeof(struct cpufreq_cpuinfo));
 
+	// if hard limit check is enabled + if new max frequency is above hard limit,
+	// overwrite with hard limit
+	if (min_freq_hardlimit[policy->cpu] != 0)
+		if (policy->min < min_freq_hardlimit[policy->cpu])
+			policy->min = min_freq_hardlimit[policy->cpu];
+
+	// if hard limit check is enabled + if new max frequency is above hard limit,
+	// overwrite with hard limit
+	if (max_freq_hardlimit[policy->cpu] != 0)
+		if (policy->max > max_freq_hardlimit[policy->cpu])
+			policy->max = max_freq_hardlimit[policy->cpu];
+
 	if (policy->min > data->user_policy.max
 		|| policy->max < data->user_policy.min) {
 		ret = -EINVAL;
@@ -2014,6 +2026,11 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 		if (policy->governor != data->governor) {
 			/* save old, working values */
 			struct cpufreq_governor *old_gov = data->governor;
+
+			// if hard limit for governor is set, only allow this governor to be set
+			if ((strlen(governor_hard[policy->cpu]) != 0) && 
+				(! strstr(policy->governor->name, governor_hard[policy->cpu])))
+				policy->governor = __find_governor(governor_hard[policy->cpu]);
 
 			pr_debug("governor switch\n");
 
