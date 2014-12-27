@@ -27,6 +27,7 @@
 #include "msm_cci.h"
 #include "msm_sd.h"
 #include <linux/pcb_version.h>
+#include <linux/proc_fs.h>
 
 #define MAX_LED_TRIGGERS 3
 
@@ -67,7 +68,8 @@ struct msm_led_cci_led_info_t {
     struct regulator *retulator;
     uint32_t status;
     int test_mode;
-    int test_status;
+    bool test_status;
+    bool blink_status;
     struct delayed_work dwork;
 };
 

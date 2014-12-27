@@ -173,6 +173,14 @@ config IMX214
 		snapshot config = 4208 x 3120 at 24 fps,
 		Video HDR support.
 
+config OV16825
+	bool "Sensor OV16825 (BAYER 16M)"
+	depends on MSMB_CAMERA
+	---help---
+		OV 16 MP Bayer Sensor with auto focus, uses
+		4 mipi lanes, preview config = 2104 x 1560 at 49 fps,
+		snapshot config = 4608 x 3456 at 24 fps.
+
 config MT9M114
 	bool "Sensor MT9M114 (YUV 1.26MP)"
 	depends on MSMB_CAMERA
@@ -265,4 +273,10 @@ config MSM_CAMERA_LED_CCI
 	default n
 	---help---
 		led flash driver for third party driver IC
-	  
+
+config MSM_CAMERA_LED_PM
+	bool "led flash use pmic"
+	depends on MSMB_CAMERA
+	default n
+	---help---
+		led flash driver for third party driver IC

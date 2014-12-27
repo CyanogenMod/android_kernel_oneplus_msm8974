@@ -17,6 +17,8 @@ obj-$(CONFIG_MSM_CAMERA_SENSOR) += msm_sensor.o
 #obj-$(CONFIG_HI256) += hi256.o
 #added by oppo start
 obj-$(CONFIG_IMX214) += imx214.o
+obj-$(CONFIG_OV16825) += ov16825.o
+
 #added by oppo end
 obj-$(CONFIG_OV5648) += ov5648.o
 #del by oppo start
