@@ -16,7 +16,7 @@
 #include <linux/module.h>
 #include "msm_led_flash.h"
 /*Added by Jinshui.Liu@Camera 20140218 start for*/
-#if defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7WX)
+#ifdef CONFIG_MACH_OPPO
 #include <linux/pcb_version.h>
 #endif
 /*Added by Jinshui.Liu@Camera 20140218 end*/
@@ -290,7 +290,7 @@ static int __init msm_led_trigger_add_driver(void)
 {
 	CDBG("called\n");
 /*modified by Jinshui.Liu@Prd.Camera 20140218 start for*/
-#if (!defined(CONFIG_MACH_FIND7)) &&  (!defined(CONFIG_MACH_FIND7WX))
+#ifdef CONFIG_MACH_OPPO
 	return platform_driver_probe(&msm_led_trigger_driver,
 		msm_led_trigger_probe);
 #else

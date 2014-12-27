@@ -678,9 +678,9 @@ static void msm_led_cci_test_off(void)
 static void msm_led_cci_test_blink_work(struct work_struct *work)
 {
     struct delayed_work *dwork = to_delayed_work(work);
-    msm_led_cci_set_brightness(&fctrl, fctrl.led_info->test_status);
-    fctrl.led_info->test_status = !fctrl.led_info->test_status;
-    schedule_delayed_work(dwork, msecs_to_jiffies(1100));
+    msm_led_cci_set_brightness(&fctrl, fctrl.led_info->blink_status);
+    fctrl.led_info->blink_status = !fctrl.led_info->blink_status;
+    schedule_delayed_work(dwork, msecs_to_jiffies(1000));
 }
 
 static ssize_t msm_led_cci_test_store(struct device *dev, struct device_attribute *attr,
@@ -688,60 +688,69 @@ static ssize_t msm_led_cci_test_store(struct device *dev, struct device_attribut
 {
 	int new_mode = simple_strtoul(buf, NULL, 10);
     int *pold_mode = &fctrl.led_info->test_mode;
+    bool need_off = 0;
+    bool need_on = 0;
+
     if (new_mode == *pold_mode) {
-        pr_err("the same mode as old\n");
+        pr_err("the same mode as old %d\n", *pold_mode);
         return count;
+    } else {
+        pr_err("the old mode is %d, new mode is %d\n", *pold_mode, new_mode);
     }
 
-    if (*pold_mode!=0 && new_mode!=0) {
-        fctrl.led_info->test_status = 0;
+    if (fctrl.led_info->test_status)
+        need_off = 1;
+    if (new_mode >= 1 && new_mode <= 3)
+        need_on = 1;
+
+    if (need_off) {
         msm_led_cci_test_off();
-        *pold_mode = 0;
+        fctrl.led_info->test_status = 0;
     }
 
     switch (new_mode) {
-    case 0:
-        if (*pold_mode==1 || *pold_mode==2 || *pold_mode==3) {
-            fctrl.led_info->test_status = 0;
-            msm_led_cci_test_off();
-            *pold_mode = 0;
-        }
-        break;
     case 1:
-        if (*pold_mode==0) {
-            fctrl.led_info->test_status = 1;
-            msm_led_cci_test_init();
-            msm_led_cci_set_brightness(&fctrl, MSM_CAMERA_LED_LOW);
-            *pold_mode = 1;
-        }
+        msm_led_cci_test_init();
+        msm_led_cci_set_brightness(&fctrl, MSM_CAMERA_LED_LOW);
+        fctrl.led_info->test_status = 1;
         break;
     case 2:
-        if (*pold_mode==0) {
-            fctrl.led_info->test_status = 1;
-            msm_led_cci_test_init();
-            INIT_DELAYED_WORK(&fctrl.led_info->dwork, msm_led_cci_test_blink_work);
-            schedule_delayed_work(&fctrl.led_info->dwork, msecs_to_jiffies(50));
-            *pold_mode = 2;
-        }
+        fctrl.led_info->blink_status = 1;
+        msm_led_cci_test_init();
+        INIT_DELAYED_WORK(&fctrl.led_info->dwork, msm_led_cci_test_blink_work);
+        schedule_delayed_work(&fctrl.led_info->dwork, msecs_to_jiffies(50));
+        fctrl.led_info->test_status = 1;
         break;
     case 3:
-        if (*pold_mode==0) {
-            fctrl.led_info->test_status = 1;
-            msm_led_cci_test_init();
-            msm_led_cci_set_brightness(&fctrl, MSM_CAMERA_LED_HIGH);
-            *pold_mode = 3;
-        }
+        msm_led_cci_test_init();
+        msm_led_cci_set_brightness(&fctrl, MSM_CAMERA_LED_HIGH);
+        fctrl.led_info->test_status = 1;
         break;
     default:
-        pr_err("invalid mode\n");
+        pr_err("other mode %d\n", new_mode);
         break;
     }
-	
+
+    *pold_mode = new_mode;
+	pr_err("the mode is %d now\n", *pold_mode);
+
 	return count;
 }
 
-static DEVICE_ATTR(test, 0660,
-		   NULL, msm_led_cci_test_store);
+static ssize_t msm_led_cci_test_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	ssize_t size = -EINVAL;
+    int *pold_mode = &fctrl.led_info->test_mode;
+
+	if (*pold_mode >= 0)
+		size = snprintf(buf, PAGE_SIZE, "%d\n", *pold_mode);
+	return size;
+}
+
+
+static DEVICE_ATTR(test, 0664,
+		   msm_led_cci_test_show, msm_led_cci_test_store);
 
 #ifdef CONFIG_HARDWARE_TEST
 static ssize_t msm_led_cci_hardware_test_op_store(struct device *dev, struct device_attribute *attr,
@@ -873,10 +882,10 @@ static ssize_t msm_led_cci_hardware_test_reg_show(struct device *dev,
 	return 1;
 }
 
-static DEVICE_ATTR(hardware_test_op, 0660,
+static DEVICE_ATTR(hardware_test_op, 0664,
 		   NULL, msm_led_cci_hardware_test_op_store);
 
-static DEVICE_ATTR(hardware_test_reg, 0660,
+static DEVICE_ATTR(hardware_test_reg, 0664,
 		   msm_led_cci_hardware_test_reg_show, msm_led_cci_hardware_test_reg_store);
 #endif
 
@@ -903,10 +912,85 @@ static struct platform_driver msm_led_cci_driver = {
 	},
 };
 
+/*Added by Jinshui.Liu@Camera 20140827 start for individual flashlight*/
+static int flash_proc_read(char *page, char **start, off_t off, int count,
+    int *eof, void *data)
+{
+    ssize_t read_size = -EINVAL;
+    int *pold_mode = &fctrl.led_info->test_mode;
+
+    if (*pold_mode >= 0)
+        read_size = snprintf(page, PAGE_SIZE, "%d\n", *pold_mode);
+    return read_size;
+}
+
+static int flash_proc_write(struct file *filp, const char __user *buff,
+    unsigned long len, void *data)
+{
+	char temp[1] = {0};
+    int new_mode = simple_strtoul(buff, NULL, 10);
+    int *pold_mode = &fctrl.led_info->test_mode;
+    bool need_off = 0;
+    bool need_on = 0;
+    int ret = -EINVAL;
+
+	if (copy_from_user(temp, buff, 1))
+		return -EFAULT;
+    ret = sscanf(temp, "%d", &new_mode);
+    if (ret <= 0)
+        return len;
+
+    if (new_mode == *pold_mode) {
+        pr_err("the same mode as old %d\n", *pold_mode);
+        return len;
+    } else {
+        pr_err("the old mode is %d, new mode is %d\n", *pold_mode, new_mode);
+    }
+
+    if (fctrl.led_info->test_status)
+        need_off = 1;
+    if (new_mode >= 1 && new_mode <= 3)
+        need_on = 1;
+
+    if (need_off) {
+        msm_led_cci_test_off();
+        fctrl.led_info->test_status = 0;
+    }
+
+    switch (new_mode) {
+    case 1:
+        msm_led_cci_test_init();
+        msm_led_cci_set_brightness(&fctrl, MSM_CAMERA_LED_LOW);
+        fctrl.led_info->test_status = 1;
+        break;
+    case 2:
+        fctrl.led_info->blink_status = 1;
+        msm_led_cci_test_init();
+        INIT_DELAYED_WORK(&fctrl.led_info->dwork, msm_led_cci_test_blink_work);
+        schedule_delayed_work(&fctrl.led_info->dwork, msecs_to_jiffies(50));
+        fctrl.led_info->test_status = 1;
+        break;
+    case 3:
+        msm_led_cci_test_init();
+        msm_led_cci_set_brightness(&fctrl, MSM_CAMERA_LED_HIGH);
+        fctrl.led_info->test_status = 1;
+        break;
+    default:
+        pr_err("other mode %d\n", new_mode);
+        break;
+    }
+
+    *pold_mode = new_mode;
+    pr_err("the mode is %d now\n", *pold_mode);
+
+    return len;
+}
+
 static int32_t msm_led_cci_probe(struct platform_device *pdev)
 {
 	int32_t rc = 0;
 	struct device_node *of_node = pdev->dev.of_node;
+	struct proc_dir_entry *proc_entry = NULL;
 
 	CDBG("called\n");
 
@@ -956,12 +1040,23 @@ static int32_t msm_led_cci_probe(struct platform_device *pdev)
         pr_err("can't find a known chip\n");
         return -ENODEV;
     }
-    pr_err("find a device");
+    pr_err("find a device\n");
 
 	rc = msm_led_cci_create_v4lsubdev(pdev, &fctrl);
 
 	if (rc >= 0)
 	    rc = sysfs_create_group(&pdev->dev.kobj, &msm_led_cci_attr_group);
+
+    /*Added by Jinshui.Liu@Camera 20140827 start for individual flashlight*/
+    proc_entry = create_proc_entry( "qcom_flash", 0664, NULL);
+    if (!proc_entry) {
+        pr_err("proc_entry create failed\n");
+        return rc;
+    }
+    proc_entry->data = &fctrl;
+    proc_entry->read_proc = flash_proc_read;
+    proc_entry->write_proc = flash_proc_write;
+
 	return rc;
 }
 
