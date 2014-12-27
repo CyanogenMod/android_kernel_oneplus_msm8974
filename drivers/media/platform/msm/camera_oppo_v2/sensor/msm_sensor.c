@@ -1428,7 +1428,7 @@ static int sensor_proc_init(struct msm_sensor_ctrl_t *sensor_ctl)
 
 	return ret;
 }
-#endif /* MACH_OPPO */
+#endif /* CONFIG_MACH_OPPO */
 
 static long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg)
