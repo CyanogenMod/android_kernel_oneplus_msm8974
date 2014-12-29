@@ -70,7 +70,8 @@ static int dsi_panel_handler(struct mdss_panel_data *pdata, int enable)
 		rc = ctrl_pdata->on(pdata);
 		if (rc)
 			pr_err("dsi_panel_handler panel on failed %d\n", rc);
-	} else {
+	} else if (!enable &&
+		(pdata->panel_info.panel_power_state == MDSS_PANEL_POWER_ON)) {
 		if (dsi_intf.op_mode_config)
 			dsi_intf.op_mode_config(DSI_CMD_MODE, pdata);
 		rc = ctrl_pdata->off(pdata);
