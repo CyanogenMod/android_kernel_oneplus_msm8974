@@ -1,23 +1,30 @@
 /*
-  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
-  *
-  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
-  *
-  *
-  * Permission to use, copy, modify, and/or distribute this software for
-  * any purpose with or without fee is hereby granted, provided that the
-  * above copyright notice and this permission notice appear in all
-  * copies.
-  *
-  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
-  * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
-  * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
-  * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
-  * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
-  * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-  * PERFORMANCE OF THIS SOFTWARE.
-*/
+ * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
+
+/*
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
+ */
+
 /*==========================================================================
  *
  *  @file:     wlan_hal_cfg.h
@@ -26,8 +33,6 @@
  *
  *  @author:   Kumar Anand
  *
- *             Copyright (C) 2010, Qualcomm Technologies, Inc. 
- *             All rights reserved.
  *
  *=========================================================================*/
 
@@ -220,11 +225,54 @@
 #define QWLAN_HAL_CFG_BTC_STATIC_OPP_WLAN_ACTIVE_BT_LEN          167
 #define QWLAN_HAL_CFG_BTC_SAP_STATIC_OPP_WLAN_ACTIVE_WLAN_LEN    168
 #define QWLAN_HAL_CFG_BTC_SAP_STATIC_OPP_WLAN_ACTIVE_BT_LEN      169
-#define QWLAN_HAL_CFG_MAX_PARAMS                        170
+#define QWLAN_HAL_CFG_RMCAST_FIXED_RATE                 170
+#define QWLAN_HAL_CFG_ASD_PROBE_INTERVAL                171
+#define QWLAN_HAL_CFG_ASD_TRIGGER_THRESHOLD             172
+#define QWLAN_HAL_CFG_ASD_RTT_RSSI_HYST_THRESHOLD       173
+#define QWLAN_HAL_CFG_BTC_CTS2S_ON_STA_DURING_SCO       174
+#define QWLAN_HAL_CFG_SHORT_PREAMBLE                    175
+#define QWLAN_HAL_CFG_SHORT_SLOT_TIME                   176
+#define QWLAN_HAL_CFG_DELAYED_BA                        177
+#define QWLAN_HAL_CFG_IMMEDIATE_BA                      178
+#define QWLAN_HAL_CFG_DOT11_MODE                        179
+#define QWLAN_HAL_CFG_HT_CAPS                           180
+#define QWLAN_HAL_CFG_AMPDU_PARAMS                      181
+#define QWLAN_HAL_CFG_TX_BF_INFO                        182
+#define QWLAN_HAL_CFG_ASC_CAP_INFO                      183
+#define QWLAN_HAL_CFG_EXT_HT_CAPS                       184
+#define QWLAN_HAL_CFG_QOS_ENABLED                       185
+#define QWLAN_HAL_CFG_WME_ENABLED                       186
+#define QWLAN_HAL_CFG_WSM_ENABLED                       187
+#define QWLAN_HAL_CFG_WMM_ENABLED                       188
+#define QWLAN_HAL_CFG_UAPSD_PER_AC_BITMASK              189
+#define QWLAN_HAL_CFG_MCS_RATES                         190
+#define QWLAN_HAL_CFG_VHT_CAPS                          191
+#define QWLAN_HAL_CFG_VHT_RX_SUPP_MCS                   192
+#define QWLAN_HAL_CFG_VHT_TX_SUPP_MCS                   193
+#define QWLAN_HAL_CFG_RA_FILTER_ENABLE                  194
+#define QWLAN_HAL_CFG_RA_RATE_LIMIT_INTERVAL            195
+#define QWLAN_HAL_CFG_BTC_FATAL_HID_NSNIFF_BLK_GUIDANCE      196
+#define QWLAN_HAL_CFG_BTC_CRITICAL_HID_NSNIFF_BLK_GUIDANCE   197
+#define QWLAN_HAL_CFG_BTC_DYN_A2DP_TX_QUEUE_THOLD            198
+#define QWLAN_HAL_CFG_BTC_DYN_OPP_TX_QUEUE_THOLD             199
+#define QWLAN_HAL_CFG_LINK_FAIL_TIMEOUT                      200
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_SP                    201
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_RX_CNT                202
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_TX_CNT                203
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_RX_CNT_MEAS_WINDOW    204
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_TX_CNT_MEAS_WINDOW    205
+#define QWLAN_HAL_CFG_MAX_PSPOLL_IN_WMM_UAPSD_PS_MODE        206
+#define QWLAN_HAL_CFG_MAX_UAPSD_INACTIVITY_INTERVALS         207
+#define QWLAN_HAL_CFG_ENABLE_DYNAMIC_WMMPS                   208
+#define QWLAN_HAL_CFG_BURST_MODE_BE_TXOP_VALUE               209
+#define QWLAN_HAL_CFG_ENABLE_DYNAMIC_RA_START_RATE           210
+
+
+#define QWLAN_HAL_CFG_MAX_PARAMS                             211
 
 
 /* Total number of Integer CFGs. This is used while allocating the memory for TLV */
-#define QWLAN_HAL_CFG_INTEGER_PARAM                     170
+#define QWLAN_HAL_CFG_INTEGER_PARAM                     211
 
 /*-------------------------------------------------------------------------
   Configuration Parameter min, max, defaults
@@ -875,11 +923,15 @@
 
 #define QWLAN_HAL_CFG_BTC_SAP_STATIC_OPP_WLAN_ACTIVE_WLAN_LEN_MIN 0
 #define QWLAN_HAL_CFG_BTC_SAP_STATIC_OPP_WLAN_ACTIVE_WLAN_LEN_MAX 250000
-#define QWLAN_HAL_CFG_BTC_SAP_STATIC_OPP_WLAN_ACTIVE_WLAN_LEN_DEF 60000
+#define QWLAN_HAL_CFG_BTC_SAP_STATIC_OPP_WLAN_ACTIVE_WLAN_LEN_DEF 30000
 
 #define QWLAN_HAL_CFG_BTC_SAP_STATIC_OPP_WLAN_ACTIVE_BT_LEN_MIN   0
 #define QWLAN_HAL_CFG_BTC_SAP_STATIC_OPP_WLAN_ACTIVE_BT_LEN_MAX   250000
-#define QWLAN_HAL_CFG_BTC_SAP_STATIC_OPP_WLAN_ACTIVE_BT_LEN_DEF   90000
+#define QWLAN_HAL_CFG_BTC_SAP_STATIC_OPP_WLAN_ACTIVE_BT_LEN_DEF   30000
+
+#define QWLAN_HAL_CFG_BTC_CTS2S_ON_STA_DURING_SCO_MIN     0
+#define QWLAN_HAL_CFG_BTC_CTS2S_ON_STA_DURING_SCO_MAX     1
+#define QWLAN_HAL_CFG_BTC_CTS2S_ON_STA_DURING_SCO_DEF     0
 
 /* QWLAN_HAL_CFG_ANTENNA_DIVERSITY */
 #define QWLAN_HAL_CFG_ANTENNA_DIVERSITY_DEF  0
@@ -917,6 +969,77 @@
 #define QWLAN_HAL_CFG_SAR_POWER_BACKOFF_MIN  1
 #define QWLAN_HAL_CFG_SAR_POWER_BACKOFF_MAX  21
 
+/*Once the period expires the RSSI will be compared with Threshold
+ * and if needed trigger events will be raised
+ */
+#define QWLAN_HAL_CFG_ASD_PROBE_INTERVAL_DEF     50
+#define QWLAN_HAL_CFG_ASD_PROBE_INTERVAL_MIN     10
+#define QWLAN_HAL_CFG_ASD_PROBE_INTERVAL_MAX     100
+
+/* RSSI Threshold used to trigger probing activity/selection process*/
+#define QWLAN_HAL_CFG_ASD_TRIGGER_THRESHOLD_DEF     -75
+#define QWLAN_HAL_CFG_ASD_TRIGGER_THRESHOLD_MIN     -120
+#define QWLAN_HAL_CFG_ASD_TRIGGER_THRESHOLD_MAX     0
+
+/*RSSI Hysteresis Threshold for RSSI-RTT*/
+#define QWLAN_HAL_CFG_ASD_RTT_RSSI_HYST_THRESHOLD_DEF     50
+#define QWLAN_HAL_CFG_ASD_RTT_RSSI_HYST_THRESHOLD_MIN     50
+#define QWLAN_HAL_CFG_ASD_RTT_RSSI_HYST_THRESHOLD_MAX     100
+
+/* QWLAN_HAL_CFG_LINK_FAIL_TIMEOUT */
+#define QWLAN_HAL_CFG_LINK_FAIL_TIMEOUT_DEF 6000
+#define QWLAN_HAL_CFG_LINK_FAIL_TIMEOUT_MAX 60000
+#define QWLAN_HAL_CFG_LINK_FAIL_TIMEOUT_MIN 1000
+
+/* QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_SP */
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_SP_MIN  0 // 0 is a special case which means ignore this rule
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_SP_MAX  500
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_SP_DEF  10
+
+/* QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_RX_CNT */
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_RX_CNT_MIN  0
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_RX_CNT_MAX  5000
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_RX_CNT_DEF  50
+
+/* QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_TX_CNT */
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_TX_CNT_MIN  0
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_TX_CNT_MAX  5000
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_TX_CNT_DEF  50
+
+/* QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_RX_CNT_MEAS_WINDOW */
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_RX_CNT_MEAS_WINDOW_MIN  50 // In milliseconds - 50ms
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_RX_CNT_MEAS_WINDOW_MAX  50000 // 50 sec
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_RX_CNT_MEAS_WINDOW_DEF  500 // 500ms
+
+/* QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_TX_CNT_MEAS_WINDOW */
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_TX_CNT_MEAS_WINDOW_MIN  50 // In milliseconds - 50ms
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_TX_CNT_MEAS_WINDOW_MAX  50000 // 50 sec
+#define QWLAN_HAL_CFG_MAX_UAPSD_CONSEC_TX_CNT_MEAS_WINDOW_DEF  500 // 500ms
+
+/* QWLAN_HAL_CFG_MAX_PSPOLL_IN_WMM_UAPSD_PS_MODE */
+#define QWLAN_HAL_CFG_MAX_PSPOLL_IN_WMM_UAPSD_PS_MODE_MIN  0
+#define QWLAN_HAL_CFG_MAX_PSPOLL_IN_WMM_UAPSD_PS_MODE_MAX  255
+#define QWLAN_HAL_CFG_MAX_PSPOLL_IN_WMM_UAPSD_PS_MODE_DEF  0
+
+/* QWLAN_HAL_CFG_MAX_UAPSD_INACTIVITY_INTERVALS */
+#define QWLAN_HAL_CFG_MAX_UAPSD_INACTIVITY_INTERVALS_MIN  1 // Cannot be 0 since otherwise switching from Active to PS mode will fail
+#define QWLAN_HAL_CFG_MAX_UAPSD_INACTIVITY_INTERVALS_MAX  255
+#define QWLAN_HAL_CFG_MAX_UAPSD_INACTIVITY_INTERVALS_DEF  10
+
+/* QWLAN_HAL_CFG_ENABLE_DYNAMIC_WMMPS */
+#define QWLAN_HAL_CFG_ENABLE_DYNAMIC_WMMPS_MIN  0
+#define QWLAN_HAL_CFG_ENABLE_DYNAMIC_WMMPS_MAX  1
+#define QWLAN_HAL_CFG_ENABLE_DYNAMIC_WMMPS_DEF  1
+
+/* QWLAN_HAL_CFG_BURST_MODE_BE_TXOP_VALUE */
+#define QWLAN_HAL_CFG_BURST_MODE_BE_TXOP_VALUE_MIN 0
+#define QWLAN_HAL_CFG_BURST_MODE_BE_TXOP_VALUE_MAX 12288
+#define QWLAN_HAL_CFG_BURST_MODE_BE_TXOP_VALUE_DEF 0
+
+/* QWLAN_HAL_CFG_ENABLE_DYNAMIC_RA_START_RATE */
+#define QWLAN_HAL_CFG_ENABLE_DYNAMIC_RA_START_RATE_DEF 0
+#define QWLAN_HAL_CFG_ENABLE_DYNAMIC_RA_START_RATE_MIN 0
+#define QWLAN_HAL_CFG_ENABLE_DYNAMIC_RA_START_RATE_MAX 300
+
+
 #endif //__WLAN_HAL_CFG_H__
-
-
