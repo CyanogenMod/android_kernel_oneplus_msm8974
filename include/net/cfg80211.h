@@ -3441,6 +3441,21 @@ cfg80211_testmode_alloc_event_skb(struct wiphy *wiphy, int approxlen, gfp_t gfp)
 					  approxlen, gfp);
 }
 
+/**
+ * cfg80211_testmode_event - send the event
+ * @skb: The skb, must have been allocated with
+ *  cfg80211_testmode_alloc_event_skb()
+ * @gfp: allocation flags
+ *
+ * This function sends the given @skb, which must have been allocated
+ * by cfg80211_testmode_alloc_event_skb(), as an event. It always
+ * consumes it.
+ */
+static inline void cfg80211_testmode_event(struct sk_buff *skb, gfp_t gfp)
+{
+	__cfg80211_send_event_skb(skb, gfp);
+}
+
 #define CFG80211_TESTMODE_CMD(cmd)	.testmode_cmd = (cmd),
 #define CFG80211_TESTMODE_DUMP(cmd)	.testmode_dump = (cmd),
 #else
