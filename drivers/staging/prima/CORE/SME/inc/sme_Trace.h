@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -19,18 +19,18 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
+ */
+
 /***********************************************************************
    sme_Trace.h
 
   \brief definition for trace related APIs
 
   \author Kiran Kumar Reddy CH L V
-
-   Copyright (c) 2013 Qualcomm Atheros, Inc.
-
-   All Rights Reserved.
-
-   Qualcomm Atheros Confidential and Proprietary.
 
   ========================================================================*/
 
@@ -125,6 +125,14 @@ enum {
     TRACE_CODE_SME_RX_HDD_UPDATE_FTENABLED,
     TRACE_CODE_SME_RX_HDD_UPDATE_WESMODE,
     TRACE_CODE_SME_RX_HDD_SET_SCANCTRL,
+    TRACE_CODE_SME_RX_HDD_EXTSCAN_GET_CAPABILITIES,
+    TRACE_CODE_SME_RX_HDD_EXTSCAN_START,
+    TRACE_CODE_SME_RX_HDD_EXTSCAN_STOP,
+    TRACE_CODE_SME_RX_HDD_EXTSCAN_SET_BSS_HOTLIST,
+    TRACE_CODE_SME_RX_HDD_EXTSCAN_RESET_BSS_HOTLIST,
+    TRACE_CODE_SME_RX_HDD_EXTSCAN_SET_SIGNF_CHANGE,
+    TRACE_CODE_SME_RX_HDD_EXTSCAN_RESET_SIGNF_CHANGE,
+    TRACE_CODE_SME_RX_HDD_EXTSCAN_GET_CACHED_RESULTS,
 };
 
 void smeTraceInit(tpAniSirGlobal pMac);

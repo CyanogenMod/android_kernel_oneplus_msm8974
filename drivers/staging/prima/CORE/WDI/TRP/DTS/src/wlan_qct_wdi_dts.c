@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18,25 +18,11 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 /**=========================================================================
@@ -63,6 +49,10 @@
 #include "wlan_qct_wdi_dp.h"
 #include "wlan_qct_wdi_sta.h"
 
+#ifdef DEBUG_ROAM_DELAY
+#include "vos_utils.h"
+#endif
+
 static WDTS_TransportDriverTrype gTransportDriver = {
   WLANDXE_Open, 
   WLANDXE_Start, 
@@ -86,8 +76,9 @@ typedef struct
    uint32 tputBpus;  //unit in Bytes per usec: round off to integral value
 }WDTS_RateInfo;
 
-#define WDTS_MAX_RATE_NUM  137
-#define WDTS_MAX_11B_RATE_NUM  8
+#define WDTS_MAX_RATE_NUM               137
+#define WDTS_MAX_11B_RATE_NUM           8
+#define MB_PER_SEC_TO_BYTES_PER_MSEC    13
 
 WDTS_RateInfo g11bRateInfo[WDTS_MAX_11B_RATE_NUM]  = {
     //11b rates
@@ -187,79 +178,79 @@ WDTS_RateInfo gRateInfo[WDTS_MAX_RATE_NUM]  = {
     { 1350, 1137,  14781, 15}, //index 63
 
     //11AC  
-    { 1350, 1137, 14781, 15}, //reserved 64
-    { 1350, 1137, 14781, 15}, //reserved 65
-    { 65,     65,   845,  1}, //index 66
-    { 130,   130,  1690,  2}, //index 67
-    { 195,   195,  2535,  3}, //index 68
-    { 260,   260,  3380,  3}, //index 69
-    { 390,   390,  5070,  5}, //index 70
-    { 520,   520,  6760,  7}, //index 71
-    { 585,   585,  7605,  8}, //index 72
-    { 650,   650,  8450,  8}, //index 73
-    { 780,   780,  2340,  2}, //index 74
-    { 1350, 1137, 14781, 15}, //reserved 75
-    { 1350, 1137, 14781, 15}, //reserved 76
-    { 1350, 1137, 14781, 15}, //reserved 77
-    { 1350, 1137, 14781, 15}, //index 78
-    { 1350, 1137, 14781, 15}, //index 79
-    { 1350, 1137, 14781, 15}, //index 80
-    { 1350, 1137, 14781, 15}, //index 81
-    { 1350, 1137, 14781, 15}, //index 82
-    { 1350, 1137, 14781, 15}, //index 83
-    { 655,   655,  8515,  9}, //index 84
-    { 722,   722,  9386,  9}, //index 85
-    { 866,   866, 11258, 11}, //index 86
-    { 1350, 1137, 14781, 15}, //reserved 87
-    { 1350, 1137, 14781, 15}, //reserved 88
-    { 1350, 1137, 14781, 15}, //reserved 89
-    { 135,   135,  1755,  2}, //index 90
-    { 270,   270,  3510,  4}, //index 91
-    { 405,   405,  5265,  5}, //index 92
-    { 540,   540,  7020,  7}, //index 93
-    { 810,   810, 10530, 11}, //index 94
-    { 1080, 1080, 14040, 14}, //index 95
-    { 1215, 1215, 15795, 16}, //index 96
-    { 1350, 1350, 17550, 18}, //index 97
-    { 1350, 1137, 14781, 15}, //index 98
-    { 1620, 1620, 21060, 21}, //index 99
-    { 1800, 1800, 23400, 23}, //index 100
-    { 1350, 1137, 14781, 15}, //reserved 101
-    { 1350, 1137, 14781, 15}, //index 102
-    { 1350, 1137, 14781, 15}, //index 103
-    { 1350, 1137, 14781, 15}, //index 104
-    { 1350, 1137, 14781, 15}, //index 105
-    { 1350, 1137, 14781, 15}, //index 106
-    { 1200, 1200, 15600, 16}, //index 107
-    { 1350, 1350, 17550, 18}, //index 108
-    { 1500, 1500, 19500, 20}, //index 109
-    { 1350, 1137, 14781, 15}, //index 110
-    { 1800, 1800, 23400, 23}, //index 111
-    { 2000, 2000, 26000, 26}, //index 112
-    { 1350, 1137, 14781, 15}, //index 113
-    { 292,   292,  3796,  4}, //index 114
-    { 585,   585,  7605,  8}, //index 115
-    { 877,   877, 11401, 11}, //index 116
-    { 1170, 1170, 15210, 15}, //index 117
-    { 1755, 1755, 22815, 23}, //index 118
-    { 2340, 2340, 30420, 30}, //index 119
-    { 2632, 2632, 34216, 34}, //index 120
-    { 2925, 2925, 38025, 38}, //index 121
-    { 1350, 1137, 14781, 15}, //index 122
-    { 3510, 3510, 45630, 46}, //index 123
-    { 3900, 3900, 50700, 51}, //index 124
-    { 1350, 1137, 14781, 15}, //reserved 125
-    { 1350, 1137, 14781, 15}, //index 126
-    { 1350, 1137, 14781, 15}, //index 127
-    { 1350, 1137, 14781, 15}, //index 128
-    { 1350, 1137, 14781, 15}, //index 129
-    { 1350, 1137, 14781, 15}, //index 130
-    { 1350, 1137, 14781, 15}, //index 131
-    { 2925, 2925, 38025, 38}, //index 132
-    { 3250, 3250, 42250, 42}, //index 133
-    { 1350, 1137, 14781, 15}, //index 134
-    { 3900, 3900, 50700, 51}, //index 135
-    { 4333, 4333, 56329, 56}  //index 136
+    { 1350,  675,  8775,  9}, //reserved 64
+    { 1350,  675,  8775,  9}, //reserved 65
+    {   65,   45,   585,  1}, //index 66
+    {  130,   91,  1183,  1}, //index 67
+    {  195,  136,  1768,  2}, //index 68
+    {  260,  182,  2366,  2}, //index 69
+    {  390,  273,  3549,  4}, //index 70
+    {  520,  364,  4732,  5}, //index 71
+    {  585,  409,  5317,  5}, //index 72
+    {  650,  455,  5915,  6}, //index 73
+    {  780,  546,  7098,  7}, //index 74
+    { 1350,  675,  8775,  9}, //reserved 75
+    { 1350,  675,  8775,  9}, //reserved 76
+    { 1350,  675,  8775,  9}, //reserved 77
+    { 1350,  675,  8775,  9}, //index 78
+    { 1350,  675,  8775,  9}, //index 79
+    { 1350,  675,  8775,  9}, //index 80
+    { 1350,  675,  8775,  9}, //index 81
+    { 1350,  675,  8775,  9}, //index 82
+    { 1350,  675,  8775,  9}, //index 83
+    {  655,  458,  5954,  6}, //index 84
+    {  722,  505,  6565,  7}, //index 85
+    {  866,  606,  7878,  8}, //index 86
+    { 1350,  675,  8775,  9}, //reserved 87
+    { 1350,  675,  8775,  9}, //reserved 88
+    { 1350,  675,  8775,  9}, //reserved 89
+    {  135,   94,  1222,  1}, //index 90
+    {  270,  189,  2457,  2}, //index 91
+    {  405,  283,  3679,  4}, //index 92
+    {  540,  378,  4914,  5}, //index 93
+    {  810,  567,  7371,  7}, //index 94
+    { 1080,  756,  9828, 10}, //index 95
+    { 1215,  850, 11050, 11}, //index 96
+    { 1350,  675,  8775,  9}, //index 97
+    { 1350,  675,  8775,  9}, //index 98
+    { 1620,  810, 10530, 11}, //index 99
+    { 1800,  900, 11700, 12}, //index 100
+    { 1350,  675,  8775,  9}, //reserved 101
+    { 1350,  675,  8775,  9}, //index 102
+    { 1350,  675,  8775,  9}, //index 103
+    { 1350,  675,  8775,  9}, //index 104
+    { 1350,  675,  8775,  9}, //index 105
+    { 1350,  675,  8775,  9}, //index 106
+    { 1200,  840, 10920, 11}, //index 107
+    { 1350,  675,  8775,  9}, //index 108
+    { 1500,  750,  9750, 10}, //index 109
+    { 1350,  675,  8775,  9}, //index 110
+    { 1800,  900, 11700, 12}, //index 111
+    { 2000, 1000, 13000, 13}, //index 112
+    { 1350,  675,  8775,  9}, //index 113
+    {  292,  204,  2652,  3}, //index 114
+    {  585,  409,  5317,  5}, //index 115
+    {  877,  613,  7969,  8}, //index 116
+    { 1170,  819, 10647, 11}, //index 117
+    { 1755,  877, 11401, 11}, //index 118
+    { 2340, 1170, 15210, 15}, //index 119
+    { 2632, 1316, 17108, 17}, //index 120
+    { 2925, 1462, 19006, 19}, //index 121
+    { 1350,  675,  8775,  9}, //index 122
+    { 3510, 1755, 22815, 23}, //index 123
+    { 3900, 1950, 25350, 25}, //index 124
+    { 1350,  675,  8775,  9}, //reserved 125
+    { 1350,  675,  8775,  9}, //index 126
+    { 1350,  675,  8775,  9}, //index 127
+    { 1350,  675,  8775,  9}, //index 128
+    { 1350,  675,  8775,  9}, //index 129
+    { 1350,  675,  8775,  9}, //index 130
+    { 1350,  675,  8775,  9}, //index 131
+    { 2925, 1462, 19006, 19}, //index 132
+    { 3250, 1625, 21125, 21}, //index 133
+    { 1350,  675,  8775,  9}, //index 134
+    { 3900, 1950, 25350, 25}, //index 135
+    { 4333, 2166, 28158, 28}  //index 136
  };
 
 /* TX stats */
@@ -290,6 +281,37 @@ static WDI_DTS_TrafficStatsType gDsTrafficStats;
 
 /* RX thread frame size threshold to delay frame drain */
 #define DTS_RX_DELAY_FRAMESIZE_THRESHOLD  500
+
+/* API to fill Rate Info based on the mac efficiency passed to it
+ * macEff si used to caclulate mac throughput based on each rate index/PHY rate.
+ * This is eventually used by MAS to calculate RX stats periodically sent to FW
+ * The start and end Rate Index are the other arguments to this API - the new mac
+ * efficiency passed to this API (Arg1)  is only applied between startRateIndex (arg2) and endRateIndex (arg3).
+ */
+void WDTS_FillRateInfo(wpt_uint8 macEff, wpt_int16 startRateIndex, wpt_int16 endRateIndex)
+{
+    int i;
+
+    DTI_TRACE( DTI_TRACE_LEVEL_ERROR, "Change only 11ac rates");
+
+    for (i=startRateIndex; i<=endRateIndex; i++)
+    {
+        // tputRate --> unit in Mega bits per sec X 10
+        gRateInfo[i].tputRate = ((gRateInfo[i].phyRate * macEff)/100);
+        // tputBmps --> unit in Bytes per msec = (tputRateX1024x1024)/(8x10X1000) ~= (tputRate*13)
+        gRateInfo[i].tputBpms = gRateInfo[i].tputRate * MB_PER_SEC_TO_BYTES_PER_MSEC;
+        // tputBpus --> unit in Bytes per usec: (+ 500) to round off to integral value
+        gRateInfo[i].tputBpus = ((gRateInfo[i].tputBpms + 500) / 1000);
+        if (gRateInfo[i].tputBpus == 0)
+            gRateInfo[i].tputBpus = 1;
+
+        DTI_TRACE( DTI_TRACE_LEVEL_ERROR, "%4u, %4u, %5u, %2u",
+                            gRateInfo[i].phyRate,
+                            gRateInfo[i].tputRate,
+                            gRateInfo[i].tputBpms,
+                            gRateInfo[i].tputBpus );
+    }
+}
 
 /* Tx/Rx stats function
  * This function should be invoked to fetch the current stats
@@ -587,9 +609,10 @@ wpt_status WDTS_RxPacket (void *pContext, wpt_packet *pFrame, WDTS_ChannelType c
         ucMPDUHOffset = usMPDUDOffset;
       }
 
-      if(VPKT_SIZE_BUFFER < (usMPDULen+ucMPDUHOffset)){
-        DTI_TRACE( DTI_TRACE_LEVEL_FATAL,
-                   "Invalid Frame size, might memory corrupted");
+      if(VPKT_SIZE_BUFFER_ALIGNED < (usMPDULen+ucMPDUHOffset)){
+        WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+                   "Invalid Frame size, might memory corrupted(%d+%d/%d)",
+                   usMPDULen, ucMPDUHOffset, VPKT_SIZE_BUFFER_ALIGNED);
 
         /* Size of the packet tranferred by the DMA engine is
          * greater than the the memory allocated for the skb
@@ -640,7 +663,9 @@ wpt_status WDTS_RxPacket (void *pContext, wpt_packet *pFrame, WDTS_ChannelType c
       pRxMetadata->offloadScanLearn = WDI_RX_BD_GET_OFFLOADSCANLEARN(pBDHeader);
       pRxMetadata->roamCandidateInd = WDI_RX_BD_GET_ROAMCANDIDATEIND(pBDHeader);
 #endif
-
+#ifdef WLAN_FEATURE_EXTSCAN
+      pRxMetadata->extscanBuffer = WDI_RX_BD_GET_EXTSCANFULLSCANRESIND(pBDHeader);
+#endif
       /* typeSubtype in BD doesn't look like correct. Fill from frame ctrl
          TL does it for Volans but TL does not know BD for Prima. WDI should do it */
       if ( 0 == WDI_RX_BD_GET_FT(pBDHeader) ) {
@@ -705,6 +730,16 @@ wpt_status WDTS_RxPacket (void *pContext, wpt_packet *pFrame, WDTS_ChannelType c
       WPAL_PACKET_SET_BD_POINTER(pFrame, pBDHeader);
       WPAL_PACKET_SET_BD_LENGTH(pFrame, sizeof(WDI_RxBdType));
 
+#ifdef DEBUG_ROAM_DELAY
+      //Hack we need to send the frame type, so we are using bufflen as frametype
+      vos_record_roam_event(e_DXE_RX_PKT_TIME, (void *)pFrame, pRxMetadata->type);
+      //Should we use the below check to avoid funciton calls
+      /*
+      if(gRoamDelayMetaInfo.dxe_monitor_tx)
+      {
+      }
+      */
+#endif
       // Invoke Rx complete callback
       pClientData->receiveFrameCB(pClientData->pCallbackContext, pFrame);  
   }
@@ -898,6 +933,16 @@ wpt_status WDTS_TxPacket(void *pContext, wpt_packet *pFrame)
 #endif
   // Send packet to  Transport Driver. 
   status =  gTransportDriver.xmit(pDTDriverContext, pFrame, channel);
+#ifdef DEBUG_ROAM_DELAY
+   //Hack we need to send the frame type, so we are using bufflen as frametype
+   vos_record_roam_event(e_DXE_FIRST_XMIT_TIME, (void *)pFrame, pTxMetadata->frmType);
+   //Should we use the below check to avoid funciton calls
+   /*
+   if(gRoamDelayMetaInfo.dxe_monitor_tx)
+   {
+   }
+   */
+#endif
   return status;
 }
 
@@ -980,9 +1025,9 @@ wpt_status WDTS_SetPowerState(void *pContext, WDTS_PowerStateType  powerState,
  * Return Value: NONE
  *
  */
-void WDTS_ChannelDebug(wpt_boolean displaySnapshot, wpt_boolean toggleStallDetect)
+void WDTS_ChannelDebug(wpt_boolean displaySnapshot, wpt_uint8 debugFlags)
 {
-   gTransportDriver.channelDebug(displaySnapshot, toggleStallDetect);
+   gTransportDriver.channelDebug(displaySnapshot, debugFlags);
    return;
 }
 
