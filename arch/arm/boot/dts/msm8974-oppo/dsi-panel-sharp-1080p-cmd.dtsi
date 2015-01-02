@@ -102,5 +102,8 @@
 		qcom,mdss-dsi-cabc-video-command = [
 			15 01 00 00 10 00 02 55 03
 			05 01 00 00 10 00 02 29 00];
+		qcom,partial-update-enabled;
+		qcom,panel-roi-alignment = <900 4 2 4 540 20>;
+		qcom,ulps-enabled;
 	};
 };
