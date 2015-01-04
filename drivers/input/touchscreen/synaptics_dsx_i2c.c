@@ -1000,6 +1000,7 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 
 #define BLANK		1
 #define UNBLANK		0
+#define DOZE		2
 
 #define SYNA_SMARTCOVER_MIN	0
 #define SYNA_SMARTCOVER_MAN	750
@@ -4323,16 +4324,18 @@ static int fb_notifier_callback(struct notifier_block *p,
 {
 	struct fb_event *evdata = data;
 	int new_status;
+	int ev;
 
 	mutex_lock(&syna_rmi4_data->ops_lock);
 
 	switch (event) {
 		case FB_EVENT_BLANK :
-			new_status = (*(int *)evdata->data) ? BLANK : UNBLANK;
+			ev = (*(int *)evdata->data);
+			new_status = (ev == UNBLANK || ev == DOZE) ? UNBLANK : BLANK;
 			if (new_status == syna_rmi4_data->old_status)
 				break;
 
-			if (new_status != UNBLANK) {
+			if (new_status == BLANK) {
 				print_ts(TS_DEBUG, KERN_ERR "[syna]:suspend tp\n");
 				synaptics_rmi4_suspend(&(syna_rmi4_data->input_dev->dev));
 			}
