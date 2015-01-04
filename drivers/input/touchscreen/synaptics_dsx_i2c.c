@@ -4328,7 +4328,7 @@ static int fb_notifier_callback(struct notifier_block *p,
 
 	switch (event) {
 		case FB_EVENT_BLANK :
-			new_status = (*(int *)evdata->data) ? BLANK : UNBLANK;
+			new_status = (*(int *)evdata->data) == BLANK ? BLANK : UNBLANK;
 			if (new_status == syna_rmi4_data->old_status)
 				break;
 
