@@ -49,8 +49,6 @@ static struct dsi_panel_cmds color_enhance_off_sequence;
 static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 			struct dsi_panel_cmds *pcmds);
 
-extern int set_backlight_pwm(int state);
-
 enum
 {
 	CABC_CLOSE = 0,
@@ -106,7 +104,6 @@ static int mdss_dsi_update_cabc_level(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	}
 
 done:
-	set_backlight_pwm((pinfo->cabc_available && (pinfo->cabc_mode > 0)) ? 1 : 0);
 
 	return ret;
 }
