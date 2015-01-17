@@ -32,8 +32,6 @@ DEFINE_LED_TRIGGER(bl_led_trigger);
 
 #ifdef CONFIG_MACH_OPPO
 extern int lm3630_bank_a_update_status(u32 bl_level);
-
-extern int set_backlight_pwm(int state);
 #endif
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)

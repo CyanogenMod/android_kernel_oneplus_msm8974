@@ -474,6 +474,9 @@ static int lm3630_probe(struct i2c_client *client,
 /* OPPO zhanglong add 2013-08-30 for ftm test LCD backlight end */
 #endif //CONFIG_MACH_OPPO
 
+	/* Always enable PWM mode */
+	regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x01, 0x01);
+
 	return 0;
 
 err_chip_init:
@@ -568,26 +571,6 @@ void lm3630_recover_max_current(void)
 	regmap_write(lm3630_pchip->regmap, REG_MAXCU_A, 0x12);
 	regmap_write(lm3630_pchip->regmap, REG_MAXCU_B, 0x12);
 }
-
-/* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/02/17  Add for set cabc */
-int set_backlight_pwm(int state)
-{
-    int rc = 0;
-	//if (get_pcb_version() < HW_VERSION__20) { /* For Find7 */
-        if (get_boot_mode() == MSM_BOOT_MODE__NORMAL) {
-        	if(state == 1)
-    		{
-       			 rc = regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x01, 0x01);
-   		    }
-   			else
-   			{
-    		     rc = regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x01, 0x00);
-  			}
-        }
-    //}
-    return rc;
-}
-
 
 #ifdef CONFIG_OF
 static struct of_device_id lm3630_table[] = {
