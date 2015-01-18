@@ -11,7 +11,7 @@
  *
  */
 
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_OPPO_CAMERA
 #include <mach/camera2-oppo.h>
 #else
 
