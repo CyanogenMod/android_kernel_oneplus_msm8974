@@ -1,7 +1,3 @@
-#ifdef CONFIG_OPPO_CAMERA
-#include <media/msmb_isp_oppo.h>
-#else
-
 #ifndef __MSMB_ISP__
 #define __MSMB_ISP__
 
@@ -232,7 +228,9 @@ enum msm_vfe_reg_cfg_type {
 	VFE_READ_DMI_32BIT,
 	VFE_READ_DMI_64BIT,
 	GET_SOC_HW_VER,
+#ifndef CONFIG_MACH_OPPO
 	GET_MAX_CLK_RATE,
+#endif
 };
 
 struct msm_vfe_cfg_cmd2 {
@@ -422,5 +420,3 @@ struct msm_isp_event_data {
 	_IOWR('V', BASE_VIDIOC_PRIVATE+13, struct msm_vfe_axi_stream_update_cmd)
 
 #endif /* __MSMB_ISP__ */
-
-#endif // CONFIG_OPPO_CAMERA
