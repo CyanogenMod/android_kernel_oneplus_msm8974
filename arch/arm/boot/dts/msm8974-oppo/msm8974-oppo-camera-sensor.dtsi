@@ -141,7 +141,8 @@
 	};
 
 	qcom,camera@20 {
-		compatible = "qcom,imx214";
+		cell-index = <0>;
+		compatible = "qcom,imx214", "qcom,camera";
 		reg = <0x20>;
 		qcom,slave-id = <0x20 0x0016 0x214>;
 		qcom,csiphy-sd-index = <0>;
@@ -181,7 +182,8 @@
 	};
 
 	qcom,camera@6c {
-		compatible = "qcom,ov5648";
+		cell-index = <1>;
+		compatible = "qcom,ov5648", "qcom,camera";
 		reg = <0x6c>;
 		qcom,slave-id = <0x6c 0x300A 0x5648>;
 		qcom,csiphy-sd-index = <2>;
