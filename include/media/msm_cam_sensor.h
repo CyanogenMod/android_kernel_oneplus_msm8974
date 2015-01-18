@@ -1,4 +1,4 @@
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_OPPO_CAMERA
 #include <media/msm_cam_sensor_oppo.h>
 #else
 
