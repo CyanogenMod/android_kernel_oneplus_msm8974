@@ -150,6 +150,9 @@ enum zone_stat_item {
 	NUMA_OTHER,		/* allocation from other node */
 #endif
 	NR_ANON_TRANSPARENT_HUGEPAGES,
+#ifdef CONFIG_UKSM
+	NR_UKSM_ZERO_PAGES,
+#endif
 	NR_FREE_CMA_PAGES,
 	NR_SWAPCACHE,
 	NR_VM_ZONE_STAT_ITEMS };
@@ -798,7 +801,7 @@ static inline int is_normal_idx(enum zone_type idx)
 }
 
 /**
- * is_highmem - helper function to quickly check if a struct zone is a 
+ * is_highmem - helper function to quickly check if a struct zone is a
  *              highmem zone or not.  This is an attempt to keep references
  *              to ZONE_{DMA/NORMAL/HIGHMEM/etc} in general code to a minimum.
  * @zone - pointer to struct zone variable
