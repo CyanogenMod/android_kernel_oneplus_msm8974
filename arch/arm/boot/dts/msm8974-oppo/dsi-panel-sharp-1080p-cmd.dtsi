@@ -89,17 +89,17 @@
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 5>, <0 10>, <1 10>;
 		qcom,mdss-dsi-cabc-off-command = [
-			15 01 00 00 10 00 02 55 00
-			05 01 00 00 10 00 02 29 00];
+			15 01 00 00 3c 00 02 55 00
+			05 01 00 00 01 00 02 29 00];
 		qcom,mdss-dsi-cabc-ui-command = [
-			15 01 00 00 10 00 02 55 01
-			05 01 00 00 10 00 02 29 00];
+			15 01 00 00 3c 00 02 55 01
+			05 01 00 00 01 00 02 29 00];
 		qcom,mdss-dsi-cabc-still-image-command = [
-			15 01 00 00 10 00 02 55 02
-			05 01 00 00 10 00 02 29 00];
+			15 01 00 00 3c 00 02 55 02
+			05 01 00 00 01 00 02 29 00];
 		qcom,mdss-dsi-cabc-video-command = [
-			15 01 00 00 10 00 02 55 03
-			05 01 00 00 10 00 02 29 00];
+			15 01 00 00 3c 00 02 55 03
+			05 01 00 00 01 00 02 29 00];
 		qcom,partial-update-enabled;
 		qcom,panel-roi-alignment = <900 4 2 4 540 20>;
 		qcom,ulps-enabled;
