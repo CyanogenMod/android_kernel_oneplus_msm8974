@@ -1348,7 +1348,7 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 		skip_partial_update = false;
 		list_for_each_entry(pipe, &mdp5_data->pipes_used, list) {
 
-			in_roi = pipe->mixer_left->is_right_mixer ?
+			in_roi = ctl->mixer_right ?
 				&data->r_roi : &data->l_roi;
 
 			ctl_roi.x = in_roi->x;
