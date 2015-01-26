@@ -39,6 +39,9 @@ MODULE_DESCRIPTION("{ip,ip6,arp,eb}_tables backend module");
 
 #define SMP_ALIGN(x) (((x) + SMP_CACHE_BYTES-1) & ~(SMP_CACHE_BYTES-1))
 
+static unsigned int debug_mask;
+module_param(debug_mask, uint, 0644);
+
 struct compat_delta {
 	unsigned int offset; /* offset in kernel */
 	int delta; /* delta in 32bit user land */
@@ -849,7 +852,7 @@ xt_replace_table(struct xt_table *table,
 	local_bh_enable();
 
 #ifdef CONFIG_AUDIT
-	if (audit_enabled) {
+	if (audit_enabled && debug_mask) {
 		struct audit_buffer *ab;
 
 		ab = audit_log_start(current->audit_context, GFP_KERNEL,
