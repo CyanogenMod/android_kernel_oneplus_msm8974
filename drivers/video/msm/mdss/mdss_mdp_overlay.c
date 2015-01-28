@@ -1651,6 +1651,11 @@ static int mdss_mdp_overlay_queue(struct msm_fb_data_type *mfd,
 		return pipe ? PTR_ERR(pipe) : -ENODEV;
 	}
 
+	if (pipe->dirty) {
+		pr_warn("dirty pipe, will not queue pipe pnum=%d\n", pipe->num);
+		return -ENODEV;
+	}
+
 	pr_debug("ov queue pnum=%d\n", pipe->num);
 
 	if (pipe->flags & MDP_SOLID_FILL)
