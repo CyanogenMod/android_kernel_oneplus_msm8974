@@ -30,7 +30,10 @@
 #include <linux/slab.h>
 #include <asm/cputime.h>
 
-#define DEFAULT_HISPEED_FREQ	1728000
+#define DEFAULT_HISPEED_FREQ		1190400
+#define DEFAULT_SYNC_FREQ		0
+#define DEFAULT_UP_THRESHOLD_FREQ	0
+#define DEFAULT_UP_THRESHOLD_LOAD	0
 
 static int active_count;
 
@@ -69,7 +72,7 @@ static spinlock_t speedchange_cpumask_lock;
 static struct mutex gov_lock;
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
-static unsigned int hispeed_freq = 1574400;
+static unsigned int hispeed_freq = DEFAULT_HISPEED_FREQ;
 
 /* Go to hi speed when CPU load at or above this value. */
 #define DEFAULT_GO_HISPEED_LOAD 99
@@ -79,7 +82,7 @@ static unsigned long go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
 static unsigned int sampling_down_factor = 1;
 
 /* Target load.  Lower values result in higher CPU speeds. */
-#define DEFAULT_TARGET_LOAD 95
+#define DEFAULT_TARGET_LOAD 90
 static unsigned int default_target_loads[] = {DEFAULT_TARGET_LOAD};
 static spinlock_t target_loads_lock;
 static unsigned int *target_loads = default_target_loads;
@@ -94,7 +97,7 @@ static unsigned long freq_calc_thresh;
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
-#define DEFAULT_MIN_SAMPLE_TIME (20 * USEC_PER_MSEC)
+#define DEFAULT_MIN_SAMPLE_TIME (80 * USEC_PER_MSEC)
 static unsigned int default_min_sample_time[] = {DEFAULT_MIN_SAMPLE_TIME};
 static spinlock_t min_sample_time_lock;
 static unsigned int *min_sample_times = default_min_sample_time;
@@ -103,7 +106,7 @@ static int nmin_sample_times = ARRAY_SIZE(default_min_sample_time);
 /*
  * The sample rate of the timer used to increase frequency
  */
-#define DEFAULT_TIMER_RATE (20000)
+#define DEFAULT_TIMER_RATE (20 * USEC_PER_MSEC)
 static unsigned int default_timer_rate[] = { DEFAULT_TIMER_RATE };
 static spinlock_t timer_rate_lock;
 static unsigned int *timer_rates = default_timer_rate;
@@ -134,7 +137,7 @@ static u64 boostpulse_endtime;
  * Max additional time to wait in idle, beyond timer_rate, at speeds above
  * minimum before wakeup to reduce speed, or -1 if unnecessary.
  */
-#define DEFAULT_TIMER_SLACK (40000)
+#define DEFAULT_TIMER_SLACK (4 * DEFAULT_TIMER_RATE)
 static int default_timer_slack_val[] = { DEFAULT_TIMER_SLACK };
 static spinlock_t timer_slack_lock;
 static int *timer_slack_vals = default_timer_slack_val;
@@ -148,9 +151,9 @@ static bool io_is_busy = 0;
  * up_threshold_any_cpu_freq then do not let the frequency to drop below
  * sync_freq
  */
-static unsigned int up_threshold_any_cpu_load = 80;
-static unsigned int sync_freq = 1574400;
-static unsigned int up_threshold_any_cpu_freq = 1574400;
+static unsigned int up_threshold_any_cpu_load = DEFAULT_UP_THRESHOLD_LOAD;
+static unsigned int sync_freq = DEFAULT_SYNC_FREQ;
+static unsigned int up_threshold_any_cpu_freq = DEFAULT_UP_THRESHOLD_FREQ;
 
 static void cpufreq_yankactive_timer_resched(
 	struct cpufreq_yankactive_cpuinfo *pcpu)
