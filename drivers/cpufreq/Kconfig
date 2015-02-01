@@ -115,6 +115,15 @@ config CPU_FREQ_DEFAULT_GOV_SMARTMAX
         help
           Use the CPUFreq governor 'smartmax' as default
 
+config CPU_FREQ_DEFAULT_GOV_YANKACTIVE
+        bool "yankactive"
+        select CPU_FREQ_GOV_YANKACTIVE
+        help
+          Use the CPUFreq governor 'yankactive' as default. This allows
+          you to get a full dynamic cpu frequency capable system by simply
+          loading your cpufreq low-level hardware driver, using the
+          'yankactive' governor for latency-sensitive workloads.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -217,6 +226,15 @@ config CPU_INPUT_BOOST
 	help
 	  Boosts the CPU on touchscreen and touchpad input. Boost frequencies and
 	  durations are calculated automatically.
+
+config CPU_FREQ_GOV_YANKACTIVE
+        tristate "'yankactive' cpufreq policy governor"
+        help
+          'yankactive' - This driver adds a dynamic cpufreq policy governor
+          designed for latency-sensitive workloads.
+          The governor is based on interactive with just different default settings
+          and can be achieved using interactive with a script. This is added for
+          simplification purposes for myself.
 
 config CPU_FREQ_GOV_SMARTMAX
         tristate "'smartmax' cpufreq policy governor"
