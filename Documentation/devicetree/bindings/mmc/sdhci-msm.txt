@@ -91,6 +91,9 @@ In the following, <supply> can be vdd (flash core voltage) or vdd-io (I/O voltag
 	- qcom,msm-bus,num-paths
 	- qcom,msm-bus,vectors-KBps
 
+	- qcom,wakeup-on-idle: if configured, the mmcqd thread will call
+	  set_wake_up_idle(), thereby voting for it to be called on idle CPUs.
+
 Example:
 
 	aliases {
