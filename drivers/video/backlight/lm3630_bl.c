@@ -234,7 +234,7 @@ static int lm3630_intr_config(struct lm3630_chip_data *pchip)
 		if (ret < 0)
 			goto out;
 		mdelay(1);
-#ifndef CONFIG_MACH_OPPO
+#if 1
 		ret = regmap_write(pchip->regmap,
 				   REG_BRT_A, bl_level);
 #else /* CONFIG_MACH_OPPO */
