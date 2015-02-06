@@ -48,7 +48,7 @@
 #define TAIKO_VALIDATE_RX_SBPORT_RANGE(port) ((port >= 16) && (port <= 22))
 #define TAIKO_CONVERT_RX_SBPORT_ID(port) (port - 16) /* RX1 port ID = 0 */
 
-#define TAIKO_HPH_PA_SETTLE_COMP_ON 3000
+#define TAIKO_HPH_PA_SETTLE_COMP_ON 5000
 #define TAIKO_HPH_PA_SETTLE_COMP_OFF 13000
 
 #define DAPM_MICBIAS2_EXTERNAL_STANDALONE "MIC BIAS2 External Standalone"
