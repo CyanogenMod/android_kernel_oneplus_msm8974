@@ -106,11 +106,18 @@ config IOSCHED_SIO
 	  mainly for aleatory access devices (eg: flash devices).
 
 config IOSCHED_ZEN
-	  tristate "Zen I/O scheduler"
-	  default y
-	  ---help---
+	tristate "Zen I/O scheduler"
+	default y
+	---help---
 	  FCFS, dispatches are back-inserted, deadlines ensure fairness.
 	  Should work best with devices where there is no travel delay.
+
+config IOSCHED_VR
+	tristate "V(R) I/O scheduler"
+	default y
+	---help---
+	  Requests are chosen according to SSTF with a penalty of rev_penalty
+	  for switching head direction.
 
 choice
 	prompt "Default I/O scheduler"
@@ -157,6 +164,9 @@ choice
 	config DEFAULT_ZEN
 		bool "ZEN" if IOSCHED_ZEN=y
 
+	config DEFAULT_VR
+		bool "VR" if IOSCHED_VR=y
+
 endchoice
 
 config DEFAULT_IOSCHED
@@ -169,6 +179,7 @@ config DEFAULT_IOSCHED
 	default "noop" if DEFAULT_NOOP
     default "fiops" if DEFAULT_FIOPS
 	default "zen" if DEFAULT_ZEN
+	default "vr" if DEFAULT_VR
 
 endmenu
 
