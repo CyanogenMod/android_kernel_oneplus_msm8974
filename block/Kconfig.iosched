@@ -129,6 +129,12 @@ config IOSCHED_VR
 	  Requests are chosen according to SSTF with a penalty of rev_penalty
 	  for switching head direction.
 
+config IOSCHED_TRIPNDROID
+	tristate "Tripndroid"
+	default y
+	---help---
+	  The Trip N Droid scheduler
+
 choice
 	prompt "Default I/O scheduler"
 	default DEFAULT_CFQ
@@ -180,6 +186,9 @@ choice
 	config DEFAULT_VR
 		bool "VR" if IOSCHED_VR=y
 
+	config DEFAULT_TRIPNDROID
+		bool "TRIPNDROID" if IOSCHED_TRIPNDROID=y
+
 endchoice
 
 config DEFAULT_IOSCHED
@@ -195,6 +204,7 @@ config DEFAULT_IOSCHED
     default "fiops" if DEFAULT_FIOPS
 	default "zen" if DEFAULT_ZEN
 	default "vr" if DEFAULT_VR
+	default "tripndroid" if DEFAULT_TRIPNDROID
 
 endmenu
 
