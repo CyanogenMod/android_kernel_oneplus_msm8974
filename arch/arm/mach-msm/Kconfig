@@ -3040,3 +3040,11 @@ config HAS_MACH_MEMUTILS
 	help
 	Faster memcpy performance for Krait
 endif
+
+config KERNEL_TEXT_MPU_PROT
+        bool "Enable xpu protection of kernel r/o sections"
+        help
+          Enables xpu protection of kernel code and read-only data
+          sections early in boot. Read access is permitted to
+          all masters; Write access is only permited to the
+          secure world.
