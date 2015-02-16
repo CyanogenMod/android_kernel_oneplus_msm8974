@@ -23,10 +23,10 @@
 #define ID_CPU_CORE_3			2	// internal id of CPU core 3
 #define ID_CPU_CORE_4			3	// internal id of CPU core 4
 
-int online_control_mode[4] = {ONL_CONT_MODE_SYSFS, 
-							  ONL_CONT_MODE_SYSFS, 
-							  ONL_CONT_MODE_SYSFS, 
-							  ONL_CONT_MODE_SYSFS};
+static int online_control_mode[4] = {ONL_CONT_MODE_SYSFS, 
+									ONL_CONT_MODE_SYSFS, 
+									ONL_CONT_MODE_SYSFS, 
+									ONL_CONT_MODE_SYSFS};
 
 struct bus_type cpu_subsys = {
 	.name = "cpu",
