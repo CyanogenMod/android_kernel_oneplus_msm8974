@@ -16,6 +16,18 @@
 
 #include "base.h"
 
+#define ONL_CONT_MODE_SYSFS 	0	// core online status controlled by sysfs (mpdecision)
+#define ONL_CONT_MODE_ONLINE 	1	// core is forced online
+#define ONL_CONT_MODE_OFFLINE	2	// core is forced offline 
+#define ONL_CONT_MODE_LOCK4_3	3	// core 4 is forced offline but locked to core 3 (only allowed for core 4 !)
+#define ID_CPU_CORE_3			2	// internal id of CPU core 3
+#define ID_CPU_CORE_4			3	// internal id of CPU core 4
+
+static int online_control_mode[4] = {ONL_CONT_MODE_SYSFS, 
+									ONL_CONT_MODE_SYSFS, 
+									ONL_CONT_MODE_SYSFS, 
+									ONL_CONT_MODE_SYSFS};
+
 struct bus_type cpu_subsys = {
 	.name = "cpu",
 	.dev_name = "cpu",
