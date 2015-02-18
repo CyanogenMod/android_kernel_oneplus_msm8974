@@ -340,7 +340,6 @@ extern int mdss_dsi_panel_set_cabc(struct mdss_panel_data *panel_data, int level
 extern int mdss_dsi_panel_set_gamma_index(struct mdss_panel_data *panel_data, int index);
 extern int mdss_dsi_panel_set_sre(struct mdss_panel_data *panel_data, bool enable);
 extern int mdss_dsi_panel_set_color_enhance(struct mdss_panel_data *panel_data, bool enable);
-extern int mdss_dsi_panel_update_sre(struct mdss_panel_data *pdata, u32 bl_level);
 
 static ssize_t mdss_get_cabc(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -385,32 +384,7 @@ static ssize_t mdss_set_sre(struct device *dev,
 
 	sscanf(buf, "%du", &value);
 	mdss_dsi_panel_set_sre(pdata, value > 0);
-	mdss_dsi_panel_update_sre(pdata, mfd->bl_level);
 	return count;
-}
-
-static ssize_t mdss_get_sre_bl_threshold(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct fb_info *fbi = dev_get_drvdata(dev);
-	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
-	struct mdss_panel_data *pdata = dev_get_platdata(&mfd->pdev->dev);
-	return sprintf(buf, "%d\n", pdata->panel_info.sre_bl_threshold);
-}
-
-static ssize_t mdss_set_sre_bl_threshold(struct device *dev,
-                               struct device_attribute *attr,
-                               const char *buf, size_t count)
-{
-    int value = 0;
-    struct fb_info *fbi = dev_get_drvdata(dev);
-    struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
-    struct mdss_panel_data *pdata = dev_get_platdata(&mfd->pdev->dev);
-
-    sscanf(buf, "%du", &value);
-    pdata->panel_info.sre_bl_threshold = value;
-	mdss_dsi_panel_update_sre(pdata, mfd->bl_level);
-    return count;
 }
 
 static ssize_t mdss_get_color_enhance(struct device *dev,
@@ -462,7 +436,6 @@ static ssize_t mdss_set_gamma_index(struct device *dev,
 static DEVICE_ATTR(cabc, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_cabc, mdss_set_cabc);
 static DEVICE_ATTR(gamma, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_gamma_index, mdss_set_gamma_index);
 static DEVICE_ATTR(sre, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_sre, mdss_set_sre);
-static DEVICE_ATTR(sre_bl_threshold, S_IRUGO | S_IWUSR | S_IWGRP,  mdss_get_sre_bl_threshold, mdss_set_sre_bl_threshold);
 static DEVICE_ATTR(color_enhance, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_color_enhance, mdss_set_color_enhance);
 
 extern int mdss_dsi_panel_get_panel_calibration(
@@ -744,9 +717,6 @@ static int mdss_fb_create_sysfs(struct msm_fb_data_type *mfd)
 
 		if (mfd->panel_info->sre_available) {
 			rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_sre.attr);
-			if (rc)
-				goto sysfs_err;
-			rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_sre_bl_threshold.attr);
 			if (rc)
 				goto sysfs_err;
 		}
@@ -1203,10 +1173,6 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 		pdata->set_backlight(pdata, temp);
 		mfd->bl_level = bkl_lvl;
 		mfd->bl_level_scaled = temp;
-
-#ifdef CONFIG_MACH_OPPO
-		mdss_dsi_panel_update_sre(pdata, bkl_lvl);
-#endif
 
 		if (mfd->mdp.update_ad_input && is_bl_changed) {
 			update_ad_input = mfd->mdp.update_ad_input;

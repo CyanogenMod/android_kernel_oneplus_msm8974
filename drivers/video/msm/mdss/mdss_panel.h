@@ -383,8 +383,6 @@ struct mdss_panel_info {
 
 	int sre_available;
 	bool sre_enabled;
-	bool sre_active;
-	int sre_bl_threshold;
 
 	bool color_enhance_available;
 	bool color_enhance_enabled;
