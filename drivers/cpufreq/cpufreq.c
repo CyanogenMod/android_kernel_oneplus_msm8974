@@ -2227,21 +2227,11 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 		int i;
 		for (i = 0; i < nr_cpu_ids; i++)
 		{
-#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 			min_freq_hardlimit[i] = CONFIG_MSM_CPU_FREQ_MIN;
 			max_freq_hardlimit[i] = CONFIG_MSM_CPU_FREQ_MAX;
-#else
-			min_freq_hardlimit[i] = table[0].frequency;
-			max_freq_hardlimit[i] = CPUFREQ_TABLE_END;
-#endif			
 			sprintf(governor_hard[i], "%s", "");
 		}
-#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 		pr_info("cpufreq : minimum/maximum scaling freq hard limit set to: %u %u\n", CONFIG_MSM_CPU_FREQ_MIN, CONFIG_MSM_CPU_FREQ_MAX);
-#else
-		pr_info("cpufreq : minimum/maximum scaling freq hard limit set to: %u %u\n", table[0].frequency, CPUFREQ_TABLE_END);
-#endif			
-	
 	}
 
 	return 0;
