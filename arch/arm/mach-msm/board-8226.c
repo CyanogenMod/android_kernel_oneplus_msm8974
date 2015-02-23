@@ -32,6 +32,7 @@
 #include <asm/mach/time.h>
 #include <mach/board.h>
 #include <mach/gpiomux.h>
+#include <mach/msm_kcal.h>
 #include <mach/msm_iomap.h>
 #include <mach/restart.h>
 #include <mach/msm_memtypes.h>
@@ -95,6 +96,7 @@ void __init msm8226_add_drivers(void)
 		msm_clock_init(&msm8226_clock_init_data);
 	tsens_tm_init_driver();
 	msm_thermal_device_init();
+	msm_kcal_ctrl_init();
 }
 
 void __init msm8226_init(void)
