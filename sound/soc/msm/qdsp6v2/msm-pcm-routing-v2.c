@@ -370,7 +370,7 @@ void msm_pcm_routing_reg_psthr_stream(int fedai_id, int dspst_id,
 	mutex_unlock(&routing_lock);
 }
 
-void msm_pcm_routing_reg_phy_stream(int fedai_id, int perf_mode,
+int msm_pcm_routing_reg_phy_stream(int fedai_id, int perf_mode,
 					int dspst_id, int stream_type)
 {
 	int i, session_type, path_type, port_type, port_id, topology;
@@ -381,7 +381,7 @@ void msm_pcm_routing_reg_phy_stream(int fedai_id, int perf_mode,
 	if (fedai_id > MSM_FRONTEND_DAI_MM_MAX_ID) {
 		/* bad ID assigned in machine driver */
 		pr_err("%s: bad MM ID %d\n", __func__, fedai_id);
-		return;
+		return -EINVAL;
 	}
 
 	if (stream_type == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -454,19 +454,24 @@ void msm_pcm_routing_reg_phy_stream(int fedai_id, int perf_mode,
 			payload.num_copps, payload.copp_ids, 0, perf_mode);
 
 	mutex_unlock(&routing_lock);
+    return 0;
 }
 
-void msm_pcm_routing_reg_phy_stream_v2(int fedai_id, bool perf_mode,
+int msm_pcm_routing_reg_phy_stream_v2(int fedai_id, bool perf_mode,
 				       int dspst_id, int stream_type,
 				       struct msm_pcm_routing_evt event_info)
 {
-	msm_pcm_routing_reg_phy_stream(fedai_id, perf_mode, dspst_id,
-				       stream_type);
+	if (msm_pcm_routing_reg_phy_stream(fedai_id, perf_mode, dspst_id,
+				       stream_type)) {
+        pr_err("%s: failed to reg phy stream\n", __func__);
+        return -EINVAL;
+    }
 
 	if (stream_type == SNDRV_PCM_STREAM_PLAYBACK)
 		fe_dai_map[fedai_id][SESSION_TYPE_RX].event_info = event_info;
 	else
 		fe_dai_map[fedai_id][SESSION_TYPE_TX].event_info = event_info;
+    return 0;
 }
 
 void msm_pcm_routing_dereg_phy_stream(int fedai_id, int stream_type)
