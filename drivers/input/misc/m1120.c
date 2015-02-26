@@ -308,7 +308,6 @@ static int change_speed_flag = 0;	// change speed
 static int motor_start_speed = 0;	// motor start speed
 static int schedule_work_delay = 0;	// different motor speed, different schedule work(different timer)
 static int poll_time = 0;	// timer count
-static int data_trend = 2;	// 1 : down ; 2 : up ; 0 : nothing.
 
 static void m1120_motor_stop_hanle(bool need_stop_motor)
 {
@@ -352,9 +351,9 @@ static void m1120_change_speed(int speed)
 
 static void cam_block_detect(short *raw, int speed_start)
 {
-	static int zero_speed_delay_count = 0;
-	static int four_speed_delay_count_206 = 0;
-	static int six_speed_delay_count = 0;
+	static int delay_counter = 0;
+	int min_change_threshold;
+	bool is_in_end_threshold;
 
 	poll_time++;
 
@@ -363,157 +362,63 @@ static void cam_block_detect(short *raw, int speed_start)
 
 	//printk_m1120(M1120_DEBUG, "count = %3d, raw[0] = %4d, raw[1] = %4d, raw[2] = %4d, raw[3] = %4d\n", detection_count, raw[0], raw[1], raw[2],raw[3]);
 
-	if (detection_count > 2) {
-		if ((start_motor_flag == 0) && (change_speed_flag == 0)) {
+	if (start_motor_flag == 0 && change_speed_flag == 0) {
+		if (detection_count
+		    || poll_time >
+		    50 /* make sure to not loop indefinitely */ ) {
 			printk("motor stop, dhall change to interrupt mode.\n");
-
 			m1120_motor_stop_hanle(false);
+		}
+		/* nothing to do while motor isn't running */
+		return;
+	}
 
+	if (direction_for_hall == 1) {	// motor forward
+		// assume block when reported value starts declining
+		int block_threshold = speed_start >= 4 ? 2 : 3;
+		if (raw[1] - raw[0] >= block_threshold && raw[0] > 20) {
+			printk
+			    ("forward down detect, cam block ! speed_start = %d\n",
+			     speed_start);
+			m1120_motor_stop_hanle(true);
+			m1120_report_forward_block();
 			return;
 		}
+		is_in_end_threshold = raw[0] > 20 && raw[1] > 20;
+		min_change_threshold = speed_start >= 5 ? 1 : 2;
+	} else {		// motor backward
+		if (raw[0] < -50 && change_speed_flag == 0 && speed_start == 0) {
+			printk("change motor speed .\n");
+			change_speed_flag = 1;
+			m1120_change_speed(2);
+		}
+		if (raw[0] - raw[1] >= 2 && raw[0] < -50) {
+			printk
+			    ("backward down detect, cam block ! speed_start = %d\n",
+			     speed_start);
+			m1120_motor_stop_hanle(true);
+			m1120_report_backward_block();
+			return;
+		}
+		is_in_end_threshold = raw[0] < -50 && raw[1] < -50;
+		min_change_threshold = speed_start >= 4 ? 2 : 3;
+	}
 
-		switch (speed_start) {
-			printk("%s, speed_start = %d\n", __func__, speed_start);
+	if (abs(raw[1] - raw[0]) < min_change_threshold && is_in_end_threshold) {
+		delay_counter++;
+	} else {
+		delay_counter = 0;
+	}
 
-		case 0:
-			if (direction_for_hall == 1)	// motor forward
-			{
-				if ((raw[1] - raw[0] > 4)
-				    ) {
-					printk
-					    ("forward down detect, cam block ! speed_start = %d\n",
-					     speed_start);
-
-					m1120_motor_stop_hanle(true);
-
-					m1120_report_forward_block();
-				}
-			} else if (direction_for_hall == 0)	// motor backward
-			{
-				if ((raw[0] < -50) && (change_speed_flag == 0)) {
-					printk("change motor speed .\n");
-
-					change_speed_flag = 1;
-
-					m1120_change_speed(2);
-				}
-
-				if ((abs(raw[1] - raw[0]) < 3)
-				    && (raw[0] < -50)
-				    && (raw[1] < -50)
-				    ) {
-					zero_speed_delay_count++;
-				} else {
-					zero_speed_delay_count = 0;	// continuous
-				}
-
-				if (zero_speed_delay_count == 3) {
-					zero_speed_delay_count = 0;
-
-					printk
-					    ("backward down detect, cam block ! speed_start = %d\n",
-					     speed_start);
-
-					m1120_motor_stop_hanle(true);
-				}
-			}
-			break;
-
-		case 1:
-		case 2:
-		case 3:
-		case 4:
-			if (direction_for_hall == 1)	// motor forward
-			{
-				if ((abs(raw[1] - raw[0]) < 3)
-				    && (abs(raw[2] - raw[0]) < 3)
-				    && (raw[2] > 0)
-				    ) {
-					four_speed_delay_count_206++;
-				} else {
-					four_speed_delay_count_206 = 0;
-				}
-
-				if ((four_speed_delay_count_206 >= 4)
-				    ) {
-					four_speed_delay_count_206 = 0;
-
-					printk
-					    ("206 degree block ! speed_start = %d\n",
-					     speed_start);
-
-					m1120_motor_stop_hanle(true);
-
-					m1120_report_forward_block();
-				}
-
-				if ((raw[1] - raw[0] > 4)
-				    ) {
-					data_trend = 1;	// down trend
-				}
-
-				if ((abs(raw[1] - raw[0]) <= 3)
-				    && (data_trend == 1)
-				    ) {
-					data_trend = 0;
-
-					four_speed_delay_count_206 = 0;
-
-					printk
-					    ("forward down detect, cam block ! speed_start = %d\n",
-					     speed_start);
-
-					m1120_motor_stop_hanle(true);
-
-					m1120_report_forward_block();
-				}
-			} else if (direction_for_hall == 0)	// motor backward
-			{
-				if ((abs(raw[1] - raw[0]) < 4)
-				    && (abs(raw[2] - raw[1]) < 4)
-				    && (raw[0] < -70)
-				    && (raw[1] < -70)
-				    && (raw[2] < -70)
-				    ) {
-					printk
-					    ("backward down detect, cam block ! speed_start = %d\n",
-					     speed_start);
-
-					m1120_motor_stop_hanle(true);
-
-					m1120_report_backward_block();
-				}
-			}
-			break;
-
-		case 5:
-		case 6:
-			if (direction_for_hall == 1)	// motor forward
-			{
-				if ((raw[0] < raw[1])
-				    && (raw[0] > 0)
-				    ) {
-					six_speed_delay_count++;
-				} else {
-					six_speed_delay_count = 0;
-				}
-
-				if (six_speed_delay_count == 4) {
-					six_speed_delay_count = 0;
-
-					printk
-					    ("forward down detect, cam block ! speed_start = %d\n",
-					     speed_start);
-
-					m1120_motor_stop_hanle(true);
-
-					m1120_report_forward_block();
-				}
-			}
-			break;
-		case 7:
-		case 8:
-			break;
+	if (delay_counter >= 2) {
+		delay_counter = 0;
+		printk("backward down detect, cam block ! speed_start = %d\n",
+		       speed_start);
+		m1120_motor_stop_hanle(true);
+		if (direction_for_hall) {
+			m1120_report_forward_block();
+		} else {
+			m1120_report_backward_block();
 		}
 	}
 }
@@ -1309,25 +1214,31 @@ static ssize_t start_block_detection(struct file *file, const char __user * buf,
 	ret = copy_from_user(tmp, buf, 32);
 
 	motor_start_speed = tmp[0] - 0x30;
-
+	if (motor_start_speed < 0) {
+		motor_start_speed = 0;
+	} else if (motor_start_speed > 6) {
+		motor_start_speed = 6;
+	}
 	// when start motor, change to polling mode
-
 	switch (motor_start_speed) {
 	case 0:
 		schedule_work_delay = 20;
 		break;
 	case 1:
 	case 2:
+		schedule_work_delay = 50;
+		break;
 	case 3:
+		schedule_work_delay = 150;
+		break;
 	case 4:
-		schedule_work_delay = 200;
+		schedule_work_delay = 250;
 		break;
 	case 5:
-	case 6:
-		schedule_work_delay = 200;
+		schedule_work_delay = 350;
 		break;
-	case 7:
-	case 8:
+	case 6:
+		schedule_work_delay = 500;
 		break;
 	}
 
@@ -1335,8 +1246,6 @@ static ssize_t start_block_detection(struct file *file, const char __user * buf,
 	       motor_start_speed, schedule_work_delay);
 
 	change_speed_flag = 0;
-	data_trend = 0;
-
 	p_m1120_data->irq_source = 0;	//delayed work for polling
 
 	//m1120_frequency_set(&p_m1120_data->client->dev,M1120_OPERATION_FREQUENCY);
