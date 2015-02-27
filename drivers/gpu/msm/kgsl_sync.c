@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014,2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -194,7 +194,6 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 		ret = priv.fence_fd;
 		goto unlock;
 	}
-	sync_fence_install(fence, priv.fence_fd);
 
 	/*
 	 * If the timestamp hasn't expired yet create an event to trigger it.
@@ -221,6 +220,7 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 		ret = -EFAULT;
 		goto out;
 	}
+	sync_fence_install(fence, priv.fence_fd);
 
 	return 0;
 
