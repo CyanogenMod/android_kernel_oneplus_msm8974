@@ -942,7 +942,7 @@ static bool wiimote_init_check(struct wiimote_data *wdata)
 {
 	__u32 flags;
 	__u8 type, data[6];
-	bool ret, poll_mp;
+	bool ret, poll_mp = false;
 
 	spin_lock_irq(&wdata->state.lock);
 	flags = wdata->state.flags;
