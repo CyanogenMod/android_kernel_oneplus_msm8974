@@ -1028,6 +1028,9 @@ sme_process_cmd:
                                 smsLog(pMac, LOGE,
                                   FL("failed to post SME PNO SCAN %d"), status);
                             }
+                            //We need to re-run the command
+                            fContinue = eANI_BOOLEAN_TRUE;
+
                             if (csrLLRemoveEntry(&pMac->sme.smeCmdActiveList,
                                               &pCommand->Link, LL_ACCESS_LOCK))
                             {
@@ -11776,3 +11779,79 @@ eHalStatus sme_Encryptmsgsend (tHalHandle hHal,
     }
     return(status);
 }
+
+eHalStatus sme_SetMiracastVendorConfig(tHalHandle hHal,
+    tANI_U32 iniNumBuffAdvert , tANI_U32 set_value)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
+    tANI_U8 mcsSet[SIZE_OF_SUPPORTED_MCS_SET];
+    tANI_U32 val = SIZE_OF_SUPPORTED_MCS_SET;
+
+    if (ccmCfgGetStr(hHal, WNI_CFG_SUPPORTED_MCS_SET, mcsSet, &val)
+                                        != eHAL_STATUS_SUCCESS)
+    {
+       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+           FL("failed to get ini param, WNI_CFG_SUPPORTED_MCS_SET"));
+       return eHAL_STATUS_FAILURE;
+    }
+
+    if (set_value)
+    {
+       if (pMac->miracastVendorConfig)
+       {
+         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+          FL(" Miracast tuning already enabled!!"));
+         return eHAL_STATUS_SUCCESS;
+       }
+
+       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+        FL("Enable Miracast tuning by disabling 64QAM rates, setting 4 blocks for aggregation and disabling probe response for broadcast probe in P2P-GO mode"));
+
+       if (ccmCfgSetInt(hHal, WNI_CFG_NUM_BUFF_ADVERT, 4,
+                  NULL, eANI_BOOLEAN_FALSE) == eHAL_STATUS_FAILURE)
+       {
+          VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+            FL("Failure: Could not set WNI_CFG_NUM_BUFF_ADVERT"));
+          return eHAL_STATUS_FAILURE;
+       }
+       /* Disable 64QAM rates ie (MCS 5,6 and 7)
+        */
+       mcsSet[0]=0x1F;
+    }
+    else
+    {
+       if (!pMac->miracastVendorConfig)
+       {
+         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+          FL(" Miracast tuning already disabled!!"));
+         return eHAL_STATUS_SUCCESS;
+       }
+
+       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
+        FL("Disable Miracast tuning by enabling all MCS rates, setting %d blocks for aggregation and enabling probe response for broadcast probe in P2P-GO mode"),
+       iniNumBuffAdvert);
+
+       if (ccmCfgSetInt(hHal, WNI_CFG_NUM_BUFF_ADVERT, iniNumBuffAdvert,
+                  NULL, eANI_BOOLEAN_FALSE) == eHAL_STATUS_FAILURE)
+       {
+          VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+            FL("Failure: Could not set WNI_CFG_NUM_BUFF_ADVERT"));
+          return eHAL_STATUS_FAILURE;
+       }
+       /* Enable all MCS rates)
+        */
+       mcsSet[0]=0xFF;
+    }
+
+    if (ccmCfgSetStr(hHal, WNI_CFG_SUPPORTED_MCS_SET, mcsSet,
+          val, NULL, eANI_BOOLEAN_FALSE) == eHAL_STATUS_FAILURE)
+    {
+       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+         FL("Failure: Could not set WNI_CFG_SUPPORTED_MCS_SET"));
+       return eHAL_STATUS_FAILURE;
+    }
+
+    pMac->miracastVendorConfig = set_value;
+    return eHAL_STATUS_SUCCESS;
+}
+

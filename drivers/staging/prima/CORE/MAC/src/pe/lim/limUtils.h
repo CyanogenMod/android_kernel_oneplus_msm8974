@@ -550,4 +550,5 @@ tANI_U8 limGetOPClassFromChannel(tANI_U8 *country,
 void limParseBeaconForTim(tpAniSirGlobal pMac, tANI_U8* pRxPacketInfo,
                           tpPESession psessionEntry);
 
+void limDecrementPendingMgmtCount (tpAniSirGlobal pMac);
 #endif /* __LIM_UTILS_H */

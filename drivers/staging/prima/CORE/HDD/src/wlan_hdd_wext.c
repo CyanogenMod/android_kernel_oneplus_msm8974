@@ -167,6 +167,8 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_SET_TDLS_OFF_CHAN_MODE        16
 #endif
 #define  WE_SET_SCAN_BAND_PREFERENCE     17
+#define  WE_SET_MIRACAST_VENDOR_CONFIG     18
+
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_INT    (SIOCIWFIRSTPRIV + 1)
@@ -5023,7 +5025,36 @@ static int __iw_setint_getnone(struct net_device *dev,
             }
             break;
         }
+        /* The WE_SET_MIRACAST_VENDOR_CONFIG IOCTL should be set before the
+         * connection happens so that the params can take effect during
+         * association. Also this should not be used in STA+p2p concurrency
+         * as the param will also effect the STA mode.
+         */
+        case WE_SET_MIRACAST_VENDOR_CONFIG:
+        {
+            hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 
+            hddLog(LOG1, FL(
+             "Set Miracast vendor tuning %d"), set_value);
+
+            if (1 == set_value || 0 == set_value)
+            {
+                if (eHAL_STATUS_SUCCESS != sme_SetMiracastVendorConfig(pHddCtx->hHal,
+                                  pHddCtx->cfg_ini->numBuffAdvert, set_value))
+                {
+                    hddLog( LOGE, FL("set vendor miracast config failed"));
+                    ret = -EIO;
+                }
+            }
+            else
+            {
+                hddLog(LOGE,
+                 FL("Invalid value %d in WE_SET_MIRACAST_VENDOR_CONFIG IOCTL"), set_value);
+                ret = -EINVAL;
+            }
+
+            break;
+        }
         default:
         {
             hddLog(LOGE, "Invalid IOCTL setvalue command %d value %d",
@@ -8919,6 +8950,10 @@ static const struct iw_priv_args we_private_args[] = {
     {   WE_SET_SCAN_BAND_PREFERENCE,
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
         0, "set_scan_pref" },
+
+    {   WE_SET_MIRACAST_VENDOR_CONFIG,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0, "setMiracstConf" },
 
     /* handlers for main ioctl */
     {   WLAN_PRIV_SET_NONE_GET_INT,
