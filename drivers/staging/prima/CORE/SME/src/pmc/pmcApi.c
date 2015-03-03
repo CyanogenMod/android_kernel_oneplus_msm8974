@@ -2945,6 +2945,8 @@ eHalStatus pmcSetPreferredNetworkList
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
     tANI_U8 ucDot11Mode;
     tSmeCmd *pCommand;
+    tANI_U8 *tmp = NULL;
+    tANI_U16 len = 0;
 
     if (NULL == pSession)
     {
@@ -2974,6 +2976,29 @@ eHalStatus pmcSetPreferredNetworkList
         ucDot11Mode = (tANI_U8) csrTranslateToWNICfgDot11Mode(pMac,
                                        csrFindBestPhyMode( pMac, pMac->roam.configParam.phyMode ));
 
+        if (pRequestBuf->us24GProbeTemplateLen ||
+                 pRequestBuf->us5GProbeTemplateLen)
+        {
+            tmp = vos_mem_malloc(SIR_PNO_MAX_PB_REQ_SIZE);
+            if (tmp == NULL)
+            {
+                VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                    FL("failed to allocate memory"));
+            }
+            /* Continue even mem alloc fails as driver can still go ahead
+             * without supplicant IE's in probe req.
+             */
+        }
+
+        if (NULL != tmp)
+        {
+            len = pRequestBuf->us24GProbeTemplateLen;
+            if (0 != len && len <= SIR_PNO_MAX_PB_REQ_SIZE)
+            {
+                vos_mem_copy(tmp, pRequestBuf->p24GProbeTemplate, len);
+            }
+        }
+
         /*Prepare a probe request for 2.4GHz band and one for 5GHz band*/
         if (eSIR_SUCCESS == pmcPrepareProbeReqTemplate(pMac, SIR_PNO_24G_DEFAULT_CH,
                                   ucDot11Mode, pSession->selfMacAddr,
@@ -2981,25 +3006,33 @@ eHalStatus pmcSetPreferredNetworkList
                                   &pRequestBuf->us24GProbeTemplateLen))
         {
             /* Append IE passed by supplicant(if any) to probe request */
-            if ((0 < pRequest->us24GProbeTemplateLen) &&
-                ((pRequestBuf->us24GProbeTemplateLen +
-                pRequest->us24GProbeTemplateLen) < SIR_PNO_MAX_PB_REQ_SIZE ))
+            if ((0 < len) &&((pRequestBuf->us24GProbeTemplateLen + len)
+                              < SIR_PNO_MAX_PB_REQ_SIZE ))
             {
                 vos_mem_copy((tANI_U8 *)&pRequestBuf->p24GProbeTemplate +
                               pRequestBuf->us24GProbeTemplateLen,
-                              pRequest->p24GProbeTemplate,
-                              pRequest->us24GProbeTemplateLen);
-                pRequestBuf->us24GProbeTemplateLen +=
-                                             pRequest->us24GProbeTemplateLen;
+                              tmp,
+                              len);
+                pRequestBuf->us24GProbeTemplateLen += len;
                 VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-                       "%s: pRequest->us24GProbeTemplateLen = %d", __func__,
-                        pRequest->us24GProbeTemplateLen);
+                     "%s: us24GProbeTemplateLen = %d", __func__,
+                      pRequestBuf->us24GProbeTemplateLen);
             }
             else
             {
                 VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                    "%s: Extra ie discarded on 2.4G, IE length = %d Max IE length is %d",
-                   __func__, pRequest->us24GProbeTemplateLen, SIR_PNO_MAX_PB_REQ_SIZE);
+                   __func__, pRequestBuf->us24GProbeTemplateLen, SIR_PNO_MAX_PB_REQ_SIZE);
+            }
+        }
+
+        len = 0;
+        if (NULL != tmp)
+        {
+            len = pRequestBuf->us5GProbeTemplateLen;
+            if (0 != len && len <= SIR_PNO_MAX_PB_REQ_SIZE)
+            {
+                vos_mem_copy(tmp, pRequestBuf->p5GProbeTemplate, len);
             }
         }
 
@@ -3009,26 +3042,27 @@ eHalStatus pmcSetPreferredNetworkList
                                    &pRequestBuf->us5GProbeTemplateLen))
         {
             /* Append IE passed by supplicant(if any) to probe request */
-            if ((0 < pRequest->us5GProbeTemplateLen ) &&
-                ((pRequestBuf->us5GProbeTemplateLen +
-                pRequest->us5GProbeTemplateLen) < SIR_PNO_MAX_PB_REQ_SIZE ))
+            if ((0 < len) &&((pRequestBuf->us5GProbeTemplateLen + len)
+                              < SIR_PNO_MAX_PB_REQ_SIZE))
             {
                 vos_mem_copy((tANI_U8 *)&pRequestBuf->p5GProbeTemplate +
                           pRequestBuf->us5GProbeTemplateLen,
-                          pRequest->p5GProbeTemplate,
-                          pRequest->us5GProbeTemplateLen);
-                pRequestBuf->us5GProbeTemplateLen += pRequest->us5GProbeTemplateLen;
+                          tmp,
+                          len);
+                pRequestBuf->us5GProbeTemplateLen += len;
                 VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
-                    "%s: pRequestBuf->us5GProbeTemplateLen = %d", __func__,
-                     pRequest->us5GProbeTemplateLen);
+                    "%s: us5GProbeTemplateLen = %d", __func__,
+                     pRequestBuf->us5GProbeTemplateLen);
             }
             else
             {
                 VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                        "%s: Extra IE discarded on 5G, IE length = %d Max IE length is %d",
-                        __func__, pRequest->us5GProbeTemplateLen, SIR_PNO_MAX_PB_REQ_SIZE);
+                        __func__, pRequestBuf->us5GProbeTemplateLen, SIR_PNO_MAX_PB_REQ_SIZE);
             }
         }
+        if (NULL != tmp)
+            vos_mem_free(tmp);
     }
     pCommand->command = eSmeCommandPnoReq;
     pCommand->sessionId = (tANI_U8)sessionId;

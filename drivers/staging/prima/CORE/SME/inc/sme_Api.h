@@ -3486,4 +3486,8 @@ eHalStatus sme_Encryptmsgsend (tHalHandle hHal,
                                pEncryptMsgRSPCb encCB);
 
 
+eHalStatus sme_SetMiracastVendorConfig(tHalHandle hHal,
+                               tANI_U32 iniNumBuffAdvert,
+                                      tANI_U32 set_value);
+
 #endif //#if !defined( __SME_API_H )

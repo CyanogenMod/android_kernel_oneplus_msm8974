@@ -1245,17 +1245,6 @@ static tANI_BOOLEAN limAgeOutProbeReq( tpAniSirGlobal pMac, tpSirMsgQ  limMsg,
     return match;
 }
 
-void limDecrementPendingMgmtCount (tpAniSirGlobal pMac)
-{
-    if( pMac->sys.gSysBbtPendingMgmtCount )
-    {
-         vos_spin_lock_acquire( &pMac->sys.lock );
-         pMac->sys.gSysBbtPendingMgmtCount--;
-         vos_spin_lock_release( &pMac->sys.lock );
-    }
-    else
-         limLog(pMac, LOGW, FL("Pending Management count going negative"));
-}
 /**
  * limProcessMessages
  *
