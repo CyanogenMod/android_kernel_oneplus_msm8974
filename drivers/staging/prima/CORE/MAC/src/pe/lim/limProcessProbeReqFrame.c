@@ -603,6 +603,10 @@ limProcessProbeReqFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession 
             else
             {
                 {
+                    if ((VOS_P2P_GO_MODE == psessionEntry->pePersona) &&
+                                                        pMac->miracastVendorConfig)
+                        return;
+
                     // Broadcast SSID in the Probe Request.
                     // Reply with SSID we're configured with.
                     //Turn off the SSID length to 0 if hidden SSID feature is present
