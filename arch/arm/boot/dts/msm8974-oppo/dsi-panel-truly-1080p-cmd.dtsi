@@ -101,7 +101,6 @@
 		qcom,mdss-dsi-bl-min-level = <1>;
 		qcom,mdss-dsi-bl-max-level = <255>;
 		qcom,mdss-dsi-bl-sre-level = <254>;
-		qcom,mdss-dsi-bl-cabc-max-level = <225>;
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";
 		qcom,mdss-dsi-mdp-trigger = "trigger_sw";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";

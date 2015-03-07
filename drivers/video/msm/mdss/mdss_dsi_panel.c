@@ -74,9 +74,13 @@ static int mdss_dsi_update_cabc_level(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
     if (!pinfo->cabc_available)
         goto done;
 
-	pr_info("%s: update cabc level=%d (%d) sre=%d", __func__,
-			pinfo->cabc_mode, pinfo->cabc_active,
-			pinfo->sre_enabled);
+	pr_info("%s: update cabc level=%d  sre=%d", __func__,
+			pinfo->cabc_mode, pinfo->sre_enabled);
+
+	if (pinfo->sre_available && pinfo->sre_enabled) {
+		mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_sre_sequence);
+		goto done;
+	}
 
 	switch (pinfo->cabc_mode)
 	{
@@ -84,12 +88,7 @@ static int mdss_dsi_update_cabc_level(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
 			break;
 		case 1:
-			if (pinfo->sre_available && pinfo->sre_enabled)
-				mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_sre_sequence);
-			else if (pinfo->cabc_bl_max > 0 && !pinfo->cabc_active)
-				mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_off_sequence);
-			else
-				mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
+			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_user_interface_image_sequence);
 			break;
 		case 2:
 			mdss_dsi_panel_cmds_send(ctrl_pdata, &cabc_still_image_sequence);
@@ -1889,8 +1888,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		"qcom,mdss-dsi-sre-ui-command", "qcom,mdss-dsi-off-command-state");
 
 	pinfo->sre_available = rc == 0 ? 1 : 0;
-
-	of_property_read_u32(np, "qcom,mdss-dsi-bl-cabc-max-level", &pinfo->cabc_bl_max);
 
 	rc = mdss_dsi_parse_dcs_cmds(np, &color_enhance_on_sequence,
 		"qcom,mdss-dsi-color-enhance-on-command", "qcom,mdss-dsi-off-command-state");
