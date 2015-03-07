@@ -375,8 +375,6 @@ struct mdss_panel_info {
 #ifdef CONFIG_MACH_OPPO
 	int cabc_available;
 	int cabc_mode;
-	int cabc_bl_max;
-	bool cabc_active;
 
 	int gamma_index;
 	int gamma_count;
