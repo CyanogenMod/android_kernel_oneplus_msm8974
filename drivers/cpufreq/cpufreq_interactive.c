@@ -492,10 +492,6 @@ exit:
 	return;
 }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> bc94179... cpufreq: interactive: Rearm governor timer at max freq
 static void cpufreq_interactive_idle_end(void)
 {
 	struct cpufreq_interactive_cpuinfo *pcpu =
