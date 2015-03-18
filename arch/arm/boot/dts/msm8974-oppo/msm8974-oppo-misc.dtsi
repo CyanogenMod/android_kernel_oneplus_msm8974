@@ -36,6 +36,7 @@
 	qcom,vibrator@c000 {
 		qcom,vib-timeout-ms = <15000>;
 		qcom,vib-vtg-level-mV = <3100>;
+		qcom,vib-vtg-min-mV = <1900>;
 		status = "okay";
 	};
 };
