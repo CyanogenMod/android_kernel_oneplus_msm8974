@@ -580,7 +580,7 @@ static int macvtap_skb_from_vnet_hdr(struct sk_buff *skb,
 		case VIRTIO_NET_HDR_GSO_UDP:
 			gso_type = SKB_GSO_UDP;
 			if (skb->protocol == htons(ETH_P_IPV6))
-				ipv6_proxy_select_ident(skb);
+				ipv6_proxy_select_ident(dev_net(skb->dev), skb);
 			break;
 		default:
 			return -EINVAL;

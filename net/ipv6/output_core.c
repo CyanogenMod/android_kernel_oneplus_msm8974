@@ -9,7 +9,7 @@
  * This is similar to ipv6_select_ident() but we use an independent hash
  * seed to limit information leakage.
  */
-void ipv6_proxy_select_ident(struct sk_buff *skb)
+void ipv6_proxy_select_ident(struct net *net, struct sk_buff *skb)
 {
 	static u32 ip6_proxy_idents_hashrnd __read_mostly;
 	static bool hashrnd_initialized = false;
@@ -31,6 +31,7 @@ void ipv6_proxy_select_ident(struct sk_buff *skb)
 	}
 	hash = __ipv6_addr_jhash(&addrs[1], ip6_proxy_idents_hashrnd);
 	hash = __ipv6_addr_jhash(&addrs[0], hash);
+	hash ^= net_hash_mix(net);
 
 	id = ip_idents_reserve(hash, 1);
 	skb_shinfo(skb)->ip6_frag_id = htonl(id);
