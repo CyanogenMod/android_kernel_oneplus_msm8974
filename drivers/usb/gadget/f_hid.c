@@ -493,9 +493,9 @@ static int __init hidg_bind(struct usb_configuration *c, struct usb_function *f)
 
 	hidg_hs_in_ep_desc.bEndpointAddress =
 		hidg_fs_in_ep_desc.bEndpointAddress;
-	hidg_hs_out_ep_desc.bEndpointAddress =
+	/*hidg_hs_out_ep_desc.bEndpointAddress =
 		hidg_fs_out_ep_desc.bEndpointAddress;
-
+	*/
 	status = usb_assign_descriptors(f, hidg_fs_descriptors,
 			hidg_hs_descriptors, NULL);
 	if (status)
