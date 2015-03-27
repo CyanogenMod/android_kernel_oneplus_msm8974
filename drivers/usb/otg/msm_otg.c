@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2015, Linux Foundation. All rights reserved.
+/* Copyright (c) 2009-2014, Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -109,7 +109,12 @@ static struct power_supply *psy;
 
 static bool aca_id_turned_on;
 static bool legacy_power_supply;
+static bool usbhost_charge_mode = true;
+module_param(usbhost_charge_mode, bool, 0755); 
+
+extern void qpnp_otg_status(bool on);
 static inline bool aca_enabled(void)
+
 {
 #ifdef CONFIG_USB_MSM_ACA
 	return true;
@@ -351,7 +356,7 @@ static int ulpi_read(struct usb_phy *phy, u32 reg)
 
 	/* initiate read operation */
 	writel(ULPI_RUN | ULPI_READ | ULPI_ADDR(reg),
-	       USB_ULPI_VIEWPORT);
+		   USB_ULPI_VIEWPORT);
 
 	/* wait for completion */
 	while (cnt < ULPI_IO_TIMEOUT_USEC) {
@@ -378,8 +383,8 @@ static int ulpi_write(struct usb_phy *phy, u32 val, u32 reg)
 
 	/* initiate write operation */
 	writel(ULPI_RUN | ULPI_WRITE |
-	       ULPI_ADDR(reg) | ULPI_DATA(val),
-	       USB_ULPI_VIEWPORT);
+		   ULPI_ADDR(reg) | ULPI_DATA(val),
+		   USB_ULPI_VIEWPORT);
 
 	/* wait for completion */
 	while (cnt < ULPI_IO_TIMEOUT_USEC) {
@@ -403,6 +408,7 @@ static struct usb_phy_io_ops msm_otg_io_ops = {
 	.write = ulpi_write,
 };
 
+static int otg_host_on = 0;
 static void ulpi_init(struct msm_otg *motg)
 {
 	struct msm_otg_platform_data *pdata = motg->pdata;
@@ -425,6 +431,8 @@ static void ulpi_init(struct msm_otg *motg)
 		if (override_phy_init)
 			pr_debug("ulpi: write 0x%02x to 0x%02x\n",
 					seq[0], seq[1]);
+
+
 
 		dev_vdbg(motg->phy.dev, "ulpi: write 0x%02x to 0x%02x\n",
 				seq[0], seq[1]);
@@ -869,7 +877,7 @@ static void msm_otg_bus_vote(struct msm_otg *motg, enum usb_bus_vote vote)
 
 	/* Check if target allows min_vote to be same as no_vote */
 	if (pdata->bus_scale_table &&
-	    vote >= pdata->bus_scale_table->num_usecases)
+		vote >= pdata->bus_scale_table->num_usecases)
 		vote = USB_NO_PERF_VOTE;
 
 	if (motg->bus_perf_client) {
@@ -1037,8 +1045,7 @@ static int msm_otg_suspend(struct msm_otg *motg)
 				phy_ctrl_val |= PHY_OTGSESSVLDHV_INTEN;
 		}
 		if (host_bus_suspend)
-			phy_ctrl_val |= (PHY_CLAMP_DPDMSE_EN |PHY_DMSE_INTEN |
-						PHY_DPSE_INTEN);
+			phy_ctrl_val |= PHY_CLAMP_DPDMSE_EN;
 
 		if (!(motg->caps & ALLOW_VDD_MIN_WITH_RETENTION_DISABLED)) {
 			writel_relaxed(phy_ctrl_val & ~PHY_RETEN, USB_PHY_CTRL);
@@ -1053,7 +1060,7 @@ static int msm_otg_suspend(struct msm_otg *motg)
 	/* Consider clocks on workaround flag only in case of bus suspend */
 	if (!(phy->state == OTG_STATE_B_PERIPHERAL &&
 		test_bit(A_BUS_SUSPEND, &motg->inputs)) ||
-	    !motg->pdata->core_clk_always_on_workaround) {
+		!motg->pdata->core_clk_always_on_workaround) {
 		clk_disable_unprepare(motg->pclk);
 		clk_disable_unprepare(motg->core_clk);
 		motg->lpm_flags |= CLOCKS_DOWN;
@@ -1196,8 +1203,7 @@ static int msm_otg_resume(struct msm_otg *motg)
 			/* Disable PHY HV interrupts */
 			phy_ctrl_val &=
 				~(PHY_IDHV_INTEN | PHY_OTGSESSVLDHV_INTEN);
-		phy_ctrl_val &= ~(PHY_CLAMP_DPDMSE_EN | PHY_DMSE_INTEN |
-					PHY_DPSE_INTEN);
+		phy_ctrl_val &= ~(PHY_CLAMP_DPDMSE_EN);
 		writel_relaxed(phy_ctrl_val, USB_PHY_CTRL);
 		motg->lpm_flags &= ~PHY_RETENTIONED;
 	}
@@ -1290,7 +1296,7 @@ static void msm_otg_notify_host_mode(struct msm_otg *motg, bool host_mode)
 
 	if (legacy_power_supply) {
 		/* legacy support */
-		if (host_mode) {
+		if (host_mode && !usbhost_charge_mode) {
 			power_supply_set_scope(psy, POWER_SUPPLY_SCOPE_SYSTEM);
 		} else {
 			power_supply_set_scope(psy, POWER_SUPPLY_SCOPE_DEVICE);
@@ -1326,8 +1332,8 @@ static int msm_otg_notify_chg_type(struct msm_otg *motg)
 	else if (motg->chg_type == USB_CDP_CHARGER)
 		charger_type = POWER_SUPPLY_TYPE_USB_CDP;
 	else if (motg->chg_type == USB_DCP_CHARGER ||
-			motg->chg_type == USB_PROPRIETARY_CHARGER ||
-			motg->chg_type == USB_FLOATED_CHARGER)
+		motg->chg_type == USB_PROPRIETARY_CHARGER ||
+		motg->chg_type == USB_FLOATED_CHARGER)
 		charger_type = POWER_SUPPLY_TYPE_USB_DCP;
 	else if ((motg->chg_type == USB_ACA_DOCK_CHARGER ||
 		motg->chg_type == USB_ACA_A_CHARGER ||
@@ -1464,6 +1470,18 @@ static void msm_otg_start_host(struct usb_otg *otg, int on)
 
 	if (on) {
 		dev_dbg(otg->phy->dev, "host on\n");
+		//otg+charge: don't use battery to power perhipherals in host mode
+		if (usbhost_charge_mode)
+			//printk("[Nethunter] Testing OTG battery off in hostmode");
+			qpnp_otg_status(false);
+		else
+			//printk("[Nethunter] Testing OTG battery on in hostmode");
+			qpnp_otg_status(true);
+		
+		otg_host_on = 1;
+
+		// Reset to apply new parameter for host.
+		msm_otg_reset(otg->phy);
 
 		if (pdata->otg_control == OTG_PHY_CONTROL)
 			ulpi_write(otg->phy, OTG_COMP_DISABLE,
@@ -1571,6 +1589,13 @@ static void msm_hsusb_vbus_power(struct msm_otg *motg, bool on)
 {
 	int ret;
 	static bool vbus_is_on;
+
+	//otg+charge: just to be safe, turn off battery power to otg perhipheral
+	if (usbhost_charge_mode) {
+		printk("[usbhost_charge_mode]: Do not supply power in host mode\n");
+		msm_otg_notify_host_mode(motg, on);
+		return;
+	}
 
 	if (vbus_is_on == on)
 		return;
@@ -2422,6 +2447,19 @@ static void msm_chg_detect_work(struct work_struct *w)
 				motg->chg_type = USB_SDP_CHARGER;
 
 			motg->chg_state = USB_CHG_STATE_DETECTED;
+
+			if (line_state) { /* DP > VLGC or/and DM > VLGC */
+				//otg+charge				
+				if (usbhost_charge_mode) {
+					motg->chg_type = USB_ACA_A_CHARGER;
+				} else {	
+					motg->chg_type = USB_PROPRIETARY_CHARGER;
+				}	
+			} else {
+				motg->chg_type = USB_SDP_CHARGER;
+			}
+
+			motg->chg_state = USB_CHG_STATE_DETECTED;
 			delay = 0;
 		}
 		break;
@@ -2996,6 +3034,17 @@ static void msm_otg_sm_work(struct work_struct *w)
 		} else if (test_bit(ID_A, &motg->inputs)) {
 			msm_hsusb_vbus_power(motg, 0);
 		} else if (!test_bit(A_BUS_REQ, &motg->inputs)) {
+
+			//otg+charge: if there is current, start charging
+			if (usbhost_charge_mode) {
+				if (test_bit(B_SESS_VLD, &motg->inputs)) {
+					pr_debug("b_sess_vld\n");
+					usleep_range(10000, 12000);
+					if (motg->chg_state == USB_CHG_STATE_UNDEFINED)
+						msm_chg_detect_work(&motg->chg_work.work);
+				} 
+			}
+
 			/*
 			 * If TA_WAIT_BCON is infinite, we don;t
 			 * turn off VBUS. Enter low power mode.
@@ -3358,6 +3407,12 @@ static void msm_otg_set_vbus_state(int online)
 {
 	static bool init;
 	struct msm_otg *motg = the_msm_otg;
+	struct usb_otg *otg = motg->phy.otg;
+	
+	/* In A Host Mode, ignore received BSV interrupts */
+	//otg+charge: ignore unless usbhost_charge_mode, then we want to sense vbus
+	if (!usbhost_charge_mode && otg->phy->state >= OTG_STATE_A_IDLE)
+		return;
 
 	if (online) {
 		pr_debug("PMIC: BSV set\n");
@@ -3365,6 +3420,16 @@ static void msm_otg_set_vbus_state(int online)
 	} else {
 		pr_debug("PMIC: BSV clear\n");
 		clear_bit(B_SESS_VLD, &motg->inputs);
+
+		//otg+charge:  cancel charging when power is disconnected
+		if (otg->phy->state >= OTG_STATE_A_IDLE && usbhost_charge_mode) {
+			printk("[usbhost_charge_mode]: chg_work cancel from set vbus state");
+			cancel_delayed_work_sync(&motg->chg_work);
+			motg->chg_state = USB_CHG_STATE_UNDEFINED;
+			motg->chg_type = USB_INVALID_CHARGER;
+			msm_otg_notify_charger(motg, 0);
+			msm_otg_reset(otg->phy);			
+		}
 	}
 
 	/* do not queue state m/c work if id is grounded */
@@ -4201,7 +4266,7 @@ unreg_chrdev:
 }
 
 static ssize_t dpdm_pulldown_enable_show(struct device *dev,
-			       struct device_attribute *attr, char *buf)
+				   struct device_attribute *attr, char *buf)
 {
 	struct msm_otg *motg = the_msm_otg;
 	struct msm_otg_platform_data *pdata = motg->pdata;
@@ -4353,7 +4418,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 
 	if (motg->pdata->bus_scale_table) {
 		motg->bus_perf_client =
-		    msm_bus_scale_register_client(motg->pdata->bus_scale_table);
+			msm_bus_scale_register_client(motg->pdata->bus_scale_table);
 		if (!motg->bus_perf_client) {
 			dev_err(motg->phy.dev, "%s: Failed to register BUS\n"
 						"scaling client!!\n", __func__);
