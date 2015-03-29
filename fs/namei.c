@@ -34,6 +34,7 @@
 #include <linux/device_cgroup.h>
 #include <linux/fs_struct.h>
 #include <linux/posix_acl.h>
+#include <linux/zfile.h>
 #include <asm/uaccess.h>
 
 #include "internal.h"
@@ -2445,6 +2446,10 @@ struct file *do_filp_open(int dfd, const char *pathname,
 		filp = path_openat(dfd, pathname, &nd, op, flags);
 	if (unlikely(filp == ERR_PTR(-ESTALE)))
 		filp = path_openat(dfd, pathname, &nd, op, flags | LOOKUP_REVAL);
+	/* Transparent compression hook */
+	if (!IS_ERR(filp))
+		if (zfile_is_compressed(filp))
+			filp = zfile_open(filp, pathname);
 	return filp;
 }
 
