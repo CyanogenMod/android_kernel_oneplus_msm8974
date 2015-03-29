@@ -16,7 +16,6 @@
 	dsi_sharp_1080_cmd: qcom,mdss_dsi_sharp_1080p_cmd {
 		compatible = "qcom,mdss-dsi-panel";
 		status = "ok";
-		qcom,cont-splash-enabled;
 		qcom,mdss-dsi-panel-name = "sharp 1080p cmd mode dsi panel";
 		qcom,mdss-dsi-panel-manufacture = "sharp";
 		qcom,mdss-dsi-panel-version = "R63315";
@@ -100,6 +99,10 @@
 		qcom,mdss-dsi-cabc-video-command = [
 			15 01 00 00 10 00 02 55 03
 			05 01 00 00 10 00 02 29 00];
+		qcom,mdss-dsi-sre-ui-command = [
+			15 01 00 00 10 00 02 55 03
+			05 01 00 00 10 00 02 29 60];
+		qcom,cont-splash-enabled;
 		qcom,partial-update-enabled;
 		qcom,panel-roi-alignment = <900 4 2 4 540 20>;
 		qcom,ulps-enabled;
