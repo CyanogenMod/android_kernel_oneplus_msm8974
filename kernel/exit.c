@@ -1012,8 +1012,6 @@ void do_exit(long code)
 	if (group_dead)
 		disassociate_ctty(1);
 
-	module_put(task_thread_info(tsk)->exec_domain->module);
-
 	proc_exit_connector(tsk);
 
 	/*
