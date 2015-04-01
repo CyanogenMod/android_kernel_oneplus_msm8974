@@ -24,7 +24,7 @@ static ssize_t charge_level_ac_show(struct kobject *kobj, struct kobj_attribute 
 {
 
 	// print current value
-	return sprintf(buf, "%d mA", ac_level);
+	return sprintf(buf, "%d", ac_level);
 
 }
 
@@ -59,7 +59,7 @@ static ssize_t charge_level_usb_show(struct kobject *kobj, struct kobj_attribute
 {
 
 	// print current value
-	return sprintf(buf, "%d mA", usb_level);
+	return sprintf(buf, "%d", usb_level);
 
 }
 
