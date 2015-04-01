@@ -1279,6 +1279,9 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
 	spin_unlock_irqrestore(&mapping->lock, flags);
 }
 
+/* We'll try 2M, 1M, 64K, and finally 4K; array must end with 0! */
+static const int iommu_order_array[] = { 9, 8, 4, 0 };
+
 static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
 					  gfp_t gfp, struct dma_attrs *attrs)
 {
@@ -1286,6 +1289,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
 	int count = size >> PAGE_SHIFT;
 	int array_size = count * sizeof(struct page *);
 	int i = 0;
+	int order_idx = 0;
 
 	if (array_size <= PAGE_SIZE)
 		pages = kzalloc(array_size, gfp);
@@ -1314,19 +1318,40 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
 		return pages;
 	}
 
+	/* Go straight to 4K chunks if caller says it's OK. */
+	if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs))
+		order_idx = ARRAY_SIZE(iommu_order_array) - 1;
+
 	/*
 	 * IOMMU can map any pages, so himem can also be used here
 	 */
 	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
 
 	while (count) {
-		int j, order = __fls(count);
+		int j, order;
 
-		pages[i] = alloc_pages(gfp, order);
-		while (!pages[i] && order)
-			pages[i] = alloc_pages(gfp, --order);
-		if (!pages[i])
-			goto error;
+		order = iommu_order_array[order_idx];
+
+		/* Drop down when we get small */
+		if (__fls(count) < order) {
+			order_idx++;
+			continue;
+		}
+
+		if (order) {
+			/* See if it's easy to allocate a high-order chunk */
+			pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
+
+			/* Go down a notch at first sign of pressure */
+			if (!pages[i]) {
+				order_idx++;
+				continue;
+			}
+		} else {
+			pages[i] = alloc_pages(gfp, 0);
+			if (!pages[i])
+				goto error;
+		}
 
 		if (order) {
 			split_page(pages[i], order);
