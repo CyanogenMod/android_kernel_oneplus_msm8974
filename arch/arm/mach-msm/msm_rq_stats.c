@@ -265,6 +265,24 @@ static struct kobj_attribute hotplug_enabled_attr =
 	__ATTR(hotplug_enable, S_IWUSR | S_IRUSR, show_hotplug_enable,
 	       store_hotplug_enable);
 
+#ifdef CONFIG_BRICKED_HOTPLUG
+unsigned int get_rq_info(void)
+{
+	unsigned long flags = 0;
+        unsigned int rq = 0;
+
+        spin_lock_irqsave(&rq_lock, flags);
+
+        rq = rq_info.rq_avg;
+        rq_info.rq_avg = 0;
+
+        spin_unlock_irqrestore(&rq_lock, flags);
+
+        return rq;
+}
+EXPORT_SYMBOL(get_rq_info);
+#endif
+
 static void def_work_fn(struct work_struct *work)
 {
 	int64_t diff;
