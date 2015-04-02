@@ -46,8 +46,16 @@
 		batfet-supply = <&pm8941_chg_batif>;
 	};
 
-	qcom,mdss_dsi@fd922800 {
-		/delete-property/ qcom,platform-supply-entry1;
+	mdss_dsi0: qcom,mdss_dsi@fd922800 {
+		qcom,panel-supply-entries {
+			/delete-property/ qcom,panel-supply-entry@0;
+		};
+	};
+
+	mdss_dsi1: qcom,mdss_dsi@fd922e00 {
+		qcom,panel-supply-entries {
+			/delete-property/ qcom,panel-supply-entry@0;
+		};
 	};
 
 	qcom,hdmi_tx@fd922100 {
