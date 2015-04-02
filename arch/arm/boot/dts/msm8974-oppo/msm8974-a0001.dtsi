@@ -50,33 +50,3 @@
 	regulator-min-microvolt = <4500000>;
 	regulator-max-microvolt = <4500000>;
 };
-
-&soc {
-	mdss_dsi0: qcom,mdss_dsi@fd922800 {
-		qcom,panel-supply-entries {
-			qcom,panel-supply-entry@0 {
-				reg = <0>;
-				qcom,supply-name = "vdd";
-				qcom,supply-min-voltage = <0>;
-				qcom,supply-max-voltage = <0>;
-				qcom,supply-enable-load = <150000>;
-				qcom,supply-disable-load = <100>;
-				qcom,supply-post-on-sleep = <0>;
-			};
-		};
-	};
-
-	mdss_dsi1: qcom,mdss_dsi@fd922e00 {
-		qcom,panel-supply-entries {
-			qcom,panel-supply-entry@0 {
-				reg = <0>;
-				qcom,supply-name = "vdd";
-				qcom,supply-min-voltage = <0>;
-				qcom,supply-max-voltage = <0>;
-				qcom,supply-enable-load = <150000>;
-				qcom,supply-disable-load = <100>;
-				qcom,supply-post-on-sleep = <0>;
-			};
-		};
-	};
-};
