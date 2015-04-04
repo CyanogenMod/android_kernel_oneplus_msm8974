@@ -1038,4 +1038,8 @@ config TOUCHSCREEN_SYNAPTICS_S3508_I2C_RMI
 
 source "drivers/input/touchscreen/gt9xx/Kconfig"
 
+config STATE_NOTIFIER
+        bool "State Notifier"
+	default y
+
 endif
