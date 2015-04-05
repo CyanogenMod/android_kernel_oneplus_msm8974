@@ -6916,12 +6916,14 @@ void qpnp_external_charger_unregister(struct qpnp_external_charger *external_cha
 }
 EXPORT_SYMBOL(qpnp_external_charger_unregister);
 
-void qpnp_otg_status(bool on, struct qpnp_chg_chip *chip)
+int qpnp_otg_status(bool on, struct regulator_dev *rdev)
 {
         if (on) {
-                is_otg_en_set = true;
-        } else {
-                is_otg_en_set = false;
+		struct qpnp_chg_chip *chip = rdev_get_drvdata(rdev);
+		return switch_usb_to_host_mode(chip);
+	} else {
+		struct qpnp_chg_chip *chip = rdev_get_drvdata(rdev);
+		return switch_usb_to_charge_mode(chip);
 		}
 }
 EXPORT_SYMBOL(qpnp_otg_status);
