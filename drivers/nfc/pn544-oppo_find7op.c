@@ -118,6 +118,38 @@ static void mainboard_verify(void)
 			mainboard_info.version = "23";
 			mainboard_info.manufacture = "SD";
 			break;
+		case HW_VERSION__30:
+			mainboard_info.version ="30";
+			mainboard_info.manufacture = "SA";
+			break;
+		case HW_VERSION__31:
+			mainboard_info.version = "31";
+			mainboard_info.manufacture = "SB";
+			break;
+		case HW_VERSION__32:
+			mainboard_info.version = "32";
+			mainboard_info.manufacture = "SC";
+			break;
+		case HW_VERSION__33:
+			mainboard_info.version = "33";
+			mainboard_info.manufacture = "SD";
+			break;
+		case HW_VERSION__40:
+			mainboard_info.version ="40";
+			mainboard_info.manufacture = "SA";
+			break;
+		case HW_VERSION__41:
+			mainboard_info.version = "41";
+			mainboard_info.manufacture = "SB";
+			break;
+		case HW_VERSION__42:
+			mainboard_info.version = "42";
+			mainboard_info.manufacture = "SC";
+			break;
+		case HW_VERSION__43:
+			mainboard_info.version = "43";
+			mainboard_info.manufacture = "SD";
+			break;
 		default:
 			mainboard_info.version = "UNKOWN";
 			mainboard_info.manufacture = "UNKOWN";

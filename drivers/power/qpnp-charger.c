@@ -6532,6 +6532,7 @@ static void qpnp_check_recharging(struct qpnp_chg_chip *chip)
 static void qpnp_check_chg_current(struct qpnp_chg_chip *chip)
 {
 	if (get_pcb_version() < HW_VERSION__20
+			|| get_pcb_version() >= HW_VERSION__30
 			|| qpnp_charger_type_get(chip) != POWER_SUPPLY_TYPE_USB_DCP
 			|| qpnp_get_fast_chg_ing(chip))
 		return;
@@ -6575,11 +6576,19 @@ bool is_alow_fast_chg(struct qpnp_chg_chip *chip)
 	if(chg_type != POWER_SUPPLY_TYPE_USB_DCP)
 		return false;
 #ifndef CONFIG_MACH_FIND7OP
+#ifdef CONFIG_MACH_N3
+	if (temp < 150 || temp > 450)
+		return false;
+	if (temp < 205 && low_temp_full == 1) {
+		return false;
+	}
+#else
 	if(temp < 105)
 		return false;
 	if((temp < 155) && (low_temp_full == 1)){
 		return false;
 	}
+#endif
 #else
 	if(temp < 205)
 		return false;
@@ -6844,7 +6853,7 @@ static int fb_notifier_callback(struct notifier_block *self,
 					if(chip->aicl_current != 0) {
 						if (chip->aicl_current >= 1500) {
 							/* OPPO 2014-05-22 sjc Add for Find7s temp rising problem */
-							if (get_pcb_version() >= HW_VERSION__20) {
+							if (get_pcb_version() >= HW_VERSION__20 && get_pcb_version() < HW_VERSION__30) {
 								if (chip->usbin_counts == USBIN_COUNT_FLAG && !qpnp_get_fast_chg_ing(chip))
 									qpnp_chg_iusbmax_set(chip, 900);
 							} else {

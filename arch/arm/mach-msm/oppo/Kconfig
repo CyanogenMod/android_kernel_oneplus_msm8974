@@ -23,6 +23,13 @@ config MACH_FIND7OP
 	help
 	  Support for the Oneplus variant
 
+config MACH_N3
+	select MACH_OPPO_MSM8974
+	select SND_SOC_TAS2552
+	bool "N3"
+	help
+	  Support for the Oppo N3 variant
+
 endmenu
 
 menu "Oppo specific options"
