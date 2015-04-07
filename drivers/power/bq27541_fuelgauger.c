@@ -191,6 +191,23 @@ static int bq27541_read(u8 reg, int *rt_value, int b_single,
 	return di->bus->read(reg, rt_value, b_single, di);
 }
 
+#ifdef CONFIG_MACH_N3
+static int mcu_en_gpio = 0;
+void mcu_en_gpio_set(int value)
+{
+	if (value) {
+		if (gpio_is_valid(mcu_en_gpio))
+			gpio_set_value(mcu_en_gpio, 0);
+	} else {
+		if (gpio_is_valid(mcu_en_gpio)) {
+			gpio_set_value(mcu_en_gpio, 1);
+			usleep_range(10000, 10000);
+			gpio_set_value(mcu_en_gpio, 0);
+		}
+	}
+}
+#endif
+
 /*
  * Return the battery temperature in tenths of degree Celsius
  * Or < 0 if something fails.
@@ -1075,6 +1092,9 @@ static void fastcg_work_func(struct work_struct *work)
 				bq27541_di->fast_normal_to_warm = false;
 				bq27541_di->fast_chg_ing = false;
 				gpio_set_value(96, 0);
+#ifdef CONFIG_MACH_N3
+				mcu_en_gpio_set(1);
+#endif
 				retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 				if (retval) {
 					pr_err("%s switch usb error %d\n", __func__, retval);
@@ -1117,6 +1137,9 @@ static void fastcg_work_func(struct work_struct *work)
 		pr_info("%s fastchg stop unexpectly,switch off fastchg\n", __func__);
 		
 		gpio_set_value(96, 0);
+#ifdef CONFIG_MACH_N3
+		mcu_en_gpio_set(1);
+#endif
 		retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 		if (retval) {
 			pr_err("%s switch usb error %d\n", __func__, retval);
@@ -1151,6 +1174,9 @@ static void fastcg_work_func(struct work_struct *work)
 		//switch off fast chg
 		pr_info("%s fastchg full,switch off fastchg,set GPIO96 0\n", __func__);
 		gpio_set_value(96, 0);
+#ifdef CONFIG_MACH_N3
+		mcu_en_gpio_set(1);
+#endif
 		retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 		if (retval) {
 			pr_err("%s switch usb error %d\n", __func__, retval);
@@ -1163,6 +1189,9 @@ static void fastcg_work_func(struct work_struct *work)
 			//switch off fast chg
 			pr_info("%s fastchg low temp full,switch off fastchg,set GPIO96 0\n", __func__);
 			gpio_set_value(96, 0);
+#ifdef CONFIG_MACH_N3
+			mcu_en_gpio_set(1);
+#endif
 			retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 			if (retval) {
 				pr_err("%s switch usb error %d\n", __func__, retval);
@@ -1181,6 +1210,9 @@ static void fastcg_work_func(struct work_struct *work)
 		//switch off fast chg
 		pr_info("%s usb bad connect,switch off fastchg\n", __func__);
 		gpio_set_value(96, 0);
+#ifdef CONFIG_MACH_N3
+		mcu_en_gpio_set(1);
+#endif
 		retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 		if (retval) {
 			pr_err("%s switch usb error %d\n", __func__, retval);
@@ -1191,6 +1223,9 @@ static void fastcg_work_func(struct work_struct *work)
 		//fastchg temp over 45 or under 20
 		pr_info("%s fastchg temp > 45 or < 20,switch off fastchg,set GPIO96 0\n", __func__);
 		gpio_set_value(96, 0);
+#ifdef CONFIG_MACH_N3
+		mcu_en_gpio_set(1);
+#endif
 		retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 		if (retval) {
 			pr_err("%s switch usb error %d\n", __func__, retval);
@@ -1215,6 +1250,9 @@ static void fastcg_work_func(struct work_struct *work)
 		fw_ver_info = 0;
 	} else {
 		gpio_set_value(96, 0);
+#ifdef CONFIG_MACH_N3
+		mcu_en_gpio_set(1);
+#endif
 		retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 		if (retval) {
 			pr_err("%s data err(101xxxx) switch usb error %d\n", __func__, retval);
@@ -1341,6 +1379,9 @@ void di_watchdog(unsigned long data)
 	pr_info("%s switch off fastchg\n", __func__);
 
 	gpio_set_value(96, 0);
+#ifdef CONFIG_MACH_N3
+		mcu_en_gpio_set(1);
+#endif
 	ret = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 	if (ret) {
 		pr_info("%s switch usb error %d\n", __func__, ret);

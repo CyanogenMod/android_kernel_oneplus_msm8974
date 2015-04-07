@@ -20,6 +20,9 @@
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
 #include <linux/memory.h>
+#ifdef CONFIG_MACH_N3
+#include <linux/regulator/consumer.h>
+#endif
 #include <linux/regulator/machine.h>
 #include <linux/regulator/krait-regulator.h>
 #include <linux/msm_tsens.h>

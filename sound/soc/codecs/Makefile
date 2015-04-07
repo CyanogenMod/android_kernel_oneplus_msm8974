@@ -102,6 +102,7 @@ snd-soc-wm9712-objs := wm9712.o
 snd-soc-wm9713-objs := wm9713.o
 snd-soc-wm-hubs-objs := wm_hubs.o
 snd-soc-es325-objs := es325.o
+snd-soc-tas2552-objs := tas2552.o
 
 snd-soc-timpani-objs := timpani.o
 snd-soc-msm-stub-objs := msm_stub.o
@@ -216,6 +217,7 @@ obj-$(CONFIG_SND_SOC_WM9713)	+= snd-soc-wm9713.o
 obj-$(CONFIG_SND_SOC_WM_HUBS)	+= snd-soc-wm-hubs.o
 obj-$(CONFIG_SND_SOC_MSM_STUB)  += snd-soc-msm-stub.o
 obj-$(CONFIG_SND_SOC_ES325)	+= snd-soc-es325.o
+obj-$(CONFIG_SND_SOC_TAS2552)	+= snd-soc-tas2552.o
 
 # Amp
 obj-$(CONFIG_SND_SOC_MAX9877)	+= snd-soc-max9877.o

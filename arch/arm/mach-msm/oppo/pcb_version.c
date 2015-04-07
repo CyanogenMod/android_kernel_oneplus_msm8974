@@ -55,6 +55,8 @@ int __init board_pcb_version_init(char *s)
 		current_pcb_version_num = HW_VERSION__22;
 	else if (!strncmp(s, "23", 2))
 		current_pcb_version_num = HW_VERSION__23;
+	else if (!strncmp(s, "30", 2))
+		current_pcb_version_num = HW_VERSION__30;
 
 	return 0;
 }
@@ -99,6 +101,22 @@ int __init board_rf_version_init(char *s)
 		current_rf_version_num = RF_VERSION__88;
 	else if (!strncmp(s, "89", 2))
 		current_rf_version_num = RF_VERSION__89;
+	else if (!strncmp(s, "90", 2))
+		current_rf_version_num = RF_VERSION__90;
+	else if (!strncmp(s, "91", 2))
+		current_rf_version_num = RF_VERSION__91;
+	else if (!strncmp(s, "92", 2))
+		current_rf_version_num = RF_VERSION__92;
+	else if (!strncmp(s, "93", 2))
+		current_rf_version_num = RF_VERSION__93;
+	else if (!strncmp(s, "94", 2))
+		current_rf_version_num = RF_VERSION__94;
+	else if (!strncmp(s, "95", 2))
+		current_rf_version_num = RF_VERSION__95;
+	else if (!strncmp(s, "96", 2))
+		current_rf_version_num = RF_VERSION__96;
+	else if (!strncmp(s, "97", 2))
+		current_rf_version_num = RF_VERSION__97;
 	else if (!strncmp(s, "98", 2))
 		current_rf_version_num = RF_VERSION__98;
 	else if (!strncmp(s, "99", 2))
