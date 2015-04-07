@@ -448,6 +448,9 @@ config SND_SOC_ES325
 config SND_SOC_ES325_SLIM
 	tristate
 
+config SND_SOC_TAS2552
+	tristate
+
 # Amp
 config SND_SOC_LM4857
 	tristate

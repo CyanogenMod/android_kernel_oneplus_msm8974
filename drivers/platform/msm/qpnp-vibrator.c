@@ -242,6 +242,10 @@ retry:
 	if (value == 0)
 		vib->state = 0;
 	else {
+#ifdef CONFIG_MACH_N3
+		if (value < 50 && value > 0)
+			value += 10;
+#endif
 		value = (value > vib->timeout ?
 				 vib->timeout : value);
 		vib->state = 1;
