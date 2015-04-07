@@ -1,0 +1,1059 @@
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/include/ "msm8974-oppo-common.dtsi"
+/include/ "msm8974-oppo-camera.dtsi"
+/include/ "msm8974-oppo-input.dtsi"
+/include/ "msm8974-oppo-usb.dtsi"
+/include/ "msm8974-oppo-misc.dtsi"
+/include/ "msm8974-oppo-pm.dtsi"
+/include/ "msm8974-oppo-nfc.dtsi"
+/include/ "msm8974-oppo-regulator.dtsi"
+/include/ "msm8974-oppo-sound.dtsi"
+/include/ "msm8974-oppo-leds.dtsi"
+
+/ {
+	aliases {
+		serial0 = &blsp1_uart1;
+	};
+};
+
+&soc {
+	serial@f991e000 {
+		status = "ok";
+	};
+
+	qcom,mdss_dsi@fd922800 {
+		/*qcom,dsi-pref-prim-pan = <&dsi_tosh_720_vid>;*/
+		qcom,dsi-pref-prim-pan = <&dsi_jdi_1080_cmd>;
+	};
+/* OPPO 2014-02-10 yxq added begin for Find7S */
+	qcom,mdss_dsi@fd922e00 {
+		qcom,dsi-pref-find7s-jdi-pan = <&dsi_jdi_1440_vid2>;
+	}; 
+/* OPPO 2014-02-10 yxq added end */
+	qcom,mdss_mdp@fd900000 {
+		qcom,mdss-pref-prim-intf = "dsi";
+		batfet-supply = <&pm8941_chg_batif>;
+	};
+
+	qcom,hdmi_tx@fd922100 {
+		status = "disabled";
+	};
+/*VENDOR_EDIT*/	
+/*wangjc add bq27541 battery */
+	i2c@f9923000 {
+		bq27541-battery@55 {
+			status = "okay";
+			compatible = "ti,bq27541-battery";
+			reg = <0x55>;
+/* OPPO 2014-06-23 sjc Add begin for 14021 */
+			microchip,mcu-en-gpio = <&pm8941_gpios 3 0>;
+/* OPPO 2014-06-23 sjc Add end */
+		};
+		/* OPPO 2013-12-17 liaofuchun add for fastcg */
+		pic16f_fastcg@25{
+			status = "okay";
+			compatible = "microchip,pic16f_fastcg";
+			reg = <0x25>;
+		};
+		/* OPPO 2013-12-17 liaofuchun add end */
+	};
+/*wangjc add.*/
+
+	i2c@f9924000 {
+/*VENDOR_EDIT*/	
+/*  //delete by yubin, oppo, 2013.11.5
+		synaptics@20 {
+			compatible = "synaptics,rmi4";
+			reg = <0x20>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <61 0x2008>;
+			vdd-supply = <&pm8941_l18>;
+			vcc_i2c-supply = <&pm8941_lvs1>;
+			synaptics,reset-gpio = <&msmgpio 60 0x00>;
+			synaptics,irq-gpio = <&msmgpio 61 0x2008>;
+			synaptics,display-coords = <0 0 1079 1919>;
+			synaptics,i2c-pull-up;
+			synaptics,power-down;
+			synaptics,disable-gpios;
+			synaptics,do-lockdown;
+		};
+*/
+/*OPPO songxh 2014-06-21 add end for enable the motor control*/		
+	cameramotor_drv8834@67 {			
+		compatible = "cameramotor,drv8834";	
+		reg = <0x67>;  ////////////
+		cameramotor,gpio = <&msmgpio 67 0x00>;
+
+/*zwx */
+		qcom,platform-vref-gpio = <&pm8941_gpios 9 0>;
+		qcom,platform-sleep-gpio = <&pm8941_gpios 10 0>;
+		qcom,platform-dir-gpio = <&pm8941_gpios 11 0>;
+		qcom,platform-m0-gpio = <&pm8941_gpios 12 0>;
+		qcom,platform-m1-gpio = <&pm8941_gpios 13 0>;
+		qcom,platform-step-gpio = <&pm8941_gpios 33 0>;
+	};/*OPPO songxh 2014-06-21 add end for enable the motor control*/
+
+/*OPPO yubin 2013-10-10 add begin for tp*/
+		synaptics-rmi-ts@20 {
+			compatible = "synaptics,rmi-ts";
+			reg = <0x20>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <61 0x8>;
+			synaptics,irq-gpio = <&msmgpio 61 0x00>;
+			synaptics,wakeup-gpio = <&msmgpio 57 0x00>;
+			synaptics,reset-gpio = <&msmgpio 60 0x00>;
+			synaptics,id-gpio = <&msmgpio 62 0x00>;
+			synaptics,id3-gpio = <&msmgpio 46 0x00>;
+		};
+/*OPPO yubin 2013-10-10 add end for tp*/
+
+		atmel_mxt_ts@4a {
+			compatible = "atmel,mxt-ts";
+			reg = <0x4a>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <61 0x2>;
+			vdd_ana-supply = <&pm8941_l18>;
+			vcc_i2c-supply = <&pm8941_lvs1>;
+			atmel,reset-gpio = <&msmgpio 60 0x00>;
+			atmel,irq-gpio = <&msmgpio 61 0x00>;
+			atmel,panel-coords = <0  0 760 1424>;
+			atmel,display-coords = <0 0 720 1280>;
+			atmel,i2c-pull-up;
+			atmel,no-force-update;
+			atmel,cfg_1 {
+				atmel,fw-name = "atmel_8974_fluid_v1_0_AA.hex";
+				atmel,family-id = <0x82>;
+				atmel,variant-id = <0x19>;
+				atmel,version = <0x10>;
+				atmel,build = <0xaa>;
+				atmel,config = [
+					/* Object 6, Instance = 0 */
+					00 00 00 00 00 00
+					/* Object 38, Instance = 0 */
+					15 01 00 03 0A 0C 00 00
+					/* Object 7, Instance = 0 */
+					20 08 32 03
+					/* Object 8, Instance = 0 */
+					0F 00 0A 0A 00 00 0A 0A 00 00
+					/* Object 9, Instance = 0 */
+					83 00 00 18 0E 00 70 46 02 01
+					00 0A 03 31 04 05 0A 0A 90 05
+					F8 02 05 F1 F1 0F 00 00 08 2D
+					12 06 00 00 00 01
+					/* Object 15, Instance = 0 */
+					00 00 00 00 00 00 00 00 00 00
+					00
+					/* Object 18, Instance = 0 */
+					00 00
+					/* Object 19, Instance = 0 */
+					00 00 00 00 00 00
+					/* Object 23, Instance = 0 */
+					00 00 00 00 00 00 00 00 00 00
+					00 00 00 00 00
+					/* Object 25, Instance = 0 */
+					00 00 00 00 00 00 00 00 00 00
+					00 00 00 00 00
+					/* Object 40, Instance = 0 */
+					00 00 00 00 00
+					/* Object 42, Instance = 0 */
+					33 1E 19 10 80 00 00 00 FF 00
+					/* Object 46, Instance = 0 */
+					00 00 10 10 00 00 03 00 00 01
+					/* Object 47, Instance = 0 */
+					08 0A 28 0A 02 0A 00 8C 00 20
+					00 00 00
+					/* Object 55, Instance = 0 */
+					00 00 00 00 00 00
+					/* Object 56, Instance = 0 */
+					00 00 00 18 05 05 05 05 05 05
+					05 05 05 05 05 05 05 05 05 05
+					05 05 05 05 05 05 05 05 00 00
+					00 00 00 00 00 00 00 00 00 00
+					00 00
+					/* Object 57, Instance = 0 */
+					00 00 00
+					/* Object 61, Instance = 0 */
+					00 00 00 00 00
+					/* Object 62, Instance = 0 */
+					01 2A 00 16 00 00 00 00 0B 01
+					02 03 04 08 00 00 08 10 18 05
+					00 0A 05 05 50 14 19 34 1A 7F
+					00 00 00 00 00 00 00 00 00 30
+					05 02 00 01 00 05 00 00 00 00
+					00 00 00 00
+					];
+			};
+		};
+/*OPPO yuyi 2013-09-27 add begin for rgb_led*/
+		sn3193_issi_rgb@68 {
+			compatible = "sn3193,issi-rgb";
+			reg = <0x68>;
+			sn3193,sdb-gpio = <&msmgpio 45 0x00>;
+			};
+/*OPPO yuyi 2013-09-27 add end for rgb _led*/
+/*yanghai add */
+		ti_lm3630_bl@36 {
+			compatible = "ti,lm3630";
+			reg = <0x36>;
+			ti,bank-a-ctrl = <0x05>;
+			ti,init-brt-ed1 = <200>;
+			ti,init-brt-led2 = <200>;
+			ti,max-brt-led1 = <255>;
+			ti,max-brt-led2 = <255>;
+			ti,pwm-active = <0>;
+			ti,pwm-ctrl = <0>;
+			ti,pwm-period = <255>;
+		};
+
+/* OPPO 2014-06-23 ranfei Add begin for digital hall MXM2011 */
+		dhall@0C {
+			compatible = "magna,dhall";
+			reg = <0x0c>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <64 0x4>;
+			dhall,irq-gpio = <&msmgpio 64 0x2008>;
+			vdd_2v8-supply = <&pm8941_l17>;
+			vcc_i2c_1v8-supply = <&pm8941_lvs2>;						
+		};
+/* OPPO 2014-06-23 ranfei Add end */
+	};
+/*OPPO yuyi 2013-03-22 add begin for nfc*/
+//ifdef VENDOR_EDIT
+	i2c@f9928000 {
+		pn544-nxp-nfc@28 {
+			compatible = "pn544,nxp-nfc";
+			reg = <0x28>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <59 0x4>;
+			/*vdd_ana-supply = <&pm8941_S3A>;*/
+			pn544,irq-gpio = <&msmgpio 59 0x00>;
+			pn544,enable-gpio = <&msmgpio 13 0x00>;
+			pn544,update-gpio = <&msmgpio 12 0x00>;
+		};
+		/*OPPO Wangjc 2013-11-7 add begin for bq charger*/
+		bq24196_charger@6b {
+			status = "okay";
+			compatible = "ti,bq24196_charger";
+			reg = <0x6b>;
+		}; 
+		/*Wangjc add end*/
+		/* xiaojun.lv 2014-6-18 add for ti tas2552 smart PA */
+		tas2552@40 {
+			status = "okay";
+			compatible = "ti,tas2552";
+			tas2552,enable-gpio = <&msmgpio 92 0x00>;
+			reg = <0x40>;
+		}; 
+		/*xiaojun.lv add end*/
+	};
+//endif //VENDOR_EDIT
+/*OPPO yuyi 2013-03-22 add end*/
+	gen-vkeys {
+		compatible = "qcom,gen-vkeys";
+		label = "atmel_mxt_ts";
+		qcom,disp-maxx = <720>;
+		qcom,disp-maxy = <1280>;
+		qcom,panel-maxx = <760>;
+		qcom,panel-maxy = <1424>;
+		qcom,key-codes = <158 139 102 217>;
+	};
+
+	i2c@f9967000 {
+		isa1200@48 {
+			status = "okay";
+			reg = <0x48>;
+			vcc_i2c-supply = <&pm8941_s3>;
+			compatible = "imagis,isa1200";
+			label = "vibrator";
+			imagis,chip-en;
+			imagis,need-pwm-clk;
+			imagis,ext-clk-en;
+			imagis,hap-en-gpio = <&msmgpio 86 0x00>;
+			imagis,max-timeout = <15000>;
+			imagis,pwm-div = <256>;
+			imagis,mode-ctrl = <2>;
+			imagis,regulator {
+				regulator-name = "vcc_i2c";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+				regulator-max-microamp = <9360>;
+			};
+		};
+	};
+	
+/* OPPO 2014-08-11 ranfei modify for fpc1021 */
+	spi@f9927000 { 
+		fpc_fpc1020@0 { //Slave driver and CS ID
+			compatible = "fpc,fpc1020"; //Manufacture, and Model
+			reg = <0>; //Same as CS ID
+			spi-max-frequency = <19200000>; //Max Frequency for Device
+			#spi-cs-high; //CS Active High
+			interrupt-parent = <&msmgpio>; //GPIO Handler
+			interrupts = <102 0>; //GPIO # and flags
+			fpc,gpio_irq = <&msmgpio 102 0x00>; //Pass a GPIO
+			fpc,gpio_reset = <&msmgpio 84 0x00>; 
+			fpc,gpio_envdd = <&msmgpio 16 0x00>;
+			fpc,vddtx_mv;
+			#fpc,txout_boost_enable;
+			#spi-cpol; //CPOL bit set for SPI polarity
+			#spi-cpha; //CPHA bit set for SPI Phase
+			vdd_io-supply = <&pm8941_s3>;  // 1.8V 
+			#vdd_ana-supply = <&pm8941_l18>; // 3.3V
+		};
+	};
+/* OPPO 2014-08-11 ranfei Add end */
+	/*OPPO yuyi 2014-06-28 add begin for 14021 NFC spi clk*/
+	/*ifdef  CONFIG_OPPO_MSM_14021*/
+	spi@f9964000 {
+		p61-nxp-nfc@0 { //Slave driver and CS ID
+			compatible = "p61,nxp-nfc-n3"; //Manufacture, and Model
+			reg = <0>; //Same as CS ID
+			spi-max-frequency = <4000000>; //Max Frequency for Device
+			spi-cs-high; //CS Active High
+			interrupt-parent = <&msmgpio>; //GPIO Handler
+			interrupts = <34 0>; //GPIO # and flags
+			p61-nxp-nfc,irq-gpio = <&msmgpio 34 0x00>; //Pass a GPIO
+			#spi-cpol; //CPOL bit set for SPI polarity
+			#spi-cpha; //CPHA bit set for SPI Phase
+		};
+	};
+	/*endif*/
+	/*OPPO yuyi 2014-06-28 add end for 14021 NFC spi clk*/
+	
+	/*OPPO yuyi 2014-03-18 add begin for 14001 NFC spi clk*/
+	/*ifdef  CONFIG_VENDOR_EDIT*/
+	spi@f9965000 {
+		p61-nxp-nfc@0 { //Slave driver and CS ID
+			compatible = "p61,nxp-nfc"; //Manufacture, and Model
+			reg = <0>; //Same as CS ID
+			spi-max-frequency = <4000000>; //Max Frequency for Device
+			spi-cs-high; //CS Active High
+			interrupt-parent = <&msmgpio>; //GPIO Handler
+			interrupts = <34 0>; //GPIO # and flags
+			p61-nxp-nfc,irq-gpio = <&msmgpio 34 0x00>; //Pass a GPIO
+			#spi-cpol; //CPOL bit set for SPI polarity
+			#spi-cpha; //CPHA bit set for SPI Phase
+		};
+	};
+	/*endif*/
+	/*OPPO yuyi 2014-03-18 add end for 14001 NFC spi clk*/
+
+	gpio_keys {
+		compatible = "gpio-keys";
+		input-name = "gpio-keys";
+/*OPPO yuyi 2013-09-27 add begin for enable gpio_key*/
+		status = "ok"; 
+/*OPPO yuyi 2013-09-27 add end for enable gpio_key*/
+		camera_snapshot {
+			label = "camera_snapshot";
+/* OPPO 2014-06-23 sjc Delete begin for 14021 */
+			#gpios = <&pm8941_gpios 3 0x1>;
+/* OPPO 2014-06-23 sjc Delete end */
+			linux,input-type = <1>;
+			linux,code = <0x2fe>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+
+		camera_focus {
+			label = "camera_focus";
+			gpios = <&pm8941_gpios 4 0x1>;
+			linux,input-type = <1>;
+			linux,code = <0x210>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+/*OPPO yuyi delete begin for vol_up and vol_down*/
+/*		vol_up {
+			label = "volume_up";
+			gpios = <&pm8941_gpios 5 0x1>;
+			linux,input-type = <1>;
+			linux,code = <115>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+*/
+/*OPPO yuyi delete end for vol_up and vol_down*/
+/*OPPO yuyi add begin for vol_up and vol_down*/
+		vol_up {
+			label = "volume_up";
+			gpios = <&pm8941_gpios 5 0x1>;
+			linux,input-type = <1>;
+			linux,code = <115>;
+			/*gpio-key,wakeup;*/
+			debounce-interval = <15>;
+		};		
+		vol_down {
+			label = "volume_down";
+			gpios = <&pm8941_gpios 2 0x1>;
+			linux,input-type = <1>;
+			linux,code = <114>;
+			/*gpio-key,wakeup;*/ /*Zhilong.Zhang@OnlineRd.Driver, 2014/10/25, Delete for disable wakeup*/
+			debounce-interval = <15>;
+		};
+/*OPPO yuyi add end for vol_up and vol_down*/
+
+		hallsensor_key {
+			label = "hallsensor_key";
+			gpios = <&msmgpio 68 1>;
+			interrupt-parent = <&msmgpio>; 
+			interrupts = <68 0x0>;
+			linux,input-type = <5>;
+			linux,code = <0>;
+			gpio-key,wakeup;
+			debounce-interval = <150>;
+		};
+		
+
+/*OPPO Lycan.Wang@Prd.BasicDrv, 2014-08-12 Add for Fingerprint key*/
+		fingerprint_key {
+			label = "fingerprint_key";
+			gpios = <&pm8941_gpios 1 0x1>;
+			linux,input-type = <1>;
+			linux,code = <120>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+/* #endif */
+	};
+
+	spi@f9923000 {
+		ethernet-switch@2 {
+			compatible = "micrel,ks8851";
+			reg = <2>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <94 0>;
+			spi-max-frequency = <4800000>;
+			rst-gpio = <&pm8941_mpps 6 0>;
+			vdd-io-supply = <&spi_eth_vreg>;
+			vdd-phy-supply = <&spi_eth_vreg>;
+		};
+	};
+
+	sound {
+		qcom,model = "msm8974-taiko-mtp-snd-card";
+		qcom,cdc-micbias2-headset-only;
+/*#ifndef VENDOR_EDIT*/
+/*xiaojun.lv@PhoneDtp.AudioDriver,modify for oppo use 4 pole jack*/
+        qcom,mbhc-audio-jack-type = "6-pole-jack";
+/*#else VENDOR_EDIT*/
+        qcom,mbhc-audio-jack-type = "4-pole-jack";
+/*#endif VENDOR_EDIT*/
+	};
+};
+
+&pm8941_lsid1 {
+	qcom,leds@d800 {
+/*VENDOR_EDIT*/	
+/*OPPO  wenxian.zhen@Onlinerd.driver, 2014/02/20  Added begin for disable wled*/	
+             /* status = "okay";          */
+		status = "disabled";
+/*OPPO  wenxian.zhen@Onlinerd.driver add end for disable wled*/	
+		qcom,wled_0 {
+			label = "wled";
+			linux,name = "wled:backlight";
+			linux,default-trigger = "bkl-trigger";
+			qcom,cs-out-en;
+			qcom,op-fdbck = <1>;
+/*VENDOR_EDIT*/	
+/*OPPO  wenxian.zhen@Onlinerd.driver, 2014/02/20  Added begin for disable wled*/
+                      /*qcom,default-state = "on";*/
+			qcom,default-state = "off";
+/*OPPO  wenxian.zhen@Onlinerd.driver added end for disable wled*/		
+			qcom,max-current = <25>;
+			qcom,ctrl-delay-us = <0>;
+			qcom,boost-curr-lim = <5>;
+			qcom,cp-sel = <0>;
+			qcom,switch-freq = <11>;
+			qcom,ovp-val = <2>;
+			qcom,num-strings = <3>;
+			qcom,id = <0>;
+		};
+	};
+
+	qcom,leds@d900 {
+		status = "disabled";
+	};
+
+	qcom,leds@da00 {
+		status = "disabled";
+	};
+
+	qcom,leds@db00 {
+		status = "disabled";
+	};
+
+	qcom,leds@dc00 {
+		status = "disabled";
+	};
+
+	qcom,leds@dd00 {
+		status = "disabled";
+	};
+
+	qcom,leds@de00 {
+		status = "disabled";
+	};
+
+	qcom,leds@df00 {
+		status = "disabled";
+	};
+
+	qcom,leds@e000 {
+		status = "disabled";
+	};
+
+	qcom,leds@e100 {
+		status = "disabled";
+	};
+};
+
+&sdcc1 {
+       status = "disabled";
+};
+
+&sdcc2 {
+	#address-cells = <0>;
+	interrupt-parent = <&sdcc2>;
+	interrupts = <0 1 2>;
+	#interrupt-cells = <1>;
+	interrupt-map-mask = <0xffffffff>;
+	interrupt-map = <0 &intc 0 125 0
+			1 &intc 0 220 0
+			2 &msmgpio 62 0x3>;
+	interrupt-names = "core_irq", "bam_irq", "status_irq";
+	cd-gpios = <&msmgpio 62 0x1>;
+	status = "disabled";
+};
+
+&sdhc_1 {
+	vdd-supply = <&pm8941_l20>;
+	vdd-io-supply = <&pm8941_s3>;
+
+	qcom,vdd-always-on;
+	qcom,vdd-lpm-sup;
+	qcom,vdd-voltage-level = <2950000 2950000>;
+	qcom,vdd-current-level = <800 500000>;
+
+	qcom,vdd-io-always-on;
+	qcom,vdd-io-voltage-level = <1800000 1800000>;
+	qcom,vdd-io-current-level = <250 154000>;
+
+	qcom,pad-pull-on = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
+	qcom,pad-pull-off = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
+	qcom,pad-drv-on = <0x4 0x4 0x4>; /* 10mA, 10mA, 10mA */
+	qcom,pad-drv-off = <0x0 0x0 0x0>; /* 2mA, 2mA, 2mA */
+
+	qcom,nonremovable;
+	status = "ok";
+};
+
+&sdhc_2 {
+	#address-cells = <0>;
+	interrupt-parent = <&sdhc_2>;
+	interrupts = <0 1 2>;
+	#interrupt-cells = <1>;
+	interrupt-map-mask = <0xffffffff>;
+	interrupt-map = <0 &intc 0 125 0
+			1 &intc 0 221 0
+			2 &msmgpio 77 0x3>; /* Zhilong.Zhang@OnlineRd.Driver, 2014/08/07, Modify for change the micro SD card detect pin to gpio_77*/
+	interrupt-names = "hc_irq", "pwr_irq", "status_irq";
+	cd-gpios = <&msmgpio 77 0x1>; /* Zhilong.Zhang@OnlineRd.Driver, 2014/08/07, Modify for change the micro SD card detect pin to gpio_77*/
+
+	vdd-supply = <&pm8941_l21>;
+	vdd-io-supply = <&pm8941_l13>;
+
+	qcom,vdd-voltage-level = <2950000 2950000>;
+	qcom,vdd-current-level = <9000 800000>;
+
+	qcom,vdd-io-voltage-level = <1800000 2950000>;
+	qcom,vdd-io-current-level = <6 22000>;
+
+	qcom,pad-pull-on = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
+	qcom,pad-pull-off = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
+	qcom,pad-drv-on = <0x4 0x4 0x4>; /* 10mA, 10mA, 10mA */
+	qcom,pad-drv-off = <0x0 0x0 0x0>; /* 2mA, 2mA, 2mA */
+	status = "ok";
+};
+
+/* Drive strength recommendations for clock line from hardware team is 10 mA.
+ * But since the driver has been been using the below values from the start
+ * without any problems, continue to use those.
+ */
+&sdcc1 {
+	qcom,pad-drv-on = <0x7 0x4 0x4>; /* 16mA, 10mA, 10mA */
+};
+
+&sdcc2 {
+	qcom,pad-drv-on = <0x7 0x4 0x4>; /* 16mA, 10mA, 10mA */
+};
+
+&sdhc_1 {
+	qcom,pad-drv-on = <0x7 0x4 0x4>; /* 16mA, 10mA, 10mA */
+};
+
+&sdhc_2 {
+	qcom,pad-drv-on = <0x7 0x4 0x4>; /* 16mA, 10mA, 10mA */
+};
+
+&usb_otg {
+	qcom,hsusb-otg-otg-control = <2>;
+};
+
+&uart7 {
+	status = "ok";
+};
+
+&usb3 {
+	qcom,otg-capability;
+};
+
+/ {
+	mtp_batterydata: qcom,battery-data {
+		qcom,rpull-up-kohm = <100>;
+		qcom,vref-batt-therm = <1800000>;
+
+		/include/ "batterydata-palladium.dtsi"
+		/include/ "batterydata-mtp-3000mah.dtsi"
+	};
+};
+
+&pm8941_bms {
+	qcom,enable-fcc-learning;
+	qcom,min-fcc-learning-soc = <20>;
+	qcom,min-fcc-ocv-pc = <30>;
+	qcom,min-fcc-learning-samples = <5>;
+	qcom,fcc-resolution = <10>;
+	status = "ok";
+	qcom,battery-data = <&mtp_batterydata>;
+};
+
+&pm8941_chg {
+	status = "ok";
+        /*VENDOR_EDIT*/
+	/*wangjc enable charger*/
+	/*qcom,charging-disabled;*/
+	/*wangjc end.*/
+	qcom,battery-data = <&mtp_batterydata>;
+
+	qcom,chgr@1000 {
+		status = "ok";
+	};
+
+	qcom,buck@1100 {
+		status = "ok";
+	};
+
+	qcom,bat-if@1200 {
+		status = "ok";
+	};
+
+	qcom,usb-chgpth@1300 {
+		status = "ok";
+	};
+
+	qcom,dc-chgpth@1400 {
+		status = "ok";
+	};
+
+	qcom,boost@1500 {
+		status = "ok";
+	};
+
+	qcom,chg-misc@1600 {
+		status = "ok";
+	};
+};
+
+&pm8941_gpios {
+	gpio@c000 { /* GPIO 1 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@c100 { /* GPIO 2 */
+	/*OPPO yuyi 2013-09-27 modify begin for gpio_keys*/
+	/*	qcom,mode = <0>;   */     /* QPNP_PIN_MODE_DIG_IN */
+	/*	qcom,pull = <0>;    */    /* QPNP_PIN_PULL_UP_30  */
+		qcom,mode = <0>;
+		qcom,pull = <5>;
+		qcom,vin-sel = <2>;
+		qcom,src-sel = <0>;
+		/*qcom,master-en = <1>;*/ 
+	/*OPPO yuyi 2013-09-27 modify end for gpio_keys*/
+	};
+
+	gpio@c200 { /* GPIO 3 */
+/* OPPO 2014-06-23 sjc Modify begin for 14021 */
+		#qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		#qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		#qcom,vin-sel = <2>;
+		#qcom,src-sel = <0>;	/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		#qcom,master-en = <1>;
+		qcom,mode = <1>;	
+		qcom,output-type = <0>;
+		qcom,pull = <5>;
+		qcom,vin-sel = <2>;
+		qcom,out-strength = <3>;
+		qcom,src-sel = <2>;
+		qcom,master-en = <1>;
+/* OPPO 2014-06-23 sjc Modify end */
+	};
+
+	gpio@c300 { /* GPIO 4 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,vin-sel = <2>;     /* QPNP_PIN_VIN2  */
+		qcom,src-sel = <0>;	/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;
+	};
+/*OPPO yuyi 2013-09-27 modify begin for gpio_keys*/
+	gpio@c400 { /* GPIO 5 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <5>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,vin-sel = <2>;     /* QPNP_PIN_VIN2  */
+		qcom,src-sel = <0>;	/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		/*qcom,master-en = <1>;*/
+/*OPPO yuyi 2013-09-27 modify end for gpio_keys*/
+	};
+
+	gpio@c500 { /* GPIO 6 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@c600 { /* GPIO 7 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@c700 { /* GPIO 8 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,master-en = <1>;
+	};
+/*OPPO songxh 2014-07-01 modify begain for config camera motor DRV8834 pin*/
+	gpio@c800 { /* GPIO 9 */
+		qcom,mode = <1>;		/* QPNP_PIN_MODE_DIG_OUT */
+		qcom,output-type = <0>;		/* QPNP_PIN_OUT_BUF_CMOS */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <0>;		/* QPNP_PIN_VIN2 VPH_PWR */
+		qcom,out-strength = <1>;	/* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <0>;
+	};
+
+
+	gpio@c900 { /* GPIO 10 */
+		qcom,mode = <1>;		/* QPNP_PIN_MODE_DIG_OUT */
+		qcom,output-type = <0>;		/* QPNP_PIN_OUT_BUF_CMOS */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <0>;		/* QPNP_PIN_VIN2 */
+		qcom,out-strength = <1>;	/* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;
+	};
+
+	gpio@ca00 { /* GPIO 11 */
+		qcom,mode = <1>;		/* QPNP_PIN_MODE_DIG_OUT */
+		qcom,output-type = <0>;		/* QPNP_PIN_OUT_BUF_CMOS */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <0>;		/* QPNP_PIN_VIN2 */
+		qcom,out-strength = <1>;	/* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;
+	};
+
+	gpio@cb00 { /* GPIO 12 */
+		qcom,mode = <1>;		/* QPNP_PIN_MODE_DIG_OUT */
+		qcom,output-type = <0>;		/* QPNP_PIN_OUT_BUF_CMOS */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <0>;		/* QPNP_PIN_VIN2 */
+		qcom,out-strength = <1>;	/* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;   //songxh modified for 1/16  step 20140627  1/32 will be set as 0
+	};
+
+	gpio@cc00 { /* GPIO 13 */
+		qcom,mode = <1>;		/* QPNP_PIN_MODE_DIG_OUT */
+		qcom,output-type = <0>;		/* QPNP_PIN_OUT_BUF_CMOS */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <0>;		/* QPNP_PIN_VIN2 */
+		qcom,out-strength = <1>;	/* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;
+	};
+	/*OPPO songxh 2014-07-01 modify end for config camera motor DRV8834 pin*/
+
+	gpio@cd00 { /* GPIO 14 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@ce00 { /* GPIO 15 */
+		qcom,mode = <1>;
+		qcom,output-type = <0>;
+		qcom,pull = <5>;
+		qcom,vin-sel = <2>;
+		qcom,out-strength = <1>;
+		qcom,src-sel = <2>;
+		qcom,master-en = <1>;
+	};
+
+	gpio@cf00 { /* GPIO 16 */
+		qcom,mode = <1>;
+		qcom,output-type = <0>;
+		qcom,pull = <5>;
+		qcom,vin-sel = <2>;
+		qcom,out-strength = <3>;
+		qcom,src-sel = <3>;       /* QPNP_PIN_SEL_FUNC_2  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d000 { /* GPIO 17 */
+	};
+
+	gpio@d100 { /* GPIO 18 */
+	};
+
+	gpio@d200 { /* GPIO 19 */
+		qcom,mode = <1>;		/* QPNP_PIN_MODE_DIG_OUT */
+		qcom,output-type = <0>;		/* QPNP_PIN_OUT_BUF_CMOS */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <2>;		/* QPNP_PIN_VIN2 */
+		qcom,out-strength = <1>;	/* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d300 { /* GPIO 20 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d400 { /* GPIO 21 */
+	};
+
+	gpio@d500 { /* GPIO 22 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d600 { /* GPIO 23 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d700 { /* GPIO 24 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d800 { /* GPIO 25 */
+		/*wangjc change to enable charge 1-->0.*/
+		qcom,mode = <0>;          /* QPNP_PIN_MODE_DIG_IN */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d900 { /* GPIO 26 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@da00 { /* GPIO 27 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
+	};
+
+	gpio@db00 { /* GPIO 28 */
+	};
+
+	gpio@dc00 { /* GPIO 29 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@dd00 { /* GPIO 30 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
+	};
+
+	gpio@de00 { /* GPIO 31 */
+	};
+
+/*OPPO yuyi 2014-05-24 modify begin for config NFC clock_requset pin*/
+//#ifndef VENDOR_EDIT
+//	gpio@df00 { /* GPIO 32 */
+//		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+//		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+//		qcom,master-en = <1>;
+//	};
+//#else
+	gpio@df00 { /* GPIO 32 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,vin-sel = <2>;
+		qcom,src-sel = <0>; /* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;
+	};
+//#endif
+/*OPPO yuyi 2014-05-24 modify end for config NFC clock_requset pin*/
+/*OPPO songxh 2014-07-01 modify begain for config camera motor pwm pin*/
+/*	gpio@e000 { //GPIO 33 //
+		qcom,mode = <1>;		// QPNP_PIN_MODE_DIG_OUT//
+		qcom,output-type = <0>;		//QPNP_PIN_OUT_BUF_CMOS //
+		qcom,pull = <5>;		//QPNP_PIN_PULL_NO//
+		qcom,vin-sel = <0>;		// QPNP_PIN_VIN2   zwx  VPH_PWR//
+		qcom,out-strength = <1>;	// QPNP_PIN_OUT_STRENGTH_LOW //
+		qcom,src-sel = <0>;		// QPNP_PIN_SEL_FUNC_CONSTANT //
+		qcom,master-en = <1>;
+	};*/
+
+	gpio@e000 { /* GPIO 33 */
+		   /* reg = <e000 0x100>;*/
+		    /*qcom,pin-num = <33>;*/
+		    qcom,mode = <1>;	 /*QPNP_PIN_MODE_DIG_OUT*/
+		    qcom,output-type = <0>;	/*QPNP_PIN_OUT_BUF_CMOS*/
+		    qcom,invert = <0>;	 /*QPNP_PIN_INVERT_DISABLE*/
+		    qcom,pull = <5>;	 /*QPNP_PIN_PULL_NO*/
+		    qcom,vin-sel = <0>;	 /*QPNP_PIN_VIN2, VREG_S3A*/
+		    qcom,out-strength = <2>; /*QPNP_PIN_OUT_STRENGTH_MED*/
+		    qcom,src-sel = <3>;	 /*QPNP_PIN_SEL_FUNC_2*/
+		    qcom,master-en = <1>;	/*Enable GPIO by default*/
+	};
+/*OPPO songxh 2014-07-01 modify end for config camera motor pwm pin*/
+
+	gpio@e100 { /* GPIO 34 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
+	};
+
+	gpio@e200 { /* GPIO 35 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
+	};
+
+	gpio@e300 { /* GPIO 36 */
+	};
+};
+
+&pm8941_mpps {
+
+	mpp@a000 { /* MPP 1 */
+		status = "disabled";
+	};
+
+	mpp@a100 { /* MPP 2 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,master-en = <1>;
+	};
+
+	mpp@a200 { /* MPP 3 */
+	};
+
+	mpp@a300 { /* MPP 4 */
+	};
+
+	mpp@a400 { /* MPP 5 */
+	};
+
+	mpp@a500 { /* MPP 6 */
+		/* SPI_ETH_RST config */
+		qcom,mode = <1>; /* DIG_OUT */
+		qcom,output-type = <0>; /* CMOS */
+		qcom,vin-sel = <2>; /* PM8941_S3 1.8V > 1.6V */
+		qcom,src-sel = <0>; /* CONSTANT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,master-en = <1>; /* ENABLE MPP */
+	};
+
+	mpp@a600 { /* MPP 7 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,master-en = <1>;
+	};
+
+	mpp@a700 { /* MPP 8 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,master-en = <1>;
+	};
+};
+
+&slim_msm {
+	taiko_codec {
+		qcom,cdc-micbias1-ext-cap;
+		qcom,cdc-micbias2-ext-cap;
+		qcom,cdc-micbias3-ext-cap;
+		qcom,cdc-micbias4-ext-cap;
+	};
+};
+/*
+&spi_epm {
+	epm-adc@0 {
+		compatible = "cy,epm-adc-cy8c5568lti-114";
+		reg = <0>;
+		interrupt-parent = <&msmgpio>;
+		spi-max-frequency = <960000>;
+		qcom,channels = <31>;
+		qcom,gain = <100 100 100 50 100 100 1 100 1 50
+				1 100 1 100 50 50 50 50 50 50
+				100 50 100 50 50 50 50 50 50 50
+				50>;
+		qcom,rsense = <2 2 2 200 20 2 1 2 1 30
+				1 10 1 30 50 30 500 30 100 30
+				100 500 20 200 1000 20 1000 1000 70 200
+				50>;
+		qcom,channel-type = <0x1540>;
+	};
+};*/
+
+/*ifndef VENDOR_EDIT */
+/*#jiangyg@OnlineRd.PM, 2013/11/04, delete for display */
+/*
+&dsi_tosh_720_vid {
+       qcom,cont-splash-enabled;
+};*/
+/*endif VENDOR_EDIT*/
+
+&dsi_generic_720p_cmd {
+       qcom,cont-splash-enabled;
+};
+
+&dsi_jdi_1080_vid {
+       qcom,cont-splash-enabled;
+};

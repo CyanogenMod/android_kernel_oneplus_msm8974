@@ -1072,7 +1072,11 @@ int get_spk_protection_cfg(struct msm_spk_prot_cfg *prot_cfg)
 
 	mutex_lock(&acdb_data.acdb_mutex);
 	if (prot_cfg) {
+#ifdef CONFIG_MACH_N3
+		prot_cfg->mode = MSM_SPKR_PROT_DISABLED;
+#else
 		prot_cfg->mode = acdb_data.spk_prot_cfg.mode;
+#endif
 		prot_cfg->r0 = acdb_data.spk_prot_cfg.r0;
 		prot_cfg->t0 = acdb_data.spk_prot_cfg.t0;
 	} else {
