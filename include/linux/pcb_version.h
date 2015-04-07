@@ -21,6 +21,7 @@ enum {
 	HW_VERSION__21 = 21,
 	HW_VERSION__22 = 22,
 	HW_VERSION__23 = 23,
+	HW_VERSION__30 = 30,
 };
 enum {
 	RF_VERSION_UNKNOWN,
