@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -259,7 +259,12 @@ WLANSAP_Start
         return VOS_STATUS_E_FAULT;
     }
 
-
+    if (!VOS_IS_STATUS_SUCCESS(vos_spin_lock_init(&pSapCtx->staInfo_lock)))
+    {
+        VOS_TRACE( VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
+                 "WLANSAP_Start failed init staInfo_lock\n");
+        return VOS_STATUS_E_FAULT;
+    }
 
     return VOS_STATUS_SUCCESS;
 }/* WLANSAP_Start */

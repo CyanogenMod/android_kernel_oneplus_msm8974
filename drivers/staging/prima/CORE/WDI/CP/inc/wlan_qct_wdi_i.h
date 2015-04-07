@@ -465,6 +465,9 @@ typedef enum
 
   WDI_SPOOF_MAC_ADDR_REQ                         = 101,
 
+  /* Send command to encrypt the given message */
+  WDI_ENCRYPT_MSG_REQ                            = 102,
+
   WDI_MAX_REQ,
 
   /*Send a suspend Indication down to HAL*/
@@ -790,6 +793,9 @@ typedef enum
   WDI_EXTSCAN_RESET_SIGNF_RSSI_CHANGE_RSP        = 100,
 #endif
   WDI_SPOOF_MAC_ADDR_RSP                         = 101,
+
+  /* Send command to encrypt the given message */
+  WDI_ENCRYPT_MSG_RSP                            = 102,
   /*-------------------------------------------------------------------------
     Indications
      !! Keep these last in the enum if possible
@@ -6077,5 +6083,18 @@ WDI_ProcessSpoofMacAddrRsp
   WDI_EventInfoType*     pEventData
 );
 
+WDI_Status
+WDI_ProcessEncryptMsgReq
+(
+  WDI_ControlBlockType*  pWDICtx,
+  WDI_EventInfoType*     pEventData
+);
+
+WDI_Status
+WDI_ProcessEncryptMsgRsp
+(
+  WDI_ControlBlockType*  pWDICtx,
+  WDI_EventInfoType*     pEventData
+);
 #endif /*WLAN_QCT_WDI_I_H*/
 
