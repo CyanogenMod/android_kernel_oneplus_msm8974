@@ -1316,6 +1316,9 @@ int afe_port_start(u16 port_id, union afe_port_config *afe_config,
 		return ret;
 
 	mutex_lock(&this_afe.afe_cmd_lock);
+#ifdef CONFIG_MACH_N3
+	if (port_id != AFE_PORT_ID_SECONDARY_MI2S_TX)
+#endif
 	afe_send_cal(port_id);
 	afe_send_hw_delay(port_id, rate);
 

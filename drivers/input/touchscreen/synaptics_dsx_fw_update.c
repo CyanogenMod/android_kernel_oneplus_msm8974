@@ -30,6 +30,9 @@
 #ifdef CONFIG_MACH_FIND7OP  //for 14001's wintek tp
 #include "synaptics_firmware_tpk_14001.h"
 #include "synaptics_firmware_wintek_14001.h"
+#elif defined(CONFIG_MACH_N3)
+#include "synaptics_firmware_tpk_14021.h"
+#include "synaptics_firmware_wintek_14021.h"
 #else
 #include "synaptics_firmware_tpk.h"
 #include "synaptics_firmware_tpk_find7s.h"
@@ -1443,7 +1446,7 @@ int synaptics_rmi4_get_firmware_version(int vendor_id) {
 		return FIRMWARE_YOUNGFAST_VERSION ;
 	}
 	else if(vendor_id == TP_VENDOR_TPK) {
-#ifndef CONFIG_MACH_FIND7OP
+#if !defined(CONFIG_MACH_FIND7OP) && !defined(CONFIG_MACH_N3)
 		if (get_pcb_version() >= HW_VERSION__21)
 			return FIRMWARE_TPK_FIND7S_VERSION;
 		else
@@ -1547,7 +1550,7 @@ static unsigned char* fwu_rmi4_get_firmware_data(void) {
 	else if(vendor_id == TP_VENDOR_YOUNGFAST)
 		firmwaredata = (unsigned char*)Syna_Firmware_Data_youngfast ;
 	else if(vendor_id == TP_VENDOR_TPK) {
-#ifndef CONFIG_MACH_FIND7OP
+#if !defined(CONFIG_MACH_FIND7OP) && !defined(CONFIG_MACH_N3)
 		if (get_pcb_version() >= HW_VERSION__21)
 			firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk_find7s;
 		else
