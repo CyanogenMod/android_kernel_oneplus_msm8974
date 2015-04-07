@@ -73,7 +73,11 @@ static int fm_pcmrx_switch_enable;
 static int srs_alsa_ctrl_ever_called;
 static int lsm_mux_slim_port;
 static int slim0_rx_aanc_fb_port;
+#ifdef CONFIG_MACH_N3
+static int msm_route_ec_ref_rx = 8; /* NONE */
+#else
 static int msm_route_ec_ref_rx = 7; /* NONE */
+#endif
 static uint32_t voc_session_id = ALL_SESSION_VSID;
 static int msm_route_ext_ec_ref = AFE_PORT_INVALID;
 
@@ -1444,7 +1448,11 @@ static int msm_routing_ec_ref_rx_put(struct snd_kcontrol *kcontrol,
 		break;
 	case 4:
 		msm_route_ec_ref_rx = 4;
+#ifdef CONFIG_MACH_N3
+		ec_ref_port_id = AFE_PORT_ID_SECONDARY_MI2S_RX;
+#else
 		ec_ref_port_id = AFE_PORT_ID_SECONDARY_MI2S_TX;
+#endif
 		break;
 	case 5:
 		msm_route_ec_ref_rx = 5;
@@ -1454,6 +1462,12 @@ static int msm_routing_ec_ref_rx_put(struct snd_kcontrol *kcontrol,
 		msm_route_ec_ref_rx = 6;
 		ec_ref_port_id = AFE_PORT_ID_QUATERNARY_MI2S_TX;
 		break;
+#ifdef CONFIG_MACH_N3
+	case 7:
+		msm_route_ec_ref_rx = 7;
+		ec_ref_port_id = AFE_PORT_ID_SECONDARY_MI2S_RX;
+		break;
+#endif
 	default:
 		msm_route_ec_ref_rx = 0; /* NONE */
 		pr_err("%s EC ref rx %ld not valid\n",
@@ -1469,12 +1483,21 @@ static int msm_routing_ec_ref_rx_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+#ifdef CONFIG_MACH_N3
+static const char *const ec_ref_rx[] = { "None", "SLIM_RX", "I2S_RX",
+	"PRI_MI2S_TX", "SEC_MI2S_TX",
+	"TERT_MI2S_TX", "QUAT_MI2S_TX", "SEC_I2S_RX", "PROXY_RX"};
+static const struct soc_enum msm_route_ec_ref_rx_enum[] = {
+	SOC_ENUM_SINGLE_EXT(9, ec_ref_rx),
+};
+#else
 static const char *const ec_ref_rx[] = { "None", "SLIM_RX", "I2S_RX",
 	"PRI_MI2S_TX",
 	"SEC_MI2S_TX", "TERT_MI2S_TX", "QUAT_MI2S_TX", "PROXY_RX"};
 static const struct soc_enum msm_route_ec_ref_rx_enum[] = {
 	SOC_ENUM_SINGLE_EXT(8, ec_ref_rx),
 };
+#endif
 
 static const struct snd_kcontrol_new ext_ec_ref_mux_ul1 =
 	SOC_DAPM_ENUM_EXT("AUDIO_REF_EC_UL1 MUX Mux",
@@ -1783,6 +1806,11 @@ static const struct snd_kcontrol_new mi2s_hl_mixer_controls[] = {
 	SOC_SINGLE_EXT("INTERNAL_FM_TX", MSM_BACKEND_DAI_SECONDARY_MI2S_RX,
 	MSM_BACKEND_DAI_INT_FM_TX, 1, 0, msm_routing_get_port_mixer,
 	msm_routing_put_port_mixer),
+#ifdef CONFIG_MACH_N3
+	SOC_SINGLE_EXT("SLIM_0_TX", MSM_BACKEND_DAI_SECONDARY_MI2S_RX,
+	MSM_BACKEND_DAI_SLIMBUS_0_TX, 1, 0, msm_routing_get_port_mixer,
+	msm_routing_put_port_mixer),
+#endif
 };
 
 static const struct snd_kcontrol_new primary_mi2s_rx_mixer_controls[] = {
@@ -3263,6 +3291,25 @@ static const struct soc_enum slim0_rx_vi_fb_lch_mux_enum =
 	ARRAY_SIZE(slim0_rx_vi_fb_tx_lch_mux_text),
 	slim0_rx_vi_fb_tx_lch_mux_text, slim0_rx_vi_fb_tx_lch_value);
 
+#ifdef CONFIG_MACH_N3
+static const char * const sec_mi2s_rx_vi_fb_tx_mux_text[] = {
+	"ZERO", "SEC_MI2S_TX"
+};
+
+static const int const sec_mi2s_rx_vi_fb_tx_value[] = {
+	MSM_BACKEND_DAI_MAX, MSM_BACKEND_DAI_SECONDARY_MI2S_TX
+};
+
+static const struct soc_enum sec_mi2s_rx_vi_fb_mux_enum =
+	SOC_VALUE_ENUM_DOUBLE(0, MSM_BACKEND_DAI_SECONDARY_MI2S_RX, 0, 0,
+	ARRAY_SIZE(sec_mi2s_rx_vi_fb_tx_mux_text),
+	sec_mi2s_rx_vi_fb_tx_mux_text, sec_mi2s_rx_vi_fb_tx_value);
+static const struct snd_kcontrol_new sec_mi2s_rx_vi_fb_mux =
+	SOC_DAPM_ENUM_EXT("SEC_MI2S_RX_VI_FB_MUX",
+	sec_mi2s_rx_vi_fb_mux_enum, spkr_prot_get_vi_lch_port,
+	spkr_prot_put_vi_lch_port);
+#endif
+
 static const struct snd_kcontrol_new slim0_rx_vi_fb_lch_mux =
 	SOC_DAPM_ENUM_EXT("SLIM0_RX_VI_FB_LCH_MUX",
 	slim0_rx_vi_fb_lch_mux_enum, spkr_prot_get_vi_lch_port,
@@ -3329,7 +3376,9 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
 	SND_SOC_DAPM_AIF_IN("SEC_MI2S_DL_HL",
 		"Secondary MI2S_RX Hostless Playback",
 		0, 0, 0, 0),
-
+#ifdef CONFIG_MACH_N3
+	SND_SOC_DAPM_AIF_OUT("SEC_MI2S_UL_HL", "Secondary MI2S Hostless Capture", 0, 0, 0, 0),
+#endif
 	SND_SOC_DAPM_AIF_IN("AUXPCM_DL_HL", "AUXPCM_HOSTLESS Playback",
 		0, 0, 0, 0),
 	SND_SOC_DAPM_AIF_OUT("AUXPCM_UL_HL", "AUXPCM_HOSTLESS Capture",
@@ -3445,6 +3494,10 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
 				&fm_switch_mixer_controls),
 	SND_SOC_DAPM_SWITCH("PCM_RX_DL_HL", SND_SOC_NOPM, 0, 0,
 				&pcm_rx_switch_mixer_controls),
+#ifdef CONFIG_MACH_N3
+	SND_SOC_DAPM_SWITCH("SECMI2S_DL_HL", SND_SOC_NOPM, 0, 0,
+				&fm_switch_mixer_controls),
+#endif
 
 	/* Mux Definitions */
 	SND_SOC_DAPM_MUX("LSM1 MUX", SND_SOC_NOPM, 0, 0, &lsm1_mux),
@@ -3636,6 +3689,10 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
 		&ext_ec_ref_mux_ul8),
 	SND_SOC_DAPM_MUX("AUDIO_REF_EC_UL9 MUX", SND_SOC_NOPM, 0, 0,
 		&ext_ec_ref_mux_ul9),
+#ifdef CONFIG_MACH_N3
+	SND_SOC_DAPM_MUX("SEC_MI2S_RX_VI_FB_MUX", SND_SOC_NOPM, 0, 0,
+		&sec_mi2s_rx_vi_fb_mux),
+#endif
 };
 
 static const struct snd_soc_dapm_route intercon[] = {
@@ -3746,6 +3803,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 
 	{"SEC_MI2S_RX Port Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
 	{"SEC_MI2S_RX Port Mixer", "INTERNAL_FM_TX", "INT_FM_TX"},
+
+#ifdef CONFIG_MACH_N3
+	{"SEC_MI2S_RX Port Mixer", "SLIM_0_TX", "SLIMBUS_0_TX"},
+#endif
 
 	{"PRI_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
 	{"PRI_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
@@ -4059,6 +4120,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"SLIM1_UL_HL", NULL, "SLIMBUS_1_TX"},
 	{"SLIM3_UL_HL", NULL, "SLIMBUS_3_TX"},
 	{"SLIM4_UL_HL", NULL, "SLIMBUS_4_TX"},
+#ifdef CONFIG_MACH_N3
+	{"SECMI2S_DL_HL", "Switch", "SLIM0_DL_HL"},
+	{"SEC_MI2S_RX", NULL, "SECMI2S_DL_HL"},
+#endif
 
 	{"LSM1 MUX", "SLIMBUS_0_TX", "SLIMBUS_0_TX"},
 	{"LSM1 MUX", "SLIMBUS_1_TX", "SLIMBUS_1_TX"},
@@ -4146,6 +4211,9 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"SEC_I2S_RX", NULL, "SEC_I2S_DL_HL"},
 	{"PRI_MI2S_UL_HL", NULL, "PRI_MI2S_TX"},
 	{"SEC_MI2S_RX", NULL, "SEC_MI2S_DL_HL"},
+#ifdef CONFIG_MACH_N3
+	{"SEC_MI2S_UL_HL", NULL, "SEC_MI2S_TX"},
+#endif
 
 	{"SLIMBUS_0_RX Port Mixer", "INTERNAL_FM_TX", "INT_FM_TX"},
 	{"SLIMBUS_0_RX Port Mixer", "SLIM_0_TX", "SLIMBUS_0_TX"},
@@ -4257,6 +4325,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"INCALL_RECORD_RX", NULL, "BE_IN"},
 	{"SLIM0_RX_VI_FB_LCH_MUX", "SLIM4_TX", "SLIMBUS_4_TX"},
 	{"SLIMBUS_0_RX", NULL, "SLIM0_RX_VI_FB_LCH_MUX"},
+#ifdef CONFIG_MACH_N3
+	{"SEC_MI2S_RX_VI_FB_MUX", "SEC_MI2S_TX", "SEC_MI2S_TX"},
+	{"SEC_MI2S_RX", NULL, "SEC_MI2S_RX_VI_FB_MUX"},
+#endif
 };
 
 static int msm_pcm_routing_hw_params(struct snd_pcm_substream *substream,

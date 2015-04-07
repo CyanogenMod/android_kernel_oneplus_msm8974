@@ -79,6 +79,7 @@
 #define TP_VENDOR_TPK		2	//TPK
 #define TP_VENDOR_TRULY		3	//ÐÅÀû
 #define TP_VENDOR_YOUNGFAST 4   //Ñó»ª
+#define TP_VENDOR_TPK_GFF	5
 
 //#define SYNC_RMI4_PWR
 
@@ -279,6 +280,9 @@ struct synaptics_rmi4_data {
 	unsigned short f54_ctrl_base_addr;
 	unsigned short f54_data_base_addr;
 	unsigned char gesturemode;
+#ifdef CONFIG_MACH_N3
+	bool gesture;
+#endif
 	bool pwrrunning;
 	unsigned int old_status;
 	unsigned int reset_count; //for reset count
