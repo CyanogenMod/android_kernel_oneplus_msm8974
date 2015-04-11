@@ -292,7 +292,7 @@ struct snd_enc_vorbis {
 	__u32 max_bit_rate;
 	__u32 min_bit_rate;
 	__u32 downmix;
-};
+} __attribute__((packed, aligned(4)));
 
 
 /**
@@ -308,7 +308,7 @@ struct snd_enc_real {
 	__u32 quant_bits;
 	__u32 start_region;
 	__u32 num_regions;
-};
+} __attribute__((packed, aligned(4)));
 
 /**
  * struct snd_enc_flac
@@ -332,17 +332,18 @@ struct snd_enc_real {
 struct snd_enc_flac {
 	__u32 num;
 	__u32 gain;
-};
+} __attribute__((packed, aligned(4)));
 
 struct snd_enc_generic {
 	__u32 bw;	/* encoder bandwidth */
 	__s32 reserved[15];
-};
+} __attribute__((packed, aligned(4)));
+
 struct snd_dec_ddp {
 	__u32 params_length;
 	__u32 params_id[18];
 	__u32 params_value[18];
-};
+} __attribute__((packed, aligned(4)));
 
 struct snd_dec_flac {
 	__u16 sample_size;
@@ -350,7 +351,7 @@ struct snd_dec_flac {
 	__u16 max_blk_size;
 	__u16 min_frame_size;
 	__u16 max_frame_size;
-};
+} __attribute__((packed, aligned(4)));
 
 union snd_codec_options {
 	struct snd_enc_wma wma;
@@ -360,7 +361,7 @@ union snd_codec_options {
 	struct snd_enc_generic generic;
 	struct snd_dec_ddp ddp;
 	struct snd_dec_flac flac_dec;
-};
+} __attribute__((packed, aligned(4)));
 
 /** struct snd_codec_desc - description of codec capabilities
  * @max_ch: Maximum number of audio channels
@@ -397,7 +398,7 @@ struct snd_codec_desc {
 	__u32 formats;
 	__u32 min_buffer;
 	__u32 reserved[15];
-};
+} __attribute__((packed, aligned(4)));
 
 /** struct snd_codec
  * @id: Identifies the supported audio encoder/decoder.
@@ -438,6 +439,6 @@ struct snd_codec {
 	__u32 align;
 	union snd_codec_options options;
 	__u32 reserved[3];
-};
+} __attribute__((packed, aligned(4)));
 
 #endif
