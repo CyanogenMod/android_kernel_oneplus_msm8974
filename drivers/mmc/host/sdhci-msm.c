@@ -801,6 +801,7 @@ int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
 	struct mmc_ios	ios = host->mmc->ios;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_msm_host *msm_host = pltfm_host->priv;
+	int search_retries = 3;
 
 	/*
 	 * Tuning is required for SDR104, HS200 and HS400 cards and
@@ -923,6 +924,20 @@ retry:
 kfree:
 	kfree(data_buf);
 out:
+	if (card && card->quirks & MMC_QUIRK_SEC_SEARCH_TUNE) {
+		while (search_retries--) {
+			struct mmc_command cmd = {0};
+			cmd.opcode = MMC_SEND_STATUS;
+			if (!mmc_host_is_spi(card->host))
+				cmd.arg = card->rca << 16;
+			cmd.flags = MMC_RSP_SPI_R2 | MMC_RSP_R1 | MMC_CMD_AC;
+			rc = mmc_wait_for_cmd(card->host, &cmd, 3);
+			if (!rc)
+				break;
+			msleep(10);
+		}
+	}
+
 	spin_lock_irqsave(&host->lock, flags);
 	if (!rc)
 		msm_host->tuning_done = true;
