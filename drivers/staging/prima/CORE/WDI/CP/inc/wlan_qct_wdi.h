@@ -154,7 +154,6 @@ of NV fragment is nt possbile.The next multiple of 1Kb is 3K */
 /* Periodic Tx pattern offload feature */
 #define PERIODIC_TX_PTRN_MAX_SIZE 1536
 #define MAXNUM_PERIODIC_TX_PTRNS 6
-#define WDI_DISA_MAX_PAYLOAD_SIZE                1600
 
 /*============================================================================
  *     GENERIC STRUCTURES 
@@ -3802,20 +3801,6 @@ typedef struct
 }WDI_EnterImpsReqParamsType;
 
 /*---------------------------------------------------------------------------
-  WDI_ExitImpsReqParamsType
-  Exit IMPS parameters passed to WDI from WDA
-----------------------------------------------------------------------------*/
-typedef struct
-{
-   /*Request status callback offered by UMAC */
-   WDI_ReqStatusCb         wdiReqStatusCB;
-   /*The user data passed in by UMAC, it will be sent back when the above
-   function pointer will be called */
-   void*                   pUserData;
-
-}WDI_ExitImpsReqParamsType;
-
-/*---------------------------------------------------------------------------
   WDI_EnterBmpsReqParamsType
   Enter BMPS parameters passed from WDI to WDA
 ---------------------------------------------------------------------------*/
@@ -5904,97 +5889,6 @@ typedef struct
    wpt_uint32 reserved;
 } WDI_SpoofMacAddrInfoType;
 
-//This is to force compiler to use the maximum of an int for enum
-#define SIR_MAX_ENUM_SIZE    0x7FFFFFFF
-// Enum to specify whether key is used
-// for TX only, RX only or both
-typedef enum
-{
-    eWDI_TX_ONLY,
-    eWDI_RX_ONLY,
-    eWDI_TX_RX,
-    eWDI_TX_DEFAULT,
-    eWDI_DONOT_USE_KEY_DIRECTION = SIR_MAX_ENUM_SIZE
-} tWDIKeyDirection;
-
-// MAX key length when ULA is used
-#define SIR_MAC_MAX_KEY_LENGTH               32
-/* Max key size  including the WAPI and TKIP */
-#define WLAN_MAX_KEY_RSC_LEN         16
-// Definition for Encryption Keys
-typedef struct
-{
-    wpt_uint8                  keyId;
-    wpt_uint8                  unicast;     // 0 for multicast
-    tWDIKeyDirection    keyDirection;
-    wpt_uint8                  keyRsc[WLAN_MAX_KEY_RSC_LEN];   // Usage is unknown
-    wpt_uint8                  paeRole;     // =1 for authenticator,
-                                     // =0 for supplicant
-    wpt_uint16                 keyLength;
-    wpt_uint8                  key[SIR_MAC_MAX_KEY_LENGTH];
-} tWDIKeys, *tpWDIKeys;
-
-typedef enum
-{
-    eWDI_WEP_STATIC,
-    eWDI_WEP_DYNAMIC,
-} tWDIWepType;
-
-// Encryption type enum used with peer
-typedef enum
-{
-    eWDI_ED_NONE,
-    eWDI_ED_WEP40,
-    eWDI_ED_WEP104,
-    eWDI_ED_TKIP,
-    eWDI_ED_CCMP,
-#if defined(FEATURE_WLAN_WAPI)
-    eWDI_ED_WPI,
-#endif
-    /* DPU HW treats encryption mode 4 plus RMF bit set in TX BD as BIP.
-     * Thus while setting BIP encryption mode in corresponding DPU Desc
-     * eSIR_ED_AES_128_CMAC should be set to eSIR_ED_CCMP
-     */
-    eWDI_ED_AES_128_CMAC,
-    eWDI_ED_NOT_IMPLEMENTED = SIR_MAX_ENUM_SIZE
-} tWDIEdType;
-#define SIR_WDI_MAX_NUM_OF_DEFAULT_KEYS      4
-/*
- * This is used by PE to configure the key information on a given station.
- * When the secType is WEP40 or WEP104, the defWEPIdx is used to locate
- * a preconfigured key from a BSS the station assoicated with; otherwise
- * a new key descriptor is created based on the key field.
- */
-typedef struct
-{
-    wpt_uint16          staIdx;
-    tWDIEdType          encType;        // Encryption/Decryption type
-    tWDIWepType         wepType;        // valid only for WEP
-    wpt_uint8           defWEPIdx;      // Default WEP key, valid only for static WEP, must between 0 and 3
-    tWDIKeys            key[SIR_WDI_MAX_NUM_OF_DEFAULT_KEYS];            // valid only for non-static WEP encyrptions
-    wpt_uint8           singleTidRc;    // 1=Single TID based Replay Count, 0=Per TID based RC
-    wpt_uint8           sessionId; // PE session id for PE<->HAL interface
-} tWDISetStaKeyParams, *tpWDISetStaKeyParams;
-
-typedef struct
-{
-    tWDISetStaKeyParams     keyParams;
-    wpt_uint8 pn[6];
-}wpt_encConfigParams;
-
-typedef struct
-{
-    wpt_uint16  length;
-    wpt_uint8 data[WDI_DISA_MAX_PAYLOAD_SIZE];
-}wpt_payload;
-
-typedef struct
-{
-    wpt_80211Header macHeader;
-    wpt_encConfigParams encParams;
-    wpt_payload data;
-}wpt_pkt80211;
-
 /*----------------------------------------------------------------------------
  *   WDI callback types
  *--------------------------------------------------------------------------*/
@@ -7902,9 +7796,6 @@ typedef void  (*WDI_LLStatsClearRspCb)(void *pEventData,
 
 typedef void  (*WDI_SetSpoofMacAddrRspCb)(
                         WDI_SpoofMacAddrRspParamType* wdiRsp, void *pUserData);
-
-typedef void  (*WDI_EncryptMsgRspCb)(wpt_uint8 status, void *pEventData, void* pUserData);
-
 /*========================================================================
  *     Function Declarations and Documentation
  ==========================================================================*/
@@ -9131,7 +9022,6 @@ WDI_EnterImpsReq
 WDI_Status 
 WDI_ExitImpsReq
 (
-   WDI_ExitImpsReqParamsType *pwdiExitImpsReqParams,
    WDI_ExitImpsRspCb  wdiExitImpsRspCb,
    void*                   pUserData
 );
@@ -11268,11 +11158,6 @@ WDI_SpoofMacAddrInfoType *pWdiReq,
   void*                          pUserData
 );
 
-WDI_Status
-WDI_EncryptMsgReq(void* pwdiEncryptMsgParams,
-        WDI_EncryptMsgRspCb wdiEncryptMsgCbRsp,
-        void*                   pUserData
-        );
 #ifdef __cplusplus
  }
 #endif 

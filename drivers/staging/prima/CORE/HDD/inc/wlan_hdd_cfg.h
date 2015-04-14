@@ -220,16 +220,6 @@
 #define CFG_IMPS_MAXIMUM_SLEEP_TIME_MAX        ( 65535 )
 #define CFG_IMPS_MAXIMUM_SLEEP_TIME_DEFAULT    ( 15 )
 
-/*If there is scan on STA interface back to back with
- *time diff nDeferScanTimeInterval, driver will not
- *issue a new scan. Driver will return cached result to kernel.
- *the interval is in msec
- */
-#define CFG_DEFER_SCAN_TIME_INTERVAL            "gDeferScanTimeInterval"
-#define CFG_DEFER_SCAN_TIME_INTERVAL_MIN        ( 0 )
-#define CFG_DEFER_SCAN_TIME_INTERVAL_MAX        ( 65535 )
-#define CFG_DEFER_SCAN_TIME_INTERVAL_DEFAULT    ( 2000  )
-
 //BMPS = BeaconModePowerSave
 #define CFG_ENABLE_BMPS_NAME                   "gEnableBmps"
 #define CFG_ENABLE_BMPS_MIN                    ( 0 )
@@ -2403,7 +2393,6 @@ typedef struct
    v_BOOL_t      ShortSlotTimeEnabled;
    v_BOOL_t      Is11dSupportEnabled;
    v_BOOL_t      Is11hSupportEnabled;
-   v_U32_t       nDeferScanTimeInterval;
    v_BOOL_t      fEnforce11dChannels;
    v_BOOL_t      fSupplicantCountryCodeHasPriority;
    v_BOOL_t      fEnforceCountryCodeMatch;
@@ -2820,7 +2809,7 @@ typedef struct
 #endif
    char                        overrideCountryCode[4];
    v_U32_t                     gAsdProbeInterval;
-   v_S7_t                      gAsdTriggerThreshold;
+   v_U32_t                     gAsdTriggerThreshold;
    v_U32_t                     gAsdRTTRssiHystThreshold;
    v_BOOL_t                    debugP2pRemainOnChannel;
    v_U32_t                     cfgBtcCTS2SduringSCO;

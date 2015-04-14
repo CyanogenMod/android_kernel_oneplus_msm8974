@@ -232,20 +232,10 @@ cfgSetInt(tpAniSirGlobal pMac, tANI_U16 cfgId, tANI_U32 value)
         PELOGE(cfgLog(pMac, LOGE, FL("Not valid cfg id %d"), cfgId);)
         retVal = eSIR_CFG_INVALID_ID;
     }
-    else if ((pMac->cfg.gCfgIBufMin[index] < pMac->cfg.gCfgIBufMax[index]) &&
-             ((pMac->cfg.gCfgIBufMin[index] > value) ||
-             (pMac->cfg.gCfgIBufMax[index] < value)))
+    else if ((pMac->cfg.gCfgIBufMin[index] > value) ||
+             (pMac->cfg.gCfgIBufMax[index] < value))
     {
-        PELOGE(cfgLog(pMac, LOGE, FL("Value %u out of range [%u,%u] cfgid %hu"),
-               value, pMac->cfg.gCfgIBufMin[index],
-               pMac->cfg.gCfgIBufMax[index], cfgId);)
-        retVal = eSIR_CFG_INVALID_ID;
-    }
-    else if (!(pMac->cfg.gCfgIBufMin[index] < pMac->cfg.gCfgIBufMax[index]) &&
-             (((tANI_S32)(pMac->cfg.gCfgIBufMin[index]) > (tANI_S32)value) ||
-              ((tANI_S32)(pMac->cfg.gCfgIBufMax[index]) < (tANI_S32)value)))
-    {
-        PELOGE(cfgLog(pMac, LOGE, FL("Value %d out of range [%d,%d] cfgid %hu"),
+        PELOGE(cfgLog(pMac, LOGE, FL("Value %d out of range [%d,%d] cfg id %d"),
                value, pMac->cfg.gCfgIBufMin[index],
                pMac->cfg.gCfgIBufMax[index], cfgId);)
         retVal = eSIR_CFG_INVALID_ID;
