@@ -147,8 +147,8 @@
 			23 01 00 00 01 00 02 b0 04
 			29 01 00 00 10 00 21 ca 00 80 80 80 80 80 80 80 08 20 80 80 0a 4a 37 a0 55 f8 0c 0c 20 10 3f 3f 00 00 10 10 3f 3f 3f 3f
 			23 01 00 00 01 00 02 b0 03];
-		qcom,partial-update-enabled;
-		qcom,panel-roi-alignment = <900 4 2 4 540 20>;
+		//qcom,partial-update-enabled;
+		//qcom,panel-roi-alignment = <900 4 2 4 540 20>;
 		qcom,ulps-enabled;
 	};
 };

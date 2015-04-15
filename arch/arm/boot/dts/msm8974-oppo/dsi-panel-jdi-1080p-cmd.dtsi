@@ -128,8 +128,8 @@
 			23 01 00 00 00 00 02 d6 01
 			23 01 00 00 01 00 02 b0 03];
 		qcom,cont-splash-enabled;
-		qcom,partial-update-enabled;
-		qcom,panel-roi-alignment = <900 4 2 4 540 20>;
+		//qcom,partial-update-enabled;
+		//qcom,panel-roi-alignment = <900 4 2 4 540 20>;
 		qcom,ulps-enabled;
 	};
 };
