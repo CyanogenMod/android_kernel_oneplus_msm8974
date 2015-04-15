@@ -71,7 +71,7 @@
 		qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
 		qcom,mdss-dsi-off-command-state = "dsi_hs_mode";
 		qcom,mdss-dsi-h-sync-pulse = <1>;
-		qcom,mdss-dsi-traffic-mode = "burst_mode";
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_event";
 		qcom,mdss-dsi-bllp-eof-power-mode;
 		qcom,mdss-dsi-bllp-power-mode;
 		qcom,mdss-dsi-lane-0-state;
@@ -128,8 +128,9 @@
 			23 01 00 00 00 00 02 d6 01
 			23 01 00 00 01 00 02 b0 03];
 		qcom,cont-splash-enabled;
-		qcom,partial-update-enabled;
-		qcom,panel-roi-alignment = <900 4 2 4 540 20>;
+		//qcom,partial-update-enabled;
+		//qcom,panel-roi-alignment = <900 4 2 4 540 20>;
 		qcom,ulps-enabled;
+		qcom,mdss-dsi-tx-eot-append;
 	};
 };
