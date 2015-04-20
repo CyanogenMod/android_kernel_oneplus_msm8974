@@ -77,55 +77,10 @@ struct pn544_dev
 };
 
 /*OPPO yuyi 2013-10-24 add begin for nfc_devinfo*/
-struct manufacture_info mainboard_info;
 struct manufacture_info nfc_info = {
 	.version = "pn65T",
 	.manufacture = "NXP",
 };
-
-static void mainboard_verify(void)
-{
-	switch(get_pcb_version()) {
-		case HW_VERSION__10:		
-			mainboard_info.version ="10";
-			mainboard_info.manufacture = "SA";
-			break;
-		case HW_VERSION__11:
-			mainboard_info.version = "11";
-			mainboard_info.manufacture = "SB";
-			break;
-		case HW_VERSION__12:
-			mainboard_info.version = "12";
-			mainboard_info.manufacture = "SC";
-			break;
-		case HW_VERSION__13:
-			mainboard_info.version = "13";
-			mainboard_info.manufacture = "SD";
-			break;
-		case HW_VERSION__20:
-			mainboard_info.version ="20";
-			mainboard_info.manufacture = "SA";
-			break;
-		case HW_VERSION__21:
-			mainboard_info.version = "21";
-			mainboard_info.manufacture = "SB";
-			break;
-		case HW_VERSION__22:
-			mainboard_info.version = "22";
-			mainboard_info.manufacture = "SC";
-			break;
-		case HW_VERSION__23:
-			mainboard_info.version = "23";
-			mainboard_info.manufacture = "SD";
-			break;
-		default:
-			mainboard_info.version = "UNKOWN";
-			mainboard_info.manufacture = "UNKOWN";
-		}
-	
-	
-}
-			
 /*OPPO yuyi 2013-10-24 add end for nfc_devinfo*/
 
 /*OPPO yuyi 2013-03-22 add begin     from 12025 board-8064.c*/
@@ -445,8 +400,6 @@ static int pn544_probe(struct i2c_client *client, const struct i2c_device_id *id
 //	printk("yuyi,pn544_parse_dt pdata->clk_req_gpio = %d\n",platform_data->clk_req_gpio );
 	
 	register_device_proc("nfc", nfc_info.version, nfc_info.manufacture);
-	mainboard_verify();
-	register_device_proc("mainboard", mainboard_info.version, mainboard_info.manufacture);
 /*OPPO yuyi 2013-10-24 add end for nfc_devinfo*/
 	if (platform_data == NULL) 
 	{
