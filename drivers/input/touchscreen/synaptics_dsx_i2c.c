@@ -2077,7 +2077,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 	y = synaptics_rmi4_i2c_read(syna_ts_data, F54_DATA_BASE_ADDR + 3, data_buf, 7) ;
 	print_ts(TS_DEBUG," trx-to-trx raw readback: %x  %x  %x  %x  %x  %x \n", data_buf[0], data_buf[1], data_buf[2], data_buf[3], data_buf[4], data_buf[5]);
 	num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-trx raw readback: %x  %x  %x  %x  %x  %x \n", data_buf[0], data_buf[1], data_buf[2], data_buf[3], data_buf[4], data_buf[5]);
-#if defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7WX)
+#ifdef CONFIG_MACH_FIND7
 	//mingqiang.guo@phone.bsp 2014-5-30  modify  must clear not use channel , other it will wrong
 	if (get_pcb_version() <= HW_VERSION__20) { //find7
 		if ((data_buf[0] == 0) && (data_buf[1] == 0) && (data_buf[2] == 0)
@@ -2112,7 +2112,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 			error_count++;
 		}
 	}
-#else /* defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7WX) */
+#else /* CONFIG_MACH_FIND7 */
 	if ((data_buf[0] == 0) && (data_buf[1] == 0) && (data_buf[2] == 0)
 		&& ((data_buf[3] & 0x07) == 0) && (data_buf[4] == 0) && ((data_buf[5] & 0x3f) == 0)) {
 		print_ts(TS_DEBUG, " trx-to-trx test pass.\n");
@@ -2121,7 +2121,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 		num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-trx test error: data_buf[3]&0x07 =%x data_buf[5]&0x3f=%x \n", data_buf[3] &0x07, data_buf[5] & 0x3f);
 		error_count++;
 	}
-#endif /* defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7WX) */
+#endif /* CONFIG_MACH_FIND7 */
 
 	//Step4 : Check trx-to-ground
 	print_ts(TS_DEBUG, "-------------------step 4 : Check trx-to-ground--------------------- \n");
@@ -2147,7 +2147,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 		print_ts(TS_DEBUG, "========!! value[%d]=0x%x\n",i,data_buf[i]);
 	}
 //qiao.hu @EXP.Basic.drv,2014/5/20 modified for touchscreen 
-#if defined (CONFIG_OPPO_DEVICE_FIND7) || defined (CONFIG_OPPO_DEVICE_FIND7WX) 
+#ifdef CONFIG_MACH_FIND7
 
 	//mingqiang.guo@phone.bsp modify  only 13077 wintk and tpk use different channels,  tpk: data_buf[4]==0xff wintek :  data_buf[4]==0xfe
 	print_ts(TS_DEBUG, "%d: syna_ts_data->vendor_id=%d,data_buf[4]=%d\n", __LINE__, syna_ts_data->vendor_id, data_buf[4]);
@@ -2179,7 +2179,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 			error_count++;
 		}
 	}
-#else /* defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7WX) */
+#else /* CONFIG_MACH_FIND7 */
 	if ((data_buf[0] == 0xff) && (data_buf[1] == 0xff) && (data_buf[2] == 0xff)
 			&& ((data_buf[3] & 0x07) == 0x7)  && (data_buf[4] == 0xff) && ((data_buf[5] & 0x3f) == 0x3f)) {
 		print_ts(TS_DEBUG, "pass.\n");
@@ -2188,7 +2188,7 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 		num_read_chars += sprintf(&(buf[num_read_chars]), " trx-to-ground test Failed[%d]\n", __LINE__);
 		error_count++;
 	}
-#endif /* defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7WX) */
+#endif /* CONFIG_MACH_FIND7 */
 
 	//step 5:reset touchpanel and reconfig the device
 END_TP_TEST:
