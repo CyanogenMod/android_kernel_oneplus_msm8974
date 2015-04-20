@@ -16,7 +16,7 @@ static struct task_struct *pic16f_fw_update_task = NULL;
 #define BYTE_OFFSET 2
 #define BYTES_TO_WRITE 16
 
-#if defined CONFIG_MACH_FIND7 || defined CONFIG_MACH_FIND7WX	//FIND7/FIND7WX:pic1503
+#ifdef CONFIG_MACH_FIND7	//FIND7/FIND7WX:pic1503
 #define ERASE_COUNT   		96	//0x200-0x7FF
 #define READ_COUNT			95	//192
 
