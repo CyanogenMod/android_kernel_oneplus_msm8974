@@ -586,7 +586,6 @@ int __msm_jpeg_open(struct msm_jpeg_device *pgmn_dev)
 		return -EBUSY;
 	}
 	pgmn_dev->open_count++;
-	mutex_unlock(&pgmn_dev->lock);
 
 	msm_jpeg_core_irq_install(msm_jpeg_irq);
 	rc = msm_jpeg_platform_init(pgmn_dev->pdev,
@@ -595,6 +594,7 @@ int __msm_jpeg_open(struct msm_jpeg_device *pgmn_dev)
 	if (rc) {
 		JPEG_PR_ERR("%s:%d] platform_init fail %d\n", __func__,
 			__LINE__, rc);
+		mutex_unlock(&pgmn_dev->lock);
 		return rc;
 	}
 
@@ -612,6 +612,7 @@ int __msm_jpeg_open(struct msm_jpeg_device *pgmn_dev)
 	msm_jpeg_core_init(pgmn_dev);
 
 	JPEG_DBG("%s:%d] success\n", __func__, __LINE__);
+	mutex_unlock(&pgmn_dev->lock);
 	return rc;
 }
 
@@ -625,7 +626,6 @@ int __msm_jpeg_release(struct msm_jpeg_device *pgmn_dev)
 		return -EINVAL;
 	}
 	pgmn_dev->open_count--;
-	mutex_unlock(&pgmn_dev->lock);
 
 	msm_jpeg_core_release(pgmn_dev, pgmn_dev->domain_num);
 	msm_jpeg_q_cleanup(&pgmn_dev->evt_q);
@@ -644,6 +644,7 @@ int __msm_jpeg_release(struct msm_jpeg_device *pgmn_dev)
 		pgmn_dev->irq, pgmn_dev);
 
 	JPEG_DBG("%s:%d]\n", __func__, __LINE__);
+	mutex_unlock(&pgmn_dev->lock);
 	return 0;
 }
 
