@@ -48,7 +48,11 @@
 #define TAIKO_VALIDATE_RX_SBPORT_RANGE(port) ((port >= 16) && (port <= 22))
 #define TAIKO_CONVERT_RX_SBPORT_ID(port) (port - 16) /* RX1 port ID = 0 */
 
+#ifdef CONFIG_MACH_OPPO
 #define TAIKO_HPH_PA_SETTLE_COMP_ON 5000
+#else
+#define TAIKO_HPH_PA_SETTLE_COMP_ON 3000
+#endif
 #define TAIKO_HPH_PA_SETTLE_COMP_OFF 13000
 
 #define DAPM_MICBIAS2_EXTERNAL_STANDALONE "MIC BIAS2 External Standalone"
@@ -453,15 +457,16 @@ struct taiko_priv {
 	int (*machine_codec_event_cb)(struct snd_soc_codec *codec,
 			enum wcd9xxx_codec_event);
 
+#ifdef CONFIG_MACH_OPPO
 	struct regulator *hpmic_reg;
 	atomic_t hpmic_ref;
+#endif
 
 	/*
 	 * list used to save/restore registers at start and
 	 * end of impedance measurement
 	 */
 	struct list_head reg_save_restore;
-
 	struct pm_qos_request pm_qos_req;
 
 	/* UHQA (class AB) mode */
@@ -589,6 +594,7 @@ static int taiko_update_uhqa_mode(struct snd_soc_codec *codec, int path)
 	return ret;
 }
 
+#ifdef CONFIG_MACH_OPPO
 /**
  * This regulator is needed to control the headset pin swap.
  * The associated GPIO should be pulled up to set US mode
@@ -630,6 +636,7 @@ static int taiko_enable_hpmic_switch(struct snd_soc_codec *codec, bool enable)
 
 	return ret;
 }
+#endif
 
 static int spkr_drv_wrnd_param_set(const char *val,
 				   const struct kernel_param *kp)
@@ -6484,12 +6491,14 @@ static irqreturn_t taiko_slimbus_irq(int irq, void *data)
 					 */
 				}
 			}
+#ifdef CONFIG_MACH_OPPO
 			if (tx && port_id == TAIKO_MAD_SLIMBUS_TX_PORT) {
 				/* MAD is expected to hold the port open */
 				pr_debug("%s: MAD holding port %d open",
 						__func__, TAIKO_MAD_SLIMBUS_TX_PORT);
 				continue;
 			}
+#endif
 			WARN(!cleared,
 			     "Couldn't find slimbus %s port %d for closing\n",
 			     (tx ? "TX" : "RX"), port_id);
@@ -7325,7 +7334,9 @@ static const struct wcd9xxx_mbhc_cb mbhc_cb = {
 	.get_cdc_type = taiko_get_cdc_type,
 	.setup_zdet = taiko_setup_zdet,
 	.compute_impedance = taiko_compute_impedance,
+#ifdef CONFIG_MACH_OPPO
 	.enable_hpmic_switch = taiko_enable_hpmic_switch,
+#endif
 	.get_hwdep_fw_cal = taiko_get_hwdep_fw_cal,
 };
 
@@ -7404,7 +7415,6 @@ static int taiko_post_reset_cb(struct wcd9xxx *wcd9xxx)
 					taiko_enable_mbhc_micbias,
 					&mbhc_cb, &cdc_intr_ids,
 					rco_clk_rate, true);
-
 		if (ret)
 			pr_err("%s: mbhc init failed %d\n", __func__, ret);
 		else
@@ -7616,11 +7626,11 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 				taiko_enable_mbhc_micbias,
 				&mbhc_cb, &cdc_intr_ids,
 				rco_clk_rate, true);
-
 	if (ret) {
 		pr_err("%s: mbhc init failed %d\n", __func__, ret);
 		goto err_hwdep;
 	}
+
 	taiko->codec = codec;
 	for (i = 0; i < COMPANDER_MAX; i++) {
 		taiko->comp_enabled[i] = 0;
@@ -7645,9 +7655,11 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 		goto err_hwdep;
 	}
 
+#ifdef CONFIG_MACH_OPPO
 	atomic_set(&taiko->hpmic_ref, 0);
 	taiko->hpmic_reg = taiko_codec_find_regulator(codec,
-							   WCD9XXX_VDD_HPMIC_SWITCH);
+						       WCD9XXX_VDD_HPMIC_SWITCH);
+#endif
 
 	taiko->spkdrv_reg = taiko_codec_find_regulator(codec,
 						       WCD9XXX_VDD_SPKDRV_NAME);
@@ -7738,7 +7750,6 @@ static int taiko_codec_probe(struct snd_soc_codec *codec)
 	snd_soc_dapm_sync(dapm);
 
 	codec->ignore_pmdown_time = 1;
-
 	return ret;
 
 err_irq:
@@ -7769,7 +7780,9 @@ static int taiko_codec_remove(struct snd_soc_codec *codec)
 	/* cleanup resmgr */
 	wcd9xxx_resmgr_deinit(&taiko->resmgr);
 
+#ifdef CONFIG_MACH_OPPO
 	taiko->hpmic_reg = NULL;
+#endif
 	taiko->spkdrv_reg = NULL;
 
 	kfree(taiko->fw_data);
