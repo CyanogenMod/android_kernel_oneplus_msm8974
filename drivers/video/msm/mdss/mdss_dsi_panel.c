@@ -816,7 +816,16 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 		if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio)) {
 			gpio_direction_output(ctrl_pdata->lcd_5v_en_gpio, 0);
 		}
-#endif
+		if (gpio_is_valid(ctrl_pdata->rst_gpio)) {
+			gpio_set_value((ctrl_pdata->rst_gpio), 0);
+			gpio_free(ctrl_pdata->rst_gpio);
+		}
+		msleep(120);
+		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
+			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
+			gpio_free(ctrl_pdata->disp_en_gpio);
+		}
+#else
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
 			gpio_free(ctrl_pdata->disp_en_gpio);
@@ -825,6 +834,7 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			gpio_set_value((ctrl_pdata->rst_gpio), 0);
 			gpio_free(ctrl_pdata->rst_gpio);
 		}
+#endif
 		if (gpio_is_valid(ctrl_pdata->mode_gpio))
 			gpio_free(ctrl_pdata->mode_gpio);
 	}
