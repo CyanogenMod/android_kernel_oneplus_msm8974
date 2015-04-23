@@ -613,6 +613,7 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
 	if (pageno < pool->nr_pages) {
 		bitmap_set(pool->bitmap, pageno, count);
 		ptr = pool->vaddr + PAGE_SIZE * pageno;
+		memset(ptr, 0, size);
 		*ret_page = pool->pages[pageno];
 	} else {
 		pr_err_once("ERROR: %u KiB atomic DMA coherent pool is too small!\n"
