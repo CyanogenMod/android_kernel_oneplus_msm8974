@@ -52,6 +52,7 @@
 #define BYTES_PER_FUSE_ROW  8
 #define MAX_EFUSE_VALUE  16
 #define THERM_SECURE_BITE_CMD 8
+#define CORE_MAX_FREQ 2880000
 
 static struct msm_thermal_data msm_thermal_info;
 static struct delayed_work check_temp_work;
@@ -1354,7 +1355,7 @@ static void do_freq_control(long temp)
 		limit_idx += msm_thermal_info.bootup_freq_step;
 		if (limit_idx >= limit_idx_high) {
 			limit_idx = limit_idx_high;
-			max_freq = UINT_MAX;
+			max_freq = CORE_MAX_FREQ;
 		} else
 			max_freq = table[limit_idx].frequency;
 	}
@@ -1551,7 +1552,9 @@ init_kthread:
 
 static __ref int do_freq_mitigation(void *data)
 {
+	long temp = 0;
 	int ret = 0;
+	bool skip_mitig = false;
 	uint32_t cpu = 0, max_freq_req = 0, min_freq_req = 0;
 	struct sched_param param = {.sched_priority = MAX_RT_PRIO-1};
 
@@ -1562,15 +1565,28 @@ static __ref int do_freq_mitigation(void *data)
 			;
 		INIT_COMPLETION(freq_mitigation_complete);
 
+		ret = therm_get_temp(msm_thermal_info.sensor_id,
+			THERM_TSENS_ID, &temp);
+		if (ret)
+			pr_err("Unable to read TSENS sensor:%d\n",
+				msm_thermal_info.sensor_id);
+		else if (temp <= msm_thermal_info.limit_temp_degC)
+			skip_mitig = true;
+		else
+			skip_mitig = false;
+
 		for_each_possible_cpu(cpu) {
 			max_freq_req = (cpus[cpu].max_freq) ?
 					msm_thermal_info.freq_limit :
-					UINT_MAX;
+					CORE_MAX_FREQ;
 			max_freq_req = min(max_freq_req,
 					cpus[cpu].user_max_freq);
 
 			min_freq_req = max(min_freq_limit,
 					cpus[cpu].user_min_freq);
+
+			if (skip_mitig && CORE_MAX_FREQ > max_freq_req)
+				max_freq_req = CORE_MAX_FREQ;
 
 			if ((max_freq_req == cpus[cpu].limited_max_freq)
 				&& (min_freq_req ==
@@ -1937,11 +1953,11 @@ static void __ref disable_msm_thermal(void)
 
 	get_online_cpus();
 	for_each_possible_cpu(cpu) {
-		if (cpus[cpu].limited_max_freq == UINT_MAX &&
+		if (cpus[cpu].limited_max_freq == CORE_MAX_FREQ &&
 			cpus[cpu].limited_min_freq == 0)
 			continue;
 		pr_info("Max frequency reset for CPU%d\n", cpu);
-		cpus[cpu].limited_max_freq = UINT_MAX;
+		cpus[cpu].limited_max_freq = CORE_MAX_FREQ;
 		cpus[cpu].limited_min_freq = 0;
 		update_cpu_freq(cpu);
 	}
@@ -2241,9 +2257,9 @@ int msm_thermal_init(struct msm_thermal_data *pdata)
 		cpus[cpu].user_offline = 0;
 		cpus[cpu].hotplug_thresh_clear = false;
 		cpus[cpu].max_freq = false;
-		cpus[cpu].user_max_freq = UINT_MAX;
+		cpus[cpu].user_max_freq = CORE_MAX_FREQ;
 		cpus[cpu].user_min_freq = 0;
-		cpus[cpu].limited_max_freq = UINT_MAX;
+		cpus[cpu].limited_max_freq = CORE_MAX_FREQ;
 		cpus[cpu].limited_min_freq = 0;
 		cpus[cpu].freq_thresh_clear = false;
 	}
@@ -2266,7 +2282,7 @@ int msm_thermal_init(struct msm_thermal_data *pdata)
 	INIT_DELAYED_WORK(&check_temp_work, check_temp);
 	schedule_delayed_work(&check_temp_work, msecs_to_jiffies(10000));
 
-	if (num_possible_cpus() > 1)
+	if (core_control_enabled)	
 		register_cpu_notifier(&msm_thermal_cpu_notifier);
 
 	return ret;
@@ -3076,7 +3092,7 @@ static int probe_cc(struct device_node *node, struct msm_thermal_data *data,
 	uint32_t cpu = 0;
 
 	if (num_possible_cpus() > 1) {
-		core_control_enabled = 1;
+		//core_control_enabled = 1;
 		hotplug_enabled = 1;
 	}
 
