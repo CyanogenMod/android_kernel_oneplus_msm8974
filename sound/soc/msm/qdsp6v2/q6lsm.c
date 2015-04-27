@@ -88,6 +88,10 @@ static int q6lsm_callback(struct apr_client_data *data, void *priv)
 		pr_debug("%s: SSR event received 0x%x, event 0x%x, proc 0x%x\n",
 			 __func__, data->opcode, data->reset_event,
 			 data->reset_proc);
+		if (client->cb)
+			client->cb(data->opcode, data->token,
+					data->payload,
+					client->priv);
 		return 0;
 	}
 
@@ -1116,6 +1120,7 @@ int q6lsm_lab_buffer_alloc(struct lsm_client *client, bool alloc)
 {
 	int ret = -EINVAL, i = 0;
 	size_t allocate_size = 0, len = 0;
+	size_t pad_zero = 0, total_mem = 0;
 	if (!client) {
 		pr_err("%s: invalid client\n", __func__);
 		return -EINVAL;
@@ -1130,6 +1135,10 @@ int q6lsm_lab_buffer_alloc(struct lsm_client *client, bool alloc)
 		}
 		allocate_size = client->hw_params.period_count *
 				client->hw_params.buf_sz;
+
+		pad_zero = (LSM_ALIGN_BOUNDARY -
+				(allocate_size % LSM_ALIGN_BOUNDARY));
+		total_mem = pad_zero + allocate_size;
 		client->lab_buffer =
 			kzalloc(sizeof(struct lsm_lab_buffer) *
 			client->hw_params.period_count, GFP_KERNEL);
@@ -1147,7 +1156,7 @@ int q6lsm_lab_buffer_alloc(struct lsm_client *client, bool alloc)
 			goto fail;
 		}
 		client->lab_buffer[0].handle =
-			ion_alloc(client->lab_buffer[0].client, allocate_size,
+			ion_alloc(client->lab_buffer[0].client, total_mem,
 				SZ_4K, (0x1 << ION_AUDIO_HEAP_ID), 0);
 		if (IS_ERR_OR_NULL(client->lab_buffer[0].handle)) {
 			pr_err("%s: ION memory allocation for AUDIO failed\n",

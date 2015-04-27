@@ -84,6 +84,7 @@ struct lsm_priv {
 	wait_queue_head_t period_wait;
 	int appl_cnt;
 	int dma_write;
+	bool reset_event;
 };
 
 static int msm_lsm_queue_lab_buffer(struct lsm_priv *prtd, int i)
@@ -224,6 +225,16 @@ static void lsm_event_handler(uint32_t opcode, uint32_t token,
 		index = 2;
 		pr_debug("%s: event detect status = %d payload size = %d\n",
 			 __func__, status , payload_size);
+		break;
+	case RESET_EVENTS:
+		pr_err("%s: RESET_EVENTS\n", __func__);
+		prtd->dma_write += snd_pcm_lib_period_bytes(substream);
+		atomic_inc(&prtd->buf_count);
+		prtd->reset_event = true;
+		if (prtd->lsm_client->lab_started) {
+			snd_pcm_period_elapsed(substream);
+		}
+		wake_up(&prtd->period_wait);
 		break;
 	default:
 		pr_debug("%s: Unsupported Event opcode 0x%x\n", __func__,
@@ -893,6 +904,7 @@ static int msm_lsm_open(struct snd_pcm_substream *substream)
 	init_waitqueue_head(&prtd->event_wait);
 	init_waitqueue_head(&prtd->period_wait);
 	prtd->substream = substream;
+	prtd->reset_event = false;
 	runtime->private_data = prtd;
 	runtime->hw = msm_pcm_hardware_capture;
 
@@ -1065,12 +1077,22 @@ static int msm_lsm_pcm_copy(struct snd_pcm_substream *substream, int ch,
 		       runtime->status->state);
 		return 0;
 	}
+
+	if (prtd->reset_event) {
+		pr_err("%s: In SSR return ENETRESET before wait\n", __func__);
+		return -ENETRESET;
+	}
+
 	rc = wait_event_timeout(prtd->period_wait,
 		(atomic_read(&prtd->buf_count) |
 		atomic_read(&prtd->read_abort)), (2 * HZ));
 	if (!rc) {
 		pr_err("%s: timeout for read retry\n", __func__);
 		return -EAGAIN;
+	}
+	if (prtd->reset_event) {
+		pr_err("%s: SSR occurred return ENETRESET \n", __func__);
+		return -ENETRESET;
 	}
 	if (atomic_read(&prtd->read_abort)) {
 		pr_err("%s: Read abort recieved\n", __func__);
