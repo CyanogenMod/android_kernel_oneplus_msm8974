@@ -1625,7 +1625,7 @@ void __init msm_8974_init_gpiomux(void)
 				    ARRAY_SIZE(msm_mhl_configs));
 	else
 		msm_gpiomux_install(msm_lcd_te_configs,
-					ARRAY_SIZE(msm_lcd_te_configs));
+				    ARRAY_SIZE(msm_lcd_te_configs));
 
 	if (of_board_is_liquid() ||
 	    (of_board_is_dragonboard() && machine_is_apq8074()))
