@@ -15,6 +15,10 @@
 	qcom,init-voltage = <1000000>;
 };
 
+&pm8941_l12 {
+	regulator-always-on;
+};
+
 &pm8941_l17 {
 	regulator-min-microvolt = <2700000>;
 	qcom,init-voltage = <2700000>;
