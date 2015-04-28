@@ -509,6 +509,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 	q->backing_dev_info.capabilities = BDI_CAP_MAP_COPY;
 	q->backing_dev_info.name = "block";
 	q->node = node_id;
+	*q->elevator_hard = '\0';
 
 	err = bdi_init(&q->backing_dev_info);
 	if (err)

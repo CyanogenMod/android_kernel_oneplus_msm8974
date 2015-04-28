@@ -409,6 +409,8 @@ struct request_queue {
 	/* Throttle data */
 	struct throtl_data *td;
 #endif
+
+	char elevator_hard[ELV_NAME_MAX];
 };
 
 #define QUEUE_FLAG_QUEUED	1	/* uses generic tag queueing */
