@@ -438,7 +438,26 @@ static int pcc_r = 32768, pcc_g = 32768, pcc_b = 32768;
 static ssize_t mdss_get_rgb(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%d %d %d\n", pcc_r, pcc_g, pcc_b);
+	u32 copyback = 0;
+	struct mdp_pcc_cfg_data pcc_cfg;
+
+	memset(&pcc_cfg, 0, sizeof(struct mdp_pcc_cfg_data));
+
+	pcc_cfg.block = MDP_LOGICAL_BLOCK_DISP_0;
+	pcc_cfg.ops = MDP_PP_OPS_READ;
+
+	mdss_mdp_pcc_config(&pcc_cfg, &copyback);
+
+	/* We disable pcc when using default values and reg
+	 * are zeroed on pp resume, so ignore empty values.
+	 */
+	if (pcc_cfg.r.r && pcc_cfg.g.g && pcc_cfg.b.b) {
+		pcc_r = pcc_cfg.r.r;
+		pcc_g = pcc_cfg.g.g;
+		pcc_b = pcc_cfg.b.b;
+	}
+
+	return scnprintf(buf, PAGE_SIZE, "%d %d %d\n", pcc_r, pcc_g, pcc_b);
 }
 
 /**
