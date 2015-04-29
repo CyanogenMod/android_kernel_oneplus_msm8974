@@ -49,36 +49,4 @@
 			pn544,update-gpio = <&msmgpio 12 0x00>;
 		};
 	};
-
-	spi_9: spi@f9965000 {
-		compatible = "qcom,spi-qup-v2";
-
-		cell-index = <9>;
-		reg-names = "spi_physical";
-		reg = <0xf9965000 0x1000>;
-		interrupt-names = "spi9_irq";
-		interrupts = <0 103 0>;
-
-		spi-max-frequency = <19200000>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		qcom,gpio-mosi = <&msmgpio 49 0>;
-		qcom,gpio-miso = <&msmgpio 50 0>;
-		qcom,gpio-clk  = <&msmgpio 52 0>;
-		qcom,gpio-cs0  = <&msmgpio 51 0>;
-
-		qcom,master-id = <84>;
-		p61-nxp-nfc@0 {
-			compatible = "p61,nxp-nfc";
-			reg = <0>;
-			spi-max-frequency = <4000000>;
-			spi-cs-high;
-			interrupt-parent = <&msmgpio>;
-			interrupts = <34 0>;
-			p61-nxp-nfc,irq-gpio = <&msmgpio 34 0x00>;
-			#spi-cpol;
-			#spi-cpha;
-		};
-	};
 };
