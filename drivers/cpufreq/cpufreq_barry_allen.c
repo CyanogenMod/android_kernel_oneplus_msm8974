@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Copyright (C) 2015 Javier Sayago <admin@lonasdigital.com>
  *
- * Barry_Allen Version 0.2
+ * Barry_Allen Version 0.3
  * 02-05-2015
  *
  * This software is licensed under the terms of the GNU General Public
@@ -391,7 +391,7 @@ static void cpufreq_barry_allen_timer(unsigned long data)
 
 	do_div(cputime_speedadj, delta_time);
 	loadadjfreq = (unsigned int)cputime_speedadj * 100;
-	cpu_load = loadadjfreq / pcpu->target_freq;
+	cpu_load = loadadjfreq / pcpu->policy->cur;
 	pcpu->prev_load = cpu_load;
 	boosted = boost_val || now < boostpulse_endtime;
 
