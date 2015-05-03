@@ -1979,7 +1979,7 @@ v_U16_t hdd_wmm_select_queue(struct net_device * dev, struct sk_buff *skb)
    v_USHORT_t queueIndex;
    hdd_adapter_t *pAdapter =  WLAN_HDD_GET_PRIV_PTR(dev);
 
-   if (isWDresetInProgress()) {
+   if (vos_is_logp_in_progress(VOS_MODULE_ID_HDD, NULL)) {
        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_WARN,
                   FL("called during WDReset"));
        skb->priority = SME_QOS_WMM_UP_BE;

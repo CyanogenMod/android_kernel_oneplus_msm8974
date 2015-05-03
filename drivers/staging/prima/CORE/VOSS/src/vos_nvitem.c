@@ -3653,9 +3653,9 @@ int wlan_hdd_linux_reg_notifier(struct wiphy *wiphy,
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                "cfg80211 reg notifier callback for country for initiator %d", request->initiator);
 
-    if (TRUE == isWDresetInProgress())
+    if (vos_is_logp_in_progress(VOS_MODULE_ID_VOSS, NULL))
     {
-       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+       VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                    ("SSR is in progress") );
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0))
        return;

@@ -144,9 +144,10 @@ eHalStatus p2pProcessRemainOnChannelCmd(tpAniSirGlobal pMac, tSmeCmd *p2pRemaino
 
 eHalStatus sme_remainOnChnRsp( tpAniSirGlobal pMac, tANI_U8 *pMsg)
 {
-    eHalStatus                         status = eHAL_STATUS_SUCCESS;
-    tListElem                          *pEntry = NULL;
-    tSmeCmd                            *pCommand = NULL;
+    eHalStatus status = eHAL_STATUS_SUCCESS;
+    tListElem  *pEntry = NULL;
+    tSmeCmd    *pCommand = NULL;
+    tSirSmeRsp *pRsp = (tSirSmeRsp *)pMsg;
 
     pEntry = csrLLPeekHead(&pMac->sme.smeCmdActiveList, LL_ACCESS_LOCK);
     if( pEntry )
@@ -157,8 +158,9 @@ eHalStatus sme_remainOnChnRsp( tpAniSirGlobal pMac, tANI_U8 *pMsg)
             remainOnChanCallback callback = pCommand->u.remainChlCmd.callback;
             /* process the msg */
             if( callback )
-                callback(pMac, pCommand->u.remainChlCmd.callbackCtx, 0);
-             
+                callback(pMac, pCommand->u.remainChlCmd.callbackCtx,
+                                                        pRsp->statusCode);
+
             if( csrLLRemoveEntry( &pMac->sme.smeCmdActiveList, pEntry, LL_ACCESS_LOCK ) )
             {
                 //Now put this command back on the avilable command list
