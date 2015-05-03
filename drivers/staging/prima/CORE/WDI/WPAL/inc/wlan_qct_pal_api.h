@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -356,14 +356,14 @@ void wpalFwDumpReq(wpt_uint32 cmd, wpt_uint32 arg1, wpt_uint32 arg2,
 void wpalDevicePanic(void);
 
 /*---------------------------------------------------------------------------
-    wpalIsWDresetInProgress -  calls vos API isWDresetInProgress()
+    wpalIslogPInProgress -  calls vos API vos_is_logp_in_progress()
 
     Param:
        NONE
     Return:
        STATUS
 --------------------------------------------------------------------------*/
-int  wpalIsWDresetInProgress(void);
+int  wpalIslogPInProgress(void);
 
 /*---------------------------------------------------------------------------
     wpalIsSsrPanicOnFailure -  calls vos API isSsrPanicOnFailure()
