@@ -22431,7 +22431,7 @@ WDI_ResponseTimerCB
     }
 #ifndef WDI_RE_ENABLE_WIFI_ON_WDI_TIMEOUT
     wpalWcnssResetIntr();
-    if(wpalIsWDresetInProgress())
+    if(wpalIslogPInProgress())
     {
       if(wpalIsSsrPanicOnFailure())
           wpalDevicePanic();
