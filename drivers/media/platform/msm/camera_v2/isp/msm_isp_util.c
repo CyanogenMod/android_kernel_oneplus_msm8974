@@ -24,9 +24,6 @@
 static DEFINE_MUTEX(bandwidth_mgr_mutex);
 static struct msm_isp_bandwidth_mgr isp_bandwidth_mgr;
 
-#define MSM_ISP_MIN_AB 300000000
-#define MSM_ISP_MIN_IB 450000000
-
 #define VFE40_8974V2_VERSION 0x1001001A
 static struct msm_bus_vectors msm_isp_init_vectors[] = {
 	{
@@ -368,6 +365,9 @@ int msm_isp_cfg_input(struct vfe_device *vfe_dev, void *arg)
 
 	switch (input_cfg->input_src) {
 	case VFE_PIX_0:
+#ifdef CONFIG_MACH_MSM8974_OPPO
+		input_cfg->input_pix_clk = 465000000;
+#endif
 		rc = msm_isp_cfg_pix(vfe_dev, input_cfg);
 		break;
 	case VFE_RAW_0:
@@ -1201,7 +1201,7 @@ irqreturn_t msm_isp_process_irq(int irq_num, void *data)
 	vfe_dev->hw_info->vfe_ops.irq_ops.
 		read_irq_status(vfe_dev, &irq_status0, &irq_status1);
 	if ((irq_status0 == 0) && (irq_status1 == 0)) {
-		pr_err_ratelimited("%s: irq_status0 & 1 are both 0\n",
+		ISP_DBG("%s: irq_status0 & 1 are both 0\n",
 			__func__);
 		return IRQ_HANDLED;
 	}
@@ -1308,6 +1308,7 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct vfe_device *vfe_dev = v4l2_get_subdevdata(sd);
 	long rc;
+	int retry_times = 5;
 	ISP_DBG("%s\n", __func__);
 
 	mutex_lock(&vfe_dev->realtime_mutex);
@@ -1330,6 +1331,16 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	atomic_set(&vfe_dev->error_info.overflow_state, NO_OVERFLOW);
 	rc = vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev,
 		ISP_RST_HARD, 1);
+/*likelong 2015.3.16 reset isp again if reset failed*/
+#ifdef CONFIG_MACH_OPPO
+	while((rc <= 0)&&retry_times)
+	{
+		pr_err("%s: reset isp failed, try again\n", __func__);
+		rc = vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev,
+		ISP_RST_HARD, 1);
+		retry_times --;
+	}
+#endif
 	if (rc <= 0) {
 		pr_err("%s: reset timeout\n", __func__);
 		mutex_unlock(&vfe_dev->core_mutex);

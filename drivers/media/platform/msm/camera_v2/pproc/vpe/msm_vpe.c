@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -210,7 +210,7 @@ static unsigned long msm_vpe_queue_buffer_info(struct vpe_device *vpe_dev,
 
 	rc = ion_map_iommu(vpe_dev->client, buff->map_info.ion_handle,
 		vpe_dev->domain_num, 0, SZ_4K, 0,
-		&buff->map_info.phy_addr,
+		(unsigned long *)&buff->map_info.phy_addr,
 		&buff->map_info.len, 0, 0);
 	if (rc < 0) {
 		pr_err("ION mmap failed\n");
@@ -691,47 +691,48 @@ static int msm_vpe_notify_frame_done(struct vpe_device *vpe_dev)
 
 	if (queue->len > 0) {
 		frame_qcmd = msm_dequeue(queue, list_frame);
-		if(frame_qcmd) {
-			processed_frame = frame_qcmd->command;
-			do_gettimeofday(&(processed_frame->out_time));
-			kfree(frame_qcmd);
-			event_qcmd = kzalloc(sizeof(struct msm_queue_cmd), GFP_ATOMIC);
-			if (!event_qcmd) {
-				pr_err("%s: Insufficient memory\n", __func__);
-				return -ENOMEM;
-			}
-			atomic_set(&event_qcmd->on_heap, 1);
-			event_qcmd->command = processed_frame;
-			VPE_DBG("fid %d\n", processed_frame->frame_id);
-			msm_enqueue(&vpe_dev->eventData_q, &event_qcmd->list_eventdata);
+		if (!frame_qcmd) {
+			pr_err("%s: %d frame_qcmd is NULL\n",
+				 __func__ , __LINE__);
+			return -EFAULT;
+		}
+		processed_frame = frame_qcmd->command;
+		do_gettimeofday(&(processed_frame->out_time));
+		kfree(frame_qcmd);
+		event_qcmd = kzalloc(sizeof(struct msm_queue_cmd), GFP_ATOMIC);
+		if (!event_qcmd) {
+			pr_err("%s: Insufficient memory\n", __func__);
+			return -ENOMEM;
+		}
+		atomic_set(&event_qcmd->on_heap, 1);
+		event_qcmd->command = processed_frame;
+		VPE_DBG("fid %d\n", processed_frame->frame_id);
+		msm_enqueue(&vpe_dev->eventData_q, &event_qcmd->list_eventdata);
 
-			if (!processed_frame->output_buffer_info.processed_divert) {
-				memset(&buff_mgr_info, 0 ,
-					sizeof(buff_mgr_info));
-				buff_mgr_info.session_id =
-					((processed_frame->identity >> 16) & 0xFFFF);
-				buff_mgr_info.stream_id =
-					(processed_frame->identity & 0xFFFF);
-				buff_mgr_info.frame_id = processed_frame->frame_id;
-				buff_mgr_info.timestamp = processed_frame->timestamp;
-				buff_mgr_info.index =
-					processed_frame->output_buffer_info.index;
-				rc = msm_vpe_buffer_ops(vpe_dev,
+		if (!processed_frame->output_buffer_info.processed_divert) {
+			memset(&buff_mgr_info, 0 ,
+				sizeof(buff_mgr_info));
+			buff_mgr_info.session_id =
+				((processed_frame->identity >> 16) & 0xFFFF);
+			buff_mgr_info.stream_id =
+				(processed_frame->identity & 0xFFFF);
+			buff_mgr_info.frame_id = processed_frame->frame_id;
+			buff_mgr_info.timestamp = processed_frame->timestamp;
+			buff_mgr_info.index =
+				processed_frame->output_buffer_info.index;
+			rc = msm_vpe_buffer_ops(vpe_dev,
 						VIDIOC_MSM_BUF_MNGR_BUF_DONE,
 						&buff_mgr_info);
-				if (rc < 0) {
-					pr_err("%s: error doing VIDIOC_MSM_BUF_MNGR_BUF_DONE\n",
-						__func__);
-					rc = -EINVAL;
-				}
+			if (rc < 0) {
+				pr_err("%s: error doing VIDIOC_MSM_BUF_MNGR_BUF_DONE\n",
+					__func__);
+				rc = -EINVAL;
 			}
-
-			v4l2_evt.id = processed_frame->inst_id;
-			v4l2_evt.type = V4L2_EVENT_VPE_FRAME_DONE;
-			v4l2_event_queue(vpe_dev->msm_sd.sd.devnode, &v4l2_evt);
 		}
-		else
-			rc = -EFAULT;
+
+		v4l2_evt.id = processed_frame->inst_id;
+		v4l2_evt.type = V4L2_EVENT_VPE_FRAME_DONE;
+		v4l2_event_queue(vpe_dev->msm_sd.sd.devnode, &v4l2_evt);
 	}
 	return rc;
 }
@@ -1372,8 +1373,11 @@ static long msm_vpe_subdev_ioctl(struct v4l2_subdev *sd,
 		struct msm_vpe_frame_info_t *process_frame;
 		VPE_DBG("VIDIOC_MSM_VPE_GET_EVENTPAYLOAD\n");
 		event_qcmd = msm_dequeue(queue, list_eventdata);
-		if (NULL == event_qcmd)
+		if (!event_qcmd) {
+			pr_err("%s: %d event_qcmd is NULL\n",
+				__func__ , __LINE__);
 			break;
+		}
 		process_frame = event_qcmd->command;
 		VPE_DBG("fid %d\n", process_frame->frame_id);
 		if (copy_to_user((void __user *)ioctl_ptr->ioctl_ptr,

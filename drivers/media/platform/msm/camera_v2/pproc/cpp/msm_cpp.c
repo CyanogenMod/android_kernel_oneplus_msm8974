@@ -286,7 +286,7 @@ static unsigned long msm_cpp_queue_buffer_info(struct cpp_device *cpp_dev,
 	}
 	rc = ion_map_iommu(cpp_dev->client, buff->map_info.ion_handle,
 		cpp_dev->domain_num, 0, SZ_4K, 0,
-		&buff->map_info.phy_addr,
+		(unsigned long *)&buff->map_info.phy_addr,
 		&buff->map_info.len, 0, 0);
 	if (rc < 0) {
 		pr_err("ION mmap failed\n");
@@ -968,16 +968,12 @@ static int cpp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 
 	CPP_DBG("open %d %p\n", i, &fh->vfh);
 	cpp_dev->cpp_open_cnt++;
-/*Added by jianbo.sun@Camera 2013-12-27 start for add quick start*/
-#ifndef CONFIG_MACH_OPPO
 	if (cpp_dev->cpp_open_cnt == 1) {
 		cpp_init_hardware(cpp_dev);
 		iommu_attach_device(cpp_dev->domain, cpp_dev->iommu_ctx);
 		cpp_init_mem(cpp_dev);
 		cpp_dev->state = CPP_STATE_IDLE;
 	}
-#endif
-/*Added by jianbo.sun@Camera 2013-12-27 end*/
 	mutex_unlock(&cpp_dev->mutex);
 	return 0;
 }
@@ -1877,34 +1873,6 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 
 		break;
 	}
-/*Added by jianbo.sun@Camera 2013-12-27 start for add quick start*/
-#ifdef CONFIG_MACH_OPPO
-	case VIDIOC_MSM_CPP_INIT_HW: {
-		if (cpp_dev->cpp_open_cnt == 1) {
-			rc = cpp_init_hardware(cpp_dev);
-			if (rc < 0) {
-				pr_err("error in hw init\n");
-				rc = -EINVAL;
-				break;
-			}
-			rc = iommu_attach_device(cpp_dev->domain, cpp_dev->iommu_ctx);
-			if (rc < 0) {
-				pr_err("error in attach device\n");
-				rc = -EINVAL;
-				break;
-			}
-			rc = cpp_init_mem(cpp_dev);
-			if (rc < 0) {
-				pr_err("error in mem init\n");
-				rc = -EINVAL;
-				break;
-			}
-			cpp_dev->state = CPP_STATE_IDLE;
-		}
-		break;
-	}
-#endif
-/*Added by jianbo.sun@Camera 2013-12-27 end*/
 	}
 	mutex_unlock(&cpp_dev->mutex);
 	CPP_DBG("X\n");
