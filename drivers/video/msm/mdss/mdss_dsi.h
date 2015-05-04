@@ -49,6 +49,15 @@
 #define MIPI_DSI_PANEL_720P_PT	8
 #define DSI_PANEL_MAX	8
 
+#define MDSS_DSI_HW_REV_100             0x10000000      /* 8974    */
+#define MDSS_DSI_HW_REV_100_1           0x10000001      /* 8x26    */
+#define MDSS_DSI_HW_REV_100_2           0x10000002      /* 8x26v2  */
+#define MDSS_DSI_HW_REV_101             0x10010000      /* 8974v2  */
+#define MDSS_DSI_HW_REV_101_1           0x10010001      /* 8974Pro */
+#define MDSS_DSI_HW_REV_102             0x10020000      /* 8084    */
+#define MDSS_DSI_HW_REV_103             0x10030000      /* 8994    */
+#define MDSS_DSI_HW_REV_103_1           0x10030001      /* 8916/8936 */
+
 enum {		/* mipi dsi panel */
 	DSI_VIDEO_MODE,
 	DSI_CMD_MODE,
@@ -390,7 +399,6 @@ int mdss_dsi_enable_bus_clocks(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 void mdss_dsi_disable_bus_clocks(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
 int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable);
 void mdss_dsi_phy_disable(struct mdss_dsi_ctrl_pdata *ctrl);
-void mdss_dsi_phy_init(struct mdss_panel_data *pdata);
 void mdss_dsi_phy_sw_reset(unsigned char *ctrl_base);
 void mdss_dsi_cmd_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl);
 void mdss_dsi_video_test_pattern(struct mdss_dsi_ctrl_pdata *ctrl);
