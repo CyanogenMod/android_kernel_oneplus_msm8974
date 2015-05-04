@@ -1144,6 +1144,7 @@ static void _qcrypto_tfm_complete(struct crypto_priv *cp, u32 type,
 	struct qcrypto_resp_ctx *arsp;
 	struct list_head *plist;
 	struct crypto_async_request *areq;
+	bool pending_list;
 
 	switch (type) {
 	case CRYPTO_ALG_TYPE_AHASH:
@@ -1159,6 +1160,7 @@ again:
 	spin_lock_irqsave(&cp->lock, flags);
 	if (list_empty(plist)) {
 		arsp = NULL; /* nothing to do */
+		pending_list = false;
 	} else {
 		arsp = list_first_entry(plist,
 				struct  qcrypto_resp_ctx, list);
@@ -1166,12 +1168,17 @@ again:
 			arsp = NULL;  /* still in progress */
 		else
 			list_del(&arsp->list); /* request is complete */
+		if (list_empty(plist))
+			pending_list = false;
+		else
+			pending_list = true;
 	}
 	spin_unlock_irqrestore(&cp->lock, flags);
 	if (arsp) {
 		areq = arsp->async_req;
 		areq->complete(areq, arsp->res);
-		goto again;
+		if (pending_list)
+			goto again;
 	}
 }
 
@@ -1929,7 +1936,7 @@ again:
 		arsp = &cipher_rctx->rsp_entry;
 		list_add_tail(
 			&arsp->list,
-			&((struct qcrypto_sha_ctx *)tfm_ctx)
+			&((struct qcrypto_cipher_ctx *)tfm_ctx)
 				->rsp_queue);
 		break;
 	case CRYPTO_ALG_TYPE_AEAD:
@@ -1940,7 +1947,7 @@ again:
 		arsp = &cipher_rctx->rsp_entry;
 		list_add_tail(
 			&arsp->list,
-			&((struct qcrypto_sha_ctx *)tfm_ctx)
+			&((struct qcrypto_cipher_ctx *)tfm_ctx)
 				->rsp_queue);
 		break;
 	}
