@@ -884,12 +884,13 @@ static void msm_rpm_smd_work(struct work_struct *work)
 {
 	uint32_t msg_id;
 	int errno;
+	unsigned long flags;
 	char buf[MAX_ERR_BUFFER_SIZE] = {0};
 
 	while (1) {
 		wait_for_completion_interruptible(&data_ready);
 
-		spin_lock(&msm_rpm_data.smd_lock_read);
+		spin_lock_irqsave(&msm_rpm_data.smd_lock_read, flags);
 		while (smd_is_pkt_avail(msm_rpm_data.ch_info)) {
 			if (msm_rpm_read_smd_data(buf))
 				break;
@@ -897,7 +898,7 @@ static void msm_rpm_smd_work(struct work_struct *work)
 			errno = msm_rpm_get_error_from_ack(buf);
 			msm_rpm_process_ack(msg_id, errno);
 		}
-		spin_unlock(&msm_rpm_data.smd_lock_read);
+		spin_unlock_irqrestore(&msm_rpm_data.smd_lock_read, flags);
 	}
 }
 
