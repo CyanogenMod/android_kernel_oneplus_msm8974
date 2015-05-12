@@ -190,6 +190,12 @@ config CPU_FREQ_DEFAULT_GOV_WHEATLEY
 	---help---
 	  Use the CPUFreq governor 'wheatley' as default.
 
+config CPU_FREQ_DEFAULT_GOV_LIONHEART
+            bool "lionheart"
+            select CPU_FREQ_GOV_LIONHEART
+            help
+              Use the CPUFreq governor 'lionheart' as default.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -385,6 +391,13 @@ config CPU_FREQ_GOV_INTELLIACTIVE
 config CPU_FREQ_GOV_WHEATLEY
 	tristate "'wheatley' cpufreq governor"
 	depends on CPU_FREQ	  
+
+config CPU_FREQ_GOV_LIONHEART
+           tristate "'lionheart' cpufreq governor"
+           depends on CPU_FREQ
+           help
+             lionheart' - a "smart" optimized governor!
+             If in doubt, say N.
 
 menu "x86 CPU frequency scaling drivers"
 depends on X86
