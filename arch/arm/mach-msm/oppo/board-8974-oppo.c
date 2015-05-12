@@ -69,11 +69,11 @@
 #include "../../../drivers/video/msm/mdss/mdss_fb.h"
 extern int update_preset_lcdc_lut(void);
 
-extern int g_kcal_r;
-extern int g_kcal_g;
-extern int g_kcal_b;
+extern int g_kcal_r = 255;
+extern int g_kcal_g = 255;
+extern int g_kcal_b = 255;
 
-extern int g_kcal_min;
+extern int g_kcal_min = 35;
 
 int kcal_set_values(int kcal_r, int kcal_g, int kcal_b)
 {
