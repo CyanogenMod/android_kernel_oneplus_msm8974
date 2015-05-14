@@ -240,6 +240,8 @@ static void free_android_config(struct android_dev *dev,
 				struct android_configuration *conf);
 static int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum);
 
+static BLOCKING_NOTIFIER_HEAD(gadget_notifier_list);
+
 /* string IDs are assigned dynamically */
 #define STRING_MANUFACTURER_IDX		0
 #define STRING_PRODUCT_IDX		1
@@ -297,6 +299,18 @@ enum android_device_state {
 	USB_SUSPENDED,
 	USB_RESUMED
 };
+
+void gadget_register_notify(struct notifier_block *nb)
+{
+	blocking_notifier_chain_register(&gadget_notifier_list, nb);
+}
+EXPORT_SYMBOL(gadget_register_notify);
+
+void gadget_unregister_notify(struct notifier_block *nb)
+{
+	blocking_notifier_chain_unregister(&gadget_notifier_list, nb);
+}
+EXPORT_SYMBOL(gadget_unregister_notify);
 
 static void android_pm_qos_update_latency(struct android_dev *dev, int vote)
 {
@@ -383,6 +397,8 @@ static void android_work(struct work_struct *data)
 		if (next_state != USB_SUSPENDED && next_state != USB_RESUMED) {
 			kobject_uevent_env(&dev->dev->kobj, KOBJ_CHANGE,
 					   uevent_envp);
+			blocking_notifier_call_chain(&gadget_notifier_list, next_state,
+					NULL);
 			last_uevent = next_state;
 		}
 		pr_info("%s: sent uevent %s\n", __func__, uevent_envp[0]);
