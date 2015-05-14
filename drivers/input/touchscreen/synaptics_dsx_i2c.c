@@ -4352,6 +4352,42 @@ static int fb_notifier_callback(struct notifier_block *p,
 }
 #endif
 
+/* Needs to match the android_device_state enum in android gadget driver */
+enum android_device_state {
+	USB_DISCONNECTED,
+	USB_CONNECTED,
+	USB_CONFIGURED,
+	USB_SUSPENDED,
+	USB_RESUMED
+};
+
+extern void gadget_register_notify(struct notifier_block *nb);
+
+static int usb_notifier_callback(struct notifier_block *p,
+		unsigned long event, void *data)
+{
+	int rc;
+	uint8_t buf;
+	struct synaptics_rmi4_data *rmi4_data = container_of(p,
+			struct synaptics_rmi4_data, usb_notif);
+
+	switch (event) {
+		case USB_DISCONNECTED:
+		case USB_CONNECTED:
+			buf = 1;
+			rc = synaptics_rmi4_i2c_write(rmi4_data,
+					rmi4_data->f01_cmd_base_addr, &buf, 1);
+			if (rc < 0) {
+				print_ts(TS_DEBUG, KERN_ERR
+					"[syna]:%s: Failed to issue reset command: %d\n",
+					__func__, rc);
+			}
+			break;
+	}
+
+	return 0;
+}
+
 /**
  * synaptics_rmi4_probe()
  *
@@ -4486,6 +4522,10 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 	if (retval)
 		goto err_enable_irq;
 #endif
+
+	rmi4_data->usb_notif.notifier_call = usb_notifier_callback;
+
+	gadget_register_notify(&rmi4_data->usb_notif);
 
 	if (platform_data->gpio_config) {
 		retval = platform_data->gpio_config(

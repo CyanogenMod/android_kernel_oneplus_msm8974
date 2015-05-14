@@ -285,6 +285,7 @@ struct synaptics_rmi4_data {
 	unsigned short points[2*7];
 	struct mutex ops_lock;
 	struct notifier_block fb_notif;
+	struct notifier_block usb_notif;
 	atomic_t syna_use_gesture;
 	atomic_t double_tap_enable;
 	atomic_t camera_enable;
