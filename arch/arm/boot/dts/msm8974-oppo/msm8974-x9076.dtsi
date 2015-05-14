@@ -37,22 +37,7 @@
 };
 
 &spi_0 {
-	compatible;
-	reg-names;
-	reg = <>;
-	interrupt-names;
-	interrupts;
-	spi-max-frequency;
-	qcom,gpio-mosi;
-	qcom,gpio-miso;
-	qcom,gpio-clk;
-	qcom,gpio-cs0;
-	qcom,infinite-mode;
-	qcom,use-bam;
-	qcom,ver-reg-exists;
-	qcom,bam-consumer-pipe-index;
-	qcom,bam-producer-pipe-index;
-	qcom,master-id;
+	status = "disabled";
 };
 
 &pm8941_lsid1 {
