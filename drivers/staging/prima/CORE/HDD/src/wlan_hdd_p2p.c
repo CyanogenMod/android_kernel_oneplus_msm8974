@@ -293,6 +293,7 @@ VOS_STATUS wlan_hdd_cancel_existing_remain_on_channel(hdd_adapter_t *pAdapter)
          */
         if (pRemainChanCtx->hdd_remain_on_chan_cancel_in_progress != TRUE)
         {
+            mutex_unlock(&pHddCtx->roc_lock);
             status = wait_for_completion_interruptible_timeout(
                                         &pAdapter->rem_on_chan_ready_event,
                                         msecs_to_jiffies(WAIT_REM_CHAN_READY));
@@ -303,11 +304,11 @@ VOS_STATUS wlan_hdd_cancel_existing_remain_on_channel(hdd_adapter_t *pAdapter)
                        " ready indication %d",
                         __func__, status);
                 pRemainChanCtx->is_pending_roc_cancelled = TRUE;
-                mutex_unlock(&pHddCtx->roc_lock);
                 return VOS_STATUS_E_FAILURE;
             }
 
             INIT_COMPLETION(pAdapter->cancel_rem_on_chan_var);
+            mutex_lock(&pHddCtx->roc_lock);
             pRemainChanCtx->hdd_remain_on_chan_cancel_in_progress = TRUE;
             mutex_unlock(&pHddCtx->roc_lock);
 
