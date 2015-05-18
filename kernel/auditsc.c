@@ -895,7 +895,7 @@ static enum audit_state audit_filter_syscall(struct task_struct *tsk,
 					     struct list_head *list)
 {
 	struct audit_entry *e;
-	enum audit_state state;
+	enum audit_state state = 0;
 
 	if (audit_pid && tsk->tgid == audit_pid)
 		return AUDIT_DISABLED;
