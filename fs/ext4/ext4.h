@@ -29,6 +29,7 @@
 #include <linux/wait.h>
 #include <linux/blockgroup_lock.h>
 #include <linux/percpu_counter.h>
+#include <linux/fs-xcomp.h>
 #ifdef __KERNEL__
 #include <linux/compat.h>
 #endif
@@ -908,6 +909,10 @@ struct ext4_inode_info {
 	 */
 	tid_t i_sync_tid;
 	tid_t i_datasync_tid;
+
+#ifdef CONFIG_FS_TRANSPARENT_COMPRESSION
+	struct xcomp_inode_info i_xcomp_info;
+#endif
 };
 
 /*
