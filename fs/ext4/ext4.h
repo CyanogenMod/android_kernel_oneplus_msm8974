@@ -29,6 +29,7 @@
 #include <linux/wait.h>
 #include <linux/blockgroup_lock.h>
 #include <linux/percpu_counter.h>
+#include <linux/fs-xcomp.h>
 #ifdef __KERNEL__
 #include <linux/compat.h>
 #endif
@@ -908,6 +909,10 @@ struct ext4_inode_info {
 	 */
 	tid_t i_sync_tid;
 	tid_t i_datasync_tid;
+
+#ifdef CONFIG_FS_TRANSPARENT_COMPRESSION
+	struct xcomp_inode_info i_xcomp_info;
+#endif
 };
 
 /*
@@ -1304,6 +1309,22 @@ static inline void ext4_set_io_unwritten_flag(struct inode *inode,
 		io_end->flag |= EXT4_IO_END_UNWRITTEN;
 		atomic_inc(&EXT4_I(inode)->i_aiodio_unwritten);
 	}
+}
+
+static inline struct xcomp_inode_info *ext4_inode_xcomp_info(struct inode *inode)
+{
+#ifdef CONFIG_FS_TRANSPARENT_COMPRESSION
+	return &EXT4_I(inode)->i_xcomp_info;
+#else
+	return NULL;
+#endif
+}
+
+static inline int ext4_inode_is_compressed(struct inode *inode)
+{
+	if (!xcomp_enabled())
+		return 0;
+	return (S_ISREG(inode->i_mode) && (EXT4_I(inode)->i_flags & EXT4_COMPR_FL));
 }
 
 /*

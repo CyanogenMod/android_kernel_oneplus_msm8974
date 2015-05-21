@@ -1014,6 +1014,8 @@ void ext4_clear_inode(struct inode *inode)
 {
 	invalidate_inode_buffers(inode);
 	end_writeback(inode);
+	if (ext4_inode_is_compressed(inode))
+		xcomp_inode_info_free(ext4_inode_xcomp_info(inode));
 	dquot_drop(inode);
 	ext4_discard_preallocations(inode);
 	if (EXT4_I(inode)->jinode) {
