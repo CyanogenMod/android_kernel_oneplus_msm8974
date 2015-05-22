@@ -2507,6 +2507,7 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	const struct tcp_sock *tp = tcp_sk(sk);
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 	u32 now = tcp_time_stamp;
+	unsigned int start;
 
 	memset(info, 0, sizeof(*info));
 
@@ -2570,12 +2571,13 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_max_pacing_rate = sk->sk_max_pacing_rate != ~0U ?
 					sk->sk_max_pacing_rate : ~0ULL;
 
-	spin_lock_bh(&sk->sk_lock.slock);
-	info->tcpi_bytes_acked = tp->bytes_acked;
-	info->tcpi_bytes_received = tp->bytes_received;
+	do {
+		start = u64_stats_fetch_begin_irq(&tp->syncp);
+		info->tcpi_bytes_acked = tp->bytes_acked;
+		info->tcpi_bytes_received = tp->bytes_received;
+	} while (u64_stats_fetch_retry_irq(&tp->syncp, start));
 	info->tcpi_segs_out = tp->segs_out;
 	info->tcpi_segs_in = tp->segs_in;
-	spin_unlock_bh(&sk->sk_lock.slock);
 
 	if (sk->sk_socket) {
 		struct file *filep = sk->sk_socket->file;
