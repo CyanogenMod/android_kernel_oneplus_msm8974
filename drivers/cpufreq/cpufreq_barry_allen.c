@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Copyright (C) 2015 Javier Sayago <admin@lonasdigital.com>
  *
- * Barry_Allen Version 0.5
+ * Barry_Allen Version 0.6
  * Last Update >> 24-05-2015
  *
  * This software is licensed under the terms of the GNU General Public
@@ -807,7 +807,7 @@ static ssize_t store_target_loads(
 	struct kobject *kobj, struct attribute *attr, const char *buf,
 	size_t count)
 {
-	int ntokens, i;
+	int ntokens;
 	unsigned int *new_target_loads = NULL;
 	unsigned long flags;
 
@@ -817,15 +817,6 @@ static ssize_t store_target_loads(
 	new_target_loads = get_tokenized_data(buf, &ntokens);
 	if (IS_ERR(new_target_loads))
 		return PTR_RET(new_target_loads);
-
-	/* Make sure frequencies are in ascending order. */
-	for (i = 3; i < ntokens; i += 2) {
-		if (new_above_hispeed_delay[i] <=
-		    new_above_hispeed_delay[i - 2]) {
-			kfree(new_above_hispeed_delay);
-			return -EINVAL;
-		}
-	}
 
 	spin_lock_irqsave(&target_loads_lock, flags);
 	if (target_loads != default_target_loads)
@@ -862,13 +853,22 @@ static ssize_t store_above_hispeed_delay(
 	struct kobject *kobj, struct attribute *attr, const char *buf,
 	size_t count)
 {
-	int ntokens;
+	int ntokens, i;
 	unsigned int *new_above_hispeed_delay = NULL;
 	unsigned long flags;
 
 	new_above_hispeed_delay = get_tokenized_data(buf, &ntokens);
 	if (IS_ERR(new_above_hispeed_delay))
 		return PTR_RET(new_above_hispeed_delay);
+
+	/* Make sure frequencies are in ascending order. */
+	for (i = 3; i < ntokens; i += 2) {
+		if (new_above_hispeed_delay[i] <=
+		    new_above_hispeed_delay[i - 2]) {
+			kfree(new_above_hispeed_delay);
+			return -EINVAL;
+		}
+	}
 
 	spin_lock_irqsave(&above_hispeed_delay_lock, flags);
 	if (above_hispeed_delay != default_above_hispeed_delay)
