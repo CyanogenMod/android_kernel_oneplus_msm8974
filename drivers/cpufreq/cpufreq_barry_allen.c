@@ -4,8 +4,8 @@
  * Copyright (C) 2010 Google, Inc.
  * Copyright (C) 2015 Javier Sayago <admin@lonasdigital.com>
  *
- * Barry_Allen Version 0.4
- * Last Update >> 22-05-2015
+ * Barry_Allen Version 0.5
+ * Last Update >> 24-05-2015
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -704,7 +704,7 @@ static int cpufreq_barry_allen_notifier(
 	int cpu;
 	unsigned long flags;
 
-	if (val == CPUFREQ_POSTCHANGE) {
+	if (val == CPUFREQ_PRECHANGE) {
 		pcpu = &per_cpu(cpuinfo, freq->cpu);
 		if (!down_read_trylock(&pcpu->enable_sem))
 			return 0;
@@ -807,7 +807,7 @@ static ssize_t store_target_loads(
 	struct kobject *kobj, struct attribute *attr, const char *buf,
 	size_t count)
 {
-	int ntokens;
+	int ntokens, i;
 	unsigned int *new_target_loads = NULL;
 	unsigned long flags;
 
@@ -817,6 +817,15 @@ static ssize_t store_target_loads(
 	new_target_loads = get_tokenized_data(buf, &ntokens);
 	if (IS_ERR(new_target_loads))
 		return PTR_RET(new_target_loads);
+
+	/* Make sure frequencies are in ascending order. */
+	for (i = 3; i < ntokens; i += 2) {
+		if (new_above_hispeed_delay[i] <=
+		    new_above_hispeed_delay[i - 2]) {
+			kfree(new_above_hispeed_delay);
+			return -EINVAL;
+		}
+	}
 
 	spin_lock_irqsave(&target_loads_lock, flags);
 	if (target_loads != default_target_loads)
@@ -891,7 +900,7 @@ static ssize_t store_hispeed_freq(struct kobject *kobj,
 	if (ba_locked)
 		return count;
 
-	ret = strict_strtoul(buf, 0, &val);
+	ret = kstrtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
 	hispeed_freq = val;
@@ -917,7 +926,7 @@ static ssize_t store_sampling_down_factor(struct kobject *kobj,
 	if (ba_locked)
 		return count;
 
-	ret = strict_strtoul(buf, 0, &val);
+	ret = kstrtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
 	sampling_down_factor = val;
@@ -943,7 +952,7 @@ static ssize_t store_go_hispeed_load(struct kobject *kobj,
 	if (ba_locked)
 		return count;
 
-	ret = strict_strtoul(buf, 0, &val);
+	ret = kstrtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
 	go_hispeed_load = val;
@@ -968,7 +977,7 @@ static ssize_t store_min_sample_time(struct kobject *kobj,
 	if (ba_locked)
 		return count;
 
-	ret = strict_strtoul(buf, 0, &val);
+	ret = kstrtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
 	min_sample_time = val;
@@ -993,7 +1002,7 @@ static ssize_t store_timer_rate(struct kobject *kobj,
 	if (ba_locked)
 		return count;
 
-	ret = strict_strtoul(buf, 0, &val);
+	ret = kstrtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
 	timer_rate = val;
