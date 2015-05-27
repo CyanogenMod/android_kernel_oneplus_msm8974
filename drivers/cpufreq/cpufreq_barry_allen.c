@@ -4,8 +4,8 @@
  * Copyright (C) 2010 Google, Inc.
  * Copyright (C) 2015 Javier Sayago <admin@lonasdigital.com>
  *
- * Barry_Allen Version 0.6
- * Last Update >> 24-05-2015
+ * Barry_Allen Version 0.7
+ * Last Update >> 27-05-2015
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -164,6 +164,8 @@ static void cpufreq_barry_allen_timer_resched(
 {
 	unsigned long expires;
 	unsigned long flags;
+	u64 now = ktime_to_us(ktime_get());
+
 
 	spin_lock_irqsave(&pcpu->load_lock, flags);
 	pcpu->cputime_speedadj = 0;
@@ -171,7 +173,10 @@ static void cpufreq_barry_allen_timer_resched(
 	expires = jiffies + usecs_to_jiffies(timer_rate);
 	mod_timer_pinned(&pcpu->cpu_timer, expires);
 
-	if (timer_slack_val >= 0 && pcpu->target_freq > pcpu->policy->min) {
+	if (timer_slack_val >= 0 &&
+	    (pcpu->target_freq > pcpu->policy->min ||
+		(pcpu->target_freq == pcpu->policy->min &&
+		 now < boostpulse_endtime))) {
 		expires += usecs_to_jiffies(timer_slack_val);
 		mod_timer_pinned(&pcpu->cpu_slack_timer, expires);
 	}
@@ -188,6 +193,8 @@ static void cpufreq_barry_allen_timer_start(int cpu, int time_override)
 	struct cpufreq_barry_allen_cpuinfo *pcpu = &per_cpu(cpuinfo, cpu);
 	unsigned long flags;
 	unsigned long expires;
+	u64 now = ktime_to_us(ktime_get());
+
 	if (time_override)
 		expires = jiffies + time_override;
 	else
@@ -195,7 +202,10 @@ static void cpufreq_barry_allen_timer_start(int cpu, int time_override)
 
 	pcpu->cpu_timer.expires = expires;
 	add_timer_on(&pcpu->cpu_timer, cpu);
-	if (timer_slack_val >= 0 && pcpu->target_freq > pcpu->policy->min) {
+	if (timer_slack_val >= 0 &&
+	    (pcpu->target_freq > pcpu->policy->min ||
+		(pcpu->target_freq == pcpu->policy->min &&
+		 now < boostpulse_endtime))) {
 		expires += usecs_to_jiffies(timer_slack_val);
 		pcpu->cpu_slack_timer.expires = expires;
 		add_timer_on(&pcpu->cpu_slack_timer, cpu);
@@ -371,6 +381,7 @@ static void cpufreq_barry_allen_timer(unsigned long data)
 	unsigned int loadadjfreq;
 	unsigned int index;
 	unsigned long flags;
+	unsigned int this_hispeed_freq;
 	unsigned long mod_min_sample_time;
 	int i, max_load;
 	unsigned int max_freq;
@@ -396,16 +407,17 @@ static void cpufreq_barry_allen_timer(unsigned long data)
 	cpu_load = loadadjfreq / pcpu->policy->cur;
 	pcpu->prev_load = cpu_load;
 	boosted = boost_val || now < boostpulse_endtime;
+	this_hispeed_freq = max(hispeed_freq, pcpu->policy->min);
 
 	if (cpu_load >= go_hispeed_load || boosted) {
-		if (pcpu->policy->cur < hispeed_freq &&
+		if (pcpu->policy->cur < this_hispeed_freq &&
 		    cpu_load <= MAX_LOCAL_LOAD) {
-			new_freq = hispeed_freq;
+			new_freq = this_hispeed_freq;
 		} else {
 			new_freq = choose_freq(pcpu, loadadjfreq);
 
-			if (new_freq < hispeed_freq)
-				new_freq = hispeed_freq;
+			if (new_freq < this_hispeed_freq)
+				new_freq = this_hispeed_freq;
 		}
 		if (new_freq > TOP_STOCK_FREQ && cpu_load < 99)
 			new_freq = TOP_STOCK_FREQ;
@@ -435,7 +447,7 @@ static void cpufreq_barry_allen_timer(unsigned long data)
 	}
 
 	if (cpu_load <= MAX_LOCAL_LOAD &&
-	    pcpu->policy->cur >= hispeed_freq &&
+	    pcpu->policy->cur >= this_hispeed_freq &&
 	    new_freq > pcpu->policy->cur &&
 	    now - pcpu->hispeed_validate_time <
 	    freq_to_above_hispeed_delay(pcpu->policy->cur)) {
@@ -481,12 +493,12 @@ static void cpufreq_barry_allen_timer(unsigned long data)
 	/*
 	 * Update the timestamp for checking whether speed has been held at
 	 * or above the selected frequency for a minimum of min_sample_time,
-	 * if not boosted to hispeed_freq.  If boosted to hispeed_freq then we
-	 * allow the speed to drop as soon as the boostpulse duration expires
-	 * (or the indefinite boost is turned off).
+	 * if not boosted to this_hispeed_freq.  If boosted to this_hispeed_freq
+	 * then we allow the speed to drop as soon as the boostpulse duration
+	 * expires (or the indefinite boost is turned off).
 	 */
 
-	if (!boosted || new_freq > hispeed_freq) {
+	if (!boosted || new_freq > this_hispeed_freq) {
 		pcpu->floor_freq = new_freq;
 		pcpu->floor_validate_time = now;
 	}
@@ -539,9 +551,12 @@ static void cpufreq_barry_allen_idle_start(void)
 		return;
 	}
 
+	now = ktime_to_us(ktime_get());
 	pending = timer_pending(&pcpu->cpu_timer);
 
-	if (pcpu->target_freq != pcpu->policy->min) {
+	if (pcpu->target_freq > pcpu->policy->min ||
+	    (pcpu->target_freq == pcpu->policy->min &&
+	     now < boostpulse_endtime)) {
 		/*
 		 * Entering idle while not at lowest speed.  On some
 		 * platforms this can hold the other CPU(s) at that speed
