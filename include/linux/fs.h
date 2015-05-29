@@ -810,6 +810,9 @@ struct inode {
 	unsigned short          i_bytes;
 	blkcnt_t		i_blocks;
 	loff_t			i_size;
+#ifdef CONFIG_FS_TRANSPARENT_COMPRESSION
+	loff_t			i_compressed_size;
+#endif
 
 #ifdef __NEED_I_SIZE_ORDERED
 	seqcount_t		i_size_seqcount;
@@ -885,6 +888,12 @@ enum inode_i_mutex_lock_class
 	I_MUTEX_QUOTA
 };
 
+#if defined(CONFIG_FS_TRANSPARENT_COMPRESSION) && defined(FS_IMPL)
+#define I_SIZE_MEMBER i_compressed_size
+#else
+#define I_SIZE_MEMBER i_size
+#endif
+
 /*
  * NOTE: in a 32bit arch with a preemptable kernel and
  * an UP compile the i_size_read/write must be atomic
@@ -896,6 +905,30 @@ enum inode_i_mutex_lock_class
  * and 64bit archs it makes no difference if preempt is enabled or not.
  */
 static inline loff_t i_size_read(const struct inode *inode)
+{
+#if BITS_PER_LONG==32 && defined(CONFIG_SMP)
+	loff_t i_size;
+	unsigned int seq;
+
+	do {
+		seq = read_seqcount_begin(&inode->i_size_seqcount);
+		i_size = inode->I_SIZE_MEMBER;
+	} while (read_seqcount_retry(&inode->i_size_seqcount, seq));
+	return i_size;
+#elif BITS_PER_LONG==32 && defined(CONFIG_PREEMPT)
+	loff_t i_size;
+
+	preempt_disable();
+	i_size = inode->I_SIZE_MEMBER;
+	preempt_enable();
+	return i_size;
+#else
+	return inode->I_SIZE_MEMBER;
+#endif
+}
+
+#if defined(CONFIG_FS_TRANSPARENT_COMPRESSION) && defined(FS_IMPL)
+static inline loff_t i_size_read_uncompressed(const struct inode *inode)
 {
 #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
 	loff_t i_size;
@@ -917,6 +950,9 @@ static inline loff_t i_size_read(const struct inode *inode)
 	return inode->i_size;
 #endif
 }
+#else
+#define i_size_read_uncompressed i_size_read
+#endif
 
 /*
  * NOTE: unlike i_size_read(), i_size_write() does need locking around it
@@ -928,13 +964,22 @@ static inline void i_size_write(struct inode *inode, loff_t i_size)
 #if BITS_PER_LONG==32 && defined(CONFIG_SMP)
 	write_seqcount_begin(&inode->i_size_seqcount);
 	inode->i_size = i_size;
+#ifdef CONFIG_FS_TRANSPARENT_COMPRESSION
+	inode->i_compressed_size = i_size;
+#endif
 	write_seqcount_end(&inode->i_size_seqcount);
 #elif BITS_PER_LONG==32 && defined(CONFIG_PREEMPT)
 	preempt_disable();
 	inode->i_size = i_size;
+#ifdef CONFIG_FS_TRANSPARENT_COMPRESSION
+	inode->i_compressed_size = i_size;
+#endif
 	preempt_enable();
 #else
 	inode->i_size = i_size;
+#ifdef CONFIG_FS_TRANSPARENT_COMPRESSION
+	inode->i_compressed_size = i_size;
+#endif
 #endif
 }
 

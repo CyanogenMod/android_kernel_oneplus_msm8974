@@ -1,0 +1,129 @@
+Transparent Compression Implementation
+======================================
+
+Transparent compression allows per-file compression on any filesystem that
+implements reads via the normal VFS readpage/readpages methods.
+
+Compressed File Format
+----------------------
+
+byte[4]         magic           'zzzz'
+byte            param1          Compression method and flags
+    bits 0..3: Compression method (1=zlib, 2=lz4, ...)
+    bits 4..7: Flags (0x10=padding)
+byte            cluster_size    log2 of compression cluster size (min=9, max=31)
+le48            orig_size       Original uncompressed file size
+if blocksize <= 16:
+    le16        cluster_map[nr_clusters]
+else:
+    le32        cluster_map[nr_clusters]
+byte            cluster_data[]
+
+Defined compression methods:
+  1: zlib
+  2: lz4
+
+Defined flags:
+  0x10: Clusters are padded to filesystem block size
+
+Cluster map format:
+
+* cluster_map is a vector of the size of each compressed data cluster.
+
+* The vector length is DIV_ROUND_UP(orig_size, cluster_size).
+
+* Each cluster must contain a full data block of cluster_size bytes, except
+  for the last cluster.
+
+* If a cluster_map entry is zero, the block is not compressed and the length
+  of the cluster data is cluster_size (or the remainder of the file for the
+  last cluster).
+
+Cluster data format:
+
+Cluster data begins immediately after the cluster map.  The size of each
+data cluster is provided by the cluster map, optionally padded:
+
+* If the padding flag is not set, then there is no padding between clusters.
+
+* If the padding flag is set, then each cluster is padded with zeros to the
+  next filesystem block.
+
+Transparent compression API
+---------------------------
+
+/*
+ * For convenience.
+ */
+typedef int (*readpage_t)(struct page *);
+
+/*
+ * Indicate whether transparent compression is enabled.  It may be desirable
+ * to disable transparent compression for test, backup, or maintenance
+ * activities.  Controlled by a sysfs file.
+ */
+int xcomp_enabled(void);
+
+/*
+ * Initialize internal data structures for a given inode.  This will result
+ * in reading the file header (and block map?), so the inode must be fully
+ * populated and ready to accept readpage requests.
+ */
+int xcomp_inode_info_init(struct inode *inode,
+		struct xcomp_inode_info *info, readpage_t lower_readpage);
+
+/*
+ * Free data associated with xcomp_inode_info.
+ */
+int xcomp_inode_info_free(struct xcomp_inode_info *info);
+
+/*
+ * Wrapper for filesystem's readpage.  Consults the block map and reads the
+ * appropriate compressed pages for the requested block, decompresses them,
+ * and populates the pages with uncompressed data.
+ */
+int xcomp_readpage(struct xcomp_inode_info *info, struct page *page);
+
+/*
+ * Wrapper for filesystem's readpages.  As above, but for a list of pages.
+ */
+int xcomp_readpages(struct xcomp_inode_info *info, struct address_space *mapping,
+		struct list_head *pages, unsigned nr_pages);
+
+Filesystem Requirements
+-----------------------
+
+* Must implement reads via the normal VFS readpage/readpages methods.
+
+* Must have a way to mark a file as compressed.  This may be an inode
+  attribute, an extended attribute, or any other applicable means.
+
+* Must be able to provide a readpage function to the transparent compression
+  layer that only takes a page ptr (eg. without a file ptr).
+
+Implementing Transparent Compression Support
+--------------------------------------------
+
+* Create a simple way to tell if a file is compressed.  For example, in
+  ext4, this is done by consulting the inode flags.  Never consider a file
+  compressed if xcomp_enabled returns zero.
+
+* Split readpage/readpages into two functions:
+
+  - The function implementation should be renamed and the file pointer
+    parameter removed.
+
+  - The function pointer in address_space_operations should call
+    xcomp_readpage/xcomp_readpages if the file is compressed, or the
+    original implementation if not.
+
+* When initializing an inode, set i_compressed_size and call
+  xcomp_inode_info_init just before returning.
+
+* When freeing an inode, call xcomp_inode_info_free.
+
+* Set "ccflags-y += -DFS_IMPL" in the Makefile so that the filesystem
+  code continues to see the real compressed file size.
+
+* Ensure that the uncompressed size is returned by getattr.  This is
+  done automatically if generic_fillattr is used.
