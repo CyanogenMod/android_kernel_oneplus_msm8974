@@ -28,8 +28,10 @@
 #include "synaptics_dsx_i2c.h"
 #include "synaptics_firmware_youngfast.h"
 #ifdef CONFIG_MACH_FIND7OP  //for 14001's wintek tp
-#include "synaptics_firmware_tpk_14001.h"
-#include "synaptics_firmware_wintek_14001.h"
+#include "synaptics_firmware_tpk_jdi_14001.h"
+#include "synaptics_firmware_tpk_sharp_14001.h"
+#include "synaptics_firmware_tpk_truly_14001.h"
+#include "synaptics_firmware_wintek_jdi_14001.h"
 #else
 #include "synaptics_firmware_tpk.h"
 #include "synaptics_firmware_tpk_find7s.h"
@@ -40,6 +42,9 @@
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pcb_version.h>
+
+extern char *tp_firmware_strings[TP_TYPE_MAX][LCD_TYPE_MAX] ;
+extern int lcd_type_id;
 
 #define FW_IMAGE_NAME "synaptics/startup_fw_update.img"
 #define DO_STARTUP_FW_UPDATE
@@ -1438,23 +1443,35 @@ exit:
 static int synaptics_rmi4_fwu_init_func(struct synaptics_rmi4_data *rmi4_data) ;
 
 //return current firmware version
-int synaptics_rmi4_get_firmware_version(int vendor_id) {
-	if(vendor_id == TP_VENDOR_YOUNGFAST) {
+
+int synaptics_rmi4_get_firmware_version(int vendor, int lcd_type) {
+	if (vendor == TP_VENDOR_YOUNGFAST) {
 		return FIRMWARE_YOUNGFAST_VERSION ;
-	}
-	else if(vendor_id == TP_VENDOR_TPK) {
+	} else if (vendor == TP_VENDOR_TPK) {
 #ifndef CONFIG_MACH_FIND7OP
 		if (get_pcb_version() >= HW_VERSION__21)
 			return FIRMWARE_TPK_FIND7S_VERSION;
-		else
+		else if (lcd_type == LCD_VENDOR_JDI)
+			return FIRMWARE_TPK_JDI_VERSION;
+#else
+		if (lcd_type == LCD_VENDOR_JDI)
+			return FIRMWARE_TPK_JDI_VERSION;
 #endif
-			return FIRMWARE_TPK_VERSION;
-	}
-	else if(vendor_id == TP_VENDOR_TRULY) {
-		return 0;
-	}
-	else if(vendor_id == TP_VENDOR_WINTEK) {
-		return FIRMWARE_WINTEK_VERSION ;
+		else if (lcd_type == LCD_VENDOR_TRULY)
+			return FIRMWARE_TPK_TRULY_VERSION;
+		else if (lcd_type == LCD_VENDOR_SHARP)
+			return FIRMWARE_TPK_SHARP_VERSION;
+		else
+			return 0;
+	} else if (vendor == TP_VENDOR_WINTEK) {
+		if (lcd_type == LCD_VENDOR_JDI)
+			return FIRMWARE_WINTEK_JDI_VERSION;
+		else if (lcd_type == LCD_VENDOR_TRULY)
+			return 0;
+		else if (lcd_type == LCD_VENDOR_SHARP)
+			return 0;
+		else
+			return 0;
 	} else {
 		return 0 ;
 	}
@@ -1535,31 +1552,37 @@ err_load_fw_close_file:
 
 static unsigned char* fwu_rmi4_get_firmware_data(void) {
 	unsigned char* firmwaredata = 0;
-	unsigned int vendor_id ;
+	unsigned int vendor_id;
 
 	if(!fwu || !(fwu->rmi4_data))
-		return 0 ;
+		return 0;
 	
-    vendor_id = fwu->rmi4_data->vendor_id ;
+	vendor_id = fwu->rmi4_data->vendor_id;
 
-    if(fwu->image_name && fwu->image_name[0] != 0)  //add manual update firmware
+	if (fwu->image_name && fwu->image_name[0] != 0)  //add manual update firmware
 		firmwaredata = synaptics_get_fw_from_file();
-	else if(vendor_id == TP_VENDOR_YOUNGFAST)
+	else if (vendor_id == TP_VENDOR_YOUNGFAST)
 		firmwaredata = (unsigned char*)Syna_Firmware_Data_youngfast ;
-	else if(vendor_id == TP_VENDOR_TPK) {
+	else if (vendor_id == TP_VENDOR_TPK) {
 #ifndef CONFIG_MACH_FIND7OP
 		if (get_pcb_version() >= HW_VERSION__21)
 			firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk_find7s;
-		else
+		else if (lcd_type_id == LCD_VENDOR_JDI)
+			firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk_jdi ;
+#else
+		if (lcd_type_id == LCD_VENDOR_JDI)
+			firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk_jdi ;
 #endif
-			firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk ;
-	} else if(vendor_id == TP_VENDOR_WINTEK)
-		firmwaredata = (unsigned char*)Syna_Firmware_Data_Wintek;
-	
+		else if (lcd_type_id == LCD_VENDOR_SHARP)
+			firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk_sharp;
+		else if (lcd_type_id == LCD_VENDOR_TRULY)
+			firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk_truly;
+	} else if (vendor_id == TP_VENDOR_WINTEK) {
+		if (lcd_type_id == LCD_VENDOR_JDI)
+			firmwaredata = (unsigned char*)Syna_Firmware_Data_Wintek_jdi;
+	}
 
-	return firmwaredata ;
-
-	
+	return firmwaredata;
 }
 
 static void fwu_startup_fw_update_work(struct work_struct *work)
