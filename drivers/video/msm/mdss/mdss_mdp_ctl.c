@@ -1770,6 +1770,7 @@ void mdss_mdp_ctl_restore(void)
 		if (ctl->restore_fnc)
 			ctl->restore_fnc(ctl);
 	}
+	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 }
 
 static int mdss_mdp_ctl_start_sub(struct mdss_mdp_ctl *ctl, bool handoff)
