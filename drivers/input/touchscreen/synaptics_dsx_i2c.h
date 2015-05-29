@@ -80,6 +80,15 @@
 #define TP_VENDOR_TRULY		3	//ÐÅÀû
 #define TP_VENDOR_YOUNGFAST 4   //Ñó»ª
 
+#define TP_TYPE_MAX		2	//we only use wintek and tpk now.
+
+enum LCD_TYPE {
+	LCD_VENDOR_JDI,
+	LCD_VENDOR_TRULY,
+	LCD_VENDOR_SHARP,
+	LCD_TYPE_MAX
+};
+
 //#define SYNC_RMI4_PWR
 
 #ifdef SYNC_RMI4_PWR
