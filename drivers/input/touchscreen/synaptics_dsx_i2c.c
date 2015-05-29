@@ -64,6 +64,11 @@
 #define IGNORE_FN_INIT_FAILURE
 */
 
+char *tp_firmware_strings[TP_TYPE_MAX][LCD_TYPE_MAX] = {
+	{"WINTEK", "WINTEK", "WINTEK"},
+	{"TPK", "TPK", "TPK"}
+};
+
 #define RPT_TYPE (1 << 0)
 #define RPT_X_LSB (1 << 1)
 #define RPT_X_MSB (1 << 2)
@@ -4274,30 +4279,34 @@ int synaptics_rmi4_get_vendorid2(int id1, int id2, int id3) {
 }
 
 //return firmware version and string
-extern int synaptics_rmi4_get_firmware_version(int vendor_id);
-char *synaptics_rmi4_get_vendorstring(int id) {
+extern int synaptics_rmi4_get_firmware_version(int vendor, int lcd_type);
+
+static char * synaptics_rmi4_get_vendorstring(int tp_type, int lcd_type) {
 	char *pconst = "UNKNOWN";
 
-	switch(id) {
-		case TP_VENDOR_WINTEK:
-			pconst = "WINTEK";
-			break;
-		case TP_VENDOR_TPK:
-			pconst = "TPK";
-			break;
-		case TP_VENDOR_TRULY:
-			pconst = "TRULY";
-			break;
-		case TP_VENDOR_YOUNGFAST:
-			pconst = "YOUNGFAST";
-			break;
-	}
-
+	pconst = tp_firmware_strings[tp_type - 1][lcd_type];
 	sprintf(synaptics_vendor_str, "%s(%x)", pconst,
-			synaptics_rmi4_get_firmware_version(id));
+			synaptics_rmi4_get_firmware_version(tp_type, lcd_type));
 
 	return synaptics_vendor_str;
 }
+
+int lcd_type_id;
+
+static int __init lcd_type_id_setup(char *str)
+{
+	if (!strcmp("1:dsi:0:qcom,mdss_dsi_jdi_1080p_cmd", str))
+		lcd_type_id = LCD_VENDOR_JDI;
+	else if (!strcmp("1:dsi:0:qcom,mdss_dsi_truly_1080p_cmd", str))
+		lcd_type_id = LCD_VENDOR_TRULY;
+	else if (!strcmp("1:dsi:0:qcom,mdss_dsi_sharp_1080p_cmd", str))
+		lcd_type_id = LCD_VENDOR_SHARP;
+	else
+		lcd_type_id = -1;
+
+	return 1;
+}
+__setup("mdss_mdp.panel=", lcd_type_id_setup);
 
 static void synaptics_rmi4_get_vendorid(struct synaptics_rmi4_data *rmi4_data) {
 	int vendor_id = 0;
@@ -4314,7 +4323,7 @@ static void synaptics_rmi4_get_vendorid(struct synaptics_rmi4_data *rmi4_data) {
 				gpio_get_value(rmi4_data->wakeup_gpio), 0);
 #endif
 	rmi4_data->vendor_id = vendor_id;
-	synaptics_rmi4_get_vendorstring(rmi4_data->vendor_id);
+	synaptics_rmi4_get_vendorstring(rmi4_data->vendor_id, lcd_type_id);
 	print_ts(TS_INFO, KERN_ERR "[syna] vendor id: %x\n", vendor_id);
 }
 
