@@ -1,0 +1,70 @@
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&pm8941_lsid1 {
+	qcom,leds@d000 {
+		status = "okay";
+		qcom,rgb_0 {
+			qcom,duty-ms = <200>;
+			qcom,start-idx = <1>;
+			qcom,idx-len = <10>;
+			qcom,duty-pcts = [00 00 00 00 00 00 00 00 00 00 00
+				01 03 05 08 0B 10 14 19 1E 24 2A
+				30 38 40 49 52 5B 64 64
+				64 64 64 5B 52 49 40 38 30
+				2A 24 1E 19 14 10 0B 08 05 03 01
+				00 00 00 00 00 00 00 00 00 00 00];
+			qcom,max-current = <6>;
+			qcom,pause-lo = <0>;
+			qcom,pause-hi = <0>;
+			qcom,ramp-step-ms = <50>;
+			linux,default-trigger = "none";
+			qcom,use-blink;
+		};
+
+		qcom,rgb_1 {
+			qcom,duty-ms = <200>;
+			qcom,start-idx = <1>;
+			qcom,idx-len = <10>;
+			qcom,duty-pcts = [00 00 00 00 00 00 00 00 00 00 00
+				01 03 05 08 0B 10 14 19 1E 24 2A
+				30 38 40 49 52 5B 64 64
+				64 64 64 5B 52 49 40 38 30
+				2A 24 1E 19 14 10 0B 08 05 03 01
+				00 00 00 00 00 00 00 00 00 00 00];
+			qcom,max-current = <6>;
+			qcom,pause-lo = <0>;
+			qcom,pause-hi = <0>;
+			qcom,ramp-step-ms = <50>;
+			linux,default-trigger = "none";
+			qcom,use-blink;
+		};
+
+		qcom,rgb_2 {
+			qcom,duty-ms = <200>;
+			qcom,start-idx = <1>;
+			qcom,idx-len = <10>;
+			qcom,duty-pcts = [00 00 00 00 00 00 00 00 00 00 00
+				01 03 05 08 0B 10 14 19 1E 24 2A
+				30 38 40 49 52 5B 64 64
+				64 64 64 5B 52 49 40 38 30
+				2A 24 1E 19 14 10 0B 08 05 03 01
+				00 00 00 00 00 00 00 00 00 00 00];
+			qcom,max-current = <6>;
+			qcom,pause-lo = <0>;
+			qcom,pause-hi = <0>;
+			qcom,ramp-step-ms = <50>;
+			linux,default-trigger = "none";
+			qcom,use-blink;
+		};
+	};
+};
