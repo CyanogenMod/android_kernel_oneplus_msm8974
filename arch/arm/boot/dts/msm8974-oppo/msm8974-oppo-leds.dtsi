@@ -10,62 +10,11 @@
  * GNU General Public License for more details.
  */
 
+/include/ "../msm8974-leds.dtsi"
+
 &pm8941_lsid1 {
 	qcom,leds@d000 {
 		status = "disabled";
-		qcom,rgb_0 {
-			qcom,duty-ms = <200>;
-			qcom,start-idx = <1>;
-			qcom,idx-len = <10>;
-			qcom,duty-pcts = [00 00 00 00 00 00 00 00 00 00 00
-				01 03 05 08 0B 10 14 19 1E 24 2A
-				30 38 40 49 52 5B 64 64
-				64 64 64 5B 52 49 40 38 30
-				2A 24 1E 19 14 10 0B 08 05 03 01
-				00 00 00 00 00 00 00 00 00 00 00];
-			qcom,max-current = <6>;
-			qcom,pause-lo = <0>;
-			qcom,pause-hi = <0>;
-			qcom,ramp-step-ms = <50>;
-			linux,default-trigger = "none";
-			qcom,use-blink;
-		};
-
-		qcom,rgb_1 {
-			qcom,duty-ms = <200>;
-			qcom,start-idx = <1>;
-			qcom,idx-len = <10>;
-			qcom,duty-pcts = [00 00 00 00 00 00 00 00 00 00 00
-				01 03 05 08 0B 10 14 19 1E 24 2A
-				30 38 40 49 52 5B 64 64
-				64 64 64 5B 52 49 40 38 30
-				2A 24 1E 19 14 10 0B 08 05 03 01
-				00 00 00 00 00 00 00 00 00 00 00];
-			qcom,max-current = <6>;
-			qcom,pause-lo = <0>;
-			qcom,pause-hi = <0>;
-			qcom,ramp-step-ms = <50>;
-			linux,default-trigger = "none";
-			qcom,use-blink;
-		};
-
-		qcom,rgb_2 {
-			qcom,duty-ms = <200>;
-			qcom,start-idx = <1>;
-			qcom,idx-len = <10>;
-			qcom,duty-pcts = [00 00 00 00 00 00 00 00 00 00 00
-				01 03 05 08 0B 10 14 19 1E 24 2A
-				30 38 40 49 52 5B 64 64
-				64 64 64 5B 52 49 40 38 30
-				2A 24 1E 19 14 10 0B 08 05 03 01
-				00 00 00 00 00 00 00 00 00 00 00];
-			qcom,max-current = <6>;
-			qcom,pause-lo = <0>;
-			qcom,pause-hi = <0>;
-			qcom,ramp-step-ms = <50>;
-			linux,default-trigger = "none";
-			qcom,use-blink;
-		};
 	};
 
 	qcom,leds@d300 {
@@ -79,6 +28,65 @@
 
 		qcom,flash_torch {
 			qcom,current = <53>;
+		};
+	};
+
+	qcom,leds@d800 {
+		status = "disabled";
+	};
+
+	qcom,leds@d900 {
+		status = "disabled";
+	};
+
+	qcom,leds@da00 {
+		status = "disabled";
+	};
+
+	qcom,leds@db00 {
+		status = "disabled";
+	};
+
+	qcom,leds@dc00 {
+		status = "disabled";
+	};
+
+	qcom,leds@dd00 {
+		status = "disabled";
+	};
+
+	qcom,leds@de00 {
+		status = "disabled";
+	};
+
+	qcom,leds@df00 {
+		status = "disabled";
+	};
+
+	qcom,leds@e000 {
+		status = "disabled";
+	};
+
+	qcom,leds@e100 {
+		status = "disabled";
+	};
+
+	qcom,leds@e200 {
+		qcom,kpdbl1 {
+			linux,name = "button-backlight";
+			qcom,max-current = <15>;
+		};
+
+		qcom,kpdbl2 {
+			status = "disabled";
+		};
+
+		qcom,kpdbl3 {
+			status = "disabled";
+		};
+
+		qcom,kpdbl4 {
+			status = "disabled";
 		};
 	};
 };
