@@ -20,6 +20,7 @@
 /include/ "msm8974-oppo-regulator.dtsi"
 /include/ "msm8974-oppo-sound.dtsi"
 /include/ "msm8974-oppo-leds.dtsi"
+/include/ "msm8974-x9076-leds.dtsi"
 /include/ "msm8974-x9076-mdss.dtsi"
 
 &soc {
@@ -53,10 +54,4 @@
 	qcom,bam-consumer-pipe-index;
 	qcom,bam-producer-pipe-index;
 	qcom,master-id;
-};
-
-&pm8941_lsid1 {
-        qcom,leds@d000 {
-                status = "okay";
-        };
 };
