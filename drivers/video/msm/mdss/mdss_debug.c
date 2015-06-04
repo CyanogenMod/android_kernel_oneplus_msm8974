@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2009-2013, 2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -381,6 +381,9 @@ int mdss_debugfs_init(struct mdss_data_type *mdata)
 
 	debugfs_create_u32("min_mdp_clk", 0644, mdd->root,
 			(u32 *)&mdata->min_mdp_clk);
+
+	debugfs_create_bool("allow_cx_vddmin", 0644, mdd->root,
+		(u32 *)&mdata->allow_cx_vddmin);
 
 	if (mdss_create_xlog_debug(mdd)) {
 		mdss_debugfs_cleanup(mdd);

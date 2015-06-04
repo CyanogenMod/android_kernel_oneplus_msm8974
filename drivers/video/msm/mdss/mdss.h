@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -214,6 +214,8 @@ struct mdss_data_type {
 	int handoff_pending;
 	struct mdss_prefill_data prefill_data;
 	bool idle_pc;
+	bool allow_cx_vddmin;
+	bool vdd_cx_en;
 	int iommu_ref_cnt;
 	atomic_t active_intf_cnt;
 
