@@ -88,6 +88,16 @@ config MSM_BIMC_BWMON
 	  has the capability to raise an IRQ when the count exceeds a
 	  programmable limit.
 
+config ADRENO_IDLER
+	tristate "MSM Adreno idler"
+	depends on DEVFREQ_GOV_MSM_ADRENO_TZ
+	default y
+	help
+	  Uses a different calculation method on top of Adreno TZ
+	  just for calculating frequency for idle to reduce the
+	  wasted power coming from stock Adreno TZ while
+	  maintaining high-performance.
+
 config DEVFREQ_GOV_MSM_BW_HWMON
 	tristate "HW monitor based governor for device BW"
 	depends on ARCH_MSM_KRAIT || ARCH_MSM_BIMC_BWMON
