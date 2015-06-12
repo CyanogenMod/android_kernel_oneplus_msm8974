@@ -8,6 +8,8 @@
  *	Added handling for CPU hotplug
  *  Feb 2006 - Jacob Shin <jacob.shin@amd.com>
  *	Fix handling for CPU hotplug -- affected CPUs
+ *  Jun 2015 - Alex Naidis <alex.naidis@linux.com>
+	Fix cores not restoring saved frequencies after replugging
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1039,6 +1041,19 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 		pr_debug("Restoring governor %s for cpu %d\n",
 		       policy->governor->name, cpu);
 	}
+
+	if (per_cpu(cpufreq_policy_save, cpu).min) {
+		policy->min = per_cpu(cpufreq_policy_save, cpu).min;
+		policy->user_policy.min = policy->min;
+	}
+	if (per_cpu(cpufreq_policy_save, cpu).max) {
+		policy->max = per_cpu(cpufreq_policy_save, cpu).max;
+		policy->user_policy.max = policy->max;
+	}
+	pr_debug("Restoring CPU%d min %d and max %d\n",
+		cpu, policy->min, policy->max);
+
+
 #endif
 
 	ret = cpufreq_add_dev_interface(cpu, policy, dev);
