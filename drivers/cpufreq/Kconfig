@@ -124,6 +124,12 @@ config CPU_FREQ_DEFAULT_GOV_YANKACTIVE
           loading your cpufreq low-level hardware driver, using the
           'yankactive' governor for latency-sensitive workloads.
 
+config CPU_FREQ_DEFAULT_GOV_IMPULSE
+	bool "impulse"
+	select CPU_FREQ_GOV_IMPULSE
+	help
+	  Use the CPUFreq governor 'interactive' as default.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -235,6 +241,12 @@ config CPU_FREQ_GOV_YANKACTIVE
           The governor is based on interactive with just different default settings
           and can be achieved using interactive with a script. This is added for
           simplification purposes for myself.
+
+config CPU_FREQ_GOV_IMPULSE
+	tristate "'impulse' cpufreq policy governor"
+	help
+	  'impulse' - This driver adds a dynamic cpufreq policy governor
+	  designed for optimized balance between power and performance.
 
 config CPU_FREQ_GOV_SMARTMAX
         tristate "'smartmax' cpufreq policy governor"
