@@ -77,7 +77,7 @@ void power_on_alarm_init(void)
 	rtc_tm_to_time(&rt, &alarm_time);
 
 	if (alarm_time)
-		power_on_alarm = alarm_time;
+		power_on_alarm = alarm_time + ALARM_DELTA;
 	else
 		power_on_alarm = 0;
 }
@@ -117,7 +117,9 @@ void set_power_on_alarm(long secs, bool enable)
 	 *to power up the device before actual alarm
 	 *expiration
 	 */
-	if (alarm_time <= rtc_secs)
+	if ((alarm_time - ALARM_DELTA) > rtc_secs)
+		alarm_time -= ALARM_DELTA;
+	else
 		goto disable_alarm;
 
 	rtc_time_to_tm(alarm_time, &alarm.time);
