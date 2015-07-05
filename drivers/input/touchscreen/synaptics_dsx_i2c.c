@@ -4914,6 +4914,16 @@ static int synaptics_rmi4_resume(struct device *dev)
 
 	rmi4_data->pwrrunning = true;
 
+#ifndef CONFIG_MACH_FIND7OP
+	if (get_pcb_version() >= HW_VERSION__20) {
+		// Software reset
+		synaptics_rmi4_i2c_write(rmi4_data,
+				rmi4_data->f01_cmd_base_addr,
+				&val, sizeof(val));
+		msleep(200);
+	}
+#endif
+
 	if (rmi4_data->smartcover_enable)
 		synaptics_rmi4_open_smartcover();
 
