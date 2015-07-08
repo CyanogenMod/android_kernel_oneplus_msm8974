@@ -105,8 +105,8 @@ void __init call_function_init(void)
  */
 static void csd_lock_wait(struct call_single_data *data)
 {
-	while (data->flags & CSD_FLAG_LOCK)
-		cpu_relax();
+	while (cpu_relaxed_read_short(&data->flags) & CSD_FLAG_LOCK)
+		cpu_read_relax();
 }
 
 static void csd_lock(struct call_single_data *data)
