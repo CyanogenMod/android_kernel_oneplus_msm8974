@@ -105,19 +105,19 @@
 		qcom,mdss-dsi-mdp-trigger = "trigger_sw";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 5>, <0 10>, <1 10>;
-		qcom,mdss-dsi-cabc-off-command = [
+		cm,mdss-livedisplay-cabc-off = [
 			15 01 00 00 10 00 02 55 00
 			05 01 00 00 10 00 02 29 00];
-		qcom,mdss-dsi-cabc-ui-command = [
+		cm,mdss-livedisplay-cabc-ui = [
 			15 01 00 00 10 00 02 55 01
 			05 01 00 00 10 00 02 29 00];
-		qcom,mdss-dsi-cabc-still-image-command = [
+		cm,mdss-livedisplay-cabc-image = [
 			15 01 00 00 10 00 02 55 02
 			05 01 00 00 10 00 02 29 00];
-		qcom,mdss-dsi-cabc-video-command = [
+		cm,mdss-livedisplay-cabc-video = [
 			15 01 00 00 10 00 02 55 03
 			05 01 00 00 10 00 02 29 00];
-		qcom,mdss-dsi-sre-ui-command = [
+		cm,mdss-livedisplay-cabc-sre = [
 			15 01 00 00 10 00 02 55 60
 			05 01 00 00 10 00 02 29 00];
 		qcom,mdss-dsi-gamma1 = [
@@ -140,11 +140,11 @@
 			29 01 00 00 01 00 14 c8 01 00 00 00 00 00 00 00 E8 E6 02 BA 00 00 F0 F0 00 FC 00
 			23 01 00 00 00 00 02 d6 01
 			23 01 00 00 01 00 02 b0 03];
-		qcom,mdss-dsi-color-enhance-on-command = [
+		cm,mdss-livedisplay-color-enhance-on = [
 			23 01 00 00 01 00 02 b0 04
 			29 01 00 00 01 00 21 CA 01 80 DC F0 DC F0 88 F0 08 3F 14 8A 0A 4A 37 A0 55 F8 01 01 01 01 01 01 00 C0 10 10 3F 3F 3F 3F
 			23 01 00 00 01 00 02 b0 03];
-		qcom,mdss-dsi-color-enhance-off-command = [
+		cm,mdss-livedisplay-color-enhance-off = [
 			23 01 00 00 01 00 02 b0 04
 			29 01 00 00 10 00 21 ca 00 80 80 80 80 80 80 80 08 20 80 80 0a 4a 37 a0 55 f8 0c 0c 20 10 3f 3f 00 00 10 10 3f 3f 3f 3f
 			23 01 00 00 01 00 02 b0 03];
