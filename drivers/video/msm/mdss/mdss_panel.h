@@ -295,6 +295,8 @@ struct mdss_mdp_pp_tear_check {
 	u32 refx100;
 };
 
+struct mdss_livedisplay_ctx;
+
 struct mdss_panel_info {
 	u32 xres;
 	u32 yres;
@@ -358,6 +360,9 @@ struct mdss_panel_info {
 	struct mipi_panel_info mipi;
 	struct lvds_panel_info lvds;
 	struct edp_panel_info edp;
+
+	struct mdss_livedisplay_ctx *livedisplay;
+
 };
 
 struct mdss_panel_data {
