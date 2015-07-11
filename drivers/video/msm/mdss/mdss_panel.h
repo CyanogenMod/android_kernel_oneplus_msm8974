@@ -372,19 +372,6 @@ struct mdss_panel_info {
 	struct lvds_panel_info lvds;
 	struct edp_panel_info edp;
 
-#ifdef CONFIG_MACH_OPPO
-	int cabc_available;
-	int cabc_mode;
-
-	int gamma_index;
-	int gamma_count;
-
-	int sre_available;
-	bool sre_enabled;
-
-	bool color_enhance_available;
-	bool color_enhance_enabled;
-#endif
 };
 
 struct mdss_panel_data {
