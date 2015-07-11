@@ -84,16 +84,16 @@
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 20>, <0 200>, <1 20>;
-		qcom,mdss-dsi-cabc-off-command = [
+		cm,mdss-livedisplay-cabc-off = [
 			05 01 00 00 10 00 02 29 00
 			15 01 00 00 10 00 02 55 80];
-		qcom,mdss-dsi-cabc-ui-command = [
+		cm,mdss-livedisplay-cabc-ui = [
 			05 01 00 00 10 00 02 29 00
 			15 01 00 00 10 00 02 55 81];
-		qcom,mdss-dsi-cabc-still-image-command = [
+		cm,mdss-livedisplay-cabc-image = [
 			05 01 00 00 10 00 02 29 00
 			15 01 00 00 10 00 02 55 82];
-		qcom,mdss-dsi-cabc-video-command = [
+		cm,mdss-livedisplay-cabc-video = [
 			05 01 00 00 10 00 02 29 00
 			15 01 00 00 10 00 02 55 83];
 	};
