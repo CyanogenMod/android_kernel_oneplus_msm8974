@@ -30,7 +30,7 @@ extern int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		struct dsi_panel_cmds *pcmds, char *cmd_key, char *link_key);
 
 
-int mdss_livedisplay_update(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
+static int mdss_livedisplay_update_locked(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		int types)
 {
 	int ret = 0;
@@ -41,19 +41,22 @@ int mdss_livedisplay_update(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		return -ENODEV;
 
 	pinfo = &(ctrl_pdata->panel_data.panel_info);
-	if (pinfo->panel_power_state != MDSS_PANEL_POWER_ON)
-		return 0;
+	if (pinfo == NULL)
+		return -ENODEV;
 
 	mlc = pinfo->livedisplay;
 	if (mlc == NULL)
 		return -ENODEV;
+
+	if (!mlc->caps || !mdss_panel_is_power_on_interactive(pinfo->panel_power_state))
+		return 0;
 
 	if (mlc->caps & MODE_CABC && (types & MODE_CABC || types & MODE_SRE)) {
 
 		pr_info("%s: update cabc level=%d  sre=%d\n", __func__,
 				mlc->cabc_mode, mlc->sre_enabled);
 
-		if (mlc->caps & MODE_SRE && mlc->sre_enabled) {
+		if ((mlc->caps & MODE_SRE) && mlc->sre_enabled) {
 			mdss_dsi_panel_cmds_send(ctrl_pdata, &(mlc->cabc_sre_cmd));
 		} else {
 
@@ -89,6 +92,26 @@ int mdss_livedisplay_update(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 	return ret;
 }
 
+int mdss_livedisplay_update(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
+		int types)
+{
+	struct mdss_panel_info *pinfo;
+	struct mdss_livedisplay_ctx *mlc;
+	int ret = 0;
+
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+	if (pinfo == NULL)
+		return -ENODEV;
+
+	mlc = pinfo->livedisplay;
+
+	mutex_lock(&mlc->lock);
+	ret = mdss_livedisplay_update_locked(ctrl_pdata, types);
+	mutex_unlock(&mlc->lock);
+
+	return ret;
+}
+
 static struct mdss_livedisplay_ctx* get_ctx(struct msm_fb_data_type *mfd)
 {
 	return mfd->panel_info->livedisplay;
@@ -119,13 +142,17 @@ static ssize_t mdss_livedisplay_set_cabc(struct device *dev,
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
 	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
 
+	mutex_lock(&mlc->lock);
+
 	sscanf(buf, "%du", &level);
 	if (level >= CABC_OFF && level < CABC_MAX &&
 				level != mlc->cabc_mode) {
 		mlc->cabc_mode = level;
-		if (!mlc->sre_enabled)
-			mdss_livedisplay_update(get_ctrl(mfd), MODE_CABC);
+		mdss_livedisplay_update_locked(get_ctrl(mfd), MODE_CABC);
 	}
+
+	mutex_unlock(&mlc->lock);
+
 	return count;
 }
 
@@ -148,12 +175,17 @@ static ssize_t mdss_livedisplay_set_sre(struct device *dev,
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
 	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
 
+	mutex_lock(&mlc->lock);
+
 	sscanf(buf, "%du", &value);
 	if ((value == 0 || value == 1)
 			&& value != mlc->sre_enabled) {
 		mlc->sre_enabled = value;
-		mdss_livedisplay_update(get_ctrl(mfd), MODE_SRE);
+		mdss_livedisplay_update_locked(get_ctrl(mfd), MODE_SRE);
 	}
+
+	mutex_unlock(&mlc->lock);
+
 	return count;
 }
 
@@ -176,12 +208,17 @@ static ssize_t mdss_livedisplay_set_color_enhance(struct device *dev,
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
 	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
 
+	mutex_lock(&mlc->lock);
+
 	sscanf(buf, "%du", &value);
 	if ((value == 0 || value == 1)
 			&& value != mlc->ce_enabled) {
 		mlc->ce_enabled = value;
-		mdss_livedisplay_update(get_ctrl(mfd), MODE_COLOR_ENHANCE);
+		mdss_livedisplay_update_locked(get_ctrl(mfd), MODE_COLOR_ENHANCE);
 	}
+
+	mutex_unlock(&mlc->lock);
+
 	return count;
 }
 
@@ -193,9 +230,13 @@ static ssize_t mdss_livedisplay_get_rgb(struct device *dev,
 	unsigned int pcc_r = 32768, pcc_g = 32768, pcc_b = 32768;
 	struct fb_info *fbi = dev_get_drvdata(dev);
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_livedisplay_ctx *mlc;
 
 	if (mfd == NULL)
 		return -ENODEV;
+
+	mlc = get_ctx(mfd);
+	mutex_lock(&mlc->lock);
 
 	memset(&pcc_cfg, 0, sizeof(struct mdp_pcc_cfg_data));
 
@@ -212,6 +253,8 @@ static ssize_t mdss_livedisplay_get_rgb(struct device *dev,
 		pcc_g = pcc_cfg.g.g;
 		pcc_b = pcc_cfg.b.b;
 	}
+
+	mutex_unlock(&mlc->lock);
 
 	return scnprintf(buf, PAGE_SIZE, "%d %d %d\n", pcc_r, pcc_g, pcc_b);
 }
@@ -236,12 +279,17 @@ static ssize_t mdss_livedisplay_set_rgb(struct device *dev,
 	u32 copyback = 0;
 	struct fb_info *fbi = dev_get_drvdata(dev);
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_livedisplay_ctx *mlc;
+
+	int ret = -EINVAL;
 
 	if (mfd == NULL)
 		return -ENODEV;
 
 	if (count > 19)
 		return -EINVAL;
+
+	mlc = get_ctx(mfd);
 
 	sscanf(buf, "%d %d %d", &r, &g, &b);
 
@@ -252,6 +300,7 @@ static ssize_t mdss_livedisplay_set_rgb(struct device *dev,
 	if (b < 0 || b > 32768)
 		return -EINVAL;
 
+	mutex_lock(&mlc->lock);
 	pr_info("%s: r=%d g=%d b=%d", __func__, r, g, b);
 
 	memset(&pcc_cfg, 0, sizeof(struct mdp_pcc_cfg_data));
@@ -267,9 +316,11 @@ static ssize_t mdss_livedisplay_set_rgb(struct device *dev,
 	pcc_cfg.b.b = b;
 
 	if (mdss_mdp_pcc_config(&pcc_cfg, &copyback) == 0)
-		return count;
+		ret = count;
 
-	return -EINVAL;
+	mutex_unlock(&mlc->lock);
+
+	return ret;
 }
 
 static DEVICE_ATTR(cabc, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_cabc, mdss_livedisplay_set_cabc);
@@ -287,6 +338,7 @@ int mdss_livedisplay_parse_dt(struct device_node *np, struct mdss_panel_info *pi
 		return -ENODEV;
 
 	mlc = kzalloc(sizeof(struct mdss_livedisplay_ctx), GFP_KERNEL);
+	mutex_init(&mlc->lock);
 
 	rc = mdss_dsi_parse_dcs_cmds(np, &(mlc->cabc_off_cmd),
 			"cm,mdss-livedisplay-cabc-off", "qcom,mdss-dsi-off-command-state");
@@ -327,7 +379,7 @@ int mdss_livedisplay_create_sysfs(struct msm_fb_data_type *mfd)
 	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
 
 	if (mlc == NULL)
-		goto sysfs_err;
+		return 0;
 
 	rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_rgb.attr);
 	if (rc)
