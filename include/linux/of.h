@@ -209,6 +209,13 @@ extern struct device_node *of_find_node_with_property(
 extern struct property *of_find_property(const struct device_node *np,
 					 const char *name,
 					 int *lenp);
+extern int of_property_read_u32_index(const struct device_node *np,
+				       const char *propname,
+				       u32 index, u32 *out_value);
+extern int of_property_read_u8_array(const struct device_node *np,
+			const char *propname, u8 *out_values, size_t sz);
+extern int of_property_read_u16_array(const struct device_node *np,
+			const char *propname, u16 *out_values, size_t sz);
 extern int of_property_read_u32_array(const struct device_node *np,
 				      const char *propname,
 				      u32 *out_values,
@@ -293,6 +300,24 @@ static inline struct device_node *of_find_compatible_node(
 						const char *compat)
 {
 	return NULL;
+}
+
+static inline int of_property_read_u32_index(const struct device_node *np,
+			const char *propname, u32 index, u32 *out_value)
+{
+	return -ENOSYS;
+}
+
+static inline int of_property_read_u8_array(const struct device_node *np,
+			const char *propname, u8 *out_values, size_t sz)
+{
+	return -ENOSYS;
+}
+
+static inline int of_property_read_u16_array(const struct device_node *np,
+			const char *propname, u16 *out_values, size_t sz)
+{
+	return -ENOSYS;
 }
 
 static inline int of_property_read_u32_array(const struct device_node *np,
@@ -428,6 +453,20 @@ static inline bool of_property_read_bool(const struct device_node *np,
 	struct property *prop = of_find_property(np, propname, NULL);
 
 	return prop ? true : false;
+}
+
+static inline int of_property_read_u8(const struct device_node *np,
+				       const char *propname,
+				       u8 *out_value)
+{
+	return of_property_read_u8_array(np, propname, out_value, 1);
+}
+
+static inline int of_property_read_u16(const struct device_node *np,
+				       const char *propname,
+				       u16 *out_value)
+{
+	return of_property_read_u16_array(np, propname, out_value, 1);
 }
 
 static inline int of_property_read_u32(const struct device_node *np,
