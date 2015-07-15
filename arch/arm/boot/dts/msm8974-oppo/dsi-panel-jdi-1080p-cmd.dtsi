@@ -93,15 +93,16 @@
 		qcom,mdss-dsi-mdp-trigger = "trigger_sw";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 5>, <0 10>, <1 10>;
-		cm,mdss-livedisplay-cabc-off = [15 01 00 00 10 00 02 55 00
-			05 01 00 00 10 00 02 29 00];
-		cm,mdss-livedisplay-cabc-ui = [15 01 00 00 10 00 02 55 01
-			05 01 00 00 10 00 02 29 00];
-		cm,mdss-livedisplay-cabc-image = [15 01 00 00 10 00 02 55 02
-			05 01 00 00 10 00 02 29 00];
-		cm,mdss-livedisplay-cabc-video = [15 01 00 00 10 00 02 55 03
-			05 01 00 00 10 00 02 29 00];
-		cm,mdss-livedisplay-cabc-sre = [15 01 00 00 10 00 02 55 60
+		cm,mdss-livedisplay-cabc-cmd = [
+			15 01 00 00 10 00 02 55 00];
+		cm,mdss-livedisplay-cabc-ui-value = <0x01>;
+		cm,mdss-livedisplay-cabc-image-value = <0x02>;
+		cm,mdss-livedisplay-cabc-video-value = <0x03>;
+		cm,mdss-livedisplay-sre-weak-value = <0x50>;
+		cm,mdss-livedisplay-sre-medium-value = <0x60>;
+		cm,mdss-livedisplay-sre-strong-value = <0x70>;
+		cm,mdss-livedisplay-aco-value = <0x80>;
+		cm,mdss-livedisplay-post-cmd = [
 			05 01 00 00 10 00 02 29 00];
 		cm,mdss-livedisplay-color-enhance-on = [23 01 00 00 01 00 02 b0 04
 			29 01 00 00 10 00 21 ca 01
@@ -111,19 +112,19 @@
 			29 01 00 00 10 00 21 ca 00
 			80 80 80 80 80 80 80 08 20 80 80 0a 4a 37 a0 55 f8 0c 0c 20 10 3f 3f 00 00 10 10 3f 3f 3f 3f
 			23 01 00 00 01 00 02 b0 03];
-		qcom,mdss-dsi-gamma1 = [23 01 00 00 01 00 02 b0 04
+		cm,mdss-livedisplay-preset-1 = [23 01 00 00 01 00 02 b0 04
 			29 01 00 00 01 00 14 c8 01 0A FD 03 01 E8 00 00 03 FC F5 A1 00 00 01 FD 06 FC 00
 			23 01 00 00 00 00 02 d6 01
 			23 01 00 00 01 00 02 b0 03];
-		qcom,mdss-dsi-gamma2 = [23 01 00 00 01 00 02 b0 04
+		cm,mdss-livedisplay-preset-2 = [23 01 00 00 01 00 02 b0 04
 			29 01 00 00 01 00 14 c8 01 00 F0 F4 00 D5 00 00 E8 E6 02 BA 00 00 00 00 00 00 00
 			23 01 00 00 00 00 02 d6 01
 			23 01 00 00 01 00 02 b0 03];
-		qcom,mdss-dsi-gamma3 = [23 01 00 00 01 00 02 b0 04
+		cm,mdss-livedisplay-preset-3 = [23 01 00 00 01 00 02 b0 04
 			29 01 00 00 01 00 14 c8 01 00 F0 F4 00 D5 00 00 00 00 00 00 00 00 F0 F0 00 FC 00
 			23 01 00 00 00 00 02 d6 01
 			23 01 00 00 01 00 02 b0 03];
-		qcom,mdss-dsi-gamma4 = [23 01 00 00 01 00 02 b0 04
+		cm,mdss-livedisplay-preset-4 = [23 01 00 00 01 00 02 b0 04
 			29 01 00 00 01 00 14 c8 01 00 00 00 00 00 00 00 E8 E6 02 BA 00 00 F0 F0 00 FC 00
 			23 01 00 00 00 00 02 d6 01
 			23 01 00 00 01 00 02 b0 03];
