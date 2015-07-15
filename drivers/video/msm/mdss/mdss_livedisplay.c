@@ -51,6 +51,10 @@ static int mdss_livedisplay_update_locked(struct mdss_dsi_ctrl_pdata *ctrl_pdata
 	if (!mlc->caps || !mdss_panel_is_power_on_interactive(pinfo->panel_power_state))
 		return 0;
 
+	if (mlc->caps & MODE_PRESET && (types & MODE_PRESET)) {
+		mdss_dsi_panel_cmds_send(ctrl_pdata, &(mlc->presets[mlc->preset]));
+	}
+
 	if (mlc->caps & MODE_CABC && (types & MODE_CABC || types & MODE_SRE)) {
 
 		pr_info("%s: update cabc level=%d  sre=%d\n", __func__,
@@ -222,6 +226,49 @@ static ssize_t mdss_livedisplay_set_color_enhance(struct device *dev,
 	return count;
 }
 
+static ssize_t mdss_livedisplay_get_preset(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
+
+	return sprintf(buf, "%d\n", mlc->preset);
+}
+
+static ssize_t mdss_livedisplay_set_preset(struct device *dev,
+							   struct device_attribute *attr,
+							   const char *buf, size_t count)
+{
+	int value = 0;
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
+
+	mutex_lock(&mlc->lock);
+
+	sscanf(buf, "%du", &value);
+	if (value < 0 || value >= MAX_PRESETS)
+		return -EINVAL;
+
+	mlc->preset = value;
+	mdss_livedisplay_update_locked(get_ctrl(mfd), MODE_PRESET);
+
+	mutex_unlock(&mlc->lock);
+
+	return count;
+}
+
+static ssize_t mdss_livedisplay_get_num_presets(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
+
+	return sprintf(buf, "%d\n", mlc->num_presets);
+}
+
 static ssize_t mdss_livedisplay_get_rgb(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -324,15 +371,17 @@ static ssize_t mdss_livedisplay_set_rgb(struct device *dev,
 }
 
 static DEVICE_ATTR(cabc, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_cabc, mdss_livedisplay_set_cabc);
-//static DEVICE_ATTR(gamma, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_gamma_index, mdss_livedisplay_set_gamma_index);
 static DEVICE_ATTR(sre, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_sre, mdss_livedisplay_set_sre);
 static DEVICE_ATTR(color_enhance, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_color_enhance, mdss_livedisplay_set_color_enhance);
+static DEVICE_ATTR(preset, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_preset, mdss_livedisplay_set_preset);
+static DEVICE_ATTR(num_presets, S_IRUGO, mdss_livedisplay_get_num_presets, NULL);
 static DEVICE_ATTR(rgb, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_rgb, mdss_livedisplay_set_rgb);
 
 int mdss_livedisplay_parse_dt(struct device_node *np, struct mdss_panel_info *pinfo)
 {
-	int rc = 0;
+	int rc = 0, i = 0;
 	struct mdss_livedisplay_ctx *mlc;
+	char preset_name[64];
 
 	if (pinfo == NULL)
 		return -ENODEV;
@@ -369,6 +418,18 @@ int mdss_livedisplay_parse_dt(struct device_node *np, struct mdss_panel_info *pi
 			mlc->caps |= MODE_COLOR_ENHANCE;
 	}
 
+	for (i = 0; i < MAX_PRESETS; i++) {
+		memset(preset_name, 0, sizeof(preset_name));
+		snprintf(preset_name, 64, "%s-%d", "cm,mdss-livedisplay-preset", i);
+		rc = mdss_dsi_parse_dcs_cmds(np, &(mlc->presets[mlc->num_presets]), preset_name,
+				"qcom,mdss-dsi-off-command-state");
+		if (rc == 0)
+			mlc->num_presets++;
+	}
+
+	if (mlc->num_presets)
+		mlc->caps |= MODE_PRESET;
+
     pinfo->livedisplay = mlc;
 	return 0;
 }
@@ -399,6 +460,15 @@ int mdss_livedisplay_create_sysfs(struct msm_fb_data_type *mfd)
 
 	if (mlc->caps & MODE_COLOR_ENHANCE) {
 		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_color_enhance.attr);
+		if (rc)
+			goto sysfs_err;
+	}
+
+	if (mlc->caps & MODE_PRESET) {
+		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_preset.attr);
+		if (rc)
+			goto sysfs_err;
+		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_num_presets.attr);
 		if (rc)
 			goto sysfs_err;
 	}

@@ -19,6 +19,8 @@
 
 #include "mdss_dsi.h"
 
+#define MAX_PRESETS 10
+
 struct mdss_livedisplay_ctx {
 	struct dsi_panel_cmds cabc_off_cmd;
 	struct dsi_panel_cmds cabc_ui_cmd;
@@ -28,10 +30,14 @@ struct mdss_livedisplay_ctx {
 	struct dsi_panel_cmds color_enhance_on_cmd;
 	struct dsi_panel_cmds color_enhance_off_cmd;
 
+	struct dsi_panel_cmds presets[MAX_PRESETS];
+
+	unsigned int preset;
 	unsigned int cabc_mode;
 	bool sre_enabled;
 	bool ce_enabled;
 
+	unsigned int num_presets;
 	unsigned int caps;
 
 	struct mutex lock;
@@ -49,7 +55,8 @@ enum {
 	MODE_CABC = 1,
 	MODE_SRE = 2,
 	MODE_COLOR_ENHANCE = 4,
-    MODE_UPDATE_ALL = MODE_CABC | MODE_SRE | MODE_COLOR_ENHANCE,
+	MODE_PRESET = 8,
+	MODE_UPDATE_ALL = 255,
 };
 
 int mdss_livedisplay_update(struct mdss_dsi_ctrl_pdata *ctrl_pdata, int types);
