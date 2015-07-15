@@ -99,17 +99,16 @@
 		qcom,mdss-dsi-mdp-trigger = "trigger_sw";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 20>, <0 200>, <1 20>;
-		cm,mdss-livedisplay-cabc-off = [
-			15 01 00 00 10 00 02 55 00
-			05 01 00 00 10 00 02 29 00];
-		cm,mdss-livedisplay-cabc-ui = [
-			15 01 00 00 10 00 02 55 01
-			05 01 00 00 10 00 02 29 00];
-		cm,mdss-livedisplay-cabc-image = [
-			15 01 00 00 10 00 02 55 02
-			05 01 00 00 10 00 02 29 00];
-		cm,mdss-livedisplay-cabc-video = [
-			15 01 00 00 10 00 02 55 03
+		cm,mdss-livedisplay-cabc-cmd = [
+			15 01 00 00 10 00 02 55 00];
+		cm,mdss-livedisplay-cabc-ui-value = /bits/ 8 <0x01>;
+		cm,mdss-livedisplay-cabc-image-value = /bits/ 8 <0x02>;
+		cm,mdss-livedisplay-cabc-video-value = /bits/ 8 <0x03>;
+		cm,mdss-livedisplay-sre-weak-value = /bits/ 8 <0x50>;
+		cm,mdss-livedisplay-sre-medium-value = /bits/ 8 <0x60>;
+		cm,mdss-livedisplay-sre-strong-value = /bits/ 8 <0x70>;
+		cm,mdss-livedisplay-aco-value = /bits/ 8 <0x80>;
+		cm,mdss-livedisplay-post-cmd = [
 			05 01 00 00 10 00 02 29 00];
 	};
 
@@ -194,5 +193,16 @@
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 20>, <0 200>, <1 20>;
+		cm,mdss-livedisplay-cabc-cmd = [
+			15 01 00 00 10 00 02 55 00];
+		cm,mdss-livedisplay-cabc-ui-value = <0x01>;
+		cm,mdss-livedisplay-cabc-image-value = <0x02>;
+		cm,mdss-livedisplay-cabc-video-value = <0x03>;
+		cm,mdss-livedisplay-sre-weak-value = <0x50>;
+		cm,mdss-livedisplay-sre-medium-value = <0x60>;
+		cm,mdss-livedisplay-sre-strong-value = <0x70>;
+		cm,mdss-livedisplay-aco-value = <0x80>;
+		cm,mdss-livedisplay-post-cmd = [
+			05 01 00 00 10 00 02 29 00];
 	};
 };

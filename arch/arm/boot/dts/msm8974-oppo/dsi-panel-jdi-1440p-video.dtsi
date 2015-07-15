@@ -113,19 +113,19 @@
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 15>, <0 75>, <1 15>;
-		cm,mdss-livedisplay-cabc-off = [
-			05 01 00 00 10 00 02 29 00
-			15 01 00 00 10 00 02 55 80];
-		cm,mdss-livedisplay-cabc-ui = [
-			05 01 00 00 10 00 02 29 00
-			15 01 00 00 10 00 02 55 81];
-		cm,mdss-livedisplay-cabc-image = [
-			05 01 00 00 10 00 02 29 00
-			15 01 00 00 10 00 02 55 82];
-		cm,mdss-livedisplay-cabc-video = [
-			05 01 00 00 10 00 02 29 00
-			15 01 00 00 10 00 02 55 83];
-		qcom,mdss-dsi-gamma1 = [
+		cm,mdss-livedisplay-cabc-cmd = [
+			15 01 00 00 10 00 02 55 00];
+		cm,mdss-livedisplay-cabc-ui-value = <0x01>;
+		cm,mdss-livedisplay-cabc-image-value = <0x02>;
+		cm,mdss-livedisplay-cabc-video-value = <0x03>;
+		cm,mdss-livedisplay-sre-weak-value = <0x50>;
+		cm,mdss-livedisplay-sre-medium-value = <0x60>;
+		cm,mdss-livedisplay-sre-strong-value = <0x70>;
+		cm,mdss-livedisplay-aco-value = <0x80>;
+		cm,mdss-livedisplay-post-cmd = [
+			05 01 00 00 10 00 02 29 00];
+
+		cm,mdss-livedisplay-preset-1 = [
 			29 01 00 00 00 00 06 F0 55 AA 52 08 00
 			29 01 00 00 00 00 11 D1 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
 			29 01 00 00 00 00 06 F0 55 AA 52 08 02
@@ -141,7 +141,7 @@
 			29 01 00 00 00 00 10 B9 50 65 74 75 89 97 AD B6 D4 FC FD FD FD FE FF
 			29 01 00 00 00 00 0F BA 04 07 08 09 25 2D 41 24 26 2E 2D 3D 4C 49
 			29 01 00 00 00 00 10 BB 41 55 6B 6C 7D 87 9B AB AC B5 CC DA E8 F7 FF];
-		qcom,mdss-dsi-gamma2 = [
+		cm,mdss-livedisplay-preset-2 = [
 			29 01 00 00 00 00 06 F0 55 AA 52 08 00
 			29 01 00 00 00 00 11 D1 00 03 06 09 0C 0F 12 15 18 15 12 0F 0C 09 06 03
 			29 01 00 00 00 00 06 F0 55 AA 52 08 02
@@ -157,7 +157,7 @@
 			29 01 00 00 00 00 10 B9 51 62 79 7B 8E 96 A4 A6 B0 BA C5 D2 E2 F5 FF
 			29 01 00 00 00 00 0F BA 3B 3F 47 4E 55 5B 61 49 44 42 3E 4E 59 54
 			29 01 00 00 00 00 10 BB 4B 5C 73 75 88 8E 99 9A A3 AE B9 C7 DA F2 FF];
-		qcom,mdss-dsi-gamma3 = [
+		cm,mdss-livedisplay-preset-3 = [
 			29 01 00 00 00 00 06 F0 55 AA 52 08 00
 			29 01 00 00 00 00 11 D1 00 03 06 09 0C 0F 12 15 18 15 12 0F 0C 09 06 03
 			29 01 00 00 00 00 06 F0 55 AA 52 08 02
@@ -173,7 +173,7 @@
 			29 01 00 00 00 00 10 B9 5A 6A 80 82 94 9B A8 AA B3 BD C7 D4 E3 F5 FF
 			29 01 00 00 00 00 0F BA 00 0A 1E 2B 38 41 49 33 30 32 31 45 52 50
 			29 01 00 00 00 00 10 BB 48 5A 72 73 87 8E 98 9A A3 AD B7 C5 D8 F1 FF];
-		qcom,mdss-dsi-gamma4 = [
+		cm,mdss-livedisplay-preset-4 = [
 			29 01 00 00 00 00 06 F0 55 AA 52 08 02
 			29 01 00 00 00 00 0F B0 00 09 1C 29 36 3F 47 31 2E 31 30 44 52 4F
 			29 01 00 00 00 00 10 B1 47 5A 71 73 86 90 A3 A6 B0 BB C8 D5 E5 F6 FF
