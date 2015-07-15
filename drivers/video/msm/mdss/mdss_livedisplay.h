@@ -19,19 +19,38 @@
 
 #include "mdss_dsi.h"
 
-struct mdss_livedisplay_ctx {
-	struct dsi_panel_cmds cabc_off_cmd;
-	struct dsi_panel_cmds cabc_ui_cmd;
-	struct dsi_panel_cmds cabc_image_cmd;
-	struct dsi_panel_cmds cabc_video_cmd;
-	struct dsi_panel_cmds cabc_sre_cmd;
-	struct dsi_panel_cmds color_enhance_on_cmd;
-	struct dsi_panel_cmds color_enhance_off_cmd;
+#define MAX_PRESETS 10
 
-	unsigned int cabc_mode;
-	bool sre_enabled;
+struct mdss_livedisplay_ctx {
+	uint8_t cabc_ui_value;
+	uint8_t cabc_image_value;
+	uint8_t cabc_video_value;
+	uint8_t sre_weak_value;
+	uint8_t sre_medium_value;
+	uint8_t sre_strong_value;
+	uint8_t aco_value;
+
+	const uint8_t *ce_off_cmds;
+	const uint8_t *ce_on_cmds;
+	unsigned int ce_off_cmds_len;
+	unsigned int ce_on_cmds_len;
+
+	const uint8_t *presets[MAX_PRESETS];
+	unsigned int presets_len[MAX_PRESETS];
+
+	const uint8_t *cabc_cmds;
+	unsigned int cabc_cmds_len;
+
+	const uint8_t *post_cmds;
+	unsigned int post_cmds_len;
+
+	unsigned int preset;
+	unsigned int cabc_level;
+	unsigned int sre_level;
+	bool aco_enabled;
 	bool ce_enabled;
 
+	unsigned int num_presets;
 	unsigned int caps;
 
 	struct mutex lock;
@@ -46,10 +65,20 @@ enum {
 };
 
 enum {
-	MODE_CABC = 1,
-	MODE_SRE = 2,
-	MODE_COLOR_ENHANCE = 4,
-    MODE_UPDATE_ALL = MODE_CABC | MODE_SRE | MODE_COLOR_ENHANCE,
+	SRE_OFF,
+	SRE_WEAK,
+	SRE_MEDIUM,
+	SRE_STRONG,
+	SRE_MAX
+};
+
+enum {
+	MODE_CABC		= 0x01,
+	MODE_SRE		= 0x02,
+	MODE_AUTO_CONTRAST	= 0x04,
+	MODE_COLOR_ENHANCE	= 0x08,
+	MODE_PRESET		= 0x10,
+	MODE_UPDATE_ALL		= 0xFF,
 };
 
 int mdss_livedisplay_update(struct mdss_dsi_ctrl_pdata *ctrl_pdata, int types);
