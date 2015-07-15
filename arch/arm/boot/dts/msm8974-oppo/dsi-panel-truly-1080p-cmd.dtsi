@@ -120,22 +120,22 @@
 		cm,mdss-livedisplay-cabc-sre = [
 			15 01 00 00 10 00 02 55 60
 			05 01 00 00 10 00 02 29 00];
-		qcom,mdss-dsi-gamma1 = [
+		cm,mdss-livedisplay-preset-1 = [
 			23 01 00 00 01 00 02 b0 04
 			29 01 00 00 01 00 14 c8 01 05 04 ff fd 91 00 00 05 ff fc ba 00 00 03 00 02 fc 00
 			23 01 00 00 00 00 02 d6 01
 			23 01 00 00 01 00 02 b0 03];
-		qcom,mdss-dsi-gamma2 = [
+		cm,mdss-livedisplay-preset-2 = [
 			23 01 00 00 01 00 02 b0 04
 			29 01 00 00 01 00 14 c8 01 00 F0 F4 00 D5 00 00 E8 E6 02 BA 00 00 00 00 00 00 00
 			23 01 00 00 00 00 02 d6 01
 			23 01 00 00 01 00 02 b0 03];
-		qcom,mdss-dsi-gamma3 = [
+		cm,mdss-livedisplay-preset-3 = [
 			23 01 00 00 01 00 02 b0 04
 			29 01 00 00 01 00 14 c8 01 00 F0 F4 00 D5 00 00 00 00 00 00 00 00 F0 F0 00 FC 00
 			23 01 00 00 00 00 02 d6 01
 			23 01 00 00 01 00 02 b0 03];
-		qcom,mdss-dsi-gamma4 = [
+		cm,mdss-livedisplay-preset-4 = [
 			23 01 00 00 01 00 02 b0 04
 			29 01 00 00 01 00 14 c8 01 00 00 00 00 00 00 00 E8 E6 02 BA 00 00 F0 F0 00 FC 00
 			23 01 00 00 00 00 02 d6 01
