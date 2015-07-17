@@ -1,4 +1,3 @@
-
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -28,6 +27,7 @@
 //set charge parameter limit
 #define BQ24196_CHG_IBATMAX_MIN		512
 #define BQ24196_CHG_IBATMAX_MAX		2496
+#define BQ24196_CHG_IBATMAX_HRM		2048
 #define BQ24196_TERM_CURR_MIN		128
 #define BQ24196_TERM_CURR_MAX		2048
 #define BQ24196_CHG_IUSBMAX_MIN		100
@@ -47,10 +47,11 @@ struct bq24196_device_info {
 	struct i2c_client		*client;
 	struct task_struct		*feedwdt_task;
 	struct mutex			i2c_lock;
+	atomic_t suspended;
 
 	/* 300ms delay is needed after bq27541 is powered up
-	 * and before any successful I2C transaction
-	 */
+	* and before any successful I2C transaction
+	*/
 
 };
 
@@ -61,6 +62,10 @@ static int bq24196_read_i2c(struct bq24196_device_info *di,u8 reg,u8 length,char
 {
 	struct i2c_client *client = di->client;
 	int retval;
+
+	if (atomic_read(&di->suspended) == 1)
+	return -1;
+
 	mutex_lock(&bq24196_di->i2c_lock);
 	retval = i2c_smbus_read_i2c_block_data(client,reg,length,&buf[0]);
 	mutex_unlock(&bq24196_di->i2c_lock);
@@ -73,6 +78,10 @@ static int bq24196_write_i2c(struct bq24196_device_info *di,u8 reg,u8 length,cha
 {
 	struct i2c_client *client = di->client;
 	int retval;
+
+	if (atomic_read(&di->suspended) == 1)
+	return -1;
+
 	mutex_lock(&bq24196_di->i2c_lock);
 	retval = i2c_smbus_write_i2c_block_data(client,reg,length,&buf[0]);
 	mutex_unlock(&bq24196_di->i2c_lock);
@@ -90,13 +99,13 @@ static int bq24196_write(struct bq24196_device_info *di,u8 reg,u8 length,char *b
 	return di->bus->write(di,reg,length,buf);
 }
 
-static int 
+static int
 bq24196_chg_masked_write(struct bq24196_device_info *di, u8 reg,
-						u8 mask, u8 value, int length)
+u8 mask, u8 value, int length)
 {
 	int rc;
 	char buf[1]={0x0};
-	
+
 	rc = bq24196_read(di,reg,length,&buf[0]);
 	if ( rc < 0 ){
 		pr_err("bq24196 read i2c failed,reg_addr=0x%x,rc=%d\n",reg,rc);
@@ -114,7 +123,7 @@ bq24196_chg_masked_write(struct bq24196_device_info *di, u8 reg,
 }
 
 #define BQ24196_IBATMAX_BITS	0xFF
-static int 
+static int
 bq24196_ibatmax_set(struct bq24196_device_info *di, int chg_current)
 {
 	u8 value = 0;
@@ -124,7 +133,15 @@ bq24196_ibatmax_set(struct bq24196_device_info *di, int chg_current)
 		value <<= 2;
 		value |= 1;
 		return bq24196_chg_masked_write(di,CHARGE_CURRENT_CTRL,BQ24196_IBATMAX_BITS,value,1);
-	} else if(chg_current == 500) {
+	}
+	/* yangfangbiao@oneplus.cn, 2015/02/25	set charge current 300ma  */
+	else if(chg_current == 300) {
+		value = (1536 - BQ24196_CHG_IBATMAX_MIN)/64;
+		value <<= 2;
+		value |= 1;
+		return bq24196_chg_masked_write(di,CHARGE_CURRENT_CTRL,BQ24196_IBATMAX_BITS,value,1);
+	}
+	else if(chg_current == 500) {
 		value = (2496 - BQ24196_CHG_IBATMAX_MIN)/64;
 		value <<= 2;
 		value |= 1;
@@ -135,7 +152,12 @@ bq24196_ibatmax_set(struct bq24196_device_info *di, int chg_current)
 			chg_current = BQ24196_CHG_IBATMAX_MIN;
 			pr_err("bad ibatmA=%d,default to 512mA\n", chg_current);
 		}
-		
+
+		// Jingchun.Wang@Phone.Bsp.Driver, 2014/09/30  Add for avoid BATFET OCP when ibat<1024mA
+		if(chg_current < 1024) {
+			chg_current = BQ24196_CHG_IBATMAX_HRM;
+		}
+
 
 		value = (chg_current - BQ24196_CHG_IBATMAX_MIN)/64;
 		value <<= 2;
@@ -145,7 +167,7 @@ bq24196_ibatmax_set(struct bq24196_device_info *di, int chg_current)
 }
 
 #define BQ24196_IBATTERM_BITS	0xF
-static int 
+static int
 bq24196_ibatterm_set(struct bq24196_device_info *di, int term_current)
 {
 	u8 value = 0;
@@ -156,11 +178,11 @@ bq24196_ibatterm_set(struct bq24196_device_info *di, int term_current)
 	}
 
 	value = (term_current - BQ24196_TERM_CURR_MIN)/128;
-	return bq24196_chg_masked_write(di,PRECHARGE_TERMCURR_CTRL,BQ24196_IBATTERM_BITS,value,1);		
+	return bq24196_chg_masked_write(di,PRECHARGE_TERMCURR_CTRL,BQ24196_IBATTERM_BITS,value,1);
 }
 
 #define BQ24196_IUSBMAX_BITS	0X07
-static int 
+static int
 bq24196_iusbmax_set(struct bq24196_device_info *di, int mA)
 {
 	u8 value = 0;
@@ -172,30 +194,30 @@ bq24196_iusbmax_set(struct bq24196_device_info *di, int mA)
 	}
 
 	if( mA == BQ24196_CHG_IUSBMAX_MAX )
-		value = 0x7;
+	value = 0x7;
 	else if( mA >= 2000 )
-		value = 0x6;
+	value = 0x6;
 	else if( mA >= 1500 )
-		value = 0x5;
+	value = 0x5;
 	else if( mA >= 1200 )
-		value = 0x4;
+	value = 0x4;
 	else if( mA >= 900 )
-		value = 0x3;
+	value = 0x3;
 	else if( mA >= 500 )
-		value = 0x2;
+	value = 0x2;
 	else if( mA >= 150 )
-		value = 0x1;
+	value = 0x1;
 	else if( mA >= 100 )
-		value = 0x0;
+	value = 0x0;
 	return bq24196_chg_masked_write(di,INPUT_SOURCE_CTRL,BQ24196_IUSBMAX_BITS,value,1);
 }
 
 #define BQ24196_VBATDET_BITS	0x1
-static int 
+static int
 bq24196_vbatdet_set(struct bq24196_device_info *di, int vbatdet)
 {
 	u8 value = 0;
-	
+
 	if( vbatdet == 100 ){
 		value = 0x0;
 	}
@@ -203,9 +225,10 @@ bq24196_vbatdet_set(struct bq24196_device_info *di, int vbatdet)
 		value = 0x1;
 	}
 	else{
+		/* yangfangbiao@oneplus.cn, 2015/03/11  vbatdetdefault to 100mv  */
 		value = 0x0;
 		pr_err("bad vbatdet:%d,default to 100mv\n",vbatdet);
-		
+
 	}
 	return bq24196_chg_masked_write(di,CHARGE_VOL_CTRL,BQ24196_VBATDET_BITS,value,1);
 }
@@ -214,18 +237,18 @@ bq24196_vbatdet_set(struct bq24196_device_info *di, int vbatdet)
 #define BQ24196_CHG_VDDMAX_MAX 4400
 #define BQ24196_VDDMAX_BITS		0xFC
 
-static int 
+static int
 bq24196_vddmax_set(struct bq24196_device_info *di, int voltage)
 {
 	u8 value = 0;
 	pr_info("%s voltage:%d\n",__func__,voltage);
-	
+
 	if (voltage < BQ24196_CHG_VDDMAX_MIN
 			|| voltage > BQ24196_CHG_VDDMAX_MAX) {
 		pr_err("bad vddmax mV=%d asked to set\n", voltage);
 		return -EINVAL;
 	}
-		
+
 	value = (voltage - BQ24196_CHG_VDDMAX_MIN)/16;
 	value <<= 2;
 
@@ -235,7 +258,7 @@ bq24196_vddmax_set(struct bq24196_device_info *di, int voltage)
 #define BQ24196_VINMIN_MIN	3880
 #define BQ24196_VINMIN_MAX	5080
 #define BQ24196_VINMIN_BITS	0x78
-static int 
+static int
 bq24196_vinmin_set(struct bq24196_device_info *di, int voltage)
 {
 	u8 value = 0;
@@ -252,110 +275,110 @@ bq24196_vinmin_set(struct bq24196_device_info *di, int voltage)
 }
 
 #define BQ24196_CHARGE_TIMEOUT_BITS		0x06
-static int 
+static int
 bq24196_check_charge_timeout(struct bq24196_device_info *di,int hours)
 {
 	u8 value = 0;
-	
+
 	if( hours >= 20 )	//20 hours
-		value = 0x06;
+	value = 0x06;
 	else if( hours >= 12 )	//12 hours
-		value = 0x04;
+	value = 0x04;
 	else if( hours >= 8 )	//8 hours
-		value = 0x02;
+	value = 0x02;
 	else					//5 hours
-		value = 0x0;
+	value = 0x0;
 	return bq24196_chg_masked_write(di,CHARGE_TERM_TIMER_CTRL,BQ24196_CHARGE_TIMEOUT_BITS,value,1);
 }
 
 #define BQ24196_OTG_CURRENT_BITS	0x01
-static int 
+static int
 bq24196_otg_current_set(struct bq24196_device_info *di,int otg_current)
 {
 	u8 value = 0;
 	// otg current:default 1.3A, modify to 500ma
 	if(otg_current >= 1000)
-		value = 0x1;	//1300ma
+	value = 0x1;	//1300ma
 	else
-		value = 0x0;	//500ma
+	value = 0x0;	//500ma
 	return bq24196_chg_masked_write(di,POWER_ON_CONF,BQ24196_OTG_CURRENT_BITS,value,1);
 }
 
 #define BQ24196_WDT_SET_BITS		0x30
-static int 
+static int
 bq24196_wdt_set(struct bq24196_device_info *di,int seconds)
 {
 	u8 value = 0;
 	if(seconds == 0)	//disable wdt
-		value = 0x0;
+	value = 0x0;
 	else if(seconds == 40)
-		value = 0x10;
+	value = 0x10;
 	else if(seconds == 80)
-		value = 0x20;
+	value = 0x20;
 	else if(seconds == 160)
-		value = 0x30;
+	value = 0x30;
 	else
-		pr_err("%s bad seconds:%d\n",__func__,seconds);
+	pr_err("%s bad seconds:%d\n",__func__,seconds);
 	return bq24196_chg_masked_write(di,CHARGE_TERM_TIMER_CTRL,BQ24196_WDT_SET_BITS,value,1);
 }
 
 #define BQ24196_REGS_RESET_BITS		0x80
-static int 
+static int
 bq24196_regs_reset(struct bq24196_device_info *di,int reset)
 {
 	u8 value = 0;
 	if(reset)	// 1 is reset
-		value = 0x80;
+	value = 0x80;
 	else
-		value = 0x0;
+	value = 0x0;
 	return bq24196_chg_masked_write(di,POWER_ON_CONF,BQ24196_REGS_RESET_BITS,value,1);
 }
 
 #define BQ24196_CHARGEEN_BITS	0x30
-static int 
+static int
 bq24196_charge_en(struct bq24196_device_info *di, int enable)
 {
 	u8 value = 0;
 	pr_info("%s enable:%d\n",__func__,enable);
 
 	if( enable == 1 )	//enable charge
-		value = 0x10;
+	value = 0x10;
 	else if( enable == 0 )	//disable charge
-		value = 0x0;
+	value = 0x0;
 	else if( enable == 2 )	//OTG
-		value = 0x20;
+	value = 0x20;
 	return bq24196_chg_masked_write(di,POWER_ON_CONF,BQ24196_CHARGEEN_BITS,value,1);
 }
 
-static int 
+static int
 bq24196_get_charge_en(struct bq24196_device_info *di)
 {
 	char value_buf;
 	int rc;
-		
+
 	rc = bq24196_read(di,POWER_ON_CONF,1,&value_buf);
 	if(rc < 0) {
 		pr_err("read charge en status fail\n");
 		return 0;
 	}
 	if((value_buf & 0x30) == 0x0)//disable charge
-		return 0;
+	return 0;
 	else if((value_buf & 0x30) == 0x10) //enable charge
-		return 1;
+	return 1;
 	else //OTG
-		return 2;
+	return 2;
 }
 
 #define BQ24196_USB_SUSPEND_ENABLE_BITS	0x80
-static int 
+static int
 bq24196_usb_suspend_enable(struct bq24196_device_info *di,int enable)
 {
 	u8 value = 0x0;
 	pr_info("%s enable:%d\n",__func__,enable);
 	if(enable)
-		value = 0x80;
+	value = 0x80;
 	else
-		value = 0x0;
+	value = 0x0;
 	return bq24196_chg_masked_write(di,INPUT_SOURCE_CTRL,BQ24196_USB_SUSPEND_ENABLE_BITS,value,1);
 }
 
@@ -363,7 +386,7 @@ static int bq24196_get_system_status(struct bq24196_device_info *di)
 {
 	char value_buf;
 	int rc;
-		
+
 	rc = bq24196_read(di,SYS_STS,1,&value_buf);
 	if(rc < 0) {
 		pr_err("read system status fail\n");
@@ -417,7 +440,7 @@ static int bq24196_chg_regs_reset(int reset)
 }
 
 static int bq24196_chg_charge_en(int enable)
-{	
+{
 	return bq24196_charge_en(bq24196_di,enable);
 }
 
@@ -475,20 +498,20 @@ static int bq24196_probe(struct i2c_client *client, const struct i2c_device_id *
 	struct bq24196_access_methods *bus;
 	int num;
 	int retval = 0;
-	
+
 	printk("lfc bq24196_probe\n");
 	if(!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		printk("lfc bq24196_probe,i2c_func error\n");
 		goto err_check_functionality_failed;
-		}
+	}
 	/* Get new ID for the new battery device */
 	retval = idr_pre_get(&bq24196_charger_id, GFP_KERNEL);
 	if (retval == 0)
-		return -ENOMEM;
+	return -ENOMEM;
 	retval = idr_get_new(&bq24196_charger_id, client, &num);
 	if (retval < 0)
-		return retval;
-	
+	return retval;
+
 	name = kasprintf(GFP_KERNEL, "%s-%d", id->name, num);
 	if (!name) {
 		dev_err(&client->dev, "failed to allocate device name\n");
@@ -507,11 +530,11 @@ static int bq24196_probe(struct i2c_client *client, const struct i2c_device_id *
 	bus = kzalloc(sizeof(*bus), GFP_KERNEL);
 	if (!bus) {
 		dev_err(&client->dev, "failed to allocate access method "
-					"data\n");
+		"data\n");
 		retval = -ENOMEM;
 		goto bq24196_chg_failed_3;
 	}
-	
+
 	i2c_set_clientdata(client, di);
 	di->dev = &client->dev;
 	bus->read = &bq24196_read_i2c;
@@ -520,29 +543,30 @@ static int bq24196_probe(struct i2c_client *client, const struct i2c_device_id *
 	di->client = client;
 	bq24196_client = client;
 	bq24196_di = di;
+	atomic_set(&di->suspended, 0);
 	mutex_init(&di->i2c_lock);
 	bq24196_hw_config_init(di);
-	
+
 	return 0;
-	
-err_check_functionality_failed:
+
+	err_check_functionality_failed:
 	printk("lfc bq24196_probe fail\n");
 	return 0;
 
-bq24196_chg_failed_3:
+	bq24196_chg_failed_3:
 	kfree(di);
-bq24196_chg_failed_2:
+	bq24196_chg_failed_2:
 	kfree(name);
-bq24196_chg_failed_1:
+	bq24196_chg_failed_1:
 	idr_remove(&bq24196_charger_id,num);
-	return retval;	
+	return retval;
 }
-    
+
 
 static int bq24196_remove(struct i2c_client *client)
 {
 	qpnp_external_charger_unregister(&bq24196_charger);
-    return 0;
+	return 0;
 }
 
 static const struct of_device_id bq24196_match[] = {
@@ -557,11 +581,35 @@ static const struct i2c_device_id bq24196_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, bq24196_id);
 
+static int bq24196_suspend(struct device *dev)
+{
+	struct bq24196_device_info *chip = dev_get_drvdata(dev);
+
+	atomic_set(&chip->suspended, 1);
+
+	return 0;
+}
+
+static int bq24196_resume(struct device *dev)
+{
+	struct bq24196_device_info *chip = dev_get_drvdata(dev);
+
+	atomic_set(&chip->suspended, 0);
+
+	return 0;
+}
+
+static const struct dev_pm_ops bq24196_pm_ops = {
+	.resume		= bq24196_resume,
+	.suspend		= bq24196_suspend,
+};
+
 static struct i2c_driver bq24196_charger_driver = {
 	.driver		= {
 		.name = "bq24196_charger",
 		.owner	= THIS_MODULE,
 		.of_match_table = bq24196_match,
+		.pm		= &bq24196_pm_ops,
 	},
 	.probe		= bq24196_probe,
 	.remove		= bq24196_remove,
@@ -573,7 +621,7 @@ static int __init bq24196_charger_init(void)
 	int ret;
 	ret = i2c_add_driver(&bq24196_charger_driver);
 	if (ret)
-		printk(KERN_ERR "Unable to register bq24196_charger driver\n");
+	printk(KERN_ERR "Unable to register bq24196_charger driver\n");
 	return ret;
 }
 module_init(bq24196_charger_init);
@@ -587,4 +635,3 @@ module_exit(bq24196_charger_exit);
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Qualcomm Innovation Center, Inc.");
 MODULE_DESCRIPTION("BQ24196 battery charger driver");
-
