@@ -918,7 +918,7 @@ static int flash_proc_read(char *page, char **start, off_t off, int count,
 {
     ssize_t read_size = -EINVAL;
     int *pold_mode = &fctrl.led_info->test_mode;
-#ifdef VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
 /*oppo hufeng 20150314 add to avoid null pointer*/
     if (!page)
     {
@@ -940,7 +940,7 @@ static int flash_proc_write(struct file *filp, const char __user *buff,
     bool need_off = 0;
     bool need_on = 0;
 
-#ifdef VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
 /*oppo hufeng 20150314 add to avoid null pointer*/
     pr_err("flash_proc write enter!\n");
     if (!buff)

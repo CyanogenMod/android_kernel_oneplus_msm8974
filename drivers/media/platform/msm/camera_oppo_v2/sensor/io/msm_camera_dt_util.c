@@ -444,7 +444,7 @@ int msm_camera_get_dt_power_setting_data(struct device_node *of_node,
 			else if (!strcmp(seq_name, "sensor_gpio_vdig"))
 				ps[i].seq_val = SENSOR_GPIO_VDIG;
 /*2014-09-09 jindian.guan add for reason*/
-#ifdef VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
 			else if (!strcmp(seq_name, "sensor_gpio_vana"))
 				ps[i].seq_val = SENSOR_GPIO_VANA;
 #endif

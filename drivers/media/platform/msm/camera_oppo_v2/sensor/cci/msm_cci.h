@@ -21,7 +21,7 @@
 #include <mach/camera2.h>
 #include "msm_sd.h"
 /*Added by Jinshui.Liu@Camera 20140221 start for cci error*/
-#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
 #include <linux/wakelock.h>
 #endif
 /*Added by Jinshui.Liu@Camera 20140221 end*/
@@ -144,7 +144,7 @@ struct cci_device {
 	struct gpio *cci_gpio_tbl;
 	uint8_t cci_gpio_tbl_size;
 /*Added by Jinshui.Liu@Camera 20140221 start for cci error*/
-#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_MACH_OPPO
 	struct wake_lock cci_wakelock;
 #endif
 /*Added by Jinshui.Liu@Camera 20140221 end*/
