@@ -12,6 +12,7 @@
 
 /include/ "msm8974-oppo-common.dtsi"
 /include/ "msm8974-oppo-camera.dtsi"
+/include/ "msm8974-oppo-camera-sensor.dtsi"
 /include/ "msm8974-oppo-input.dtsi"
 /include/ "msm8974-oppo-usb.dtsi"
 /include/ "msm8974-oppo-misc.dtsi"
