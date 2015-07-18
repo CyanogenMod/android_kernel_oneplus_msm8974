@@ -1,5 +1,5 @@
-#ifdef CONFIG_OPPO_CAMERA
-#include <media/msm_cam_sensor_oppo.h>
+#ifdef CONFIG_ONEPLUS_CAMERA
+#include <media/msm_cam_sensor_oneplus.h>
 #else
 
 #ifndef __LINUX_MSM_CAM_SENSOR_H

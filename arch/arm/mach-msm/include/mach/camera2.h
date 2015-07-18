@@ -11,8 +11,8 @@
  *
  */
 
-#ifdef CONFIG_OPPO_CAMERA
-#include <mach/camera2-oppo.h>
+#ifdef CONFIG_ONEPLUS_CAMERA
+#include <mach/camera2-oneplus.h>
 #else
 
 #ifndef __CAMERA2_H__

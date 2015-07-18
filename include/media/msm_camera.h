@@ -10,8 +10,8 @@
  * GNU General Public License for more details.
  *
  */
-#ifdef CONFIG_OPPO_CAMERA
-#include <media/msm_camera_oppo.h>
+#ifdef CONFIG_ONEPLUS_CAMERA
+#include <media/msm_camera_oneplus.h>
 #else
 
 #ifndef __LINUX_MSM_CAMERA_H

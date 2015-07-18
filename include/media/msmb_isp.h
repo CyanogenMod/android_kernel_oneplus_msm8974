@@ -10,8 +10,8 @@
  * GNU General Public License for more details.
  */
 
-#ifdef CONFIG_OPPO_CAMERA
-#include <media/msmb_isp_oppo.h>
+#ifdef CONFIG_ONEPLUS_CAMERA
+#include <media/msmb_isp_oneplus.h>
 #else
 #ifndef __MSMB_ISP__
 #define __MSMB_ISP__
@@ -441,4 +441,4 @@ struct msm_isp_event_data {
 
 #endif /* __MSMB_ISP__ */
 
-#endif // CONFIG_OPPO_CAMERA
+#endif // CONFIG_ONEPLUS_CAMERA
