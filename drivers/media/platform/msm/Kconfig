@@ -34,18 +34,34 @@ config MSMB_CAMERA_DEBUG
 	---help---
 	  Enable printk() debug for msm camera 2.0
 
-menuconfig ONEPLUS_CAMERA
+choice
+	prompt "Camera stack variant"
+	depends on MSMB_CAMERA && MACH_OPPO
+	default MSMB_CAMERA_DEFAULT
+
+config MSMB_CAMERA_DEFAULT
+	bool "Default Qualcomm camera stack"
+
+config ONEPLUS_CAMERA
 	bool "OnePlus' variant of the camera stack"
-	depends on ARCH_MSM && VIDEO_V4L2 && I2C && MSMB_CAMERA && MACH_OPPO
-	default n
 	---help---
 	  Enable the old OnePlus camera code
+
+config OPPO_CAMERA
+	bool "Oppo's variant of the camera stack"
+	---help---
+	  Enable the old Oppo camera code
+
+endchoice
 
 if MSMB_CAMERA
 if ONEPLUS_CAMERA
 source "drivers/media/platform/msm/camera_oneplus_v2/Kconfig"
 endif
-if !ONEPLUS_CAMERA
+if OPPO_CAMERA
+source "drivers/media/platform/msm/camera_oppo_v2/Kconfig"
+endif
+if MSMB_CAMERA_DEFAULT
 source "drivers/media/platform/msm/camera_v2/Kconfig"
 endif
 endif # MSMB_CAMERA
