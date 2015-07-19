@@ -295,6 +295,11 @@ int mdss_livedisplay_update(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		return -ENODEV;
 
 	mlc = pinfo->livedisplay;
+	if (mlc == NULL)
+		return -ENODEV;
+
+	if (mlc->mfd == NULL)
+		return -ENODEV;
 
 	mutex_lock(&mlc->lock);
 	ret = mdss_livedisplay_update_locked(ctrl_pdata, types);
