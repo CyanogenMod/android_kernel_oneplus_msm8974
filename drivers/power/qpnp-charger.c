@@ -250,9 +250,10 @@
 
 #define AUTO_CHARGING_BATT_TEMP_T0				-100
 #define AUTO_CHARGING_BATT_TEMP_T1				0
-#define AUTO_CHARGING_BATT_TEMP_T2				50
-#define AUTO_CHARGING_BATT_TEMP_T3				450
-#define AUTO_CHARGING_BATT_TEMP_T4				550
+#define AUTO_CHARGING_BATT_TEMP_T2				100
+#define AUTO_CHARGING_BATT_TEMP_T3				150
+#define AUTO_CHARGING_BATT_TEMP_T4				450
+#define AUTO_CHARGING_BATT_TEMP_T5				550
 #define AUTO_CHARGING_BATT_REMOVE_TEMP				-400
 #define AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_HOT_TO_WARM	30
 #define AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_WARM_TO_NORMAL	10
@@ -286,23 +287,6 @@ enum chg_battery_status_type {
 	BATTERY_STATUS_INVALID
 };
 
-typedef enum {
-	/*! Battery is cold           */
-	CV_BATTERY_TEMP_REGION__COLD,
-	/*! Battery is little cold    */
-	CV_BATTERY_TEMP_REGION__LITTLE_COLD,
-	/*! Battery is cool           */
-	CV_BATTERY_TEMP_REGION__COOL,
-	/*! Battery is normal         */
-	CV_BATTERY_TEMP_REGION__NORMAL,
-	/*! Battery is warm           */
-	CV_BATTERY_TEMP_REGION__WARM,
-	/*! Battery is hot            */
-	CV_BATTERY_TEMP_REGION__HOT,
-	/*! Invalid battery temp region */
-	CV_BATTERY_TEMP_REGION__INVALID,
-} chg_cv_battery_temp_region_type;
-
 static bool use_fake_temp = false;
 static int fake_temp = 300;
 static bool use_fake_chgvol = false;
@@ -316,6 +300,7 @@ static struct qpnp_battery_gauge *qpnp_batt_gauge = NULL;
 static struct qpnp_external_charger *qpnp_ext_charger = NULL;
 #endif
 
+struct qpnp_chg_chip *g_chip;
 #endif
 
 struct qpnp_chg_irq {
@@ -495,8 +480,10 @@ struct qpnp_chg_chip {
 	unsigned int			usb_trim_default;
 	u8				chg_temp_thresh_default;
 #ifdef CONFIG_MACH_OPPO
-	unsigned int			little_cold_bat_mv;
 	bool				chg_display_full;
+	int				usb_present_count;
+	unsigned int			little_cold_bat_mv;
+	unsigned int			little_cool_bat_mv;
 	struct delayed_work		update_heartbeat_work;
 	enum chg_charger_status_type	charger_status;
 	chg_cv_battery_temp_region_type	mBatteryTempRegion;
@@ -505,9 +492,11 @@ struct qpnp_chg_chip {
 	short				mBatteryTempBoundT2;
 	short				mBatteryTempBoundT3;
 	short				mBatteryTempBoundT4;
+	short				mBatteryTempBoundT5;
 	enum chg_battery_status_type	battery_status;
 	int				batt_health;
 	bool				time_out;
+	bool				aicl_interrupt;
 	unsigned int			aicl_current;
 #ifdef CONFIG_BQ24196_CHARGER
 	struct work_struct		start_charge_work;
@@ -519,6 +508,7 @@ struct qpnp_chg_chip {
 #endif
 	atomic_t			suspended;
 	unsigned int			usbin_counts;
+	bool				normal_chg_stopped_by_fastchg;
 #endif
 };
 
@@ -1131,6 +1121,7 @@ qpnp_chg_iusb_trim_set(struct qpnp_chg_chip *chip, int trim)
 	return rc;
 }
 
+#define IOVP_USB_WALL_TRSH_MA   150
 #ifdef CONFIG_BQ24196_CHARGER
 static int
 qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
@@ -1152,7 +1143,6 @@ qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 	}
 }
 #else
-#define IOVP_USB_WALL_TRSH_MA   150
 static int
 qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 {
@@ -1859,6 +1849,8 @@ qpnp_chg_set_appropriate_vddmax(struct qpnp_chg_chip *chip)
 		qpnp_chg_vddmax_set(chip, chip->little_cold_bat_mv);
 	else if (chip->mBatteryTempRegion == CV_BATTERY_TEMP_REGION__COOL)
 		qpnp_chg_vddmax_set(chip, chip->cool_bat_mv);
+	else if (chip->mBatteryTempRegion == CV_BATTERY_TEMP_REGION__LITTLE_COOL)
+		qpnp_chg_vddmax_set(chip, chip->little_cool_bat_mv);
 	else if (chip->mBatteryTempRegion == CV_BATTERY_TEMP_REGION__WARM)
 		qpnp_chg_vddmax_set(chip, chip->warm_bat_mv);
 	else
@@ -2132,6 +2124,7 @@ qpnp_chg_regulator_batfet_set(struct qpnp_chg_chip *chip, bool enable)
 {
 	int rc = 0;
 
+#ifndef CONFIG_MACH_OPPO
 	if (chip->charging_disabled || !chip->bat_if_base)
 		return rc;
 
@@ -2145,11 +2138,14 @@ qpnp_chg_regulator_batfet_set(struct qpnp_chg_chip *chip, bool enable)
 			chip->bat_if_base + CHGR_BAT_IF_BATFET_CTRL4,
 			BATFET_LPM_MASK,
 			enable ? BATFET_NO_LPM : BATFET_LPM, 1);
+#endif
 
 	return rc;
 }
 
 #ifdef CONFIG_MACH_OPPO
+static int qpnp_charger_type_get(struct qpnp_chg_chip *chip);
+
 #define USB_WALL_THRESHOLD_MA	2000
 #else
 #define USB_WALL_THRESHOLD_MA	500
@@ -2209,18 +2205,16 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 			}
 			if (!qpnp_chg_is_dc_chg_plugged_in(chip))
 				chip->chg_done = false;
-#endif
-#ifdef CONFIG_BQ24196_CHARGER
-			schedule_work(&chip->stop_charge_work);
-#else
 
 			if (!qpnp_is_dc_higher_prio(chip))
 				qpnp_chg_idcmax_set(chip, chip->maxinput_dc_ma);
 
 			qpnp_chg_usb_suspend_enable(chip, 0);
 			qpnp_chg_iusbmax_set(chip, QPNP_CHG_I_MAX_MIN_100);
-#endif
 			qpnp_chg_iusb_trim_set(chip, chip->usb_trim_default);
+#else
+			schedule_work(&chip->stop_charge_work);
+#endif
 			chip->prev_usb_max_ma = -EINVAL;
 #ifdef CONFIG_MACH_OPPO
 			chip->usbin_counts = 0;
@@ -2248,20 +2242,24 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 				}
 			}
 #endif
-
 			schedule_delayed_work(&chip->eoc_work,
 				msecs_to_jiffies(EOC_CHECK_PERIOD_MS));
-			schedule_work(&chip->soc_check_work);
 #ifdef CONFIG_MACH_OPPO
 			pm_stay_awake(chip->dev);
+#endif
+			schedule_work(&chip->soc_check_work);
+#ifdef CONFIG_MACH_OPPO
 			power_supply_changed(&chip->dc_psy);
 #endif
 		}
 
 		power_supply_set_present(chip->usb_psy, chip->usb_present);
-		schedule_work(&chip->batfet_lcl_work);
 #ifdef CONFIG_MACH_OPPO
-		if (!usb_present) {
+		if (qpnp_charger_type_get(chip) != POWER_SUPPLY_TYPE_USB_DCP) {
+			chip->aicl_interrupt = false;
+		}
+
+		if (!usb_present && !chip->aicl_interrupt) {
 			power_supply_set_online(chip->usb_psy, 0);
 			power_supply_set_current_limit(chip->usb_psy, 0);
 			power_supply_set_online(&chip->dc_psy, 0);
@@ -2269,9 +2267,10 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 		}
 #endif
 #ifdef CONFIG_BQ24196_CHARGER
-		if (is_work_struct_init)
+		if (is_work_struct_init && !chip->aicl_interrupt)
 			schedule_work(&chip->ext_charger_hwinit_work);
 #endif
+		schedule_work(&chip->batfet_lcl_work);
 	}
 
 #ifdef CONFIG_BQ24196_CHARGER
@@ -2847,6 +2846,9 @@ static enum power_supply_property pm_power_props_mains[] = {
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
+#ifdef CONFIG_PIC1503_FASTCG
+	POWER_SUPPLY_PROP_FASTCHARGER,
+#endif
 };
 
 static enum power_supply_property msm_batt_power_props[] = {
@@ -2899,10 +2901,6 @@ module_param(charger_monitor, int, 0644);
 
 static int ext_ovp_present;
 module_param(ext_ovp_present, int, 0444);
-
-#ifdef CONFIG_MACH_OPPO
-static int qpnp_charger_type_get(struct qpnp_chg_chip *chip);
-#endif
 
 #define OVP_USB_WALL_TRSH_MA   200
 static int
@@ -3053,6 +3051,14 @@ chg_cv_battery_temp_region_type qpnp_battery_temp_region_get(
 		struct qpnp_chg_chip *chip)
 {
 	return chip->mBatteryTempRegion;
+}
+
+int
+fuelgauge_battery_temp_region_get(void)
+{
+	if (!g_chip)
+		return CV_BATTERY_TEMP_REGION__NORMAL;
+	return qpnp_battery_temp_region_get(g_chip);
 }
 
 static void
@@ -3228,6 +3234,14 @@ get_prop_batt_status(struct qpnp_chg_chip *chip)
 	} else {
 		return POWER_SUPPLY_STATUS_DISCHARGING;
 	}
+}
+
+int
+get_charging_status(void)
+{
+	if (!g_chip)
+		return POWER_SUPPLY_STATUS_DISCHARGING;
+	return get_prop_batt_status(g_chip);
 }
 #else
 static int
@@ -3514,61 +3528,36 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 			qpnp_chg_iusbmax_set(chip, QPNP_CHG_I_MAX_MIN_100);
 #endif
 #ifdef CONFIG_MACH_OPPO
-			qpnp_battery_temp_region_set(chip, CV_BATTERY_TEMP_REGION__INVALID);
+			qpnp_battery_temp_region_set(chip,
+					CV_BATTERY_TEMP_REGION__INVALID);
 			chip->charger_status = CHARGER_STATUS_GOOD;
 			chip->aicl_current = 0;
 #endif
 		} else {
 #ifdef CONFIG_MACH_OPPO
 			qpnp_check_charger_uovp(chip);
-			if (qpnp_battery_temp_region_get(chip) != CV_BATTERY_TEMP_REGION__HOT &&
-				qpnp_battery_temp_region_get(chip) != CV_BATTERY_TEMP_REGION__COLD &&
-				chip->charger_status != CHARGER_STATUS_OVER &&
-				qpnp_battery_status_get(chip) != BATTERY_STATUS_BAD) {
-				qpnp_chg_usb_suspend_enable(chip, 0);
-				qpnp_chg_charge_en(chip, !chip->charging_disabled);
-				power_supply_changed(&chip->batt_psy);
-				if (((ret.intval / 1000) > USB_WALL_THRESHOLD_MA)
-						&& (charger_monitor ||
-						!chip->charger_monitor_checked)) {
-					if (!ext_ovp_present) {
-						qpnp_chg_iusbmax_set(chip,
-							USB_WALL_THRESHOLD_MA);
-#ifdef CONFIG_BQ24196_CHARGER
-						qpnp_chg_ibatmax_set(chip, USB_WALL_THRESHOLD_MA);
+
+			if (qpnp_battery_temp_region_get(chip) !=
+					CV_BATTERY_TEMP_REGION__HOT &&
+					qpnp_battery_temp_region_get(chip) !=
+					CV_BATTERY_TEMP_REGION__COLD &&
+					chip->charger_status !=
+					CHARGER_STATUS_OVER &&
+					qpnp_battery_status_get(chip) !=
+					BATTERY_STATUS_BAD) {
 #endif
-					} else {
-						qpnp_chg_iusbmax_set(chip,
-							OVP_USB_WALL_TRSH_MA);
-#ifdef CONFIG_BQ24196_CHARGER
-						qpnp_chg_ibatmax_set(chip, OVP_USB_WALL_TRSH_MA);
-#endif
-					}
-				} else {
-					if (get_prop_fast_chg_started(chip)) {
-						qpnp_start_charging(chip);
-					}
-				}
-#ifndef CONFIG_BQ24196_CHARGER
-				if ((chip->flags & POWER_STAGE_WA)
-						&& ((ret.intval / 1000) > USB_WALL_THRESHOLD_MA)
-						&& !chip->power_stage_workaround_running
-						&& chip->power_stage_workaround_enable) {
-					chip->power_stage_workaround_running = true;
-					pr_debug("usb wall chg inserted starting power stage workaround charger_monitor = %d\n",
-							charger_monitor);
-					schedule_work(&chip->reduce_power_stage_work);
-				}
-#endif
-				power_supply_changed(&chip->batt_psy);
-			}
-#else
+#ifndef CONFIG_MACH_OPPO
 			qpnp_chg_usb_suspend_enable(chip, 0);
+#endif
 			if (qpnp_is_dc_higher_prio(chip)
 				&& qpnp_chg_is_dc_chg_plugged_in(chip)) {
 					pr_debug("dc has higher priority\n");
 					qpnp_chg_iusbmax_set(chip,
 							QPNP_CHG_I_MAX_MIN_100);
+#ifdef CONFIG_MACH_OPPO
+			qpnp_chg_charge_en(chip, !chip->charging_disabled);
+			power_supply_changed(&chip->batt_psy);
+#endif
 			} else if (((ret.intval / 1000) > USB_WALL_THRESHOLD_MA)
 					&& (charger_monitor ||
 					!chip->charger_monitor_checked)) {
@@ -3578,6 +3567,10 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 					if (unlikely(ext_ovp_present)) {
 						qpnp_chg_iusbmax_set(chip,
 							OVP_USB_WALL_TRSH_MA);
+#ifdef CONFIG_BQ24196_CHARGER
+						qpnp_chg_ibatmax_set(chip,
+							USB_WALL_THRESHOLD_MA);
+#endif
 					} else if (unlikely(
 							ext_ovp_isns_present)) {
 						qpnp_chg_iusb_trim_set(chip,
@@ -3587,9 +3580,19 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 					} else {
 						qpnp_chg_iusbmax_set(chip,
 							USB_WALL_THRESHOLD_MA);
+#ifdef CONFIG_BQ24196_CHARGER
+						qpnp_chg_ibatmax_set(chip,
+							OVP_USB_WALL_TRSH_MA);
+#endif
 					}
 			} else {
+#ifdef CONFIG_MACH_OPPO
+				if (get_prop_fast_chg_started(chip) == false) {
+					qpnp_start_charging(chip);
+				}
+#else
 				qpnp_chg_iusbmax_set(chip, ret.intval / 1000);
+#endif
 			}
 
 #ifndef CONFIG_BQ24196_CHARGER
@@ -3603,14 +3606,21 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 				schedule_work(&chip->reduce_power_stage_work);
 			}
 #endif
+#ifdef CONFIG_PIC1503_FASTCG
+			switch_fast_chg(chip);
+#endif
+#ifdef CONFIG_MACH_OPPO
+			}
 #endif
 		}
 	}
 
 skip_set_iusb_max:
 	pr_debug("end of power supply changed\n");
+#ifndef CONFIG_MACH_OPPO
 	pr_debug("psy changed batt_psy\n");
 	power_supply_changed(&chip->batt_psy);
+#endif
 }
 
 static int
@@ -3624,6 +3634,14 @@ qpnp_batt_power_get_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
 		val->intval = get_prop_batt_status(chip);
+#ifdef CONFIG_MACH_OPPO
+		if (val->intval == POWER_SUPPLY_STATUS_FULL
+				&& (qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__LITTLE_COOL
+				|| qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__NORMAL)
+				&& get_prop_capacity(chip) < 100) {
+			val->intval = POWER_SUPPLY_STATUS_CHARGING;
+		}
+#endif
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_TYPE:
 		val->intval = get_prop_charge_type(chip);
@@ -4169,10 +4187,12 @@ static void qpnp_chg_ext_charger_hwinit(struct qpnp_chg_chip *chip)
 	qpnp_chg_ext_charger_reset(chip, 0); // Reset bq24196 regs to default
 	qpnp_chg_ext_charger_wdt_set(chip, 0); // Disable wdt
 
-#ifdef CONFIG_MACH_OPPO
-	qpnp_chg_charge_en(chip, 0);
+	if (!chip->aicl_interrupt) {
+		qpnp_chg_charge_en(chip, 0);
+	} else {
+		qpnp_chg_charge_en(chip, 1);
+	}
 	qpnp_chg_vddmax_set(chip, chip->max_voltage_mv);
-#endif
 	qpnp_chg_vinmin_set(chip, chip->min_voltage_mv);
 	qpnp_chg_ibatterm_set(chip, chip->term_current);
 	qpnp_chg_tchg_max_set(chip, chip->tchg_mins);
@@ -4387,6 +4407,8 @@ qpnp_chg_regulator_boost_enable(struct regulator_dev *rdev)
 		pr_err("failed to enable boost rc = %d\n", rc);
 		return rc;
 	}
+
+#ifndef CONFIG_BQ24196_CHARGER
 	/*
 	 * update battery status when charger is connected and state is full
 	 */
@@ -4395,6 +4417,7 @@ qpnp_chg_regulator_boost_enable(struct regulator_dev *rdev)
 			|| (get_prop_batt_status(chip) ==
 			POWER_SUPPLY_STATUS_FULL)))
 		power_supply_changed(&chip->batt_psy);
+#endif
 
 	return rc;
 }
@@ -4493,6 +4516,7 @@ qpnp_chg_regulator_boost_disable(struct regulator_dev *rdev)
 #endif
 	}
 
+#ifndef CONFIG_BQ24196_CHARGER
 	/*
 	 * When a charger is connected,if state of charge is not full
 	 * resumeing charging else update battery status
@@ -4506,6 +4530,7 @@ qpnp_chg_regulator_boost_disable(struct regulator_dev *rdev)
 			power_supply_changed(&chip->batt_psy);
 		}
 	}
+#endif
 
 	if (ext_ovp_isns_present && chip->ext_ovp_ic_gpio_enabled) {
 		pr_debug("EXT OVP IC ISNS enable\n");
@@ -4701,7 +4726,7 @@ qpnp_chg_adjust_vddmax(struct qpnp_chg_chip *chip, int vbat_mv)
 #endif
 
 #define CONSECUTIVE_COUNT	3
-#define CONSECUTIVE_COUNT_POSITIVE	6
+#define CONSECUTIVE_COUNT_POSITIVE	12
 #define VBATDET_MAX_ERR_MV	50
 #ifdef CONFIG_BQ24196_CHARGER
 static void
@@ -4757,16 +4782,19 @@ qpnp_eoc_work(struct work_struct *work)
 
 		if (qpnp_battery_temp_region_get(chip) ==
 				CV_BATTERY_TEMP_REGION__LITTLE_COLD) {
-			max_comp_volt = chip->little_cold_bat_mv - 50;
+			max_comp_volt = chip->little_cold_bat_mv - 100;
 		} else if (qpnp_battery_temp_region_get(chip) ==
 				CV_BATTERY_TEMP_REGION__COOL) {
-			max_comp_volt = chip->cool_bat_mv - 50;
+			max_comp_volt = chip->cool_bat_mv - 100;
+		} else if (qpnp_battery_temp_region_get(chip) ==
+				CV_BATTERY_TEMP_REGION__LITTLE_COOL) {
+			max_comp_volt = chip->little_cool_bat_mv - 100;
 		} else if (qpnp_battery_temp_region_get(chip) ==
 				CV_BATTERY_TEMP_REGION__NORMAL) {
-			max_comp_volt = chip->max_voltage_mv - 50;
+			max_comp_volt = chip->max_voltage_mv - 100;
 		} else if (qpnp_battery_temp_region_get(chip) ==
 				CV_BATTERY_TEMP_REGION__WARM) {
-			max_comp_volt = chip->warm_bat_mv - 50;
+			max_comp_volt = chip->warm_bat_mv - 100;
 		}
 
 		if (vbat_mv < max_comp_volt) {
@@ -5394,8 +5422,10 @@ qpnp_dc_power_set_property(struct power_supply *psy,
 		return -EINVAL;
 	}
 
+#ifndef CONFIG_MACH_OPPO
 	pr_debug("psy changed dc_psy\n");
 	power_supply_changed(&chip->dc_psy);
+#endif
 	return rc;
 }
 
@@ -5979,6 +6009,19 @@ qpnp_chg_hwinit(struct qpnp_chg_chip *chip, u8 subtype,
 			break;
 		}
 
+#ifdef CONFIG_MACH_OPPO
+		if (chip->type == SMBB)
+			rc = qpnp_chg_masked_write(chip,
+				chip->bat_if_base + CHGR_BAT_IF_SPARE,
+				BATFET_LPM_MASK,
+				BATFET_NO_LPM, 1);
+		else
+			rc = qpnp_chg_masked_write(chip,
+				chip->bat_if_base + CHGR_BAT_IF_BATFET_CTRL4,
+				BATFET_LPM_MASK,
+				BATFET_NO_LPM, 1);
+#endif
+
 		rc = qpnp_chg_masked_write(chip,
 			chip->bat_if_base + BAT_IF_BPD_CTRL,
 			BAT_IF_BPD_CTRL_SEL,
@@ -6214,6 +6257,7 @@ qpnp_charger_read_dt_props(struct qpnp_chg_chip *chip)
 #ifdef CONFIG_MACH_OPPO
 	OF_PROP_READ(chip, warm_bat_mv, "warm-bat-mv", rc, 1);
 	OF_PROP_READ(chip, cool_bat_mv, "cool-bat-mv", rc, 1);
+	OF_PROP_READ(chip, little_cool_bat_mv, "little-cool-bat-mv", rc, 1);
 	OF_PROP_READ(chip, little_cold_bat_mv, "little-cold-bat-mv", rc, 1);
 #endif
 
@@ -6249,10 +6293,9 @@ qpnp_charger_read_dt_props(struct qpnp_chg_chip *chip)
 
 		OF_PROP_READ(chip, warm_bat_chg_ma, "ibatmax-warm-ma", rc, 1);
 		OF_PROP_READ(chip, cool_bat_chg_ma, "ibatmax-cool-ma", rc, 1);
-#ifndef CONFIG_MACH_OPPO
 		OF_PROP_READ(chip, warm_bat_mv, "warm-bat-mv", rc, 1);
 		OF_PROP_READ(chip, cool_bat_mv, "cool-bat-mv", rc, 1);
-#endif
+
 		if (rc)
 			return rc;
 	}
@@ -6371,18 +6414,20 @@ set_prop_batt_health(struct qpnp_chg_chip *chip, int batt_health)
 }
 
 #define MAX_COUNT	50
-#define SOFT_AICL_VOL	4500
+#define SOFT_AICL_VOL	4555
 static int
 soft_aicl(struct qpnp_chg_chip *chip)
 {
 	int i, chg_vol;
 
+	chip->aicl_interrupt = false;
+	qpnp_chg_vinmin_set(chip, 4440);
 	qpnp_chg_iusbmax_set(chip, 150);
 	qpnp_chg_ibatmax_set(chip, chip->max_bat_chg_current);
 	qpnp_chg_charge_en(chip, 1);
-	for (i = 0; i < MAX_COUNT; i++) {
+	for (i = 0; i < MAX_COUNT / 5; i++) {
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < SOFT_AICL_VOL) {
+		if (chg_vol < (SOFT_AICL_VOL - 50)) {
 			chip->aicl_current = 100;
 			qpnp_chg_iusbmax_set(chip, 100);
 			return 0;
@@ -6390,9 +6435,12 @@ soft_aicl(struct qpnp_chg_chip *chip)
 	}
 
 	qpnp_chg_iusbmax_set(chip, 500);
-	for (i = 0; i < MAX_COUNT; i++) {
+	for (i = 0; i < MAX_COUNT / 5; i++) {
+		if (!chip->usb_present)
+			chip->aicl_current = 0;
+			return 0;
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < SOFT_AICL_VOL) {
+		if (chg_vol < (SOFT_AICL_VOL - 50)) {
 			qpnp_chg_iusbmax_set(chip, 150);
 			chip->aicl_current = 150;
 			return 0;
@@ -6401,42 +6449,110 @@ soft_aicl(struct qpnp_chg_chip *chip)
 
 	qpnp_chg_iusbmax_set(chip, 900);
 	for (i = 0; i < MAX_COUNT; i++) {
+		if (!chip->usb_present) {
+			qpnp_chg_iusbmax_set(chip, 500);
+			chip->aicl_current = 500;
+			chip->aicl_interrupt = true;
+			return 0;
+		}
 		chg_vol = get_prop_charger_voltage_now(chip);
 		if (chg_vol < SOFT_AICL_VOL) {
 			qpnp_chg_iusbmax_set(chip, 500);
+			qpnp_chg_iusbmax_set(chip, 500);
 			chip->aicl_current = 500;
+			if (!chip->usb_present) {
+				chip->aicl_interrupt = true;
+			}
 			return 0;
 		}
 	}
 
-	qpnp_chg_iusbmax_set(chip, 1500);
+	qpnp_chg_iusbmax_set(chip, 1200);
 	for (i = 0; i < MAX_COUNT; i++) {
+		if (!chip->usb_present) {
+			qpnp_chg_iusbmax_set(chip, 900);
+			chip->aicl_current = 900;
+			chip->aicl_interrupt = true;
+			return 0;
+		}
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < SOFT_AICL_VOL) {
+		if (chg_vol < SOFT_AICL_VOL + 50) {
+			qpnp_chg_iusbmax_set(chip, 900);
 			qpnp_chg_iusbmax_set(chip, 900);
 			chip->aicl_current = 900;
 			qpnp_chg_vinmin_set(chip, chip->min_voltage_mv + 280);
+			if (!chip->usb_present) {
+				chip->aicl_interrupt = true;
+			}
 			return 0;
 		}
 	}
 
-	qpnp_chg_iusbmax_set(chip, 2000);
-	for (i = 0; i < MAX_COUNT; i++) {
+	qpnp_chg_ibatmax_set(chip, 1216);
+	qpnp_chg_iusbmax_set(chip, 1500);
+	for (i = 0; i < MAX_COUNT + 30; i++) {
+		if (!chip->usb_present) {
+			qpnp_chg_iusbmax_set(chip, 900);
+			chip->aicl_current = 900;
+			chip->aicl_interrupt = true;
+			return 0;
+		}
+		if (i == 20)
+			qpnp_chg_ibatmax_set(chip, 1344);
+		else if (i == 40)
+			qpnp_chg_ibatmax_set(chip, 1536);
+		else if (i == 60)
+			qpnp_chg_ibatmax_set(chip, 1728);
 		chg_vol = get_prop_charger_voltage_now(chip);
 		if (chg_vol < SOFT_AICL_VOL) {
+			qpnp_chg_iusbmax_set(chip, 900);
+			qpnp_chg_iusbmax_set(chip, 900);
+			chip->aicl_current = 900;
+			qpnp_chg_vinmin_set(chip, chip->min_voltage_mv + 280);
+			if (!chip->usb_present) {
+				chip->aicl_interrupt = true;
+			}
+			return 0;
+		}
+	}
+
+	qpnp_chg_ibatmax_set(chip, 1536);
+	qpnp_chg_iusbmax_set(chip, 2000);
+	for (i = 0; i < MAX_COUNT + 30; i++) {
+		if (!chip->usb_present) {
+			qpnp_chg_iusbmax_set(chip, 1500);
+			chip->aicl_current = 1500;
+			chip->aicl_interrupt = true;
+			return 0;
+		}
+		if (i == 20)
+			qpnp_chg_ibatmax_set(chip, 1728);
+		else if (i == 40)
+			qpnp_chg_ibatmax_set(chip, 1920);
+		else if (i == 60)
+			qpnp_chg_ibatmax_set(chip, 2112);
+		chg_vol = get_prop_charger_voltage_now(chip);
+		if (chg_vol < SOFT_AICL_VOL - 30) {
 #ifdef CONFIG_MACH_FIND7OP
 			qpnp_chg_iusbmax_set(chip, 1200);
+			qpnp_chg_iusbmax_set(chip, 1200);
 #else
+			qpnp_chg_iusbmax_set(chip, 1500);
 			qpnp_chg_iusbmax_set(chip, 1500);
 #endif
 			chip->aicl_current = 1500;
 			qpnp_chg_vinmin_set(chip, chip->min_voltage_mv + 280);
+			if (!chip->usb_present) {
+				chip->aicl_interrupt = true;
+			}
 			return 0;
 		}
 	}
 #ifdef CONFIG_MACH_FIND7OP
 	qpnp_chg_iusbmax_set(chip, 1200);
+	qpnp_chg_iusbmax_set(chip, 1200);
 #else
+	qpnp_chg_iusbmax_set(chip, 1500);
 	qpnp_chg_iusbmax_set(chip, 1500);
 #endif
 	chip->aicl_current = 2000;
@@ -6474,7 +6590,7 @@ qpnp_start_charging(struct qpnp_chg_chip *chip)
 
 		qpnp_chg_iusbmax_set(chip, ret.intval / 1000);
 		qpnp_chg_vddmax_set(chip, chip->little_cold_bat_mv);
-		qpnp_chg_ibatmax_set(chip, 200);
+		qpnp_chg_ibatmax_set(chip, 300);
 		qpnp_chg_vbatdet_set(chip, chip->little_cold_bat_mv
 				- chip->resume_delta_mv);
 	} else if (batt_temp <= chip->mBatteryTempBoundT2) { // 0 - 10
@@ -6492,9 +6608,54 @@ qpnp_start_charging(struct qpnp_chg_chip *chip)
 			chg_current = 500;
 		}
 		qpnp_chg_ibatmax_set(chip, chg_current);
+		qpnp_chg_ibatmax_set(chip, chg_current);
 		qpnp_chg_vbatdet_set(chip, chip->cool_bat_mv
 				- chip->resume_delta_mv);
-	} else if (batt_temp <= chip->mBatteryTempBoundT3) { // 10 - 45
+	} else if (batt_temp <= chip->mBatteryTempBoundT3) { // 10 - 15
+		qpnp_battery_temp_region_set(chip,
+				CV_BATTERY_TEMP_REGION__LITTLE_COOL);
+
+		chip->usb_psy->get_property(chip->usb_psy,
+				POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
+
+		if (ret.intval / 1000 == 500) {
+			qpnp_chg_iusbmax_set(chip, ret.intval / 1000);
+		} else {
+			if (chip->aicl_current == 0) {
+				soft_aicl(chip);
+			} else {
+				if (chip->aicl_current >= 1500) {
+#ifdef CONFIG_MACH_FIND7OP
+					qpnp_chg_iusbmax_set(chip, 1200);
+					qpnp_chg_iusbmax_set(chip, 1200);
+#else
+					qpnp_chg_iusbmax_set(chip, 1500);
+					qpnp_chg_iusbmax_set(chip, 1500);
+#endif
+				} else {
+					qpnp_chg_iusbmax_set(chip,
+							chip->aicl_current);
+					qpnp_chg_iusbmax_set(chip,
+							chip->aicl_current);
+				}
+			}
+		}
+		qpnp_chg_vddmax_set(chip, chip->little_cool_bat_mv);
+		if (qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP) {
+			if (ret.intval / 1000 == 500) {
+				qpnp_chg_ibatmax_set(chip, 500);
+				qpnp_chg_ibatmax_set(chip, 500);
+			} else {
+				qpnp_chg_ibatmax_set(chip, 1400);
+				qpnp_chg_ibatmax_set(chip, 1400);
+			}
+		} else {
+			qpnp_chg_ibatmax_set(chip, 500);
+			qpnp_chg_ibatmax_set(chip, 500);
+		}
+		qpnp_chg_vbatdet_set(chip, chip->little_cool_bat_mv
+				- chip->resume_delta_mv);
+	} else if (batt_temp <= chip->mBatteryTempBoundT4){ // 15 - 45
 		qpnp_battery_temp_region_set(chip,
 				CV_BATTERY_TEMP_REGION__NORMAL);
 
@@ -6507,13 +6668,17 @@ qpnp_start_charging(struct qpnp_chg_chip *chip)
 			if (chip->aicl_current == 0) {
 				soft_aicl(chip);
 			} else {
-				if (chip->aicl_current == 1500) {
+				if (chip->aicl_current >= 1500) {
 #ifdef CONFIG_MACH_FIND7OP
+					qpnp_chg_iusbmax_set(chip, 1200);
 					qpnp_chg_iusbmax_set(chip, 1200);
 #else
 					qpnp_chg_iusbmax_set(chip, 1500);
+					qpnp_chg_iusbmax_set(chip, 1500);
 #endif
 				} else {
+					qpnp_chg_iusbmax_set(chip,
+							chip->aicl_current);
 					qpnp_chg_iusbmax_set(chip,
 							chip->aicl_current);
 				}
@@ -6521,17 +6686,30 @@ qpnp_start_charging(struct qpnp_chg_chip *chip)
 		}
 		qpnp_chg_vddmax_set(chip, chip->max_voltage_mv);
 		if (qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP) {
-			if (ret.intval / 1000 == 500)
+			if (ret.intval / 1000 == 500) {
 				qpnp_chg_ibatmax_set(chip, 500);
-			else
-				qpnp_chg_ibatmax_set(chip,
-						chip->max_bat_chg_current);
+				qpnp_chg_ibatmax_set(chip, 500);
+			} else {
+				if (chip->aicl_current != 0 &&
+						chip->aicl_current <= 1500) {
+					qpnp_chg_ibatmax_set(chip,
+							chip->aicl_current);
+					qpnp_chg_ibatmax_set(chip,
+							chip->aicl_current);
+				} else {
+					qpnp_chg_ibatmax_set(chip,
+						    chip->max_bat_chg_current);
+					qpnp_chg_ibatmax_set(chip,
+						    chip->max_bat_chg_current);
+				}
+			}
 		} else {
+			qpnp_chg_ibatmax_set(chip, 500);
 			qpnp_chg_ibatmax_set(chip, 500);
 		}
 		qpnp_chg_vbatdet_set(chip, chip->max_voltage_mv
 				- chip->resume_delta_mv);
-	} else if (batt_temp <= chip->mBatteryTempBoundT4) { // 45 - 55
+	} else if (batt_temp <= chip->mBatteryTempBoundT5) { // 45 - 55
 		qpnp_battery_temp_region_set(chip,
 				CV_BATTERY_TEMP_REGION__WARM);
 
@@ -6545,6 +6723,7 @@ qpnp_start_charging(struct qpnp_chg_chip *chip)
 		} else {
 			chg_current = 500;
 		}
+		qpnp_chg_ibatmax_set(chip, chg_current);
 		qpnp_chg_ibatmax_set(chip, chg_current);
 		qpnp_chg_vbatdet_set(chip, chip->warm_bat_mv
 				- chip->resume_delta_mv);
@@ -6576,9 +6755,7 @@ qpnp_handle_battery_uovp(struct qpnp_chg_chip *chip)
 {
 	pr_debug("%s\n", __func__);
 
-	qpnp_chg_usb_suspend_enable(chip, 1);
 	set_prop_batt_health(chip, POWER_SUPPLY_HEALTH_OVERVOLTAGE);
-
 #ifdef CONFIG_BQ24196_CHARGER
 	qpnp_chg_charge_en(chip, 0);
 #endif
@@ -6591,7 +6768,6 @@ qpnp_handle_battery_restore_from_uovp(struct qpnp_chg_chip *chip)
 {
 	pr_debug("%s\n", __func__);
 
-	qpnp_chg_usb_suspend_enable(chip, 0);
 	qpnp_start_charging(chip);
 	set_prop_batt_health(chip, POWER_SUPPLY_HEALTH_GOOD);
 
@@ -6623,6 +6799,7 @@ handle_batt_temp_cold(struct qpnp_chg_chip *chip)
 			+ AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_COOL_TO_NORMAL;
 		chip->mBatteryTempBoundT3 = AUTO_CHARGING_BATT_TEMP_T3;
 		chip->mBatteryTempBoundT4 = AUTO_CHARGING_BATT_TEMP_T4;
+		chip->mBatteryTempBoundT5 = AUTO_CHARGING_BATT_TEMP_T5;
 
 		set_prop_batt_health(chip, POWER_SUPPLY_HEALTH_COLD);
 	}
@@ -6653,7 +6830,7 @@ handle_batt_temp_little_cold(struct qpnp_chg_chip *chip)
 
 		qpnp_chg_iusbmax_set(chip, ret.intval / 1000);
 		qpnp_chg_vddmax_set(chip, chip->little_cold_bat_mv);
-		qpnp_chg_ibatmax_set(chip, 200);
+		qpnp_chg_ibatmax_set(chip, 300);
 		qpnp_chg_vbatdet_set(chip, chip->little_cold_bat_mv
 				- chip->resume_delta_mv);
 
@@ -6665,10 +6842,10 @@ handle_batt_temp_little_cold(struct qpnp_chg_chip *chip)
 		chip->mBatteryTempBoundT0 = AUTO_CHARGING_BATT_TEMP_T0;
 		chip->mBatteryTempBoundT1 = AUTO_CHARGING_BATT_TEMP_T1
 			+ AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_COOL_TO_NORMAL;
-		chip->mBatteryTempBoundT2 = AUTO_CHARGING_BATT_TEMP_T2
-			+ AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_COOL_TO_NORMAL;
+		chip->mBatteryTempBoundT2 = AUTO_CHARGING_BATT_TEMP_T2;
 		chip->mBatteryTempBoundT3 = AUTO_CHARGING_BATT_TEMP_T3;
 		chip->mBatteryTempBoundT4 = AUTO_CHARGING_BATT_TEMP_T4;
+		chip->mBatteryTempBoundT5 = AUTO_CHARGING_BATT_TEMP_T5;
 
 		set_prop_batt_health(chip, POWER_SUPPLY_HEALTH_GOOD);
 	}
@@ -6698,13 +6875,20 @@ handle_batt_temp_cool(struct qpnp_chg_chip *chip)
 		chip->usb_psy->get_property(chip->usb_psy,
 				POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
 
-		qpnp_chg_iusbmax_set(chip, ret.intval / 1000);
+		if (ret.intval / 1000 == 500) {
+			qpnp_chg_iusbmax_set(chip, ret.intval / 1000);
+		} else {
+			if (chip->aicl_current > 0 && chip->aicl_current < 900)
+				qpnp_chg_iusbmax_set(chip, chip->aicl_current);
+			else
+				qpnp_chg_iusbmax_set(chip, 900);
+		}
 		qpnp_chg_vddmax_set(chip, chip->cool_bat_mv);
 		if (qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP) {
 			if (ret.intval / 1000 == 500)
 				chg_current = 500;
 			else
-				chg_current = 900;
+				chg_current = 1024;
 		} else {
 			chg_current = 500;
 		}
@@ -6718,18 +6902,98 @@ handle_batt_temp_cool(struct qpnp_chg_chip *chip)
 
 		/* Update the temperature boundaries */
 		chip->mBatteryTempBoundT0 = AUTO_CHARGING_BATT_TEMP_T0;
-		chip->mBatteryTempBoundT1 = AUTO_CHARGING_BATT_TEMP_T1;
+		chip->mBatteryTempBoundT1 = AUTO_CHARGING_BATT_TEMP_T1
+			- AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_COOL_TO_NORMAL;
 		chip->mBatteryTempBoundT2 = AUTO_CHARGING_BATT_TEMP_T2
 			+ AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_COOL_TO_NORMAL;
 		chip->mBatteryTempBoundT3 = AUTO_CHARGING_BATT_TEMP_T3;
 		chip->mBatteryTempBoundT4 = AUTO_CHARGING_BATT_TEMP_T4;
+		chip->mBatteryTempBoundT5 = AUTO_CHARGING_BATT_TEMP_T5;
 
 		set_prop_batt_health(chip, POWER_SUPPLY_HEALTH_GOOD);
 	}
 	return 0;
 }
 
-/* 10 C < Tbatt < 45C */
+/* 10 C < Tbatt <= 15C */
+static int
+handle_batt_temp_little_cool(struct qpnp_chg_chip *chip)
+{
+	unsigned int chg_current = chip->max_bat_chg_current;
+	union power_supply_propval ret = {0,};
+
+	if (chip->charger_status == CHARGER_STATUS_OVER)
+		return 0;
+
+	if (qpnp_battery_temp_region_get(chip) !=
+			CV_BATTERY_TEMP_REGION__LITTLE_COOL) {
+		pr_err("%s\n", __func__);
+
+		if (qpnp_battery_temp_region_get(chip) ==
+				CV_BATTERY_TEMP_REGION__HOT ||
+				qpnp_battery_temp_region_get(chip) ==
+				CV_BATTERY_TEMP_REGION__COLD)
+			qpnp_chg_charge_en(chip, !chip->charging_disabled);
+
+		chip->usb_psy->get_property(chip->usb_psy,
+				POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
+
+		if (ret.intval / 1000 == 500) {
+			qpnp_chg_iusbmax_set(chip, ret.intval / 1000);
+		} else {
+			if (qpnp_charger_type_get(chip) ==
+						POWER_SUPPLY_TYPE_USB_DCP) {
+				if (chip->aicl_current == 0) {
+					soft_aicl(chip);
+				} else {
+					if (chip->aicl_current >= 1500) {
+#ifdef CONFIG_MACH_FIND7OP
+						qpnp_chg_iusbmax_set(chip,
+								1200);
+#else
+						qpnp_chg_iusbmax_set(chip,
+								1500);
+#endif
+					} else {
+						qpnp_chg_iusbmax_set(chip,
+							    chip->aicl_current);
+					}
+				}
+			}
+		}
+		if (qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP) {
+			if (ret.intval / 1000 == 500)
+				chg_current = 500;
+			else
+				chg_current = 1400;
+		} else {
+			chg_current = 500;
+		}
+		qpnp_chg_vddmax_set(chip, chip->little_cool_bat_mv);
+		qpnp_chg_ibatmax_set(chip, chg_current);
+		qpnp_chg_vbatdet_set(chip, chip->little_cool_bat_mv
+				- chip->resume_delta_mv);
+
+		/* Update battery temp region */
+		qpnp_battery_temp_region_set(chip,
+				CV_BATTERY_TEMP_REGION__LITTLE_COOL);
+
+		/* Update the temperature boundaries */
+		chip->mBatteryTempBoundT0 = AUTO_CHARGING_BATT_TEMP_T0;
+		chip->mBatteryTempBoundT1 = AUTO_CHARGING_BATT_TEMP_T1;
+		chip->mBatteryTempBoundT2 = AUTO_CHARGING_BATT_TEMP_T2
+			- AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_COOL_TO_NORMAL;
+		chip->mBatteryTempBoundT3 = AUTO_CHARGING_BATT_TEMP_T3
+			+ AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_COOL_TO_NORMAL;
+		chip->mBatteryTempBoundT4 = AUTO_CHARGING_BATT_TEMP_T4;
+		chip->mBatteryTempBoundT5 = AUTO_CHARGING_BATT_TEMP_T5;
+
+		set_prop_batt_health(chip, POWER_SUPPLY_HEALTH_GOOD);
+	}
+	return 0;
+}
+
+/* 15C < Tbatt < 45C */
 static int
 handle_batt_temp_normal(struct qpnp_chg_chip *chip)
 {
@@ -6747,6 +7011,10 @@ handle_batt_temp_normal(struct qpnp_chg_chip *chip)
 				qpnp_battery_temp_region_get(chip) ==
 				CV_BATTERY_TEMP_REGION__COLD)
 			qpnp_chg_charge_en(chip, !chip->charging_disabled);
+		
+		/* Update battery temp region */
+		qpnp_battery_temp_region_set(chip,
+				CV_BATTERY_TEMP_REGION__NORMAL);
 
 		chip->usb_psy->get_property(chip->usb_psy,
 				POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
@@ -6759,7 +7027,7 @@ handle_batt_temp_normal(struct qpnp_chg_chip *chip)
 				if (chip->aicl_current == 0) {
 					soft_aicl(chip);
 				} else {
-					if (chip->aicl_current == 1500) {
+					if (chip->aicl_current >= 1500) {
 #ifdef CONFIG_MACH_FIND7OP
 						qpnp_chg_iusbmax_set(chip,
 								1200);
@@ -6774,13 +7042,18 @@ handle_batt_temp_normal(struct qpnp_chg_chip *chip)
 				}
 			}
 		}
-		
 		if (qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP) {
 			if (ret.intval / 1000 == 500)
 				qpnp_chg_ibatmax_set(chip, 500);
-			else
-				qpnp_chg_ibatmax_set(chip,
-						chip->max_bat_chg_current);
+			else {
+				if (chip->aicl_current != 0 &&
+						chip->aicl_current <= 1500)
+					qpnp_chg_ibatmax_set(chip,
+							chip->aicl_current);
+				else
+					qpnp_chg_ibatmax_set(chip,
+						    chip->max_bat_chg_current);
+			}
 		} else {
 			qpnp_chg_ibatmax_set(chip, 500);
 		}
@@ -6788,16 +7061,16 @@ handle_batt_temp_normal(struct qpnp_chg_chip *chip)
 		qpnp_chg_vbatdet_set(chip, chip->max_voltage_mv
 				- chip->resume_delta_mv);
 
-		/* Update battery temp region */
-		qpnp_battery_temp_region_set(chip,
-				CV_BATTERY_TEMP_REGION__NORMAL);
+		qpnp_chg_charge_en(chip, 1);
 
 		/* Update the temperature boundaries */
 		chip->mBatteryTempBoundT0 = AUTO_CHARGING_BATT_TEMP_T0;
 		chip->mBatteryTempBoundT1 = AUTO_CHARGING_BATT_TEMP_T1;
 		chip->mBatteryTempBoundT2 = AUTO_CHARGING_BATT_TEMP_T2;
-		chip->mBatteryTempBoundT3 = AUTO_CHARGING_BATT_TEMP_T3;
+		chip->mBatteryTempBoundT3 = AUTO_CHARGING_BATT_TEMP_T3
+			- AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_COOL_TO_NORMAL;
 		chip->mBatteryTempBoundT4 = AUTO_CHARGING_BATT_TEMP_T4;
+		chip->mBatteryTempBoundT5 = AUTO_CHARGING_BATT_TEMP_T5;
 
 		set_prop_batt_health(chip, POWER_SUPPLY_HEALTH_GOOD);
 	}
@@ -6826,20 +7099,28 @@ handle_batt_temp_warm(struct qpnp_chg_chip *chip)
 
 		chip->usb_psy->get_property(chip->usb_psy,
 				POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
-
-		qpnp_chg_iusbmax_set(chip, ret.intval / 1000);
+		if (ret.intval / 1000 == 500) {
+			qpnp_chg_iusbmax_set(chip, ret.intval / 1000);
+		} else {
+			if (chip->aicl_current > 0 && chip->aicl_current < 900)
+				qpnp_chg_iusbmax_set(chip, chip->aicl_current);
+			else
+				qpnp_chg_iusbmax_set(chip, 900);
+		}
 		qpnp_chg_vddmax_set(chip, chip->warm_bat_mv);
 		if (qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP) {
 			if(ret.intval / 1000 == 500)
 				chg_current = 500;
 			else
-				chg_current = 900;
+				chg_current = 1024;
 		} else {
 			chg_current = 500;
 		}
 		qpnp_chg_ibatmax_set(chip, chg_current);
 		qpnp_chg_vbatdet_set(chip, chip->warm_bat_mv
 				- chip->resume_delta_mv);
+
+		qpnp_chg_charge_en(chip, 1);
 
 		/* Update battery temp region */
 		qpnp_battery_temp_region_set(chip,
@@ -6849,9 +7130,10 @@ handle_batt_temp_warm(struct qpnp_chg_chip *chip)
 		chip->mBatteryTempBoundT0 = AUTO_CHARGING_BATT_TEMP_T0;
 		chip->mBatteryTempBoundT1 = AUTO_CHARGING_BATT_TEMP_T1;
 		chip->mBatteryTempBoundT2 = AUTO_CHARGING_BATT_TEMP_T2;
-		chip->mBatteryTempBoundT3 = AUTO_CHARGING_BATT_TEMP_T3
+		chip->mBatteryTempBoundT3 = AUTO_CHARGING_BATT_TEMP_T3;
+		chip->mBatteryTempBoundT4 = AUTO_CHARGING_BATT_TEMP_T4
 			- AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_WARM_TO_NORMAL;
-		chip->mBatteryTempBoundT4 = AUTO_CHARGING_BATT_TEMP_T4;
+		chip->mBatteryTempBoundT5 = AUTO_CHARGING_BATT_TEMP_T5;
 
 		set_prop_batt_health(chip, POWER_SUPPLY_HEALTH_GOOD);
 	}
@@ -6876,11 +7158,11 @@ handle_batt_temp_hot(struct qpnp_chg_chip *chip)
 		chip->mBatteryTempBoundT0 = AUTO_CHARGING_BATT_TEMP_T0;
 		chip->mBatteryTempBoundT1 = AUTO_CHARGING_BATT_TEMP_T1;
 		chip->mBatteryTempBoundT2 = AUTO_CHARGING_BATT_TEMP_T2;
-		chip->mBatteryTempBoundT3 = AUTO_CHARGING_BATT_TEMP_T3
-			- AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_WARM_TO_NORMAL;
+		chip->mBatteryTempBoundT3 = AUTO_CHARGING_BATT_TEMP_T3;
 		chip->mBatteryTempBoundT4 = AUTO_CHARGING_BATT_TEMP_T4
+			- AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_WARM_TO_NORMAL;
+		chip->mBatteryTempBoundT5 = AUTO_CHARGING_BATT_TEMP_T5
 			- AUTO_CHARGING_BATTERY_TEMP_HYST_FROM_HOT_TO_WARM;
-
 		set_prop_batt_health(chip, POWER_SUPPLY_HEALTH_OVERHEAT);
 	}
 	return 0;
@@ -6925,22 +7207,29 @@ qpnp_check_charger_uovp(struct qpnp_chg_chip *chip)
 
 	if (!qpnp_chg_is_usb_chg_plugged_in(chip)) {
 		if (chip->usb_present) {
-			chip->usb_present = false;
-			chip->usbin_counts = 0;
-			schedule_work(&chip->stop_charge_work);
-			chip->prev_usb_max_ma = -EINVAL;
-			power_supply_set_present(chip->usb_psy,
-					chip->usb_present);
-			if (!chip->usb_present) {
-				power_supply_set_online(chip->usb_psy, 0);
-				power_supply_set_current_limit(chip->usb_psy,
-						0);
-				power_supply_set_online(&chip->dc_psy, 0);
-				power_supply_set_current_limit(&chip->dc_psy,
-						0);
+			chip->usb_present_count++;
+			if (chip->usb_present_count == 2) {
+				chip->usb_present = false;
+				chip->usbin_counts = 0;
+				schedule_work(&chip->stop_charge_work);
+				chip->prev_usb_max_ma = -EINVAL;
+				power_supply_set_present(chip->usb_psy,
+						chip->usb_present);
+				if (!chip->usb_present) {
+					power_supply_set_online(
+							chip->usb_psy, 0);
+					power_supply_set_current_limit(
+							chip->usb_psy, 0);
+					power_supply_set_online(
+							&chip->dc_psy, 0);
+					power_supply_set_current_limit(
+							&chip->dc_psy, 0);
+				}
 			}
+			return;
+		} else {
+			chip->usb_present_count = 0;
 		}
-		return;
 	}
 
 	vchg_mv = get_prop_charger_voltage_now(chip);
@@ -6952,8 +7241,6 @@ qpnp_check_charger_uovp(struct qpnp_chg_chip *chip)
 				vchg_mv <= CHARGER_SOFT_UVP_VOLTAGE) {
 			pr_info("charger over voltage\n");
 
-			qpnp_chg_usb_suspend_enable(chip, 1);
-
 			qpnp_chg_iusbmax_set(chip, QPNP_CHG_I_MAX_MIN_100);
 #ifdef CONFIG_BQ24196_CHARGER
 			qpnp_chg_charge_en(chip, 0);
@@ -6961,9 +7248,8 @@ qpnp_check_charger_uovp(struct qpnp_chg_chip *chip)
 			chip->charger_status = CHARGER_STATUS_OVER;
 		}
 	} else if (chip->charger_status == CHARGER_STATUS_OVER) {
-		if (vchg_mv < (CHARGER_SOFT_OVP_VOLTAGE - 100) && 
+		if(vchg_mv < (CHARGER_SOFT_OVP_VOLTAGE - 100) &&
 				vchg_mv > (CHARGER_SOFT_UVP_VOLTAGE + 100)) {
-			qpnp_chg_usb_suspend_enable(chip, 0);
 			qpnp_chg_charge_en(chip, !chip->charging_disabled);
 			qpnp_start_charging(chip);
 			chip->charger_status = CHARGER_STATUS_GOOD;
@@ -7023,23 +7309,28 @@ qpnp_check_battery_temp(struct qpnp_chg_chip *chip)
 		/* battery is cool */
 		rc = handle_batt_temp_cool(chip);
 	} else if ((temperature > chip->mBatteryTempBoundT2) &&
-			(temperature < chip->mBatteryTempBoundT3)) {
+			(temperature <= chip->mBatteryTempBoundT3)) {
+		/* battery is little cool */
+		rc = handle_batt_temp_little_cool(chip);
+	} else if ((temperature > chip->mBatteryTempBoundT3) &&
+			(temperature < chip->mBatteryTempBoundT4)) {
 		/* battery is normal */
 		rc = handle_batt_temp_normal(chip);
-	} else if ((temperature >= chip->mBatteryTempBoundT3) &&
-			(temperature <=  chip->mBatteryTempBoundT4)) {
+	} else if ((temperature >= chip->mBatteryTempBoundT4) &&
+			(temperature <= chip->mBatteryTempBoundT5)) {
 		/* battery is warm */
 		rc = handle_batt_temp_warm(chip);
-	} else if (temperature > chip->mBatteryTempBoundT4) {
+	} else if (temperature > chip->mBatteryTempBoundT5) {
 		/* battery is hot */
 		rc = handle_batt_temp_hot(chip);
 	}
 	return rc;
 }
 
-#define BATT_RECHARGING_VOLTAGE__LITTLE_COLD	3800 * 1000
+#define BATT_RECHARGING_VOLTAGE__LITTLE_COLD	3900 * 1000
 #define BATT_RECHARGING_VOLTAGE__COOL		4100 * 1000
-#define BATT_RECHARGING_VOLTAGE__NORMAL		4200 * 1000
+#define BATT_RECHARGING_VOLTAGE__LITTLE_COOL	4220 * 1000
+#define BATT_RECHARGING_VOLTAGE__NORMAL		4220 * 1000
 #define BATT_RECHARGING_VOLTAGE__WARM		4000 * 1000
 #define BATT_RECHARGING_CHECK_COUNT		50
 static void
@@ -7062,6 +7353,9 @@ qpnp_check_recharging(struct qpnp_chg_chip *chip)
 	if (!chip->chg_done)
 		return;
 
+	if (chip->time_out)
+		return;
+
 	batt_temp_region = qpnp_battery_temp_region_get(chip);
 	batt_volt = get_prop_battery_voltage_now(chip);
 	switch (batt_temp_region) {
@@ -7072,6 +7366,9 @@ qpnp_check_recharging(struct qpnp_chg_chip *chip)
 			break;
 		case CV_BATTERY_TEMP_REGION__COOL:
 			compare_volt = BATT_RECHARGING_VOLTAGE__COOL;
+			break;
+		case CV_BATTERY_TEMP_REGION__LITTLE_COOL:
+			compare_volt = BATT_RECHARGING_VOLTAGE__LITTLE_COOL;
 			break;
 		case CV_BATTERY_TEMP_REGION__NORMAL:
 #ifdef CONFIG_BATTERY_BQ27541
@@ -7128,6 +7425,8 @@ qpnp_check_chg_current(struct qpnp_chg_chip *chip)
 			pr_err("%s: iusbmax set 900.\n", __func__);
 		}
 	}
+
+	return;
 }
 
 #ifdef CONFIG_PIC1503_FASTCG
@@ -7166,7 +7465,7 @@ is_alow_fast_chg(struct qpnp_chg_chip *chip)
 		return false;
 	if (cap < 1)
 		return false;
-	if (cap > 96)
+	if (cap > 90)
 		return false;
 	if (get_prop_fast_switch_to_normal(chip)) {
 		pr_err("%s fast_switch_to_normal is true\n",__func__);
@@ -7222,10 +7521,10 @@ update_heartbeat(struct work_struct *work)
 		switch_fast_chg(chip);
 		pr_info("%s fast chg started, GPIO96:%d\n", __func__,
 				gpio_get_value(96));
-		power_supply_changed(&chip->batt_psy);
 
 		if (qpnp_chg_get_charge_en() && qpnp_get_fast_chg_ing(chip) ) {
 			qpnp_chg_charge_en(chip, false);
+			chip->normal_chg_stopped_by_fastchg = true;
 		}
 
 		/* Update time: 6s */
@@ -7233,6 +7532,11 @@ update_heartbeat(struct work_struct *work)
 				round_jiffies_relative(msecs_to_jiffies
 				(BATT_HEARTBEAT_INTERVAL)));
 		return;
+	} else {
+		if (chip->normal_chg_stopped_by_fastchg) {
+			qpnp_chg_charge_en(chip, 1);
+			chip->normal_chg_stopped_by_fastchg = false;
+		}
 	}
 
 	if (charge_type == POWER_SUPPLY_TYPE_USB_DCP) {
@@ -7298,21 +7602,29 @@ qpnp_stop_charge(struct work_struct *work)
 	chip->time_out = false;
 	chip->aicl_current = 0;
 	chip->chg_display_full = false;
+	if (chip->charger_status == CHARGER_STATUS_OVER) {
+		chip->charger_status = CHARGER_STATUS_GOOD;
+	}
 }
 #endif
 
 static void
 qpnp_charge_info_init(struct qpnp_chg_chip *chip)
 {
-	qpnp_battery_temp_region_set(chip, CV_BATTERY_TEMP_REGION__NORMAL);
-
+	if (!qpnp_chg_is_usb_chg_plugged_in(chip)) {
+		qpnp_battery_temp_region_set(chip,
+				CV_BATTERY_TEMP_REGION__NORMAL);
+	}
 	chip->mBatteryTempBoundT0 = AUTO_CHARGING_BATT_TEMP_T0;
 	chip->mBatteryTempBoundT1 = AUTO_CHARGING_BATT_TEMP_T1;
 	chip->mBatteryTempBoundT2 = AUTO_CHARGING_BATT_TEMP_T2;
 	chip->mBatteryTempBoundT3 = AUTO_CHARGING_BATT_TEMP_T3;
 	chip->mBatteryTempBoundT4 = AUTO_CHARGING_BATT_TEMP_T4;
+	chip->mBatteryTempBoundT5 = AUTO_CHARGING_BATT_TEMP_T5;
 	chip->charger_status = CHARGER_STATUS_GOOD;
 	chip->aicl_current = 0;
+	chip->aicl_interrupt = false;
+	chip->usb_present_count = 0;
 }
 
 static ssize_t
@@ -7432,7 +7744,12 @@ fb_notifier_callback(struct notifier_block *self,
 							qpnp_chg_iusbmax_set(chip, chip->aicl_current);
 						}
 					}
-					qpnp_chg_ibatmax_set(chip,
+					if (chip->aicl_current != 0 &&
+						    chip->aicl_current <= 1500)
+						qpnp_chg_ibatmax_set(chip,
+							    chip->aicl_current);
+					else
+						qpnp_chg_ibatmax_set(chip,
 						    chip->max_bat_chg_current);
 				} else if (*blank == FB_BLANK_POWERDOWN) {
 					atomic_set(&chip->suspended, 1);
@@ -7440,7 +7757,13 @@ fb_notifier_callback(struct notifier_block *self,
 						qpnp_chg_iusbmax_set(chip,
 							    chip->aicl_current);
 					}
-					qpnp_chg_ibatmax_set(chip, 2496);
+					if (chip->aicl_current != 0 &&
+						    chip->aicl_current <= 1500)
+						qpnp_chg_ibatmax_set(chip,
+							    chip->aicl_current);
+					else
+						qpnp_chg_ibatmax_set(chip,
+							    2496);
 				}
 			}
 		}
@@ -7449,6 +7772,69 @@ fb_notifier_callback(struct notifier_block *self,
 	return 0;
 }
 #endif
+
+#define SOC_INVALID			0x7E
+#define SOC_DATA_REG_0		0x40B0
+#define SOC_STORAGE_MASK	0xFE
+static int
+load_data(struct qpnp_chg_chip *chip)
+{
+	u8 stored_soc = 0;
+	int rc = 0;
+	int shutdown_soc = 0;
+
+	if (chip == NULL) {
+		printk(KERN_ERR "%s: chip is NULL !\n", __func__);
+		return SOC_INVALID;
+	}
+	rc = qpnp_chg_read(chip, &stored_soc, SOC_DATA_REG_0, 1);
+	if (rc) {
+		printk(KERN_ERR "%s: failed to read addr[0x%x], rc=%d\n", __func__, SOC_DATA_REG_0, rc);
+		return SOC_INVALID;
+	}
+
+	if ((stored_soc >> 1) > 0)
+		shutdown_soc = (stored_soc >> 1) - 1;
+	else
+		shutdown_soc = SOC_INVALID;
+	printk(KERN_ERR "%s: stored_soc[0x%x], shutdown_soc[%d]\n", __func__, stored_soc, shutdown_soc);
+	return shutdown_soc;
+}
+
+int
+load_soc(void)
+{
+	int soc = 0;
+
+	soc = load_data(g_chip);
+	if (soc == SOC_INVALID || soc < 0 || soc > 100)
+		return -1;
+	return soc;
+}
+
+static void
+backup_soc(struct qpnp_chg_chip *chip, int soc)
+{
+	int rc = 0;
+
+	if (chip == NULL || soc < 0 || soc > 100) {
+		printk(KERN_ERR "%s: chip or soc invalid, store an invalid soc\n", __func__);
+		qpnp_chg_masked_write(chip, SOC_DATA_REG_0, SOC_STORAGE_MASK, SOC_STORAGE_MASK, 1);
+		return;
+	}
+
+	printk(KERN_ERR "%s: backup_soc[%d]\n", __func__, soc);
+	rc = qpnp_chg_masked_write(chip, SOC_DATA_REG_0, SOC_STORAGE_MASK, (soc + 1) << 1, 1);
+	if (rc) {
+		printk(KERN_ERR "%s: failed to write addr[0x%x], rc=%d\n", __func__, SOC_DATA_REG_0, rc);
+	}
+}
+
+void
+backup_soc_ex(int soc)
+{
+	backup_soc(g_chip, soc);
+}
 
 #endif
 
@@ -7473,6 +7859,9 @@ qpnp_charger_probe(struct spmi_device *spmi)
 	chip->dev = &(spmi->dev);
 	chip->spmi = spmi;
 
+#ifdef CONFIG_MACH_OPPO
+	g_chip = chip;
+#endif
 	chip->usb_psy = power_supply_get_by_name("usb");
 	if (!chip->usb_psy) {
 		pr_err("usb supply not found deferring probe\n");
@@ -7765,7 +8154,11 @@ qpnp_charger_probe(struct spmi_device *spmi)
 		chip->adc_param.low_temp = chip->cool_bat_decidegc;
 		chip->adc_param.high_temp = chip->warm_bat_decidegc;
 		chip->adc_param.timer_interval = ADC_MEAS2_INTERVAL_1S;
+#ifdef CONFIG_MACH_OPPO
+		chip->adc_param.state_request = ADC_TM_HIGH_LOW_THR_DISABLE;
+#else
 		chip->adc_param.state_request = ADC_TM_HIGH_LOW_THR_ENABLE;
+#endif
 		chip->adc_param.btm_ctx = chip;
 		chip->adc_param.threshold_notification =
 						qpnp_chg_adc_notification;
@@ -7789,11 +8182,13 @@ qpnp_charger_probe(struct spmi_device *spmi)
 	chip->usb_trim_default = qpnp_chg_iusb_trim_get(chip);
 #ifndef CONFIG_BQ24196_CHARGER
 	qpnp_chg_charge_en(chip, !chip->charging_disabled);
+#endif
 #ifdef CONFIG_MACH_OPPO
 	if (get_boot_mode() != MSM_BOOT_MODE__NORMAL) {
 		qpnp_chg_usb_suspend_enable(chip, 1);
 	}
 #endif
+#ifndef CONFIG_BQ24196_CHARGER
 	qpnp_chg_force_run_on_batt(chip, chip->charging_disabled);
 #endif
 	qpnp_chg_set_appropriate_vddmax(chip);
@@ -7936,6 +8331,8 @@ static void qpnp_charger_shutdown(struct spmi_device *spmi)
 
 	if (qpnp_chg_regulator_otg_is_enabled(chip->otg_vreg.rdev))
 		qpnp_chg_regulator_otg_disable(chip->otg_vreg.rdev);
+
+	return;
 #endif
 }
 #endif
