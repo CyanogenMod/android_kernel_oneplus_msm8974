@@ -26,8 +26,7 @@ struct qpnp_battery_gauge {
 	int (*monitor_for_recharging) (void);
 	int (*get_battery_soc) (void);
 	int (*get_average_current) (void);
-	int (*is_battery_authenticated) (void);//wangjc add for authentication
-	//lfc add for fastchg
+	int (*is_battery_authenticated) (void);
 	int (*fast_chg_started) (void);
 	int (*fast_switch_to_normal) (void);
 	int (*set_switch_to_noraml_false) (void);
@@ -38,7 +37,6 @@ struct qpnp_battery_gauge {
 	int (*get_fast_chg_ing) (void);
 	int (*get_fast_low_temp_full) (void);
 	int (*set_low_temp_full_false) (void);
-	//lfc add for fastchg end
 };
 
 struct qpnp_external_charger {
