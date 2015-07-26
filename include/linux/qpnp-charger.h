@@ -14,7 +14,27 @@
 #define __QPNP_CHARGER_H__
 
 #include <linux/power_supply.h>
-
+/* yangfangbiao@oneplus.cn, 2015/01/06  Add begin for  sync with KK charge standard  */
+typedef enum   
+{
+    /*! Battery is cold               */
+    CV_BATTERY_TEMP_REGION__COLD,
+    /*! Battery is little cold               */
+    CV_BATTERY_TEMP_REGION_LITTLE__COLD,
+    /*! Battery is cool               */
+    CV_BATTERY_TEMP_REGION__COOL,
+     /*! Battery is little cool               */
+    CV_BATTERY_TEMP_REGION__LITTLE_COOL,
+    /*! Battery is normal             */
+    CV_BATTERY_TEMP_REGION__NORMAL,
+    /*! Battery is warm               */
+    CV_BATTERY_TEMP_REGION__WARM,
+    /*! Battery is hot                */
+    CV_BATTERY_TEMP_REGION__HOT,
+    /*! Invalid battery temp region   */
+    CV_BATTERY_TEMP_REGION__INVALID,
+}chg_cv_battery_temp_region_type;
+/* yangfangbiao@oneplus.cn, 2015/01/06  Add end for  sync with KK charge standard  */
 struct qpnp_battery_gauge {
 	int (*get_battery_mvolts) (void);
 	int (*get_battery_temperature) (void);
@@ -27,6 +47,8 @@ struct qpnp_battery_gauge {
 	int (*get_battery_soc) (void);
 	int (*get_average_current) (void);
 	int (*is_battery_authenticated) (void);//wangjc add for authentication
+	int (*get_batt_cc) (void);
+	int (*get_batt_fcc) (void);  /* yangfangbiao@oneplus.cn, 2015/01/06  Modify for  sync with KK charge standard  */
 	//lfc add for fastchg
 	int (*fast_chg_started) (void);
 	int (*fast_switch_to_normal) (void);
