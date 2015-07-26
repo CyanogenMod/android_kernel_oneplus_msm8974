@@ -15,6 +15,25 @@
 
 #include <linux/power_supply.h>
 
+typedef enum {
+	/*! Battery is cold               */
+	CV_BATTERY_TEMP_REGION__COLD,
+	/*! Battery is little cold        */
+	CV_BATTERY_TEMP_REGION__LITTLE_COLD,
+	/*! Battery is cool               */
+	CV_BATTERY_TEMP_REGION__COOL,
+	/*! Battery is little cool        */
+	CV_BATTERY_TEMP_REGION__LITTLE_COOL,
+	/*! Battery is normal             */
+	CV_BATTERY_TEMP_REGION__NORMAL,
+	/*! Battery is warm               */
+	CV_BATTERY_TEMP_REGION__WARM,
+	/*! Battery is hot                */
+	CV_BATTERY_TEMP_REGION__HOT,
+	/*! Invalid battery temp region   */
+	CV_BATTERY_TEMP_REGION__INVALID,
+} chg_cv_battery_temp_region_type;
+
 struct qpnp_battery_gauge {
 	int (*get_battery_mvolts) (void);
 	int (*get_battery_temperature) (void);
