@@ -44,7 +44,8 @@
 #include <linux/random.h>
 #include <linux/rtc.h>
 
-extern char *BQ27541_HMACSHA1_authenticate(char *Message,char *Key,char *result);
+extern char *BQ27541_HMACSHA1_authenticate(char *Message, char *Key,
+		char *result);
 #endif
 
 #ifdef CONFIG_PIC1503_FASTCG
@@ -118,14 +119,16 @@ extern int pic16f_fw_update(bool pull96);
 #define BQ27541_SUBCMD_RESET   0x0041
 #define ZERO_DEGREE_CELSIUS_IN_TENTH_KELVIN   (-2731)
 #define BQ27541_INIT_DELAY   ((HZ)*1)
+
 #ifdef CONFIG_MACH_OPPO
-#define CAPACITY_SALTATE_COUNTER  4
-#define CAPACITY_SALTATE_COUNTER_NOT_CHARGING  20
-#define CAPACITY_SALTATE_COUNTER_80  30
-#define CAPACITY_SALTATE_COUNTER_90  40
-#define CAPACITY_SALTATE_COUNTER_95  60
-#define CAPACITY_SALTATE_COUNTER_FULL  120
+#define CAPACITY_SALTATE_COUNTER		4
+#define CAPACITY_SALTATE_COUNTER_NOT_CHARGING	20
+#define CAPACITY_SALTATE_COUNTER_80		30
+#define CAPACITY_SALTATE_COUNTER_90		40
+#define CAPACITY_SALTATE_COUNTER_95		60
+#define CAPACITY_SALTATE_COUNTER_FULL		120
 #endif
+
 /* If the system has several batteries we need a different name for each
  * of them...
  */
@@ -149,32 +152,30 @@ struct bq27541_device_info {
 	 */
 	struct  delayed_work		hw_config;
 #ifdef CONFIG_MACH_OPPO
-	int soc_pre;
-	int temp_pre;
-	int batt_vol_pre;
-	int current_pre;
-	int saltate_counter;
-	bool is_authenticated;
-	bool fast_chg_started;
-	bool fast_switch_to_normal;
-	bool fast_normal_to_warm;	//lfc add for fastchg over temp
-	int battery_type;
-	struct power_supply *batt_psy;
-	int irq;
-	struct work_struct fastcg_work;
+	int				soc_pre;
+	int				temp_pre;
+	int				batt_vol_pre;
+	int				current_pre;
+	int				saltate_counter;
+	bool				is_authenticated;
+	bool				fast_chg_started;
+	bool				fast_switch_to_normal;
+	bool				fast_normal_to_warm;
+	int				battery_type;
+	struct power_supply		*batt_psy;
+	int				irq;
+	struct work_struct		fastcg_work;
 
-	bool alow_reading;
-	struct timer_list watchdog;
-	struct wakeup_source fastchg_wakeup_source;
-	bool fast_chg_allow;
-	bool fast_low_temp_full;
-/* jingchun.wang@Onlinerd.Driver, 2014/02/12  Add for retry when config fail */
-	int retry_count;
-/* jingchun.wang@Onlinerd.Driver, 2014/02/27  Add for get right soc when sleep long time */
-	unsigned long rtc_resume_time;
-	unsigned long rtc_suspend_time;
-	atomic_t suspended;
-	bool fast_chg_ing;
+	bool				allow_reading;
+	struct timer_list		watchdog;
+	struct wakeup_source		fastchg_wakeup_source;
+	bool				fast_chg_allow;
+	bool				fast_low_temp_full;
+	int				retry_count;
+	unsigned long			rtc_resume_time;
+	unsigned long			rtc_suspend_time;
+	atomic_t			suspended;
+	bool				fast_chg_ing;
 #endif
 };
 
@@ -207,7 +208,7 @@ static int bq27541_battery_temperature(struct bq27541_device_info *di)
 		return di->temp_pre + ZERO_DEGREE_CELSIUS_IN_TENTH_KELVIN;
 	}
 
-	if (di->alow_reading == true) {
+	if (di->allow_reading) {
 		ret = bq27541_read(BQ27541_REG_TEMP, &temp, 0, di);
 		if (ret) {
 			count++;
@@ -245,7 +246,7 @@ static int bq27541_remaining_capacity(struct bq27541_device_info *di)
 	int ret;
 	int cap = 0;
 
-	if(di->alow_reading == true) {
+	if (di->allow_reading) {
 		ret = bq27541_read(BQ27541_REG_RM, &cap, 0, di);
 		if (ret) {
 			dev_err(di->dev, "error reading capacity.\n");
@@ -267,12 +268,16 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 		di->soc_pre = soc;
 	}
 	if (di->batt_psy) {
-		di->batt_psy->get_property(di->batt_psy,POWER_SUPPLY_PROP_STATUS, &ret);
+		di->batt_psy->get_property(di->batt_psy,
+				POWER_SUPPLY_PROP_STATUS, &ret);
 
-		if (ret.intval == POWER_SUPPLY_STATUS_CHARGING || ret.intval == POWER_SUPPLY_STATUS_FULL) { // is charging
+		if (ret.intval == POWER_SUPPLY_STATUS_CHARGING ||
+				ret.intval == POWER_SUPPLY_STATUS_FULL) {
+			// charging
 			if (abs(soc - di->soc_pre) >= 2) {
 				di->saltate_counter++;
-				if(di->saltate_counter < CAPACITY_SALTATE_COUNTER)
+				if (di->saltate_counter <
+						CAPACITY_SALTATE_COUNTER)
 					return di->soc_pre;
 				else
 					di->saltate_counter = 0;
@@ -285,8 +290,7 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 				soc_calib = di->soc_pre - 1;
 			else
 				soc_calib = di->soc_pre;
-			
-			/* jingchun.wang@Onlinerd.Driver, 2013/12/12  Add for set capacity to 100 when full in normal temp */
+
 			if (ret.intval == POWER_SUPPLY_STATUS_FULL) {
 				if (soc > 94) {
 					soc_calib = 100;
@@ -294,25 +298,30 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 			}
 		} else {
 			// not charging
-			if ((abs(soc - di->soc_pre) >= 2) || (di->soc_pre > 80)) {
+			if ((abs(soc - di->soc_pre) >= 2) ||
+					(di->soc_pre > 80)) {
 				di->saltate_counter++;
 				if (di->soc_pre == 100) {
-					counter_temp = CAPACITY_SALTATE_COUNTER_FULL;//6
+					counter_temp =
+					    CAPACITY_SALTATE_COUNTER_FULL;
 				} else if (di->soc_pre > 95) {
-					counter_temp = CAPACITY_SALTATE_COUNTER_95;//3
+					counter_temp =
+					    CAPACITY_SALTATE_COUNTER_95;
 				} else if (di->soc_pre > 90) {
-					counter_temp = CAPACITY_SALTATE_COUNTER_90;//2
+					counter_temp =
+					    CAPACITY_SALTATE_COUNTER_90;
 				} else if (di->soc_pre > 80) {
-					counter_temp = CAPACITY_SALTATE_COUNTER_80;//1.5
+					counter_temp =
+					    CAPACITY_SALTATE_COUNTER_80;
 				} else {
-					counter_temp = CAPACITY_SALTATE_COUNTER_NOT_CHARGING;//1
+					counter_temp =
+					  CAPACITY_SALTATE_COUNTER_NOT_CHARGING;
 				}
-				if(di->saltate_counter < counter_temp)
+				if (di->saltate_counter < counter_temp)
 					return di->soc_pre;
 				else
 					di->saltate_counter = 0;
-			}
-			else
+			} else
 				di->saltate_counter = 0;
 
 			if (soc < di->soc_pre)
@@ -338,26 +347,24 @@ static int bq27541_battery_soc(struct bq27541_device_info *di, bool raw)
 		return di->soc_pre;
 	}
 
-	if (di->alow_reading == true) {
+	if (di->allow_reading) {
 		ret = bq27541_read(BQ27541_REG_SOC, &soc, 0, di);
 		if (ret) {
 			dev_err(di->dev, "error reading soc.ret:%d\n",ret);
 			goto read_soc_err;
 		}
 	} else {
-		if(di->soc_pre)
+		if (di->soc_pre)
 			return di->soc_pre;
 		else
 			return 0;
 	}
 
-	if (raw == true) {
-		if(soc > 90) {
+	if (raw) {
+		if (soc > 90)
 			soc += 2;
-		}
-		if(soc <= di->soc_pre) {
+		if (soc <= di->soc_pre)
 			di->soc_pre = soc;
-		}
 	}
 
 	soc = bq27541_soc_calibrate(di,soc);
@@ -379,7 +386,7 @@ static int bq27541_average_current(struct bq27541_device_info *di)
 		return -di->current_pre;
 	}
 
-	if (di->alow_reading == true) {
+	if (di->allow_reading) {
 		ret = bq27541_read(BQ27541_REG_AI, &curr, 0, di);
 		if (ret) {
 			dev_err(di->dev, "error reading current.\n");
@@ -411,7 +418,7 @@ static int bq27541_battery_voltage(struct bq27541_device_info *di)
 		return di->batt_vol_pre;
 	}
 
-	if (di->alow_reading) {
+	if (di->allow_reading) {
 		ret = bq27541_read(BQ27541_REG_VOLT, &volt, 0, di);
 		if (ret) {
 			dev_err(di->dev, "error reading voltage,ret:%d\n", ret);
@@ -602,13 +609,12 @@ static int bq27541_set_switch_to_noraml_false(void)
 	if (bq27541_di) {
 		bq27541_di->fast_switch_to_normal = false;
 	}
-
 	return 0;
 }
 
 static int bq27541_get_fast_low_temp_full(void)
 {
-	if(bq27541_di) {
+	if (bq27541_di) {
 		return bq27541_di->fast_low_temp_full;
 	}
 	return false;
@@ -616,7 +622,7 @@ static int bq27541_get_fast_low_temp_full(void)
 
 static int bq27541_set_fast_low_temp_full_false(void)
 {
-	if(bq27541_di) {
+	if (bq27541_di) {
 		return bq27541_di->fast_low_temp_full = false;
 	}
 	return 0;
@@ -931,113 +937,119 @@ static bool bq27541_authenticate(struct i2c_client *client)
 #ifdef CONFIG_MACH_FIND7OP
 	return true;
 #else
-	char recv_buf[MESSAGE_LEN]={0x0};
-	char send_buf[MESSAGE_LEN]={0x0};
-	char result[MESSAGE_LEN]={0x0};
-	char Key[KEY_LEN]={0x77,0x30,0xa1,0x28,0x0a,0xa1,0x13,0x20,0xef,0xcd,0xab,0x89,0x67,0x45,0x23,0x01};
-	char checksum_buf[1] ={0x0};
+	char recv_buf[MESSAGE_LEN] = {0x0};
+	char send_buf[MESSAGE_LEN] = {0x0};
+	char result[MESSAGE_LEN] = {0x0};
+	char Key[KEY_LEN] = {0x77, 0x30, 0xa1, 0x28, 0x0a, 0xa1, 0x13, 0x20,
+			0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01};
+	char checksum_buf[1] = {0x0};
 	char authen_cmd_buf[1] = {0x00};
-	int i,rc;
-	pr_info("%s Enter\n",__func__);
+	int i, rc;
+
+	pr_info("%s Enter\n", __func__);
 
 	// step 0: produce 20 bytes random data and checksum
-	get_random_bytes(send_buf,20);	
-	for(i = 0;i < 20;i++){
+	get_random_bytes(send_buf, 20);
+	for (i = 0; i < 20; i++) {
 		checksum_buf[0] = checksum_buf[0] + send_buf[i];
 	}
-	checksum_buf[0] = 0xff - (checksum_buf[0]&0xff);
+	checksum_buf[0] = 0xff - (checksum_buf[0] & 0xff);
 
-	/* step 1: unseal mode->write 0x01 to blockdatactrl
-	authen_cmd_buf[0] = 0x01;
-	rc = i2c_smbus_write_i2c_block_data(client,BLOCKDATACTRL,1,&authen_cmd_buf[0]);
-	}	*/
-	
 	// step 1: seal mode->write 0x00 to dataflashblock
-	rc = i2c_smbus_write_i2c_block_data(client,DATAFLASHBLOCK,1,&authen_cmd_buf[0]);
-	if( rc < 0 ){
-		pr_info("%s i2c write error\n",__func__);
+	rc = i2c_smbus_write_i2c_block_data(client, DATAFLASHBLOCK, 1,
+			&authen_cmd_buf[0]);
+	if (rc < 0) {
+		pr_info("%s i2c write error\n", __func__);
 		return false;
 	}
+
 	// step 2: write 20 bytes to authendata_reg
-	i2c_smbus_write_i2c_block_data(client,AUTHENDATA,MESSAGE_LEN,&send_buf[0]);
+	i2c_smbus_write_i2c_block_data(client, AUTHENDATA, MESSAGE_LEN,
+			&send_buf[0]);
 	msleep(1);
+
 	// step 3: write checksum to authenchecksum_reg for compute
-	i2c_smbus_write_i2c_block_data(client,AUTHENCHECKSUM,1,&checksum_buf[0]);
+	i2c_smbus_write_i2c_block_data(client, AUTHENCHECKSUM, 1,
+			&checksum_buf[0]);
 	msleep(50);
+
 	// step 4: read authendata
-	i2c_smbus_read_i2c_block_data(client,AUTHENDATA,MESSAGE_LEN,&recv_buf[0]);
+	i2c_smbus_read_i2c_block_data(client, AUTHENDATA, MESSAGE_LEN,
+			&recv_buf[0]);
+
 	// step 5: phone do hmac(sha1-generic) algorithm
-	BQ27541_HMACSHA1_authenticate(send_buf,Key,result);
+	BQ27541_HMACSHA1_authenticate(send_buf, Key, result);
+
 	// step 6: compare recv_buf from bq27541 and result by phone
-	rc = strncmp(recv_buf,result,MESSAGE_LEN);
-	if(rc == 0){
+	rc = strncmp(recv_buf, result, MESSAGE_LEN);
+	if (rc == 0) {
 		pr_info("bq27541_authenticate success\n");
 		return true;
 	}
-	pr_info("bq27541_authenticate error,dump buf:\n");
-	for(i = 0;i < 20;i++){
-		pr_info("send_buf[%d]:0x%x,recv_buf[%d]:0x%x ?= result[%d]:0x%x\n",i,send_buf[i],i,recv_buf[i],i,result[i]);
+	pr_info("bq27541_authenticate error, dump buf:\n");
+	for (i = 0; i < 20; i++){
+		pr_info("send_buf[%d]:0x%x,recv_buf[%d]:0x%x ?= result[%d]:0x%x\n",
+				i, send_buf[i], i, recv_buf[i], i, result[i]);
 	}
 	return false;
 #endif
 }
 
-//Fuchun.Liao@EXP.Driver,2014/01/10 add for check battery type
 #define BATTERY_2700MA		0
 #define BATTERY_3000MA		1
 #define TYPE_INFO_LEN		8
-
-#ifndef CONFIG_MACH_FIND7OP
-/* jingchun.wang@Onlinerd.Driver, 2014/03/10  Modify for 14001 */
 static int bq27541_batt_type_detect(struct i2c_client *client)
 {
+#ifdef CONFIG_MACH_FIND7OP
+	return BATTERY_3000MA;
+#else
 	char blockA_cmd_buf[1] = {0x01};
 	char rc = 0;
 	char recv_buf[TYPE_INFO_LEN] = {0x0};
 	int i = 0;
 	
-	rc = i2c_smbus_write_i2c_block_data(client,DATAFLASHBLOCK,1,&blockA_cmd_buf[0]);
-	if( rc < 0 ){
+	rc = i2c_smbus_write_i2c_block_data(client, DATAFLASHBLOCK, 1,
+			&blockA_cmd_buf[0]);
+	if (rc < 0) {
 		pr_info("%s i2c write error\n",__func__);
 		return 0;
 	}
-	msleep(30);	//it is needed
-	i2c_smbus_read_i2c_block_data(client,AUTHENDATA,TYPE_INFO_LEN,&recv_buf[0]);
-	if((recv_buf[0] == 0x01) && (recv_buf[1] == 0x09) && (recv_buf[2] == 0x08) && (recv_buf[3] == 0x06))
+	msleep(30);
+	i2c_smbus_read_i2c_block_data(client, AUTHENDATA, TYPE_INFO_LEN,
+			&recv_buf[0]);
+	if ((recv_buf[0] == 0x01) && (recv_buf[1] == 0x09)
+			&& (recv_buf[2] == 0x08) && (recv_buf[3] == 0x06))
 		rc = BATTERY_2700MA;
-	else if((recv_buf[0] == 0x02) && (recv_buf[1] == 0x00) && (recv_buf[2] == 0x01) && (recv_buf[3] == 0x03))
+	else if ((recv_buf[0] == 0x02) && (recv_buf[1] == 0x00)
+			&& (recv_buf[2] == 0x01) && (recv_buf[3] == 0x03))
 		rc = BATTERY_3000MA;
 	else {
-		for(i = 0;i < TYPE_INFO_LEN;i++)
-			pr_info("%s error,recv_buf[%d]:0x%x\n",__func__,i,recv_buf[i]);
-		rc =  BATTERY_2700MA;
+		for (i = 0; i < TYPE_INFO_LEN; i++)
+			pr_info("%s error, recv_buf[%d]:0x%x\n",
+					__func__, i, recv_buf[i]);
+		rc = BATTERY_2700MA;
 	}
 	pr_info("%s battery_type:%d\n",__func__,rc);
 	return rc;
+#endif
 }
-#else /*CONFIG_MACH_FIND7OP*/
-static int bq27541_batt_type_detect(struct i2c_client *client)
-{
-	return BATTERY_3000MA;
-}
-#endif /*CONFIG_MACH_FIND7OP*/
 #endif
 
-/* OPPO 2013-12-12 liaofuchun add for fastchg */
 #ifdef CONFIG_PIC1503_FASTCG
-#define AP_TX_EN	GPIO_CFG(0, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
-#define AP_TX_DIS	GPIO_CFG(0, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA)
-
+#define AP_TX_EN	GPIO_CFG(0, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, \
+		GPIO_CFG_2MA)
+#define AP_TX_DIS	GPIO_CFG(0, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, \
+		GPIO_CFG_2MA)
+#define AP_SWITCH_USB	GPIO_CFG(96, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, \
+		GPIO_CFG_2MA)
 static irqreturn_t irq_rx_handler(int irq, void *dev_id)
 {
 	struct bq27541_device_info *di = dev_id;
-	//pr_info("%s\n", __func__);
-	
+
 	schedule_work(&di->fastcg_work);
 	return IRQ_HANDLED;
 }
 
-#define AP_SWITCH_USB	GPIO_CFG(96, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)
 static void fastcg_work_func(struct work_struct *work)
 {
 	int data = 0;
@@ -1052,32 +1064,34 @@ static void fastcg_work_func(struct work_struct *work)
 	int current_now = 0;
 	int remain_cap = 0;
 	static bool isnot_power_on = 0;
-		
+
 	free_irq(bq27541_di->irq, bq27541_di);
 
-	for(i = 0; i < 7; i++) {
+	for (i = 0; i < 7; i++) {
 		gpio_set_value(0, 0);
 		gpio_tlmm_config(AP_TX_EN, GPIO_CFG_ENABLE);
-		usleep_range(1000,1000);
+		usleep_range(1000, 1000);
 		gpio_set_value(0, 1);
 		gpio_tlmm_config(AP_TX_DIS, GPIO_CFG_ENABLE);
-		usleep_range(19000,19000);
+		usleep_range(19000, 19000);
 		bit = gpio_get_value(1);
-		data |= bit<<(6-i);
-		if((i == 2) && (data != 0x50) && (!fw_ver_info)){
-			//data recvd not start from "101"
-			pr_err("%s data err:%d\n",__func__,data);
-			if(bq27541_di->fast_chg_started == true) {
-				bq27541_di->alow_reading = true;
+		data |= bit << (6 - i);
+		if ((i == 2) && (data != 0x50) && (!fw_ver_info)) {
+			// data recvd not start from "101"
+			pr_err("%s data err:%d\n", __func__, data);
+			if (bq27541_di->fast_chg_started) {
+				bq27541_di->allow_reading = true;
 				bq27541_di->fast_chg_started = false;
 				bq27541_di->fast_chg_allow = false;
 				bq27541_di->fast_switch_to_normal = false;
 				bq27541_di->fast_normal_to_warm = false;
 				bq27541_di->fast_chg_ing = false;
 				gpio_set_value(96, 0);
-				retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
+				retval = gpio_tlmm_config(AP_SWITCH_USB,
+						GPIO_CFG_ENABLE);
 				if (retval) {
-					pr_err("%s switch usb error %d\n", __func__, retval);
+					pr_err("%s switch usb error %d\n",
+							__func__, retval);
 				}
 				power_supply_changed(bq27541_di->batt_psy);
 			}
@@ -1087,35 +1101,36 @@ static void fastcg_work_func(struct work_struct *work)
 
 	pr_err("%s recv data:0x%x\n", __func__, data);
 
-	if(data == 0x52) {
-		//request fast charging
+	if (data == 0x52) {
+		// request fast charging
 		__pm_stay_awake(&bq27541_di->fastchg_wakeup_source);
 		pic_need_to_up_fw = 0;
 		fw_ver_info = 0;
-		bq27541_di->alow_reading = false;
+		bq27541_di->allow_reading = false;
 		bq27541_di->fast_chg_started = true;
 		bq27541_di->fast_chg_allow = false;
 		bq27541_di->fast_normal_to_warm = false;
-		
+
 		mod_timer(&bq27541_di->watchdog,
-		  jiffies + msecs_to_jiffies(10000));
-		if(!isnot_power_on){
+				jiffies + msecs_to_jiffies(10000));
+		if (!isnot_power_on) {
 			isnot_power_on = 1;
 			ret_info = 0x1;
 		} else {
 			ret_info = 0x2;
 		}
-	} else if(data == 0x54) {
-		//fast charge stopped
-		bq27541_di->alow_reading = true;
+	} else if (data == 0x54) {
+		// fast charge stopped
+		bq27541_di->allow_reading = true;
 		bq27541_di->fast_chg_started = false;
 		bq27541_di->fast_chg_allow = false;
 		bq27541_di->fast_switch_to_normal = false;
 		bq27541_di->fast_normal_to_warm = false;
 		bq27541_di->fast_chg_ing = false;
-		//switch off fast chg
-		pr_info("%s fastchg stop unexpectly,switch off fastchg\n", __func__);
-		
+		// switch off fast chg
+		pr_info("%s fastchg stop unexpectly, switch off fastchg\n",
+				__func__);
+
 		gpio_set_value(96, 0);
 		retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 		if (retval) {
@@ -1123,33 +1138,29 @@ static void fastcg_work_func(struct work_struct *work)
 		}
 		del_timer(&bq27541_di->watchdog);
 		ret_info = 0x2;
-	} else if(data == 0x58) {
-		//tell ap can read i2c
-		bq27541_di->alow_reading = true;
-		//reading
+	} else if (data == 0x58) {
+		// tell ap can read i2c
+		bq27541_di->allow_reading = true;
+		// reading
 		bq27541_di->fast_chg_ing = true;
 		volt = bq27541_get_battery_mvolts();
 		temp = bq27541_get_battery_temperature();
 		remain_cap = bq27541_get_batt_remaining_capacity();
 		soc = bq27541_get_battery_soc();
 		current_now = bq27541_get_average_current();
-		pr_err("%s volt:%d,temp:%d,remain_cap:%d,soc:%d,current:%d\n",__func__,volt,temp,
-			remain_cap,soc,current_now);
-		//don't read
-		bq27541_di->alow_reading = false;
+		pr_err("%s volt:%d,temp:%d,remain_cap:%d,soc:%d,current:%d\n",
+				__func__, volt, temp,
+				remain_cap, soc, current_now);
+		// don't read
+		bq27541_di->allow_reading = false;
 		mod_timer(&bq27541_di->watchdog,
-			  jiffies + msecs_to_jiffies(10000));
+				jiffies + msecs_to_jiffies(10000));
 		ret_info = 0x2;
-	} else if(data == 0x5a){
-		//fastchg full,vbatt > 4350
-#if 0	//lfc modify for it(set fast_switch_to_normal ture) is earlier than usb_plugged_out irq(set it false)
-		bq27541_di->fast_switch_to_normal = true;
-		bq27541_di->alow_reading = true;
-		bq27541_di->fast_chg_started = false;
-		bq27541_di->fast_chg_allow = false;
-#endif
-		//switch off fast chg
-		pr_info("%s fastchg full,switch off fastchg,set GPIO96 0\n", __func__);
+	} else if (data == 0x5a) {
+		// fastchg full, vbatt > 4350
+		// switch off fast chg
+		pr_info("%s fastchg full,switch off fastchg\n",
+				__func__);
 		gpio_set_value(96, 0);
 		retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 		if (retval) {
@@ -1157,29 +1168,27 @@ static void fastcg_work_func(struct work_struct *work)
 		}
 		del_timer(&bq27541_di->watchdog);
 		ret_info = 0x2;
-	} else if(data == 0x53){
-		if (bq27541_di->battery_type == BATTERY_3000MA){	//13097 ATL battery
-			//if temp:10~20 decigec,vddmax = 4250mv
-			//switch off fast chg
-			pr_info("%s fastchg low temp full,switch off fastchg,set GPIO96 0\n", __func__);
+	} else if (data == 0x53) {
+		if (bq27541_di->battery_type == BATTERY_3000MA) {
+			// if temp:10~20 decigec, vddmax = 4250mv
+			// switch off fast chg
+			pr_info("%s fastchg low temp full,switch off fastchg\n",
+					__func__);
 			gpio_set_value(96, 0);
-			retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
+			retval = gpio_tlmm_config(AP_SWITCH_USB,
+					GPIO_CFG_ENABLE);
 			if (retval) {
-				pr_err("%s switch usb error %d\n", __func__, retval);
+				pr_err("%s switch usb error %d\n", __func__,
+						retval);
 			}
 		}
 		del_timer(&bq27541_di->watchdog);
 		ret_info = 0x2;
-	} else if(data == 0x59){
-		//usb bad connected,stop fastchg
-#if 0  //lfc modify for it(set fast_switch_to_normal ture) is earlier than usb_plugged_out irq(set it false)
-		bq27541_di->alow_reading = true;
-		bq27541_di->fast_chg_started = false;
-		bq27541_di->fast_chg_allow = false;
-		bq27541_di->fast_switch_to_normal = true;
-#endif
-		//switch off fast chg
-		pr_info("%s usb bad connect,switch off fastchg\n", __func__);
+	} else if (data == 0x59) {
+		// bad usb connection
+		// switch off fast chg
+		pr_info("%s bad usb connection, switch off fastchg\n",
+				__func__);
 		gpio_set_value(96, 0);
 		retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 		if (retval) {
@@ -1187,9 +1196,11 @@ static void fastcg_work_func(struct work_struct *work)
 		}
 		del_timer(&bq27541_di->watchdog);
 		ret_info = 0x2;
-	} else if(data == 0x5c){
-		//fastchg temp over 45 or under 20
-		pr_info("%s fastchg temp > 45 or < 20,switch off fastchg,set GPIO96 0\n", __func__);
+	} else if (data == 0x5c) {
+		// fastchg temp over 45 or under 20
+		// switch off fastchg
+		pr_info("%s fastchg temp > 45 or < 20, switch off fastchg\n",
+				__func__);
 		gpio_set_value(96, 0);
 		retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 		if (retval) {
@@ -1197,147 +1208,149 @@ static void fastcg_work_func(struct work_struct *work)
 		}
 		del_timer(&bq27541_di->watchdog);
 		ret_info = 0x2;
-	} else if(data == 0x56){
-		//ready to get fw_ver
+	} else if (data == 0x56) {
+		// ready to get fw_ver
 		fw_ver_info = 1;
 		ret_info = 0x2;
-	} else if(fw_ver_info){
-		//get fw_ver
-		//fw in local is large than mcu1503_fw_ver
-		if((!pic_have_updated) && (Pic16F_firmware_data[pic_fw_ver_count - 4] > data)){
+	} else if (fw_ver_info) {
+		// get fw_ver
+		if ((!pic_have_updated) &&
+				(Pic16F_firmware_data[pic_fw_ver_count - 4] >
+				data)) {
 			ret_info = 0x2;
-			pic_need_to_up_fw = 1;	//need to update fw
-		}else{
+			pic_need_to_up_fw = 1;	// need to update fw
+		} else {
 			ret_info = 0x1;
-			pic_need_to_up_fw = 0;	//fw is already new,needn't to up
+			pic_need_to_up_fw = 0;	// fw is already up to date
 		}
-		pr_info("local_fw:0x%x,need_to_up_fw:%d\n",Pic16F_firmware_data[pic_fw_ver_count - 4],pic_need_to_up_fw);
+		pr_info("local_fw:0x%x, need_to_up_fw:%d\n",
+				Pic16F_firmware_data[pic_fw_ver_count - 4],
+				pic_need_to_up_fw);
 		fw_ver_info = 0;
 	} else {
 		gpio_set_value(96, 0);
 		retval = gpio_tlmm_config(AP_SWITCH_USB, GPIO_CFG_ENABLE);
 		if (retval) {
-			pr_err("%s data err(101xxxx) switch usb error %d\n", __func__, retval);
-			goto out;	//avoid i2c conflict
+			pr_err("%s data err(101xxxx) switch usb error %d\n",
+					__func__, retval);
+			goto out;
 		}
-		msleep(500);	//avoid i2c conflict
-		//data err
-		bq27541_di->alow_reading = true;
+		msleep(500);
+		// data error
+		bq27541_di->allow_reading = true;
 		bq27541_di->fast_chg_started = false;
 		bq27541_di->fast_chg_allow = false;
 		bq27541_di->fast_switch_to_normal = false;
 		bq27541_di->fast_normal_to_warm = false;
 		bq27541_di->fast_chg_ing = false;
-		//data err
 		pr_info("%s data err(101xxxx),switch off fastchg\n", __func__);
 		power_supply_changed(bq27541_di->batt_psy);
 		goto out;
 	}
 
 	msleep(2);
-	gpio_tlmm_config(GPIO_CFG(1,0,GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
+	gpio_tlmm_config(GPIO_CFG(1, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,
+			GPIO_CFG_2MA), 1);
 	gpio_direction_output(1, 0);
 
-	for(i = 0; i < 3; i++) {
-		if(i == 0){	//tell mcu1503 battery_type
+	for (i = 0; i < 3; i++) {
+		if (i == 0) { // tell mcu1503 battery_type
 			gpio_set_value(1, ret_info >> 1);
-		} else if(i == 1){
+		} else if (i == 1) {
 			gpio_set_value(1, ret_info & 0x1);
 		} else {
-			gpio_set_value(1,bq27541_di->battery_type);
+			gpio_set_value(1, bq27541_di->battery_type);
 		}
-		
+
 		gpio_set_value(0, 0);
 		gpio_tlmm_config(AP_TX_EN, GPIO_CFG_ENABLE);
-		usleep_range(1000,1000);
+		usleep_range(1000, 1000);
 		gpio_set_value(0, 1);
 		gpio_tlmm_config(AP_TX_DIS, GPIO_CFG_ENABLE);
-		usleep_range(19000,19000);
+		usleep_range(19000, 19000);
 	}
 
 out:
-	gpio_tlmm_config(GPIO_CFG(1,0,GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
+	gpio_tlmm_config(GPIO_CFG(1, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
+			GPIO_CFG_2MA), 1);
 	gpio_direction_input(1);
-	
-	//lfc add for it is faster than usb_plugged_out irq to send 0x5a(fast_chg full and usb bad connected) to AP
-	if(data == 0x5a || data == 0x59){
-		usleep_range(180000,180000);
+
+	if (data == 0x5a || data == 0x59) {
+		usleep_range(180000, 180000);
 		bq27541_di->fast_switch_to_normal = true;
-		bq27541_di->alow_reading = true;
+		bq27541_di->allow_reading = true;
 		bq27541_di->fast_chg_started = false;
 		bq27541_di->fast_chg_allow = false;
 		bq27541_di->fast_chg_ing = false;
 	}
-	//fastchg temp over( > 45 or < 20)
 
-	//lfc add to set fastchg vddmax = 4250mv during 10 ~ 20 decigec for ATL 3000mAH battery
-	if(data == 0x53){
-		if(bq27541_di->battery_type == BATTERY_3000MA){	//13097 ATL battery
-			usleep_range(180000,180000);
+	if (data == 0x53) {
+		if (bq27541_di->battery_type == BATTERY_3000MA) {
+			usleep_range(180000, 180000);
 			bq27541_di->fast_low_temp_full = true;
-			bq27541_di->alow_reading = true;
+			bq27541_di->allow_reading = true;
 			bq27541_di->fast_chg_started = false;
 			bq27541_di->fast_chg_allow = false;
 			bq27541_di->fast_chg_ing = false;
 		}
 	}
-	//lfc add to set fastchg vddmax = 4250mv end
-	
-	if(data == 0x5c){
-		usleep_range(180000,180000);
+
+	if (data == 0x5c) {
+		usleep_range(180000, 180000);
 		bq27541_di->fast_normal_to_warm = true;
-		bq27541_di->alow_reading = true;
+		bq27541_di->allow_reading = true;
 		bq27541_di->fast_chg_started = false;
 		bq27541_di->fast_chg_allow = false;
 		bq27541_di->fast_chg_ing = false;
 	}
-	
-	if(pic_need_to_up_fw){
+
+	if (pic_need_to_up_fw) {
 		msleep(500);
 		del_timer(&bq27541_di->watchdog);
 		pic16f_fw_update(false);
 		pic_need_to_up_fw = 0;
 		mod_timer(&bq27541_di->watchdog,
-			  jiffies + msecs_to_jiffies(10000));
+				jiffies + msecs_to_jiffies(10000));
 	}
-	
-	retval = request_irq(bq27541_di->irq, irq_rx_handler, IRQF_TRIGGER_RISING, "mcu_data", bq27541_di);	//0X01:rising edge,0x02:falling edge
-	if(retval < 0) {
-	pr_err("%s request ap rx irq failed.\n", __func__);
+
+	retval = request_irq(bq27541_di->irq, irq_rx_handler,
+			IRQF_TRIGGER_RISING, "mcu_data", bq27541_di);
+	if (retval < 0) {
+		pr_err("%s request ap rx irq failed.\n", __func__);
 	}
-	if((data == 0x52) || (data == 0x58)){
+
+	if ((data == 0x52) || (data == 0x58)) {
 		power_supply_changed(bq27541_di->batt_psy);
 	}
 
-	if(data == 0x53){
-		if(bq27541_di->battery_type == BATTERY_3000MA){
+	if (data == 0x53) {
+		if (bq27541_di->battery_type == BATTERY_3000MA) {
 			power_supply_changed(bq27541_di->batt_psy);
 			__pm_relax(&bq27541_di->fastchg_wakeup_source);
 		}
 	}
 		
-	if((data == 0x54) || (data == 0x5a) || (data == 0x59) || (data == 0x5c)){
+	if ((data == 0x54) || (data == 0x5a) ||
+			(data == 0x59) || (data == 0x5c)) {
 		power_supply_changed(bq27541_di->batt_psy);
 		__pm_relax(&bq27541_di->fastchg_wakeup_source);
 	}
-	
-	
 }
 
 void di_watchdog(unsigned long data)
 {
 	struct bq27541_device_info *di = (struct bq27541_device_info *)data;
-
 	int ret = 0;
+
 	pr_err("di_watchdog can't receive mcu data\n");
-	di->alow_reading = true;
+	di->allow_reading = true;
 	di->fast_chg_started = false;
 	di->fast_switch_to_normal = false;
 	di->fast_low_temp_full = false;
 	di->fast_chg_allow = false;
 	di->fast_normal_to_warm = false;
 	di->fast_chg_ing = false;
-	//switch off fast chg
+	// switch off fast chg
 	pr_info("%s switch off fastchg\n", __func__);
 
 	gpio_set_value(96, 0);
@@ -1347,7 +1360,6 @@ void di_watchdog(unsigned long data)
 	}
 	__pm_relax(&bq27541_di->fastchg_wakeup_source);
 }
-/* OPPO 2013-12-12 liaofuchun add for fastchg */
 #endif
 
 #ifdef CONFIG_MACH_OPPO
@@ -1406,7 +1418,7 @@ static int bq27541_battery_probe(struct i2c_client *client,
 	di->client = client;
 #ifdef CONFIG_MACH_OPPO
 	di->temp_pre = 0;
-	di->alow_reading = true;
+	di->allow_reading = true;
 	di->fast_chg_ing = false;
 	di->fast_low_temp_full = false;
 	di->retry_count = MAX_RETRY_COUNT;
@@ -1447,13 +1459,14 @@ static int bq27541_battery_probe(struct i2c_client *client,
 	di->watchdog.data = (unsigned long)di;
 	di->watchdog.function = di_watchdog;
 	wakeup_source_init(&di->fastchg_wakeup_source, "fastcg_wakeup_source");
-	INIT_WORK(&di->fastcg_work,fastcg_work_func);
+	INIT_WORK(&di->fastcg_work, fastcg_work_func);
 	gpio_request(1, "mcu_clk");
-	gpio_tlmm_config(GPIO_CFG(1,0,GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
+	gpio_tlmm_config(GPIO_CFG(1, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL,
+			GPIO_CFG_2MA), 1);
 	gpio_direction_input(1);
 	di->irq = gpio_to_irq(1);
-	retval = request_irq(di->irq, irq_rx_handler, IRQF_TRIGGER_RISING, "mcu_data", di);
-	//0X01:rising edge,0x02:falling edge
+	retval = request_irq(di->irq, irq_rx_handler, IRQF_TRIGGER_RISING,
+			"mcu_data", di);
 	if (retval < 0) {
 		pr_err("%s request ap rx irq failed.\n", __func__);
 	}
@@ -1502,23 +1515,21 @@ static int bq27541_battery_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_MACH_OPPO
-static int bq27541_battery_suspend(struct i2c_client *client, pm_message_t message)
+static int bq27541_battery_suspend(struct i2c_client *client,
+		pm_message_t message)
 {
 	struct bq27541_device_info *di = i2c_get_clientdata(client);
-	
+
 	atomic_set(&di->suspended, 1);
-	
+
 	return 0;
 }
 
-/*1 minute*/
-#define RESUME_TIME  1*60 
 static int bq27541_battery_resume(struct i2c_client *client)
 {
 	struct bq27541_device_info *di = i2c_get_clientdata(client);
-			
+
 	atomic_set(&di->suspended, 0);
-	
 	bq27541_battery_soc(bq27541_di, true); 
 
 	return 0;
