@@ -12,11 +12,13 @@
 
 &mtp_batterydata {
 	qcom,mtp-3000mah {
-		qcom,max-voltage-uv = <4350000>;
+		qcom,max-voltage-uv = <4320000>;
+		qcom,chg-term-ua = <150000>;
 	};
 
 	qcom,palladium-batterydata {
-		qcom,max-voltage-uv = <4350000>;
+		qcom,max-voltage-uv = <4320000>;
+		qcom,chg-term-ua = <150000>;
 	};
 };
 
@@ -45,28 +47,22 @@
 		};
 	};
 
-	qcom,coincell@2800 {
-		qcom,rset-ohms = <800>;
-		qcom,vset-millivolts = <3200>;
-		qcom,charge-enable = <1>;
-	};
-
 	qcom,bms {
 		qcom,low-voltage-threshold = <3520000>;
 	};
 
 	qcom,charger {
-		qcom,vddmax-mv = <4352>;
-		qcom,vddsafe-mv = <4350>;
+		qcom,vddmax-mv = <4320>;
+		qcom,vddsafe-mv = <4320>;
 		qcom,vinmin-mv = <4400>;
 		qcom,ibatmax-ma = <2000>;
 		qcom,ibatterm-ma = <150>;
 		qcom,ibatsafe-ma = <2000>;
 		qcom,thermal-mitigation = <2000 900 900 200>;
-		qcom,cool-bat-mv = <4200>;
-		qcom,ibatmax-warm-ma = <900>;
 		qcom,warm-bat-mv = <4100>;
-		qcom,ibatmax-cool-ma = <900>;
+		qcom,cool-bat-mv = <4200>;
+		qcom,little-cool-bat-mv = <4320>;
+		qcom,little-cold-bat-mv = <4000>;
 	};
 
 	qcom,pm8941_rtc {
