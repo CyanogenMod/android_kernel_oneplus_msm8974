@@ -112,7 +112,7 @@
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-		qcom,mdss-dsi-reset-sequence = <1 15>, <0 75>, <1 15>;
+		qcom,mdss-dsi-reset-sequence = <1 20>, <0 200>, <1 20>;
 		cm,mdss-livedisplay-cabc-cmd = [
 			15 01 00 00 10 00 02 55 00];
 		cm,mdss-livedisplay-cabc-ui-value = <0x01>;
@@ -288,7 +288,7 @@
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-		qcom,mdss-dsi-reset-sequence = <1 15>, <0 75>, <1 15>;
+		qcom,mdss-dsi-reset-sequence = <1 20>, <0 200>, <1 20>;
 		cm,mdss-livedisplay-cabc-off = [
 			05 01 00 00 10 00 02 29 00
 			15 01 00 00 10 00 02 55 80];
