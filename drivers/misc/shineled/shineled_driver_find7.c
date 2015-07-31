@@ -1166,20 +1166,8 @@ static int __init SN3193_dev_init(void)
 		ret = -ENOMEM;
 		goto err_exit;
 	}
-/*OPPO yuyi 2014-02-20 modified begin for SN3193 would not be used*/
-#ifndef VENDOR_EDIT
 	pr_info("yanghai shineld driver init\n");
 	return i2c_add_driver(&SN3193_driver);
-#else
-	if(get_pcb_version() < HW_VERSION__20) {
-		pr_info("SN3193 shineld driver init\n");
-		return i2c_add_driver(&SN3193_driver);
-	} else {
-		pr_info("SN3193 13097 forbiden shineld driver init\n");
-		return -1;
-	};
-#endif
-/*OPPO yuyi 2014-02-20 modified end for SN3193 would not be used*/
 err_exit:
 	return ret;
 }
