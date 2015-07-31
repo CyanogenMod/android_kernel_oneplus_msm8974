@@ -12,11 +12,6 @@
 
 &soc {
 	i2c@f9924000 {
-		sn3193_issi_rgb@68 {
-			compatible = "sn3193,issi-rgb";
-			reg = <0x68>;
-			sn3193,sdb-gpio = <&msmgpio 45 0x00>;
-		};
 		ti_lm3630_bl@36 {
 			compatible = "ti,lm3630";
 			reg = <0x36>;

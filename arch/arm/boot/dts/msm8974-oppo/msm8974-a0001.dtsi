@@ -23,6 +23,16 @@
 /include/ "msm8974-a0001-sound.dtsi"
 /include/ "msm8974-oppo-leds.dtsi"
 
+&soc {
+	i2c@f9924000 {
+		sn3193_issi_rgb@68 {
+			compatible = "sn3193,issi-rgb";
+			reg = <0x68>;
+			sn3193,sdb-gpio = <&msmgpio 45 0x00>;
+		};
+	};
+};
+
 &i2c_1 {
 	status = "ok";
 };
