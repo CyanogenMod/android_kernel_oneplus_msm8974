@@ -667,17 +667,10 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 		},
 	},
 	{
-		.gpio      = 2,		/* BLSP1 QUP I2C_DATA */
+		.gpio      = 3,		/* BLSP1 QUP SPI_CLK */
 		.settings = {
-			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
-			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
-		},
-	},
-	{
-		.gpio      = 3,		/* BLSP1 QUP I2C_CLK */
-		.settings = {
-			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
-			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
+			[GPIOMUX_ACTIVE] = &gpio_spi_config,
+			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
 		},
 	},
 	{
@@ -692,6 +685,21 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 		.settings = {
 			[GPIOMUX_ACTIVE] = &gpio_spi_cs1_config,
 			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
+		},
+	},
+#else
+	{
+		.gpio      = 2,		/* BLSP1 QUP I2C_DATA */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
+			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
+		},
+	},
+	{
+		.gpio      = 3,		/* BLSP1 QUP I2C_CLK */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
+			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
 		},
 	},
 #endif
