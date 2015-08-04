@@ -208,6 +208,12 @@ config CPU_FREQ_DEFAULT_GOV_PEGASUSQ
 	help
 	Use the CPUFreq governor 'pegasusq' as default.
 
+config CPU_FREQ_DEFAULT_GOV_ONDEMANDPLUS
+	bool "ondemandplus"
+	select CPU_FREQ_GOV_ONDEMANDPLUS
+	help
+	Use the CPUFreq governor 'ondemandplus' as default.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -419,6 +425,10 @@ config CPU_FREQ_GOV_LIONHEART
 	
 config CPU_FREQ_GOV_PEGASUSQ
 	tristate "'pegasusq' cpufreq policy governor"	
+	  
+config CPU_FREQ_GOV_ONDEMANDPLUS
+	tristate "'ondemandplus' cpufreq governor"
+	depends on CPU_FREQ	  
             
 menu "x86 CPU frequency scaling drivers"
 depends on X86
