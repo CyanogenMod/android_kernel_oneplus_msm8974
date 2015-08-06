@@ -195,6 +195,9 @@ struct kgsl_mem_entry {
 #define MMU_CONFIG 1
 #endif
 
+int kgsl_cmdbatch_add_memobj(struct kgsl_cmdbatch *cmdbatch,
+			struct kgsl_ibdesc *ibdesc);
+
 void kgsl_mem_entry_destroy(struct kref *kref);
 
 struct kgsl_mem_entry *kgsl_get_mem_entry(struct kgsl_device *device,
@@ -225,7 +228,7 @@ void kgsl_trace_regwrite(struct kgsl_device *device, unsigned int offset,
 		unsigned int value);
 
 void kgsl_trace_issueibcmds(struct kgsl_device *device, int id,
-		struct kgsl_cmdbatch *cmdbatch,
+		struct kgsl_cmdbatch *cmdbatch, unsigned int numibs,
 		unsigned int timestamp, unsigned int flags,
 		int result, unsigned int type);
 
