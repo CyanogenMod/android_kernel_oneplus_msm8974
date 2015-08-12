@@ -2512,13 +2512,10 @@ static u32 pcc_rescale(u32 raw, u32 user)
 {
 	int val = 0;
 
-	if (raw == 0 && user == 0)
-		return 0;
-	else if (raw == 0)
-		return user;
-	else if (user == 0)
-		return raw;
-
+	if (raw == 0 || raw > 32768)
+		raw = 32768;
+	if (user == 0 || user > 32768)
+		user = 32768;
 	val = 32768 - ((32768 - raw) + (32768 - user));
 	return val < 100 ? 100 : val;
 }
