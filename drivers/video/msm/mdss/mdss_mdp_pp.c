@@ -2512,9 +2512,9 @@ static u32 pcc_rescale(u32 raw, u32 user)
 {
 	int val = 0;
 
-	if (raw == 0 || raw > 32768)
+	if (raw > 32768)
 		raw = 32768;
-	if (user == 0 || user > 32768)
+	if (user > 32768)
 		user = 32768;
 	val = 32768 - ((32768 - raw) + (32768 - user));
 	return val < 100 ? 100 : val;
@@ -2544,10 +2544,15 @@ static void pcc_combine(struct mdp_pcc_cfg_data *raw,
 	// there is a mode switch. we only care about the base
 	// coefficients from the user config.
 
+	if (!r_en || (raw->r.r == 0 && raw->g.g == 0 && raw->b.b == 0))
+		raw->r.r = raw->g.g = raw->b.b = 32768;
+	if (!u_en || (user->r.r == 0 && user->g.g == 0 && user->b.b ==0))
+		user->r.r = user->g.g = user->b.b = 32768;
+
 	memcpy(real, raw, sizeof(struct mdp_pcc_cfg_data));
-	real->r.r = pcc_rescale((r_en ? raw->r.r : 0), (u_en ? user->r.r : 0));
-	real->g.g = pcc_rescale((r_en ? raw->g.g : 0), (u_en ? user->g.g : 0));
-	real->b.b = pcc_rescale((r_en ? raw->b.b : 0), (u_en ? user->b.b : 0));
+	real->r.r = pcc_rescale(raw->r.r, user->r.r);
+	real->g.g = pcc_rescale(raw->g.g, user->g.g);
+	real->b.b = pcc_rescale(raw->b.b, user->b.b);
 	if (r_en && u_en)
 		real->ops = r_ops | u_ops;
 	else if (r_en)
