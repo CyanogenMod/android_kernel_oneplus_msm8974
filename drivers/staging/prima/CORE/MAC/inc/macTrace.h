@@ -43,9 +43,6 @@
 
 #include "aniGlobal.h"
 
-
-#ifdef TRACE_RECORD
-
 #define MAC_TRACE_GET_MODULE_ID(data) ((data >> 8) & 0xff)
 #define MAC_TRACE_GET_MSG_ID(data)       (data & 0xffff)
 
@@ -77,8 +74,6 @@ tANI_U8* macTraceGetcsrRoamSubState(tANI_U16 csrRoamSubState);
 tANI_U8* macTraceGetLimSmeState(tANI_U16 limState);
 tANI_U8* macTraceGetLimMlmState(tANI_U16 mlmState);
 tANI_U8* macTraceGetTLState(tANI_U16 tlState);
-
-#endif
 
 #endif
 

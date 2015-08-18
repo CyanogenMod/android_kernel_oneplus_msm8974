@@ -45,10 +45,15 @@
 #define __printf(a,b)
 #endif
 
+#ifdef WLAN_DEBUG
 void __printf(3,4)
 smsLog(tpAniSirGlobal pMac, tANI_U32 loglevel, const char *pString, ...);
 
 void __printf(3,4)
 pmcLog(tpAniSirGlobal pMac, tANI_U32 loglevel, const char *pString, ...);
+#else
+#define smsLog(arg...)
+#define pmcLog(arg...)
+#endif
 
 #endif // __SMS_DEBUG_H__
