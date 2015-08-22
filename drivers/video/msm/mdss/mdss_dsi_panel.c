@@ -270,19 +270,19 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			return rc;
 		}
 		if (!pinfo->cont_splash_enabled) {
-			if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
-				gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
-
 			for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) {
 				gpio_set_value((ctrl_pdata->rst_gpio),
 					pdata->panel_info.rst_seq[i]);
 				if (pdata->panel_info.rst_seq[++i])
 					usleep(pinfo->rst_seq[i] * 1000);
 			}
+
+			if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
+				gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
 #ifdef CONFIG_MACH_OPPO
-			if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio)) {
+			usleep(2 * 1000);
+			if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio))
 				gpio_direction_output(ctrl_pdata->lcd_5v_en_gpio, 1);
-			}
 #endif
 		}
 
@@ -300,16 +300,24 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 		}
 	} else {
 #ifdef CONFIG_MACH_OPPO
-		if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio)) {
+		gpio_set_value((ctrl_pdata->rst_gpio), 1);
+		usleep(110 * 1000);
+#endif
+		gpio_set_value((ctrl_pdata->rst_gpio), 0);
+		gpio_free(ctrl_pdata->rst_gpio);
+#ifdef CONFIG_MACH_OPPO
+		usleep(10 * 1000);
+		if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio))
 			gpio_direction_output(ctrl_pdata->lcd_5v_en_gpio, 0);
-		}
+		usleep(2 * 1000);
 #endif
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
 			gpio_free(ctrl_pdata->disp_en_gpio);
 		}
-		gpio_set_value((ctrl_pdata->rst_gpio), 0);
-		gpio_free(ctrl_pdata->rst_gpio);
+#ifdef CONFIG_MACH_OPPO
+		usleep(10 * 1000);
+#endif
 		if (gpio_is_valid(ctrl_pdata->mode_gpio))
 			gpio_free(ctrl_pdata->mode_gpio);
 	}
