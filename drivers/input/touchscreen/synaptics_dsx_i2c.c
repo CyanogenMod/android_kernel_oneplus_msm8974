@@ -56,14 +56,6 @@
 #define REPORT_2D_Z
 #define REPORT_2D_W
 
-/*
-#define USE_F12_DATA_15
-*/
-
-/*
-#define IGNORE_FN_INIT_FAILURE
-*/
-
 char *tp_firmware_strings[TP_TYPE_MAX][LCD_TYPE_MAX] = {
 	{"WINTEK", "WINTEK", "WINTEK"},
 	{"TPK", "TPK", "TPK"}
@@ -2533,44 +2525,6 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 	extra_data = (struct synaptics_rmi4_f12_extra_data *)fhandler->extra;
 	size_of_2d_data = sizeof(struct synaptics_rmi4_f12_finger_data);
 
-#ifdef USE_F12_DATA_15
-	/* Determine the total number of fingers to process */
-	if (extra_data->data15_size) {
-		retval = synaptics_rmi4_i2c_read(rmi4_data,
-				data_addr + extra_data->data15_offset,
-				extra_data->data15_data,
-				extra_data->data15_size);
-		if (retval < 0)
-			return 0;
-
-		/* Start checking from the highest bit */
-		temp = extra_data->data15_size - 1; /* Highest byte */
-		finger = (fingers_to_process - 1) % 8; /* Highest bit */
-		do {
-			if (extra_data->data15_data[temp] & (1 << finger))
-				break;
-
-			if (finger) {
-				finger--;
-			} else {
-				temp--; /* Move to the next lower byte */
-				finger = 7;
-			}
-
-			fingers_to_process--;
-		} while (fingers_to_process);
-
-		dev_dbg(&rmi4_data->i2c_client->dev,
-				"%s: Number of fingers to process = %d\n",
-				__func__, fingers_to_process);
-	}
-
-	if (!fingers_to_process) {
-		synaptics_rmi4_free_fingers(rmi4_data);
-		return 0;
-	}
-#endif
-
 	if (atomic_read(&rmi4_data->syna_use_gesture)) {
 		retval = synaptics_rmi4_i2c_read(rmi4_data,
 				SYNA_ADDR_GESTURE_OFFSET,
@@ -3783,12 +3737,7 @@ rescan_pdt:
 					retval = synaptics_rmi4_f1a_init(rmi4_data,
 							fhandler, &rmi_fd, intr_count);
 					if (retval < 0) {
-#ifdef IGNORE_FN_INIT_FAILURE
-						kfree(fhandler);
-						fhandler = NULL;
-#else
 						return retval;
-#endif
 					}
 					break;
 				case SYNAPTICS_RMI4_F54:
@@ -4881,19 +4830,6 @@ static int synaptics_rmi4_suspend(struct device *dev)
 	rmi4_data->pwrrunning = false;
 	return 0;
 }
-
-#ifdef SYNC_RMI4_PWR
-void synaptics_rmi4_sync_lcd_suspend(void) {
-	if (!syna_rmi4_data)
-		return;
-	synaptics_rmi4_suspend(&syna_rmi4_data->i2c_client->dev);
-}
-void synaptics_rmi4_sync_lcd_resume(void) {
-	if (!syna_rmi4_data)
-		return;
-	synaptics_rmi4_resume(&syna_rmi4_data->i2c_client->dev);
-}
-#endif
 
 /**
  * synaptics_rmi4_resume()
