@@ -89,14 +89,6 @@ enum LCD_TYPE {
 	LCD_TYPE_MAX
 };
 
-//#define SYNC_RMI4_PWR
-
-#ifdef SYNC_RMI4_PWR
-extern void synaptics_rmi4_sync_lcd_suspend(void);
-extern void synaptics_rmi4_sync_lcd_resume(void);
-#endif
-
-
 /*
  * struct synaptics_rmi4_fn_desc - function descriptor fields in PDT
  * @query_base_addr: base address for query registers
