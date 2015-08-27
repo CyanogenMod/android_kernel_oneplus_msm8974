@@ -774,7 +774,7 @@ qpnp_is_dc_higher_prio(struct qpnp_chg_chip *chip)
 	int rc;
 	u8 usb_ctl;
 
-	if (!chip->type == SMBB)
+	if (chip->type != SMBB)
 		return false;
 
 	rc = qpnp_chg_read(chip, &usb_ctl,
