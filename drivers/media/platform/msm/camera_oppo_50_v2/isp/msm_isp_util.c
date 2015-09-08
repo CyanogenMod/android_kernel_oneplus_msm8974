@@ -365,6 +365,9 @@ int msm_isp_cfg_input(struct vfe_device *vfe_dev, void *arg)
 
 	switch (input_cfg->input_src) {
 	case VFE_PIX_0:
+#ifdef CONFIG_MACH_OPPO
+		input_cfg->input_pix_clk = 465000000;
+#endif
 		rc = msm_isp_cfg_pix(vfe_dev, input_cfg);
 		break;
 	case VFE_RAW_0:
