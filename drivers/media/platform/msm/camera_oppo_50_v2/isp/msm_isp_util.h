@@ -22,6 +22,9 @@
 #define ISP_DBG(fmt, args...) pr_debug(fmt, ##args)
 #endif
 
+#define MSM_ISP_MIN_AB 450000000
+#define MSM_ISP_MIN_IB 900000000
+
 #define ALT_VECTOR_IDX(x) {x = 3 - x; }
 struct msm_isp_bandwidth_info {
 	uint32_t active;
