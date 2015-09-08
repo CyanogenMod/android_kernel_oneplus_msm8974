@@ -22,8 +22,13 @@
 #define ISP_DBG(fmt, args...) pr_debug(fmt, ##args)
 #endif
 
+#ifdef CONFIG_MACH_OPPO
+#define MSM_ISP_MIN_AB 1600000000ULL
+#define MSM_ISP_MIN_IB 2400000000ULL
+#else
 #define MSM_ISP_MIN_AB 450000000
 #define MSM_ISP_MIN_IB 900000000
+#endif
 
 #define ALT_VECTOR_IDX(x) {x = 3 - x; }
 struct msm_isp_bandwidth_info {
