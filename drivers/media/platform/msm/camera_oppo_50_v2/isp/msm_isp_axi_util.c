@@ -1177,16 +1177,14 @@ static int msm_isp_update_stream_bandwidth(struct vfe_device *vfe_dev)
 			pixel_clock) * ISP_DEFAULT_FORMAT_FACTOR / ISP_Q2;
 	total_bandwidth = total_pix_bandwidth + total_rdi_bandwidth;
 	total_streams = num_pix_streams + num_rdi_streams;
-	if (total_streams == 1) {
-         rc = msm_isp_update_bandwidth(ISP_VFE0 + vfe_dev->pdev->id,
-		(total_bandwidth - MSM_ISP_MIN_AB) , (total_bandwidth *
-		ISP_BUS_UTILIZATION_FACTOR / ISP_Q2 - MSM_ISP_MIN_IB));
-	}
-	else {
-	rc = msm_isp_update_bandwidth(ISP_VFE0 + vfe_dev->pdev->id,
-		total_bandwidth, total_bandwidth *
-		ISP_BUS_UTILIZATION_FACTOR / ISP_Q2);
-	}
+	if (total_streams == 1)
+		rc = msm_isp_update_bandwidth(ISP_VFE0 + vfe_dev->pdev->id,
+			total_bandwidth,
+			(total_bandwidth * ISP_BUS_UTILIZATION_FACTOR / ISP_Q2));
+	else
+		rc = msm_isp_update_bandwidth(ISP_VFE0 + vfe_dev->pdev->id,
+			(total_bandwidth + MSM_ISP_MIN_AB), (total_bandwidth *
+			ISP_BUS_UTILIZATION_FACTOR / ISP_Q2 + MSM_ISP_MIN_IB));
 	if (rc < 0)
 		pr_err("%s: update failed\n", __func__);
 
