@@ -53,4 +53,8 @@ config QCOM_TDLS
     bool "Enable TDLS feature"
     default n
 
+config WLAN_AUTOGEN_MACADDR_FEATURE
+        bool "Enable new mac address by modifying cfg.ini settings"
+        default n
+
 endif # PRIMA_WLAN || PRONTO_WLAN
