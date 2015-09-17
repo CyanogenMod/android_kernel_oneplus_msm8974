@@ -100,7 +100,7 @@ static struct vmpressure *work_to_vmpressure(struct work_struct *work)
 	return container_of(work, struct vmpressure, work);
 }
 
-#ifdef CONFIG_MEMCG
+#ifdef CONFIG_CGROUP_MEM_RES_CTLR
 static struct vmpressure *cg_to_vmpressure(struct cgroup *cg)
 {
 	return css_to_vmpressure(cgroup_subsys_state(cg, mem_cgroup_subsys_id));
