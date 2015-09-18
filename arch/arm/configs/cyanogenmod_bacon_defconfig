@@ -696,7 +696,7 @@ CONFIG_ZBOOT_ROM_BSS=0
 CONFIG_CMDLINE=""
 # CONFIG_XIP_KERNEL is not set
 CONFIG_KEXEC=y
-CONFIG_ATAGS_PROC=y
+# CONFIG_ATAGS_PROC is not set
 CONFIG_KEXEC_HARDBOOT=y
 # CONFIG_CRASH_DUMP is not set
 # CONFIG_AUTO_ZRELADDR is not set
@@ -1180,7 +1180,7 @@ CONFIG_BT_HIDP=y
 # Bluetooth device drivers
 #
 CONFIG_BT_HCISMD=y
-# CONFIG_BT_HCIBTUSB is not set
+CONFIG_BT_HCIBTUSB=y
 # CONFIG_BT_HCIBTSDIO is not set
 CONFIG_BT_HCIUART=y
 # CONFIG_BT_HCIUART_H4 is not set
@@ -1195,6 +1195,7 @@ CONFIG_BT_HCIUART_ATH3K=y
 # CONFIG_BT_HCIVHCI is not set
 # CONFIG_BT_MRVL is not set
 CONFIG_MSM_BT_POWER=y
+# CONFIG_BT_ATH3K is not set
 # CONFIG_AF_RXRPC is not set
 CONFIG_FIB_RULES=y
 CONFIG_WIRELESS=y
@@ -2229,7 +2230,8 @@ CONFIG_MEDIA_CONTROLLER=y
 CONFIG_VIDEO_DEV=y
 CONFIG_VIDEO_V4L2_COMMON=y
 CONFIG_VIDEO_V4L2_SUBDEV_API=y
-# CONFIG_DVB_CORE is not set
+CONFIG_DVB_CORE=y
+CONFIG_DVB_NET=y
 CONFIG_VIDEO_MEDIA=y
 
 #
@@ -2278,6 +2280,7 @@ CONFIG_MSMB_JPEG=y
 CONFIG_MSM_VIDC_V4L2=y
 CONFIG_MSM_WFD=y
 # CONFIG_MSM_WFD_DEBUG is not set
+# CONFIG_DVB_MPQ is not set
 # CONFIG_MSM_VCAP is not set
 CONFIG_MEDIA_TUNER=y
 # CONFIG_MEDIA_TUNER_CUSTOMISE is not set
@@ -2416,7 +2419,171 @@ CONFIG_USB_VIDEO_CLASS_INPUT_EVDEV=y
 CONFIG_V4L_PLATFORM_DRIVERS=y
 # CONFIG_SOC_CAMERA is not set
 # CONFIG_V4L_MEM2MEM_DRIVERS is not set
-# CONFIG_RADIO_ADAPTERS is not set
+CONFIG_RADIO_ADAPTERS=y
+# CONFIG_RADIO_SI470X is not set
+# CONFIG_USB_MR800 is not set
+# CONFIG_USB_DSBR is not set
+# CONFIG_I2C_SI4713 is not set
+# CONFIG_RADIO_SI4713 is not set
+# CONFIG_USB_KEENE is not set
+# CONFIG_RADIO_TEA5764 is not set
+# CONFIG_RADIO_SAA7706H is not set
+# CONFIG_RADIO_TEF6862 is not set
+# CONFIG_RADIO_WL1273 is not set
+
+#
+# Texas Instruments WL128x FM driver (ST based)
+#
+# CONFIG_RADIO_WL128X is not set
+# CONFIG_RADIO_IRIS is not set
+CONFIG_DVB_MAX_ADAPTERS=8
+# CONFIG_DVB_DYNAMIC_MINORS is not set
+CONFIG_DVB_CAPTURE_DRIVERS=y
+# CONFIG_TTPCI_EEPROM is not set
+
+#
+# Supported USB Adapters
+#
+
+#
+# Supported FlexCopII (B2C2) Adapters
+#
+# CONFIG_DVB_B2C2_FLEXCOP is not set
+
+#
+# Supported DVB Frontends
+#
+CONFIG_DVB_FE_CUSTOMISE=y
+
+#
+# Customise DVB Frontends
+#
+
+#
+# Multistandard (satellite) frontends
+#
+# CONFIG_DVB_STB0899 is not set
+# CONFIG_DVB_STB6100 is not set
+# CONFIG_DVB_STV090x is not set
+# CONFIG_DVB_STV6110x is not set
+
+#
+# Multistandard (cable + terrestrial) frontends
+#
+# CONFIG_DVB_DRXK is not set
+# CONFIG_DVB_TDA18271C2DD is not set
+
+#
+# DVB-S (satellite) frontends
+#
+# CONFIG_DVB_CX24110 is not set
+# CONFIG_DVB_CX24123 is not set
+# CONFIG_DVB_MT312 is not set
+# CONFIG_DVB_ZL10036 is not set
+# CONFIG_DVB_ZL10039 is not set
+# CONFIG_DVB_S5H1420 is not set
+# CONFIG_DVB_STV0288 is not set
+# CONFIG_DVB_STB6000 is not set
+# CONFIG_DVB_STV0299 is not set
+# CONFIG_DVB_STV6110 is not set
+# CONFIG_DVB_STV0900 is not set
+# CONFIG_DVB_TDA8083 is not set
+# CONFIG_DVB_TDA10086 is not set
+# CONFIG_DVB_TDA8261 is not set
+# CONFIG_DVB_VES1X93 is not set
+# CONFIG_DVB_TUNER_ITD1000 is not set
+# CONFIG_DVB_TUNER_CX24113 is not set
+# CONFIG_DVB_TDA826X is not set
+# CONFIG_DVB_TUA6100 is not set
+# CONFIG_DVB_CX24116 is not set
+# CONFIG_DVB_SI21XX is not set
+# CONFIG_DVB_DS3000 is not set
+# CONFIG_DVB_MB86A16 is not set
+# CONFIG_DVB_TDA10071 is not set
+
+#
+# DVB-T (terrestrial) frontends
+#
+# CONFIG_DVB_SP8870 is not set
+# CONFIG_DVB_SP887X is not set
+# CONFIG_DVB_CX22700 is not set
+# CONFIG_DVB_CX22702 is not set
+# CONFIG_DVB_S5H1432 is not set
+# CONFIG_DVB_DRXD is not set
+# CONFIG_DVB_L64781 is not set
+# CONFIG_DVB_TDA1004X is not set
+# CONFIG_DVB_NXT6000 is not set
+# CONFIG_DVB_MT352 is not set
+# CONFIG_DVB_ZL10353 is not set
+# CONFIG_DVB_DIB3000MB is not set
+# CONFIG_DVB_DIB3000MC is not set
+# CONFIG_DVB_DIB7000M is not set
+# CONFIG_DVB_DIB7000P is not set
+# CONFIG_DVB_DIB9000 is not set
+# CONFIG_DVB_TDA10048 is not set
+# CONFIG_DVB_AF9013 is not set
+# CONFIG_DVB_EC100 is not set
+# CONFIG_DVB_HD29L2 is not set
+# CONFIG_DVB_STV0367 is not set
+# CONFIG_DVB_CXD2820R is not set
+CONFIG_DVB_RTL2830=y
+
+#
+# DVB-C (cable) frontends
+#
+# CONFIG_DVB_VES1820 is not set
+# CONFIG_DVB_TDA10021 is not set
+# CONFIG_DVB_TDA10023 is not set
+# CONFIG_DVB_STV0297 is not set
+
+#
+# ATSC (North American/Korean Terrestrial/Cable DTV) frontends
+#
+# CONFIG_DVB_NXT200X is not set
+# CONFIG_DVB_OR51211 is not set
+# CONFIG_DVB_OR51132 is not set
+# CONFIG_DVB_BCM3510 is not set
+# CONFIG_DVB_LGDT330X is not set
+# CONFIG_DVB_LGDT3305 is not set
+# CONFIG_DVB_S5H1409 is not set
+# CONFIG_DVB_AU8522 is not set
+# CONFIG_DVB_S5H1411 is not set
+
+#
+# ISDB-T (terrestrial) frontends
+#
+# CONFIG_DVB_S921 is not set
+# CONFIG_DVB_DIB8000 is not set
+# CONFIG_DVB_MB86A20S is not set
+
+#
+# Digital terrestrial only tuners/PLL
+#
+# CONFIG_DVB_PLL is not set
+# CONFIG_DVB_TUNER_DIB0070 is not set
+# CONFIG_DVB_TUNER_DIB0090 is not set
+
+#
+# SEC control devices for DVB-S
+#
+# CONFIG_DVB_LNBP21 is not set
+# CONFIG_DVB_LNBP22 is not set
+# CONFIG_DVB_ISL6405 is not set
+# CONFIG_DVB_ISL6421 is not set
+# CONFIG_DVB_ISL6423 is not set
+# CONFIG_DVB_A8293 is not set
+# CONFIG_DVB_LGS8GL5 is not set
+# CONFIG_DVB_LGS8GXX is not set
+# CONFIG_DVB_ATBM8830 is not set
+# CONFIG_DVB_TDA665x is not set
+# CONFIG_DVB_IX2505V is not set
+# CONFIG_DVB_IT913X_FE is not set
+# CONFIG_DVB_M88RS2000 is not set
+
+#
+# Tools to develop new frontends
+#
+# CONFIG_DVB_DUMMY_FE is not set
 
 #
 # Graphics support
