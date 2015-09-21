@@ -179,7 +179,7 @@ static void __rt_mutex_adjust_prio(struct task_struct *task)
  * of task. We do not use the spin_xx_mutex() variants here as we are
  * outside of the debug path.)
  */
-void rt_mutex_adjust_prio(struct task_struct *task)
+static void rt_mutex_adjust_prio(struct task_struct *task)
 {
 	unsigned long flags;
 
@@ -569,13 +569,14 @@ static int task_blocks_on_rt_mutex(struct rt_mutex *lock,
 }
 
 /*
+ * Wake up the next waiter on the lock.
+ *
  * Remove the top waiter from the current tasks pi waiter list and
- * queue it up.
+ * wake it up.
  *
  * Called with lock->wait_lock held.
  */
-static void mark_wakeup_next_waiter(struct wake_q_head *wake_q,
-				    struct rt_mutex *lock)
+static void wakeup_next_waiter(struct rt_mutex *lock)
 {
 	struct rt_mutex_waiter *waiter;
 	unsigned long flags;
@@ -604,7 +605,12 @@ static void mark_wakeup_next_waiter(struct wake_q_head *wake_q,
 
 	raw_spin_unlock_irqrestore(&current->pi_lock, flags);
 
-	wake_q_add(wake_q, waiter->task);
+	/*
+	 * It's safe to dereference waiter as it cannot go away as
+	 * long as we hold lock->wait_lock. The waiter task needs to
+	 * acquire it in order to dequeue the waiter.
+	 */
+	wake_up_process(waiter->task);
 }
 
 /*
@@ -854,11 +860,10 @@ static inline int rt_mutex_slowtrylock(struct rt_mutex *lock)
 }
 
 /*
- * Slow path to release a rt-mutex.
- * Return whether the current task needs to undo a potential priority boosting.
+ * Slow path to release a rt-mutex:
  */
-static bool __sched rt_mutex_slowunlock(struct rt_mutex *lock,
-					struct wake_q_head *wake_q)
+static void __sched
+rt_mutex_slowunlock(struct rt_mutex *lock)
 {
 	raw_spin_lock(&lock->wait_lock);
 
@@ -900,7 +905,7 @@ static bool __sched rt_mutex_slowunlock(struct rt_mutex *lock,
 	while (!rt_mutex_has_waiters(lock)) {
 		/* Drops lock->wait_lock ! */
 		if (unlock_rt_mutex_safe(lock) == true)
-			return false;
+			return;
 		/* Relock the rtmutex and try again */
 		raw_spin_lock(&lock->wait_lock);
 	}
@@ -908,15 +913,13 @@ static bool __sched rt_mutex_slowunlock(struct rt_mutex *lock,
 	/*
 	 * The wakeup next waiter path does not suffer from the above
 	 * race. See the comments there.
-	 *
-	 * Queue the next waiter for wakeup once we release the wait_lock.
 	 */
-	mark_wakeup_next_waiter(wake_q, lock);
+	wakeup_next_waiter(lock);
 
 	raw_spin_unlock(&lock->wait_lock);
 
-	/* check PI boosting */
-	return true;
+	/* Undo pi boosting if necessary: */
+	rt_mutex_adjust_prio(current);
 }
 
 /*
@@ -965,23 +968,12 @@ rt_mutex_fasttrylock(struct rt_mutex *lock,
 
 static inline void
 rt_mutex_fastunlock(struct rt_mutex *lock,
-		    bool (*slowfn)(struct rt_mutex *lock,
-				   struct wake_q_head *wqh))
+		    void (*slowfn)(struct rt_mutex *lock))
 {
-	WAKE_Q(wake_q);
-
-	if (likely(rt_mutex_cmpxchg(lock, current, NULL))) {
+	if (likely(rt_mutex_cmpxchg(lock, current, NULL)))
 		rt_mutex_deadlock_account_unlock(current);
-
-	} else {
-		bool deboost = slowfn(lock, &wake_q);
-
-		wake_up_q(&wake_q);
-
-		/* Undo pi boosting if necessary: */
-		if (deboost)
-			rt_mutex_adjust_prio(current);
-	}
+	else
+		slowfn(lock);
 }
 
 /**
@@ -1072,23 +1064,6 @@ void __sched rt_mutex_unlock(struct rt_mutex *lock)
 	rt_mutex_fastunlock(lock, rt_mutex_slowunlock);
 }
 EXPORT_SYMBOL_GPL(rt_mutex_unlock);
-
-/**
- * rt_mutex_futex_unlock - Futex variant of rt_mutex_unlock
- * @lock: the rt_mutex to be unlocked
- *
- * Returns: true/false indicating whether priority adjustment is
- * required or not.
- */
-bool __sched rt_mutex_futex_unlock(struct rt_mutex *lock,
-				   struct wake_q_head *wqh)
-{
-	if (likely(rt_mutex_cmpxchg(lock, current, NULL))) {
-		rt_mutex_deadlock_account_unlock(current);
-		return false;
-	}
-	return rt_mutex_slowunlock(lock, wqh);
-}
 
 /**
  * rt_mutex_destroy - mark a mutex unusable
