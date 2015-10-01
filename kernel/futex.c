@@ -968,14 +968,11 @@ static void wake_futex(struct futex_q *q)
 	put_task_struct(p);
 }
 
-static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_q *this,
-			 struct futex_hash_bucket *hb)
+static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_q *this)
 {
 	struct task_struct *new_owner;
 	struct futex_pi_state *pi_state = this->pi_state;
 	u32 uninitialized_var(curval), newval;
-	WAKE_Q(wake_q);
-	bool deboost;
 	int ret = 0;
 
 	if (!pi_state)
@@ -1027,19 +1024,7 @@ static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_q *this,
 	raw_spin_unlock_irq(&new_owner->pi_lock);
 
 	raw_spin_unlock(&pi_state->pi_mutex.wait_lock);
-
-	deboost = rt_mutex_futex_unlock(&pi_state->pi_mutex, &wake_q);
-
-	/*
-	 * First unlock HB so the waiter does not spin on it once he got woken
-	 * up. Second wake up the waiter before the priority is adjusted. If we
-	 * deboost first (and lose our higher priority), then the task might get
-	 * scheduled away before the wake up can take place.
-	 */
-	spin_unlock(&hb->lock);
-	wake_up_q(&wake_q);
-	if (deboost)
-		rt_mutex_adjust_prio(current);
+	rt_mutex_unlock(&pi_state->pi_mutex);
 
 	return 0;
 }
@@ -1563,7 +1548,7 @@ retry_private:
 			this->pi_state = pi_state;
 			ret = rt_mutex_start_proxy_lock(&pi_state->pi_mutex,
 							this->rt_waiter,
-							this->task);
+							this->task, 1);
 			if (ret == 1) {
 				/* We got the lock. */
 				requeue_pi_wake_futex(this, &key2, hb2);
@@ -2169,9 +2154,9 @@ retry_private:
 	/*
 	 * Block on the PI mutex:
 	 */
-	if (!trylock) {
-		ret = rt_mutex_timed_futex_lock(&q.pi_state->pi_mutex, to);
-	} else {
+	if (!trylock)
+		ret = rt_mutex_timed_lock(&q.pi_state->pi_mutex, to, 1);
+	else {
 		ret = rt_mutex_trylock(&q.pi_state->pi_mutex);
 		/* Fixup the trylock return value: */
 		ret = ret ? 0 : -EWOULDBLOCK;
@@ -2281,13 +2266,7 @@ retry:
 	plist_for_each_entry_safe(this, next, head, list) {
 		if (!match_futex (&this->key, &key))
 			continue;
-		ret = wake_futex_pi(uaddr, uval, this, hb);
-		/*
-		 * In case of success wake_futex_pi dropped the hash
-		 * bucket lock.
-		 */
-		if (!ret)
-			goto out_putkey;
+		ret = wake_futex_pi(uaddr, uval, this);
 		/*
 		 * The atomic access to the futex value
 		 * generated a pagefault, so retry the
@@ -2295,10 +2274,6 @@ retry:
 		 */
 		if (ret == -EFAULT)
 			goto pi_faulted;
-		/*
-		 * wake_futex_pi has detected invalid state. Tell user
-		 * space.
-		 */
 		goto out_unlock;
 	}
 	/*
@@ -2310,7 +2285,6 @@ retry:
 
 out_unlock:
 	spin_unlock(&hb->lock);
-out_putkey:
 	put_futex_key(&key);
 
 out:
@@ -2513,7 +2487,7 @@ static int futex_wait_requeue_pi(u32 __user *uaddr, unsigned int flags,
 		 */
 		WARN_ON(!q.pi_state);
 		pi_mutex = &q.pi_state->pi_mutex;
-		ret = rt_mutex_finish_proxy_lock(pi_mutex, to, &rt_waiter);
+		ret = rt_mutex_finish_proxy_lock(pi_mutex, to, &rt_waiter, 1);
 		debug_rt_mutex_free_waiter(&rt_waiter);
 
 		spin_lock(q.lock_ptr);

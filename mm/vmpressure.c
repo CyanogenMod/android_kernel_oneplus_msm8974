@@ -100,7 +100,7 @@ static struct vmpressure *work_to_vmpressure(struct work_struct *work)
 	return container_of(work, struct vmpressure, work);
 }
 
-#ifdef CONFIG_MEMCG
+#ifdef CONFIG_CGROUP_MEM_RES_CTLR
 static struct vmpressure *cg_to_vmpressure(struct cgroup *cg)
 {
 	return css_to_vmpressure(cgroup_subsys_state(cg, mem_cgroup_subsys_id));
@@ -351,7 +351,7 @@ void vmpressure(gfp_t gfp, struct mem_cgroup *memcg,
 	if (!memcg)
 		vmpressure_global(gfp, scanned, reclaimed);
 
-	if (IS_ENABLED(CONFIG_MEMCG))
+	if (IS_ENABLED(CONFIG_CGROUP_MEM_RES_CTLR))
 		vmpressure_memcg(gfp, memcg, scanned, reclaimed);
 }
 
