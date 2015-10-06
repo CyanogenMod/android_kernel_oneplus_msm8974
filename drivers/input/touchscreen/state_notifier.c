@@ -15,8 +15,21 @@
 #include <linux/fb.h>
 #include <linux/module.h>
 
-#define DEFAULT_SUSPEND_DEFER_TIME 10
-#define DEFAULT_USE_FB_NOTIFIER 0
+#define DEFAULT_SUSPEND_DEFER_TIME 	10
+#define DEFAULT_USE_FB_NOTIFIER 	0
+#define STATE_NOTIFIER			"state_notifier"
+
+/*
+ * debug = 1 will print all
+ */
+static unsigned int debug;
+module_param_named(debug_mask, debug, uint, 0644);
+
+#define dprintk(msg...)		\
+do {				\
+	if (debug)		\
+		pr_info(msg);	\
+} while (0)
 
 static struct notifier_block notif;
 static int prev_fb = FB_BLANK_UNBLANK;
@@ -26,6 +39,8 @@ static struct delayed_work suspend_work;
 static struct workqueue_struct *susp_wq;
 struct work_struct resume_work;
 bool state_suspended;
+module_param_named(state_suspended, state_suspended, bool, 0444);
+static bool suspend_in_progress;
 bool use_fb_notifier = DEFAULT_USE_FB_NOTIFIER;
 module_param_named(use_fb_notifier, use_fb_notifier, bool, 0664);
 
@@ -67,18 +82,24 @@ static void _suspend_work(struct work_struct *work)
 {
 	state_notifier_call_chain(STATE_NOTIFIER_SUSPEND, NULL);
 	state_suspended = true;
+	suspend_in_progress = false;
+	dprintk("%s: suspend completed.\n", STATE_NOTIFIER);
 }
 
 static void _resume_work(struct work_struct *work)
 {
 	state_notifier_call_chain(STATE_NOTIFIER_ACTIVE, NULL);
 	state_suspended = false;
+	dprintk("%s: resume completed.\n", STATE_NOTIFIER);
 }
 
 void state_suspend(void)
 {
-	if (state_suspended)
+	dprintk("%s: suspend called.\n", STATE_NOTIFIER);
+	if (state_suspended || suspend_in_progress)
 		return;
+
+	suspend_in_progress = true;
 
 	INIT_DELAYED_WORK(&suspend_work, _suspend_work);
 	queue_delayed_work_on(0, susp_wq, &suspend_work, 
@@ -87,8 +108,10 @@ void state_suspend(void)
 
 void state_resume(void)
 {
+	dprintk("%s: resume called.\n", STATE_NOTIFIER);
 	flush_workqueue(susp_wq);
 	cancel_delayed_work_sync(&suspend_work);
+	suspend_in_progress = false;
 
 	if (state_suspended)
 		queue_work_on(0, susp_wq, &resume_work);
