@@ -1453,7 +1453,7 @@ static struct of_device_id msm_rpm_match_table[] __initdata =  {
 	{},
 };
 
-static struct platform_driver msm_rpm_device_driver __initdata = {
+static struct platform_driver msm_rpm_device_driver = {
 	.probe = msm_rpm_dev_probe,
 	.driver = {
 		.name = "rpm-smd",
