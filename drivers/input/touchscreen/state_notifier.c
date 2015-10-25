@@ -80,16 +80,16 @@ EXPORT_SYMBOL_GPL(state_notifier_call_chain);
 
 static void _suspend_work(struct work_struct *work)
 {
-	state_notifier_call_chain(STATE_NOTIFIER_SUSPEND, NULL);
 	state_suspended = true;
+	state_notifier_call_chain(STATE_NOTIFIER_SUSPEND, NULL);
 	suspend_in_progress = false;
 	dprintk("%s: suspend completed.\n", STATE_NOTIFIER);
 }
 
 static void _resume_work(struct work_struct *work)
 {
-	state_notifier_call_chain(STATE_NOTIFIER_ACTIVE, NULL);
 	state_suspended = false;
+	state_notifier_call_chain(STATE_NOTIFIER_ACTIVE, NULL);
 	dprintk("%s: resume completed.\n", STATE_NOTIFIER);
 }
 
@@ -101,7 +101,6 @@ void state_suspend(void)
 
 	suspend_in_progress = true;
 
-	INIT_DELAYED_WORK(&suspend_work, _suspend_work);
 	queue_delayed_work_on(0, susp_wq, &suspend_work, 
 		msecs_to_jiffies(suspend_defer_time * 1000));
 }
@@ -109,7 +108,6 @@ void state_suspend(void)
 void state_resume(void)
 {
 	dprintk("%s: resume called.\n", STATE_NOTIFIER);
-	flush_workqueue(susp_wq);
 	cancel_delayed_work_sync(&suspend_work);
 	suspend_in_progress = false;
 
@@ -157,7 +155,7 @@ static int __init state_notifier_init(void)
 		pr_err("Failed to register FB notifier callback for state notifier.\n");
 
 	susp_wq =
-	    alloc_workqueue("state_susp_wq", WQ_FREEZABLE, 0);
+	    alloc_workqueue("state_susp_wq", WQ_HIGHPRI, 0);
 	if (!susp_wq)
 		pr_err("State Notifier failed to allocate suspend workqueue\n");
 
