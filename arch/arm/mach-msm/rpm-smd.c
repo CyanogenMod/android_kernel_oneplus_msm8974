@@ -74,6 +74,7 @@ struct msm_rpm_driver_data {
 static __refdata ATOMIC_NOTIFIER_HEAD(msm_rpm_sleep_notifier);
 static bool standalone;
 static int probe_status = -EPROBE_DEFER;
+static int msm_rpm_read_smd_data(char *buf);
 
 int msm_rpm_register_notifier(struct notifier_block *nb)
 {
@@ -387,12 +388,27 @@ static struct msm_rpm_driver_data msm_rpm_data = {
 	.smd_open = COMPLETION_INITIALIZER(msm_rpm_data.smd_open),
 };
 
+/*
+ * Returns
+ *	= 0 on successful reads
+ *	> 0 on successful reads with no further data
+ *	standard Linux error codes on failure.
+ */
+static int msm_rpm_read_sleep_ack(void)
+{
+	int ret;
+	char buf[MAX_ERR_BUFFER_SIZE] = {0};
+
+	ret = msm_rpm_read_smd_data(buf);
+	if (!ret)
+		ret = smd_is_pkt_avail(msm_rpm_data.ch_info);
+	return ret;
+}
+
 static int msm_rpm_flush_requests(bool print)
 {
 	struct rb_node *t;
 	int ret;
-	int pkt_sz;
-	char buf[MAX_ERR_BUFFER_SIZE] = {0};
 	int count = 0;
 
 	for (t = rb_first(&tr_root); t; t = rb_next(t)) {
@@ -427,36 +443,12 @@ static int msm_rpm_flush_requests(bool print)
 		 * process these sleep set acks.
 		 */
 		if (count >= MAX_WAIT_ON_ACK) {
-			int len;
-			int timeout = 10;
+			int ret = msm_rpm_read_sleep_ack();
 
-			while (timeout) {
-				if (smd_is_pkt_avail(msm_rpm_data.ch_info))
-					break;
-				/*
-				 * Sleep for 50us at a time before checking
-				 * for packet availability. The 50us is based
-				 * on the the time rpm could take to process
-				 * and send an ack for the sleep set request.
-				 */
-				udelay(50);
-				timeout--;
-			}
-			/*
-			 * On timeout return an error and exit the spinlock
-			 * control on this cpu. This will allow any other
-			 * core that has wokenup and trying to acquire the
-			 * spinlock from being locked out.
-			 */
-			if (!timeout) {
-				pr_err("%s: Timed out waiting for RPM ACK\n",
-					__func__);
-				return -EAGAIN;
-			}
-
-			pkt_sz = smd_cur_packet_size(msm_rpm_data.ch_info);
-			len = smd_read(msm_rpm_data.ch_info, buf, pkt_sz);
-			count--;
+			if (ret >= 0)
+				count--;
+			else
+				return ret;
 		}
 	}
 	return 0;
@@ -1386,8 +1378,14 @@ EXPORT_SYMBOL(msm_rpm_enter_sleep);
  */
 void msm_rpm_exit_sleep(void)
 {
+	int ret;
+
 	if (standalone)
 		return;
+
+	do  {
+		ret =  msm_rpm_read_sleep_ack();
+	} while (ret > 0);
 
 	smd_mask_receive_interrupt(msm_rpm_data.ch_info, false, NULL);
 }
