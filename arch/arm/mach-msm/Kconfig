@@ -1881,6 +1881,27 @@ config MSM_CPU_FREQ_MIN
 
 endif # CPU_FREQ_MSM
 
+config ZEN_DECISION
+	bool "Zen Decision MPDecision Replacement"
+	depends on SMP && FB
+	default y
+	help
+	  MPDecision is a userspace service that does several functions
+	  related to CPU Frequency and CPU Hotplugging. Some of these are:
+	  - Remove cores when screen goes off
+	  - Enable cores when screen goes on
+	  - Raise CPU_MIN_FREQ to a fixed value for a few seconds on input
+  
+	  Zen Decision allows some of the MPDecison functions to be delegated
+	  to the kernel. Right now these are
+	  - Remove cores when screen goes off (after a configurable amount of time)
+	  - Enable cores when screen comes on (immediately)
+
+	  Zen Decision assumes the input boost function of MPDecision should be
+	  delegated to somewhere else in the kernel (Such as in CPU-BOOST)
+
+	  Enable this if you'd like the ability to disable MPDecision.
+
 config CPU_VOLTAGE_TABLE
 	bool "Enable CPU Voltage Table via sysfs for adjustements"
 	default n
