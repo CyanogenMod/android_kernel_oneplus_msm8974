@@ -1,3 +1,6 @@
+KBUILD_CFLAGS += -w
+KBUILD_CFLAGS += -Wno-error=unused-but-set-variable
+
 ccflags-$(CONFIG_USB_DWC3_DEBUG)	:= -DDEBUG
 ccflags-$(CONFIG_USB_DWC3_VERBOSE)	+= -DVERBOSE_DEBUG
 ccflags-y += -Idrivers/usb/host
