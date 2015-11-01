@@ -37,7 +37,20 @@ static bool non_standard = false;
 static int max_chgr_retry_count = MAX_INVALID_CHRGR_RETRY;
 module_param(max_chgr_retry_count, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(max_chgr_retry_count, "Max invalid charger retry count");
+
+//Module param for aca enabling
+static bool aca_enable = 0;
+module_param(aca_enable, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(aca_enable, "Force ACA host mode to allow charging and host.");
+
+//Define absent ID_A flag (from msm_otg module)
+#define ID_A    2
+
+//Flag for choosing either ID(host w/ vbus) or ID_A (host w/ charge) based on aca_enable toggle 
+int ID_MODE;
+
 static void dwc3_otg_reset(struct dwc3_otg *dotg);
+static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA);
 
 static void dwc3_otg_notify_host_mode(struct usb_otg *otg, int host_mode);
 static void dwc3_otg_reset(struct dwc3_otg *dotg);
@@ -197,12 +210,16 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 	struct dwc3_otg *dotg = container_of(otg, struct dwc3_otg, otg);
 	struct dwc3_ext_xceiv *ext_xceiv = dotg->ext_xceiv;
 	struct dwc3 *dwc = dotg->dwc;
+	struct usb_phy *phy = dotg->otg.phy;
+	
 	int ret = 0;
 
 	if (!dwc->xhci)
 		return -EINVAL;
-
-	if (!dotg->vbus_otg) {
+	
+	//Check for false aca_enable to enable vbus	
+    if(!aca_enable){
+	  if (!dotg->vbus_otg) {
 		dotg->vbus_otg = devm_regulator_get(dwc->dev->parent,
 							"vbus_dwc3");
 		if (IS_ERR(dotg->vbus_otg)) {
@@ -211,18 +228,27 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 			dotg->vbus_otg = 0;
 			return ret;
 		}
-	}
-
+	  }
+     }
+     
 	if (on) {
 		dev_dbg(otg->phy->dev, "%s: turn on host\n", __func__);
 
+		/*if(aca_enable)
+			//Set power to charge
+			   dwc3_otg_set_power(phy, DWC3_IDEV_CHG_MAX);
+			*/   
 		dwc3_otg_notify_host_mode(otg, on);
-		ret = regulator_enable(dotg->vbus_otg);
-		if (ret) {
-			dev_err(otg->phy->dev, "unable to enable vbus_otg\n");
-			dwc3_otg_notify_host_mode(otg, 0);
-			return ret;
-		}
+		
+		if(!aca_enable){
+			ret = regulator_enable(dotg->vbus_otg);
+			if (ret) {
+				dev_err(otg->phy->dev, "unable to enable vbus_otg\n");
+				dwc3_otg_notify_host_mode(otg, 0);
+				return ret;
+			}
+	    }
+	
 
 		/*
 		 * This should be revisited for more testing post-silicon.
@@ -249,7 +275,10 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 			dev_err(otg->phy->dev,
 				"%s: failed to add XHCI pdev ret=%d\n",
 				__func__, ret);
-			regulator_disable(dotg->vbus_otg);
+			
+			if(!aca_enable)
+			   regulator_disable(dotg->vbus_otg);
+			
 			dwc3_otg_notify_host_mode(otg, 0);
 			return ret;
 		}
@@ -257,15 +286,22 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 		/* re-init OTG EVTEN register as XHCI reset clears it */
 		if (ext_xceiv && !ext_xceiv->otg_capability)
 			dwc3_otg_reset(dotg);
+			
+			
 	} else {
 		dev_dbg(otg->phy->dev, "%s: turn off host\n", __func__);
 
+        if(!aca_enable){
 		ret = regulator_disable(dotg->vbus_otg);
 		if (ret) {
 			dev_err(otg->phy->dev, "unable to disable vbus_otg\n");
 			return ret;
 		}
-		dwc3_otg_notify_host_mode(otg, on);
+	    }
+		/*if(aca_enable)
+			//Set power to charge
+			   dwc3_otg_set_power(phy, 0);
+			*/   
 
 		platform_device_del(dwc->xhci);
 		/*
@@ -310,8 +346,10 @@ static int dwc3_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
 		 * required for XHCI controller before setting OTG Port Power
 		 * TODO: Tune this delay
 		 */
-		msleep(300);
-		dwc3_otg_set_host_power(dotg);
+		 if(!aca_enable){
+		    msleep(300);
+		    dwc3_otg_set_host_power(dotg);
+	     }
 	} else {
 		otg->host = NULL;
 	}
@@ -442,7 +480,12 @@ static void dwc3_ext_event_notify(struct usb_otg *otg,
 	struct dwc3_ext_xceiv *ext_xceiv = dotg->ext_xceiv;
 	struct usb_phy *phy = dotg->otg.phy;
 	int ret = 0;
-
+    
+    if(!aca_enable)
+       ID_MODE = ID;
+    else
+       ID_MODE = ID_A;
+       
 	/* Flush processing any pending events before handling new ones */
 	if (init)
 		flush_delayed_work(&dotg->sm_work);
@@ -475,11 +518,11 @@ static void dwc3_ext_event_notify(struct usb_otg *otg,
 				dev_warn(phy->dev, "pm_runtime_get failed!!\n");
 		}
 		if (ext_xceiv->id == DWC3_ID_FLOAT) {
-			dev_dbg(phy->dev, "XCVR: ID set\n");
-			set_bit(ID, &dotg->inputs);
+			dev_dbg(phy->dev, "XCVR: ID_MODE set\n");
+			set_bit(ID_MODE, &dotg->inputs);
 		} else {
-			dev_dbg(phy->dev, "XCVR: ID clear\n");
-			clear_bit(ID, &dotg->inputs);
+			dev_dbg(phy->dev, "XCVR: ID_MODE clear\n");
+			clear_bit(ID_MODE, &dotg->inputs);
 		}
 
 		if (ext_xceiv->bsv) {
@@ -526,16 +569,25 @@ int dwc3_set_ext_xceiv(struct usb_otg *otg, struct dwc3_ext_xceiv *ext_xceiv)
 static void dwc3_otg_notify_host_mode(struct usb_otg *otg, int host_mode)
 {
 	struct dwc3_otg *dotg = container_of(otg, struct dwc3_otg, otg);
+	
+	
+    if(!aca_enable){
+		if (!dotg->psy) {
+			dev_err(otg->phy->dev, "no usb power supply registered\n");
+			return;
+		}
 
-	if (!dotg->psy) {
-		dev_err(otg->phy->dev, "no usb power supply registered\n");
-		return;
+		if (host_mode)
+			power_supply_set_scope(dotg->psy, POWER_SUPPLY_SCOPE_SYSTEM);
+		else
+			power_supply_set_scope(dotg->psy, POWER_SUPPLY_SCOPE_DEVICE);
+		
+	 }else{
+		/*dev_err(otg->phy->dev, "no usb power supply registered\n");
+		  return;
+	    }*/
+	    power_supply_set_scope(dotg->psy, POWER_SUPPLY_SCOPE_DEVICE);
 	}
-
-	if (host_mode)
-		power_supply_set_scope(dotg->psy, POWER_SUPPLY_SCOPE_SYSTEM);
-	else
-		power_supply_set_scope(dotg->psy, POWER_SUPPLY_SCOPE_DEVICE);
 }
 
 static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
@@ -564,9 +616,17 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 	else if (dotg->charger->chg_type == DWC3_DCP_CHARGER ||
 			dotg->charger->chg_type == DWC3_PROPRIETARY_CHARGER)
 #endif
-		power_supply_type = POWER_SUPPLY_TYPE_USB_DCP;
+       /* //Change power supply to ACA mode if enabled
+		if(!aca_enable)*/
+		   power_supply_type = POWER_SUPPLY_TYPE_USB_DCP;
+		/*else
+		   power_supply_type = POWER_SUPPLY_TYPE_USB_ACA;*/
 	else
 		power_supply_type = POWER_SUPPLY_TYPE_UNKNOWN;
+		
+		//Detect as regular charger for notification
+		if(aca_enable)
+			power_supply_type = POWER_SUPPLY_TYPE_USB;
 
 	power_supply_set_supply_type(dotg->psy, power_supply_type);
 
@@ -576,6 +636,9 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 #ifdef CONFIG_MACH_OPPO
 	if (dotg->charger->chg_type == DWC3_FLOATED_CHARGER)
 		mA = DWC3_IDEV_CHG_FLOATED;
+	
+	/*if(aca_enable)
+               mA = DWC3_IDEV_CHG_MAX;*/
 #endif
 
 	if (dotg->charger->max_power == mA)
@@ -642,6 +705,11 @@ static irqreturn_t dwc3_otg_interrupt(int irq, void *_dotg)
 	int handled_irqs = 0;
 	struct usb_phy *phy = dotg->otg.phy;
 
+    if(!aca_enable)
+       ID_MODE = ID;
+    else
+       ID_MODE = ID_A;
+	
 	oevt_reg = dwc3_readl(dotg->regs, DWC3_OEVT);
 
 	if (!(oevt_reg & DWC3_OEVT_MASK))
@@ -652,17 +720,17 @@ static irqreturn_t dwc3_otg_interrupt(int irq, void *_dotg)
 	if ((oevt_reg & DWC3_OEVTEN_OTGCONIDSTSCHNGEVNT) ||
 	    (oevt_reg & DWC3_OEVTEN_OTGBDEVVBUSCHNGEVNT)) {
 		/*
-		 * ID sts has changed, set inputs later, in the workqueue
+		 * ID_MODE sts has changed, set inputs later, in the workqueue
 		 * function, switch from A to B or from B to A.
 		 */
 
 		if (oevt_reg & DWC3_OEVTEN_OTGCONIDSTSCHNGEVNT) {
 			if (osts & DWC3_OTG_OSTS_CONIDSTS) {
-				dev_dbg(phy->dev, "ID set\n");
-				set_bit(ID, &dotg->inputs);
+				dev_dbg(phy->dev, "ID_MODE set\n");
+				set_bit(ID_MODE, &dotg->inputs);
 			} else {
-				dev_dbg(phy->dev, "ID clear\n");
-				clear_bit(ID, &dotg->inputs);
+				dev_dbg(phy->dev, "ID_MODE clear\n");
+				clear_bit(ID_MODE, &dotg->inputs);
 			}
 			handled_irqs |= DWC3_OEVTEN_OTGCONIDSTSCHNGEVNT;
 		}
@@ -701,6 +769,11 @@ void dwc3_otg_init_sm(struct dwc3_otg *dotg)
 	struct dwc3_ext_xceiv *ext_xceiv;
 	int ret;
 
+    if(!aca_enable)
+       ID_MODE = ID;
+    else
+       ID_MODE = ID_A;
+       
 	dev_dbg(phy->dev, "Initialize OTG inputs, osts: 0x%x\n", osts);
 
 	/*
@@ -711,16 +784,16 @@ void dwc3_otg_init_sm(struct dwc3_otg *dotg)
 	if (!ret) {
 		dev_err(phy->dev, "%s: completion timeout\n", __func__);
 		/* We can safely assume no cable connected */
-		set_bit(ID, &dotg->inputs);
+		set_bit(ID_MODE, &dotg->inputs);
 	}
 
 	ext_xceiv = dotg->ext_xceiv;
 	dwc3_otg_reset(dotg);
 	if (ext_xceiv && !ext_xceiv->otg_capability) {
 		if (osts & DWC3_OTG_OSTS_CONIDSTS)
-			set_bit(ID, &dotg->inputs);
+			set_bit(ID_MODE, &dotg->inputs);
 		else
-			clear_bit(ID, &dotg->inputs);
+			clear_bit(ID_MODE, &dotg->inputs);
 
 		if (osts & DWC3_OTG_OSTS_BSESVALID)
 			set_bit(B_SESS_VLD, &dotg->inputs);
@@ -772,6 +845,11 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 	int ret = 0;
 	unsigned long delay = 0;
 
+    if(!aca_enable)
+       ID_MODE = ID;
+    else
+       ID_MODE = ID_A;
+       
 	pm_runtime_resume(phy->dev);
 	dev_dbg(phy->dev, "%s state\n", otg_state_string(phy->state));
 
@@ -787,8 +865,8 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					 "couldn't get usb power supply\n");
 		}
 
-		/* Switch to A or B-Device according to ID / BSV */
-		if (!test_bit(ID, &dotg->inputs)) {
+		/* Switch to A or B-Device according to ID_MODE / BSV */
+		if (!test_bit(ID_MODE, &dotg->inputs)) {
 			dev_dbg(phy->dev, "!id\n");
 			phy->state = OTG_STATE_A_IDLE;
 			work = 1;
@@ -804,7 +882,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 		break;
 
 	case OTG_STATE_B_IDLE:
-		if (!test_bit(ID, &dotg->inputs)) {
+		if (!test_bit(ID_MODE, &dotg->inputs)) {
 			dev_dbg(phy->dev, "!id\n");
 			phy->state = OTG_STATE_A_IDLE;
 			work = 1;
@@ -946,7 +1024,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 
 	case OTG_STATE_B_PERIPHERAL:
 		if (!test_bit(B_SESS_VLD, &dotg->inputs) ||
-				!test_bit(ID, &dotg->inputs)) {
+				!test_bit(ID_MODE, &dotg->inputs)) {
 			dev_dbg(phy->dev, "!id || !bsv\n");
 			dwc3_otg_start_peripheral(&dotg->otg, 0);
 			phy->state = OTG_STATE_B_IDLE;
@@ -958,14 +1036,21 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 
 	case OTG_STATE_A_IDLE:
 		/* Switch to A-Device*/
-		if (test_bit(ID, &dotg->inputs)) {
+		if (test_bit(ID_MODE, &dotg->inputs)) {
 			dev_dbg(phy->dev, "id\n");
 			phy->state = OTG_STATE_B_IDLE;
 			dotg->vbus_retry_count = 0;
 			work = 1;
 		} else {
 			phy->state = OTG_STATE_A_HOST;
+			
+			if(aca_enable){
+			//Set power to charge
+			   dwc3_otg_set_power(phy, DWC3_IDEV_CHG_MAX);
+			}
+
 			ret = dwc3_otg_start_host(&dotg->otg, 1);
+				
 			if ((ret == -EPROBE_DEFER) &&
 						dotg->vbus_retry_count < 3) {
 				/*
@@ -992,8 +1077,14 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 		break;
 
 	case OTG_STATE_A_HOST:
-		if (test_bit(ID, &dotg->inputs)) {
+		if (test_bit(ID_MODE, &dotg->inputs)) {
 			dev_dbg(phy->dev, "id\n");
+			
+			if(aca_enable){
+			   //Set power to off
+			   dwc3_otg_set_power(phy, 0);
+			} 
+
 			dwc3_otg_start_host(&dotg->otg, 0);
 			phy->state = OTG_STATE_B_IDLE;
 			dotg->vbus_retry_count = 0;
@@ -1047,7 +1138,7 @@ static void dwc3_otg_reset(struct dwc3_otg *dotg)
 	/* Clear all otg events (interrupts) indications  */
 	dwc3_writel(dotg->regs, DWC3_OEVT, 0xFFFF);
 
-	/* Enable ID/BSV StsChngEn event*/
+	/* Enable ID_MODE/BSV StsChngEn event*/
 	if (ext_xceiv && !ext_xceiv->otg_capability)
 		dwc3_writel(dotg->regs, DWC3_OEVTEN,
 				DWC3_OEVTEN_OTGCONIDSTSCHNGEVNT |
@@ -1067,7 +1158,11 @@ int dwc3_otg_init(struct dwc3 *dwc)
 	struct dwc3_otg *dotg;
 
 	dev_dbg(dwc->dev, "dwc3_otg_init\n");
-
+    
+    if(!aca_enable)
+       ID_MODE = ID;
+    else
+       ID_MODE = ID_A;
 	/*
 	 * GHWPARAMS6[10] bit is SRPSupport.
 	 * This bit also reflects DWC_USB3_EN_OTG
@@ -1090,7 +1185,7 @@ int dwc3_otg_init(struct dwc3 *dwc)
 		return -ENOMEM;
 	}
 
-	/* DWC3 has separate IRQ line for OTG events (ID/BSV etc.) */
+	/* DWC3 has separate IRQ line for OTG events (ID_MODE/BSV etc.) */
 	dotg->irq = platform_get_irq_byname(to_platform_device(dwc->dev),
 								"otg_irq");
 	if (dotg->irq < 0) {
