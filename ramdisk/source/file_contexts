@@ -254,7 +254,7 @@
 /mnt/asec/[^/]+/lib(/.*)?   u:object_r:asec_public_file:s0
 /data/app-asec(/.*)?        u:object_r:asec_image_file:s0
 #line 1 "device/qcom/sepolicy/common/file_contexts"
-###################################
+##################################
 # Dev nodes
 #
 /dev/adsprpc-smd                                u:object_r:qdsp_device:s0
@@ -310,6 +310,7 @@
 /dev/wcnss_ctrl                                 u:object_r:wcnss_device:s0
 /dev/wcnss_wlan                                 u:object_r:wcnss_device:s0
 /dev/pta                                        u:object_r:pta_device:s0
+/dev/mdss_rotator                               u:object_r:graphics_device:s0
 /dev/hbtp_input                                 u:object_r:hbtp_device:s0
 /dev/jdi-bu21150                                u:object_r:bu21150_device:s0
 /dev/voice_svc                                  u:object_r:voice_device:s0
@@ -346,6 +347,7 @@
 /dev/socket/rild2-debug                         u:object_r:rild_debug_socket:s0
 /dev/socket/rild3                               u:object_r:rild_socket:s0
 /dev/socket/rild3-debug                         u:object_r:rild_debug_socket:s0
+/dev/socket/msm_irqbalance                      u:object_r:msm_irqbalance_socket:s0
 
 ###################################
 # System files
@@ -424,6 +426,7 @@
 /system/vendor/bin/qti                          u:object_r:qti_exec:s0
 /system/bin/wcnss_service                       u:object_r:wcnss_service_exec:s0
 /system/vendor/bin/hbtp_daemon                  u:object_r:hbtp_exec:s0
+/system/bin/wcnss_filter                        u:object_r:wcnss_filter_exec:s0
 
 ###################################
 # sysfs files
@@ -439,6 +442,7 @@
 /sys/devices/qpnp-charger.*/power_supply/battery(/.*)?              u:object_r:sysfs_battery_supply:s0
 /sys/devices/system/cpu/cpu0/rq-stats/*                             u:object_r:sysfs_rqstats:s0
 /sys/devices/virtual/graphics/fb([0-2])+/idle_time                  u:object_r:sysfs_graphics:s0
+/sys/devices/virtual/graphics/fb([0-2])+/dynamic_fps                u:object_r:sysfs_graphics:s0
 /sys/devices/virtual/graphics/fb([0-2])+/product_description        u:object_r:sysfs_graphics:s0
 /sys/devices/virtual/graphics/fb([0-2])+/vendor_name                u:object_r:sysfs_graphics:s0
 /sys/devices/virtual/hsicctl/hsicctl1[0-9]/modem_wait               u:object_r:sysfs_hsic_modem_wait:s0
@@ -500,6 +504,7 @@
 /persist/data(/.*)?                                                 u:object_r:persist_drm_file:s0
 /persist/data/tz(/.*)?                                              u:object_r:persist_drm_file:s0
 /persist/data/sfs(/.*)?                                             u:object_r:persist_drm_file:s0
+/persist/display(/.*)?                                              u:object_r:persist_display_file:s0
 
 ###################################
 # oem files
