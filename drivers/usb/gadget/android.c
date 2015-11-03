@@ -133,7 +133,7 @@ struct android_usb_function {
 
 	/* Optional: called when the configuration is removed */
 	void (*unbind_config)(struct android_usb_function *,
-				  struct usb_configuration *);
+			      struct usb_configuration *);
 	/* Optional: handle ctrl requests before the device is configured */
 	int (*ctrlrequest)(struct android_usb_function *,
 					struct usb_composite_dev *,
@@ -364,9 +364,9 @@ static void android_work(struct work_struct *data)
 		 * happen if host PC resets and configures device really quick.
 		 */
 		if (((uevent_envp == connected) &&
-			  (last_uevent != USB_DISCONNECTED)) ||
-			((uevent_envp == configured) &&
-			  (last_uevent == USB_CONFIGURED))) {
+		      (last_uevent != USB_DISCONNECTED)) ||
+		    ((uevent_envp == configured) &&
+		      (last_uevent == USB_CONFIGURED))) {
 			pr_info("%s: sent missed DISCONNECT event\n", __func__);
 			kobject_uevent_env(&dev->dev->kobj, KOBJ_CHANGE,
 								disconnected);
@@ -443,7 +443,7 @@ struct functionfs_config {
 };
 
 static int ffs_function_init(struct android_usb_function *f,
-				 struct usb_composite_dev *cdev)
+			     struct usb_composite_dev *cdev)
 {
 	f->config = kzalloc(sizeof(struct functionfs_config), GFP_KERNEL);
 	if (!f->config)
@@ -483,7 +483,7 @@ static void ffs_function_disable(struct android_usb_function *f)
 }
 
 static int ffs_function_bind_config(struct android_usb_function *f,
-					struct usb_configuration *c)
+				    struct usb_configuration *c)
 {
 	struct functionfs_config *config = f->config;
 	return functionfs_bind_config(c->cdev, c, config->data);
@@ -530,7 +530,7 @@ ffs_aliases_store(struct device *pdev, struct device_attribute *attr,
 }
 
 static DEVICE_ATTR(aliases, S_IRUGO | S_IWUSR, ffs_aliases_show,
-						   ffs_aliases_store);
+					       ffs_aliases_store);
 static struct device_attribute *ffs_function_attributes[] = {
 	&dev_attr_aliases,
 	NULL
@@ -1072,15 +1072,15 @@ static ssize_t ncm_ethaddr_store(struct device *dev,
 	struct ncm_function_config *ncm = f->config;
 
 	if (sscanf(buf, "%02x:%02x:%02x:%02x:%02x:%02x\n",
-			(int *)&ncm->ethaddr[0], (int *)&ncm->ethaddr[1],
-			(int *)&ncm->ethaddr[2], (int *)&ncm->ethaddr[3],
-			(int *)&ncm->ethaddr[4], (int *)&ncm->ethaddr[5]) == 6)
+		    (int *)&ncm->ethaddr[0], (int *)&ncm->ethaddr[1],
+		    (int *)&ncm->ethaddr[2], (int *)&ncm->ethaddr[3],
+		    (int *)&ncm->ethaddr[4], (int *)&ncm->ethaddr[5]) == 6)
 		return size;
 	return -EINVAL;
 }
 
 static DEVICE_ATTR(ncm_ethaddr, S_IRUGO | S_IWUSR, ncm_ethaddr_show,
-						   ncm_ethaddr_store);
+					       ncm_ethaddr_store);
 static struct device_attribute *ncm_function_attributes[] = {
 	&dev_attr_ncm_ethaddr,
 	NULL
@@ -1173,15 +1173,15 @@ static ssize_t ecm_ethaddr_store(struct device *dev,
 	struct ecm_function_config *ecm = f->config;
 
 	if (sscanf(buf, "%02x:%02x:%02x:%02x:%02x:%02x\n",
-			(int *)&ecm->ethaddr[0], (int *)&ecm->ethaddr[1],
-			(int *)&ecm->ethaddr[2], (int *)&ecm->ethaddr[3],
-			(int *)&ecm->ethaddr[4], (int *)&ecm->ethaddr[5]) == 6)
+		    (int *)&ecm->ethaddr[0], (int *)&ecm->ethaddr[1],
+		    (int *)&ecm->ethaddr[2], (int *)&ecm->ethaddr[3],
+		    (int *)&ecm->ethaddr[4], (int *)&ecm->ethaddr[5]) == 6)
 		return size;
 	return -EINVAL;
 }
 
 static DEVICE_ATTR(ecm_ethaddr, S_IRUGO | S_IWUSR, ecm_ethaddr_show,
-						   ecm_ethaddr_store);
+					       ecm_ethaddr_store);
 
 static ssize_t ecm_transports_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -1197,7 +1197,7 @@ static ssize_t ecm_transports_store(struct device *dev,
 }
 
 static DEVICE_ATTR(ecm_transports, S_IRUGO | S_IWUSR, ecm_transports_show,
-						   ecm_transports_store);
+					       ecm_transports_store);
 
 static struct device_attribute *ecm_function_attributes[] = {
 	&dev_attr_ecm_transports,
@@ -1712,7 +1712,7 @@ static int rndis_qc_function_bind_config(struct android_usb_function *f,
 	}
 
 	return rndis_qc_bind_config_vendor(c, rndis->ethaddr, rndis->vendorID,
-					rndis->manufacturer,
+				    rndis->manufacturer,
 					rndis->max_pkt_per_xfer);
 }
 
@@ -1752,7 +1752,7 @@ static ssize_t rndis_manufacturer_store(struct device *dev,
 }
 
 static DEVICE_ATTR(manufacturer, S_IRUGO | S_IWUSR, rndis_manufacturer_show,
-							rndis_manufacturer_store);
+						    rndis_manufacturer_store);
 
 static ssize_t rndis_wceis_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -1778,7 +1778,7 @@ static ssize_t rndis_wceis_store(struct device *dev,
 }
 
 static DEVICE_ATTR(wceis, S_IRUGO | S_IWUSR, rndis_wceis_show,
-						 rndis_wceis_store);
+					     rndis_wceis_store);
 
 static ssize_t rndis_ethaddr_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -1798,15 +1798,15 @@ static ssize_t rndis_ethaddr_store(struct device *dev,
 	struct rndis_function_config *rndis = f->config;
 
 	if (sscanf(buf, "%02x:%02x:%02x:%02x:%02x:%02x\n",
-			(int *)&rndis->ethaddr[0], (int *)&rndis->ethaddr[1],
-			(int *)&rndis->ethaddr[2], (int *)&rndis->ethaddr[3],
-			(int *)&rndis->ethaddr[4], (int *)&rndis->ethaddr[5]) == 6)
+		    (int *)&rndis->ethaddr[0], (int *)&rndis->ethaddr[1],
+		    (int *)&rndis->ethaddr[2], (int *)&rndis->ethaddr[3],
+		    (int *)&rndis->ethaddr[4], (int *)&rndis->ethaddr[5]) == 6)
 		return size;
 	return -EINVAL;
 }
 
 static DEVICE_ATTR(ethaddr, S_IRUGO | S_IWUSR, rndis_ethaddr_show,
-						   rndis_ethaddr_store);
+					       rndis_ethaddr_store);
 
 static ssize_t rndis_vendorID_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -2315,7 +2315,7 @@ err_out:
 
 static int
 android_bind_enabled_functions(struct android_dev *dev,
-				   struct usb_configuration *c)
+			       struct usb_configuration *c)
 {
 	struct android_usb_function_holder *f_holder;
 	struct android_configuration *conf =
@@ -2345,7 +2345,7 @@ android_bind_enabled_functions(struct android_dev *dev,
 
 static void
 android_unbind_enabled_functions(struct android_dev *dev,
-				   struct usb_configuration *c)
+			       struct usb_configuration *c)
 {
 	struct android_usb_function_holder *f_holder;
 	struct android_configuration *conf =
@@ -2399,7 +2399,7 @@ static int android_enable_function(struct android_dev *dev,
 				f->android_dev = dev;
 				f_holder->f = f;
 				list_add_tail(&f_holder->enabled_list,
-						  &conf->enabled_functions);
+					      &conf->enabled_functions);
 				pr_debug("func:%s is enabled.\n", f->name);
 				/*
 				 * compare enable function with streaming func
@@ -2489,7 +2489,7 @@ functions_show(struct device *pdev, struct device_attribute *attr, char *buf)
 
 static ssize_t
 functions_store(struct device *pdev, struct device_attribute *attr,
-				   const char *buff, size_t size)
+			       const char *buff, size_t size)
 {
 	struct android_dev *dev = dev_get_drvdata(pdev);
 	struct list_head *curr_conf = &dev->configs;
@@ -2572,11 +2572,16 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 								   name, err);
 		}
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 	/* HID driver always enabled, it's the whole point of this kernel patch */
 	android_enable_function(dev, conf, "hid");
 =======
 >>>>>>> parent of 00e8d59... HID Keyboard Support
+=======
+		/* HID driver always enabled, it's the whole point of this kernel patch */
+		android_enable_function(dev, conf, "hid");
+>>>>>>> parent of 998852d... Update hid-keyboard
 	}
 
 	/* Free uneeded configurations if exists */
@@ -2600,7 +2605,7 @@ static ssize_t enable_show(struct device *pdev, struct device_attribute *attr,
 }
 
 static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
-				const char *buff, size_t size)
+			    const char *buff, size_t size)
 {
 	struct android_dev *dev = dev_get_drvdata(pdev);
 	struct usb_composite_dev *cdev = dev->cdev;
@@ -2925,8 +2930,8 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 
 	list_for_each_entry(conf, &dev->configs, list_item)
 		list_for_each_entry(f_holder,
-					&conf->enabled_functions,
-					enabled_list) {
+				    &conf->enabled_functions,
+				    enabled_list) {
 			f = f_holder->f;
 			if (f->ctrlrequest) {
 				value = f->ctrlrequest(f, cdev, c);
@@ -3095,7 +3100,7 @@ static struct android_configuration *alloc_android_config
 }
 
 static void free_android_config(struct android_dev *dev,
-				 struct android_configuration *conf)
+			     struct android_configuration *conf)
 {
 	list_del(&conf->list_item);
 	dev->configs_num--;
