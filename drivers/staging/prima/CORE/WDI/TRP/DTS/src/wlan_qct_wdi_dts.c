@@ -972,7 +972,7 @@ wpt_status WDTS_openTransport( void *pContext)
 
   wpalMemoryZero(&gDsTrafficStats, sizeof(gDsTrafficStats));
 
-  WDI_DS_LoggingMbCreate(&pClientData->loggingMbContext, sizeof(tLoggingMailBox));
+  sWdiStatus = WDI_DS_LoggingMbCreate(&pClientData->loggingMbContext, sizeof(tLoggingMailBox));
   if (WDI_STATUS_SUCCESS != sWdiStatus)
     return eWLAN_PAL_STATUS_E_NOMEM;
 

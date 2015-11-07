@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -50,8 +50,6 @@ static tANI_U32  __gCfgIBufMax[CFG_STA_IBUF_MAX_SIZE]          ;
 static tANI_U32  __gCfgIBuf[CFG_STA_IBUF_MAX_SIZE]             ;
 static tANI_U8   __gCfgSBuf[CFG_STA_SBUF_MAX_SIZE]             ;
 static tANI_U8   __gSBuffer[CFG_MAX_STR_LEN]                   ;
-static tANI_U32  __gParamList[WNI_CFG_MAX_PARAM_NUM + 
-                              WNI_CFG_GET_PER_STA_STAT_RSP_NUM];
 
 
 static void Notify(tpAniSirGlobal, tANI_U16, tANI_U32);
@@ -142,7 +140,6 @@ tSirRetStatus cfgInit(tpAniSirGlobal pMac)
    pMac->cfg.gCfgSBuf     = __gCfgSBuf;
    pMac->cfg.gSBuffer     = __gSBuffer;
    pMac->cfg.gCfgEntry    = __gCfgEntry;
-   pMac->cfg.gParamList   = __gParamList;
 
    for(i=0; i<CFG_PARAM_MAX_NUM; i++)
    {
@@ -167,7 +164,6 @@ void cfgDeInit(tpAniSirGlobal pMac)
    pMac->cfg.gCfgSBuf     = NULL;
    pMac->cfg.gSBuffer     = NULL;
    pMac->cfg.gCfgEntry    = NULL;
-   pMac->cfg.gParamList   = NULL;
 }
 
 // ---------------------------------------------------------------------

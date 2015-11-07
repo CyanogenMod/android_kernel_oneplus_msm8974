@@ -2600,19 +2600,6 @@ void limProcessChannelSwitchTimeout(tpAniSirGlobal pMac)
     channel = psessionEntry->gLimChannelSwitch.primaryChannel;
 
     /*
-     * If Lim allows Switch channel on same channel on which preauth
-     * is going on then LIM will not post resume link(WDA_FINISH_SCAN)
-     * during preauth rsp handling hence firmware may crash on ENTER/
-     * EXIT BMPS request.
-     */
-    if(pMac->ft.ftPEContext.pFTPreAuthReq)
-    {
-        limLog(pMac, LOGE,
-           FL("Avoid Switch Channel req during pre auth"));
-        return;
-    }
-
-    /*
      *  This potentially can create issues if the function tries to set
      * channel while device is in power-save, hence putting an extra check
      * to verify if the device is in power-save or not
@@ -2628,7 +2615,34 @@ void limProcessChannelSwitchTimeout(tpAniSirGlobal pMac)
 
     /* Channel-switch timeout has occurred. reset the state */
     psessionEntry->gLimSpecMgmt.dot11hChanSwState = eLIM_11H_CHANSW_END;
-    
+
+    /*
+     * If Lim allows Switch channel on same channel on which preauth
+     * is going on then LIM will not post resume link(WDA_FINISH_SCAN)
+     * during preauth rsp handling hence firmware may crash on ENTER/
+     * EXIT BMPS request.
+     */
+    if(pMac->ft.ftPEContext.pFTPreAuthReq)
+    {
+        limLog(pMac, LOGE,
+           FL("Avoid Switch Channel req during pre auth"));
+        return;
+    }
+    /* If link is already suspended mean some off
+     * channel operation or scan is in progress, Allowing
+     * Change channel here will lead to either Init Scan
+     * sent twice or missing Finish scan when change
+     * channel is completed, this may lead
+     * to driver in invalid state and crash.
+     */
+    if (limIsLinkSuspended(pMac))
+    {
+       limLog(pMac, LOGE, FL("Link is already suspended for "
+               "some other reason. Return here for sessionId:%d"),
+               pMac->lim.limTimers.gLimChannelSwitchTimer.sessionId);
+       return;
+    }
+
     /* Check if the AP is switching to a channel that we support.
      * Else, just don't bother to switch. Indicate HDD to look for a 
      * better AP to associate
@@ -2660,14 +2674,6 @@ void limProcessChannelSwitchTimeout(tpAniSirGlobal pMac)
             if ( isLimSessionOffChannel(pMac,
                 pMac->lim.limTimers.gLimChannelSwitchTimer.sessionId) )
             {
-                if (limIsLinkSuspended(pMac))
-                {
-                    limLog(pMac, LOGE, FL("Link is already suspended for "
-                        "some other reason. Return here for sessionId:%d"),
-                        pMac->lim.limTimers.gLimChannelSwitchTimer.sessionId);
-                    return;
-                }
-
                 limSuspendLink(pMac,
                     eSIR_DONT_CHECK_LINK_TRAFFIC_BEFORE_SCAN,
                     limProcessChannelSwitchSuspendLink,

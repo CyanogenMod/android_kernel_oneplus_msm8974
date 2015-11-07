@@ -700,7 +700,7 @@ void __hdd_softap_tx_timeout(struct net_device *dev)
 
    ++pAdapter->hdd_stats.hddTxRxStats.txTimeoutCount;
 
-   for (i = 0; i < 8; i++)
+   for (i = 0; i < NUM_TX_QUEUES; i++)
    {
       txq = netdev_get_tx_queue(dev, i);
       VOS_TRACE( VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_ERROR,
@@ -708,7 +708,7 @@ void __hdd_softap_tx_timeout(struct net_device *dev)
    }
 
    VOS_TRACE( VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_ERROR,
-              "carrier state: %d", netif_carrier_ok(dev));
+             "carrier state: %d", netif_carrier_ok(dev));
 
    ++pAdapter->hdd_stats.hddTxRxStats.continuousTxTimeoutCount;
 

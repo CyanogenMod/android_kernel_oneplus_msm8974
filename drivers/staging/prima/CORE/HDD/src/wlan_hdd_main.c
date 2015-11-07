@@ -3706,14 +3706,22 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            if (VOS_TRUE == vos_mem_compare(targetApBssid,
                                            pHddStaCtx->conn_info.bssId, sizeof(tSirMacAddr)))
            {
-               VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-                         "%s:11r Reassoc BSSID is same as currently associated AP bssid",
-                         __func__);
+               /* Reassoc to same AP, only supported for Open Security*/
+               if ((pHddStaCtx->conn_info.ucEncryptionType ||
+                   pHddStaCtx->conn_info.mcEncryptionType))
+               {
+                   hddLog(LOGE,
+                      FL("Reassoc to same AP, only supported for Open Security"));
+                   ret = -ENOTSUPP;
+                   goto exit;
+               }
+               hddLog(LOG1,
+                     FL("11r Reassoc BSSID is same as currently associated AP bssid"));
                sme_GetModifyProfileFields(hHal, pAdapter->sessionId,
                                        &modProfileFields);
                sme_RoamReassoc(hHal, pAdapter->sessionId,
                             NULL, modProfileFields, &roamId, 1);
-               return 0;
+               goto exit;
            }
 
            /* Check channel number is a valid channel number */
@@ -3722,7 +3730,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            {
                hddLog(VOS_TRACE_LEVEL_ERROR,
                       "%s: Invalid Channel  [%d]", __func__, channel);
-               return -EINVAL;
+               ret = -EINVAL;
+               goto exit;
            }
 
            trigger = eSME_ROAM_TRIGGER_SCAN;
@@ -7696,6 +7705,7 @@ VOS_STATUS hdd_start_all_adapters( hdd_context_t *pHddCtx )
             connState = (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState;
 
             hdd_init_station_mode(pAdapter);
+
             /* Open the gates for HDD to receive Wext commands */
             pAdapter->isLinkUpSvcNeeded = FALSE; 
             pHddCtx->scan_info.mScanPending = FALSE;
@@ -8794,6 +8804,7 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
          "%s: Failed to stop VOSS",__func__);
       VOS_ASSERT( VOS_IS_STATUS_SUCCESS( vosStatus ) );
+      VOS_BUG(0);
    }
 
    //This requires pMac access, Call this before vos_close().
@@ -9944,6 +9955,7 @@ int hdd_wlan_startup(struct device *dev )
    if ( !VOS_IS_STATUS_SUCCESS( status ) )
    {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: vos_start failed",__func__);
+      VOS_BUG(0);
       goto err_vosclose;
    }
 
@@ -10248,7 +10260,8 @@ int hdd_wlan_startup(struct device *dev )
        //EAPOL and DHCP
        if (!pHddCtx->cfg_ini->gEnableDebugLog)
            pHddCtx->cfg_ini->gEnableDebugLog =
-           VOS_PKT_PROTO_TYPE_EAPOL | VOS_PKT_PROTO_TYPE_DHCP;
+           VOS_PKT_PROTO_TYPE_EAPOL | VOS_PKT_PROTO_TYPE_DHCP |
+           VOS_PKT_PROTO_TYPE_ARP;
    }
 
    if (pHddCtx->cfg_ini->wlanLoggingEnable &&

@@ -202,6 +202,7 @@ typedef struct sPmcInfo
     v_BOOL_t    ImpsReqTimerFailed;
     tANI_U8     ImpsReqFailCnt;
     tANI_U8     ImpsReqTimerfailCnt;
+    tANI_U8     ImpsRspFailCnt;
 
 #ifdef FEATURE_WLAN_BATCH_SCAN
    /*HDD callback to be called after receiving SET BATCH SCAN RSP from FW*/

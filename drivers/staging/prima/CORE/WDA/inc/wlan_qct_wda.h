@@ -431,6 +431,8 @@ typedef struct
    wpt_uint8            wdaAddSelfStaFailReason;
 } tWDA_AddSelfStaDebugParams;
 
+#define BMPS_IMPS_FAILURE_REPORT_THRESHOLD    10
+
 typedef struct
 {
    v_PVOID_t            pVosContext;             /* global VOSS context*/

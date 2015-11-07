@@ -2358,6 +2358,12 @@ static void hdd_mon_add_rx_radiotap_hdr (struct sk_buff *skb,
        rateIdx-=202;
     if( rateIdx >= 218 && rateIdx <= 225 )
        rateIdx-=210;
+
+    if(rateIdx > (sizeof(gRatefromIdx)/ sizeof(int))) {
+       VOS_TRACE( VOS_MODULE_ID_HDD_DATA, VOS_TRACE_LEVEL_ERROR,
+                  "%s: invalid rateIdx %d make it 0", __func__, rateIdx);
+       rateIdx = 0;
+    }
     currentRSSI0 = WDA_GETRSSI0(pRxPacket) - 100;
     currentRSSI1 = WDA_GETRSSI1(pRxPacket) - 100;
     currentRSSI  = (currentRSSI0 > currentRSSI1) ? currentRSSI0 : currentRSSI1;
@@ -2422,6 +2428,15 @@ VOS_STATUS  hdd_rx_packet_monitor_cbk(v_VOID_t *vosContext,vos_pkt_t *pVosPacket
    }
 
    pHddCtx = (hdd_context_t *)vos_get_context( VOS_MODULE_ID_HDD, vosContext );
+
+   if (NULL == pHddCtx)
+   {
+      VOS_TRACE(VOS_MODULE_ID_HDD_DATA, VOS_TRACE_LEVEL_ERROR,
+                 FL("Failed to get pHddCtx from vosContext"));
+      vos_pkt_return_packet( pVosPacket );
+      return VOS_STATUS_E_FAILURE;
+   }
+
    pAdapter = hdd_get_adapter(pHddCtx,WLAN_HDD_MONITOR);
    if ((NULL == pAdapter)  || (WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic) )
    {

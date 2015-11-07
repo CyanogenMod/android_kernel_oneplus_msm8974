@@ -151,6 +151,18 @@ defMsgDecision(tpAniSirGlobal pMac, tpSirMsgQ  limMsg)
         (limMsg->type != WDA_START_OEM_DATA_RSP) &&
 #endif
         (limMsg->type != WDA_ADD_TS_RSP) &&
+
+        /* LIM won't process any defer queue commands if gLimAddtsSent is set to
+           TRUE. gLimAddtsSent will be set TRUE to while sending ADDTS REQ. Say,
+           when deferring is enabled, if SIR_LIM_ADDTS_RSP_TIMEOUT is posted
+           (because of not receiving ADDTS RSP) then this command will be added
+           to defer queue and as gLimAddtsSent is set TRUE LIM will never
+           process any commands from defer queue, including
+           SIR_LIM_ADDTS_RSP_TIMEOUT. Hence allowing SIR_LIM_ADDTS_RSP_TIMEOUT
+           command to be processed with deferring enabled, so that this will be
+           processed immediately and sets gLimAddtsSent to FALSE.
+         */
+        (limMsg->type != SIR_LIM_ADDTS_RSP_TIMEOUT) &&
         (limMsg->type != WDA_LOST_LINK_PARAMS_IND) &&
         /* Allow processing of RX frames while awaiting reception of
            ADD TS response over the air. This logic particularly handles the

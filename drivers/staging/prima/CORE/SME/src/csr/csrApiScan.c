@@ -3587,7 +3587,6 @@ void csrUpdateFCCChannelList(tpAniSirGlobal pMac)
     tCsrChannel ChannelList;
     tANI_U8 chnlIndx = 0;
     int i;
-    chnlIndx = pMac->scan.base20MHzChannels.numChannels;
 
     for ( i = 0; i < pMac->scan.base20MHzChannels.numChannels; i++ )
     {
@@ -3600,7 +3599,8 @@ void csrUpdateFCCChannelList(tpAniSirGlobal pMac)
                           pMac->scan.base20MHzChannels.channelList[i]);
             continue;
         }
-        ChannelList.channelList[i] = pMac->scan.base20MHzChannels.channelList[i];
+        ChannelList.channelList[chnlIndx] =
+                    pMac->scan.base20MHzChannels.channelList[i];
         chnlIndx++;
     }
     csrSetCfgValidChannelList(pMac, ChannelList.channelList, chnlIndx);

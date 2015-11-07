@@ -407,10 +407,9 @@ limChangeChannelWithCallback(tpAniSirGlobal pMac, tANI_U8 newChannel,
 void limContinuePostChannelScan(tpAniSirGlobal pMac)
 {
     tANI_U8 channelNum;
-    tANI_U8 handleError = 0;
     tANI_U8 i = 0;
     tSirRetStatus status = eSIR_SUCCESS;
-    
+
     if( pMac->lim.abortScan || (NULL == pMac->lim.gpLimMlmScanReq ) ||
         (pMac->lim.gLimCurrentScanChannelId >
             (tANI_U32)(pMac->lim.gpLimMlmScanReq->channelList.numChannels - 1)))
@@ -496,14 +495,18 @@ void limContinuePostChannelScan(tpAniSirGlobal pMac)
             limDeactivateAndChangeTimer(pMac, eLIM_MIN_CHANNEL_TIMER);
 
 #ifdef GEN6_TODO
-            /* revisit this piece of code to assign the appropriate sessionId below
-             * priority - LOW/might not be needed
-             */ 
+            /* revisit this piece of code to assign the appropriate sessionId
+             * below priority - LOW/might not be needed
+             */
             pMac->lim.limTimers.gLimMinChannelTimer.sessionId = sessionId;
-#endif            
-            if (tx_timer_activate(&pMac->lim.limTimers.gLimMinChannelTimer) != TX_SUCCESS)
+#endif
+            if (tx_timer_activate(&pMac->lim.limTimers.gLimMinChannelTimer) !=
+                                                                     TX_SUCCESS)
             {
-                limLog(pMac, LOGP, FL("could not start min channel timer"));
+                limLog(pMac, LOGE, FL("could not start min channel timer"));
+                limDeactivateAndChangeTimer(pMac, eLIM_MIN_CHANNEL_TIMER);
+                limSendHalEndScanReq(pMac, channelNum,
+                                   eLIM_HAL_END_SCAN_WAIT_STATE);
                 return;
             }
 
@@ -523,8 +526,11 @@ void limContinuePostChannelScan(tpAniSirGlobal pMac)
               {
                  /// Could not activate max channel timer.
                  // Log error
-                 limLog(pMac,LOGP, FL("could not start max channel timer"));
-                 return; 
+                 limLog(pMac,LOGE, FL("could not start max channel timer"));
+                 limDeactivateAndChangeTimer(pMac, eLIM_MAX_CHANNEL_TIMER);
+                 limSendHalEndScanReq(pMac,
+                    channelNum, eLIM_HAL_END_SCAN_WAIT_STATE);
+                 return;
               }
 
     }
@@ -536,9 +542,8 @@ void limContinuePostChannelScan(tpAniSirGlobal pMac)
         limDeactivateAndChangeTimer(pMac, eLIM_PERIODIC_PROBE_REQ_TIMER);
         if (tx_timer_activate(periodicScanTimer) != TX_SUCCESS)
         {
-             limLog(pMac, LOGP, FL("could not start periodic probe req "
+             limLog(pMac, LOGE, FL("could not start periodic probe req "
                                                                   "timer"));
-             return;
         }
         periodicScanTimer->sessionId = channelNum;
     }
@@ -553,12 +558,12 @@ void limContinuePostChannelScan(tpAniSirGlobal pMac)
         {
             // Could not deactivate max channel timer.
             // Log error
-            limLog(pMac, LOGP, FL("Unable to deactivate max channel timer"));
-            return;
+            limLog(pMac, LOGE, FL("Unable to deactivate max channel timer"));
+            limSendHalEndScanReq(pMac, channelNum,
+                                 eLIM_HAL_END_SCAN_WAIT_STATE);
         }
         else
         {
-            tANI_U32 val1 = 0;
             if (pMac->miracast_mode)
             {
                 val = DEFAULT_MIN_CHAN_TIME_DURING_MIRACAST +
@@ -571,69 +576,38 @@ void limContinuePostChannelScan(tpAniSirGlobal pMac)
                  * Could not get max channel value
                  * from CFG. Log error.
                  */
-                limLog(pMac, LOGP, FL("could not retrieve passive max channel value"));
-                return;
+                limLog(pMac, LOGE,
+                 FL("could not retrieve passive max chan value, Use Def val"));
+                val= WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME_STADEF;
             }
 
             val = SYS_MS_TO_TICKS(val);
-            //TODO: consider sessions.
-#if 0
-            // If a background was triggered via Quiet BSS,
-            // then we need to adjust the MIN and MAX channel
-            // timer's accordingly to the Quiet duration that
-            // was specified
-            if( eLIM_QUIET_RUNNING == pMac->lim.gLimSpecMgmt.quietState &&
-                    pMac->lim.gLimTriggerBackgroundScanDuringQuietBss )
-            {
-                // gLimQuietDuration is already cached in units of
-                // system ticks. No conversion is reqd...
-                val1 = pMac->lim.gLimSpecMgmt.quietDuration;
-            }
-            else
-            {
-                val1 = SYS_MS_TO_TICKS(pMac->lim.gpLimMlmScanReq->maxChannelTime);
-            }
-#endif
-            //Pick the longer stay time
-            val = (val > val1) ? val : val1;
             if (tx_timer_change(&pMac->lim.limTimers.gLimMaxChannelTimer,
                         val, 0) != TX_SUCCESS)
             {
                 // Could not change max channel timer.
                 // Log error
-                limLog(pMac, LOGP, FL("Unable to change max channel timer"));
+                limLog(pMac, LOGE, FL("Unable to change max channel timer"));
+                limDeactivateAndChangeTimer(pMac, eLIM_MAX_CHANNEL_TIMER);
+                limSendHalEndScanReq(pMac, channelNum,
+                                  eLIM_HAL_END_SCAN_WAIT_STATE);
                 return;
             }
-            else if (tx_timer_activate(&pMac->lim.limTimers.gLimMaxChannelTimer) != TX_SUCCESS)
+            else if (tx_timer_activate(&pMac->lim.limTimers.gLimMaxChannelTimer)
+                                                                  != TX_SUCCESS)
             {
-                limLog(pMac, LOGP, FL("could not start max channel timer"));
+
+                limLog(pMac, LOGE, FL("could not start max channel timer"));
+                limDeactivateAndChangeTimer(pMac, eLIM_MAX_CHANNEL_TIMER);
+                limSendHalEndScanReq(pMac, channelNum,
+                                 eLIM_HAL_END_SCAN_WAIT_STATE);
                 return;
             }
         }
         // Wait for Beacons to arrive
     } // if (pMac->lim.gLimMlmScanReq->scanType == eSIR_ACTIVE_SCAN)
 
-    if( handleError )
-    {
-        //
-        // FIXME - With this, LIM/SoftMAC will try and recover
-        // state, but eWNI_SME_SCAN_CNF maybe reporting an
-        // incorrect status back to the SME. Some of the possible
-        // errors are:
-        // eSIR_SME_HAL_SCAN_INIT_FAILED
-        // eSIR_SME_RESOURCES_UNAVAILABLE
-        //
-        //Set the resume channel to Any valid channel (invalid). 
-        //This will instruct HAL to set it to any previous valid channel.
-        peSetResumeChannel(pMac, 0, 0);
-        limSendHalFinishScanReq( pMac, eLIM_HAL_FINISH_SCAN_WAIT_STATE );
-        //limCompleteMlmScan(pMac, eSIR_SME_HAL_SCAN_INIT_FAILED);
-    }
-    else
-    {
-        limAddScanChannelInfo(pMac, channelNum);
-    }
-
+    limAddScanChannelInfo(pMac, channelNum);
     return;
 }
 
@@ -2025,10 +1999,10 @@ limProcessMlmScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
              * Could not get max channel value
              * from CFG. Log error.
              */
-            limLog(pMac, LOGP, FL("could not retrieve passive max channel value"));
-
-            /* use a default value of 110ms */
-            val = 110;
+            limLog(pMac, LOGP,
+             FL("could not retrieve passive max channel value use def"));
+            /* use a default value */
+            val= WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME_STADEF;
         }
 
         for (i = 0; i < pMac->lim.gpLimMlmScanReq->channelList.numChannels; i++) {

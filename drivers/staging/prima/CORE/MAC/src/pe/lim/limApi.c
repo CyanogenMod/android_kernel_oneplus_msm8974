@@ -2182,6 +2182,13 @@ void limUpdateLostLinkParams(tpAniSirGlobal pMac,
     }
     pSmeLostLinkParams =
     (tpSirSmeLostLinkParamsInd)vos_mem_malloc(sizeof(tSirSmeLostLinkParamsInd));
+
+    if (pSmeLostLinkParams == NULL)
+    {
+        limLog(pMac, LOGE,
+          FL("pSmeLostLinkParams is NULL"));
+        return;
+    }
     vos_mem_set(pSmeLostLinkParams, sizeof(tSirSmeLostLinkParamsInd), 0);
     pSmeLostLinkParams->messageType = eWNI_SME_LOST_LINK_PARAMS_IND;
     pSmeLostLinkParams->length = sizeof(tSirSmeLostLinkParamsInd);

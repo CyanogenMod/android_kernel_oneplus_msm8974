@@ -1251,11 +1251,12 @@ __limProcessSmeScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
     /*copy the Self MAC address from SmeReq to the globalplace, used for sending probe req*/
     sirCopyMacAddr(pMac->lim.gSelfMacAddr,  pScanReq->selfMacAddr);
 
-   /* This routine should return the sme sessionId and SME transaction Id */
-       
-    if (!limIsSmeScanReqValid(pMac, pScanReq))
+   /* Check if scan req is not valid or link is already suspended*/
+    if (!limIsSmeScanReqValid(pMac, pScanReq) || limIsLinkSuspended(pMac))
     {
-        limLog(pMac, LOGE, FL("Received SME_SCAN_REQ with invalid parameters"));
+        limLog(pMac, LOGE,
+         FL("Received SME_SCAN_REQ with invalid params or link is suspended %d"),
+          limIsLinkSuspended(pMac));
 
         if (pMac->lim.gLimRspReqd)
         {
@@ -1401,6 +1402,7 @@ __limProcessSmeScanReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
                                         pScanReq->sessionId,
                                         pScanReq->transactionId);
                   }
+                  vos_mem_free(pMlmScanReq);
                   return;
               }
               pMlmScanReq->channelList.numChannels = (tANI_U8) cfg_len;
