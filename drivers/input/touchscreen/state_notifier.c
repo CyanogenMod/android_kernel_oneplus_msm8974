@@ -167,7 +167,7 @@ static int __init state_notifier_init(void)
 	return ret;
 }
 
-late_initcall(state_notifier_init);
+subsys_initcall(state_notifier_init);
 
 MODULE_AUTHOR("Pranav Vashi <neobuddy89@gmail.com>");
 MODULE_DESCRIPTION("State Notifier Driver");
