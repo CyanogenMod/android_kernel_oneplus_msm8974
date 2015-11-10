@@ -191,6 +191,21 @@
 	.get = xhandler_get, .put = xhandler_put, \
 	.private_value = (unsigned long)&xenum }
 
+#define SND_SOC_BYTES(xname, xbase, xregs)            \
+{   .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname,   \
+	.info = snd_soc_bytes_info, .get = snd_soc_bytes_get, \
+	.put = snd_soc_bytes_put, .private_value =        \
+		((unsigned long)&(struct soc_bytes)           \
+		{.base = xbase, .num_regs = xregs }) }
+
+#define SND_SOC_BYTES_MASK(xname, xbase, xregs, xmask)        \
+{   .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname,   \
+	.info = snd_soc_bytes_info, .get = snd_soc_bytes_get, \
+	.put = snd_soc_bytes_put, .private_value =        \
+		((unsigned long)&(struct soc_bytes)           \
+		{.base = xbase, .num_regs = xregs,        \
+		 .mask = xmask }) }
+
 #define SOC_DOUBLE_R_SX_TLV(xname, xreg_left, xreg_right, xshift,\
 		xmin, xmax, tlv_array) \
 {	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = (xname), \
@@ -484,6 +499,12 @@ int snd_soc_put_volsw_s8(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol);
 int snd_soc_limit_volume(struct snd_soc_codec *codec,
 	const char *name, int max);
+int snd_soc_bytes_info(struct snd_kcontrol *kcontrol,
+			   struct snd_ctl_elem_info *uinfo);
+int snd_soc_bytes_get(struct snd_kcontrol *kcontrol,
+			  struct snd_ctl_elem_value *ucontrol);
+int snd_soc_bytes_put(struct snd_kcontrol *kcontrol,
+			  struct snd_ctl_elem_value *ucontrol);
 int snd_soc_info_volsw_2r_sx(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_info *uinfo);
 int snd_soc_get_volsw_2r_sx(struct snd_kcontrol *kcontrol,
@@ -1033,6 +1054,13 @@ struct soc_mixer_control {
 	int min, max, platform_max;
 	unsigned int reg, rreg, shift, rshift, invert;
 };
+
+struct soc_bytes {
+	int base;
+	int num_regs;
+	u32 mask;
+};
+
 struct soc_multi_mixer_control {
 	int min, max, platform_max, count;
 	unsigned int reg, rreg, shift, rshift, invert;

@@ -212,7 +212,7 @@ static char *inode_to_filename(struct inode *inode)
 	if (list_empty(&inode->i_dentry))
 		return "unknown";
 
-	dentry = list_first_entry(&inode->i_dentry, struct dentry, d_alias);
+	dentry = list_first_entry(&inode->i_dentry, struct dentry, d_u.d_alias);
 
 	filename = dentry->d_iname;
 
