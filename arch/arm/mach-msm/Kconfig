@@ -3041,7 +3041,7 @@ config HAS_MACH_MEMUTILS
 	Faster memcpy performance for Krait
 endif
 
-<<<<<<< HEAD
+
 config KERNEL_TEXT_MPU_PROT
         bool "Enable xpu protection of kernel r/o sections"
         help
@@ -3049,7 +3049,7 @@ config KERNEL_TEXT_MPU_PROT
           sections early in boot. Read access is permitted to
           all masters; Write access is only permited to the
           secure world.
-=======
+
 config MSM_HOTPLUG
 	bool "MSM hotplug driver"
 	depends on HOTPLUG_CPU
@@ -3057,4 +3057,3 @@ config MSM_HOTPLUG
 	help
 	  The MSM hotplug driver controls on-/offlining of additional cores based
 	  on current cpu load.
->>>>>>> 08a85f0... MSM_Hotplug: Special version modded by neobuddy89
