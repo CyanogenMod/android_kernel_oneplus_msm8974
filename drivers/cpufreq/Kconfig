@@ -151,6 +151,22 @@ config CPU_FREQ_DEFAULT_GOV_NIGHTMARE
 	select CPU_FREQ_GOV_NIGHTMARE
 	help
 
+config CPU_FREQ_DEFAULT_GOV_ELEMENTALX
+	bool "elementalx"
+	select CPU_FREQ_GOV_ELEMENTALX
+	select CPU_FREQ_GOV_PERFORMANCE
+	help
+	  Use the CPUFreq governor 'elementalx' as default.
+
+config CPU_FREQ_DEFAULT_GOV_ALUCARD
+	bool "alucard"
+	select CPU_FREQ_GOV_ALUCARD
+	help
+
+config CPU_FREQ_DEFAULT_GOV_DARKNESS
+	bool "darkness"
+	select CPU_FREQ_GOV_DARKNESS
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -310,6 +326,17 @@ config CPU_FREQ_GOV_SMARTMAX
 config CPU_FREQ_GOV_NIGHTMARE
 	tristate "'nightmare' cpufreq governor"
 	depends on CPU_FREQ
+
+config CPU_FREQ_GOV_ELEMENTALX
+tristate "'elementalx' cpufreq policy governor"
+select CPU_FREQ_TABLE
+
+config CPU_FREQ_GOV_ALUCARD
+	tristate "'alucard' cpufreq governor"
+	depends on CPU_FREQ
+
+config CPU_FREQ_GOV_DARKNESS
+	tristate "'darkness' cpufreq policy governor"
 
 menu "x86 CPU frequency scaling drivers"
 depends on X86
