@@ -221,6 +221,14 @@ extern const struct dev_pm_ops kgsl_pm_ops;
 int kgsl_suspend_driver(struct platform_device *pdev, pm_message_t state);
 int kgsl_resume_driver(struct platform_device *pdev);
 
+void kgsl_trace_regwrite(struct kgsl_device *device, unsigned int offset,
+		unsigned int value);
+
+void kgsl_trace_issueibcmds(struct kgsl_device *device, int id,
+		struct kgsl_cmdbatch *cmdbatch,
+		unsigned int timestamp, unsigned int flags,
+		int result, unsigned int type);
+
 int kgsl_open_device(struct kgsl_device *device);
 
 int kgsl_close_device(struct kgsl_device *device);

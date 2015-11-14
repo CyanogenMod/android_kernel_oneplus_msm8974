@@ -18,7 +18,6 @@
 #define TRACE_SYSTEM kgsl
 #undef TRACE_INCLUDE_PATH
 #define TRACE_INCLUDE_PATH .
-#undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE adreno_trace
 
 #include <linux/tracepoint.h>

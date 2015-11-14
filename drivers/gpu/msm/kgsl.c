@@ -79,6 +79,44 @@ static void kgsl_mem_entry_detach_process(struct kgsl_mem_entry *entry);
 static void
 kgsl_put_process_private(struct kgsl_device *device,
 			 struct kgsl_process_private *private);
+/**
+ * kgsl_trace_issueibcmds() - Call trace_issueibcmds by proxy
+ * device: KGSL device
+ * id: ID of the context submitting the command
+ * cmdbatch: Pointer to kgsl_cmdbatch describing these commands
+ * timestamp: Timestamp assigned to the command batch
+ * flags: Flags sent by the user
+ * result: Result of the submission attempt
+ * type: Type of context issuing the command
+ *
+ * Wrap the issueibcmds ftrace hook into a function that can be called from the
+ * GPU specific modules.
+ */
+void kgsl_trace_issueibcmds(struct kgsl_device *device, int id,
+		struct kgsl_cmdbatch *cmdbatch,
+		unsigned int timestamp, unsigned int flags,
+		int result, unsigned int type)
+{
+	trace_kgsl_issueibcmds(device, id, cmdbatch,
+		timestamp, flags, result, type);
+}
+EXPORT_SYMBOL(kgsl_trace_issueibcmds);
+
+/**
+ * kgsl_trace_regwrite - call regwrite ftrace function by proxy
+ * device: KGSL device
+ * offset: dword offset of the register being written
+ * value: Value of the register being written
+ *
+ * Wrap the regwrite ftrace hook into a function that can be called from the
+ * GPU specific modules.
+ */
+void kgsl_trace_regwrite(struct kgsl_device *device, unsigned int offset,
+		unsigned int value)
+{
+	trace_kgsl_regwrite(device, offset, value);
+}
+EXPORT_SYMBOL(kgsl_trace_regwrite);
 
 /*
  * The memfree list contains the last N blocks of memory that have been freed.
@@ -2272,11 +2310,8 @@ free_cmdbatch:
 	 * -EPROTO is a "success" error - it just tells the user that the
 	 * context had previously faulted
 	 */
-	if (result && result != -EPROTO) {
-		kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
+	if (result && result != -EPROTO)
 		kgsl_cmdbatch_destroy(cmdbatch);
-		kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
-	}
 
 done:
 	kgsl_context_put(context);
@@ -2327,11 +2362,8 @@ free_cmdbatch:
 	 * -EPROTO is a "success" error - it just tells the user that the
 	 * context had previously faulted
 	 */
-	if (result && result != -EPROTO) {
-		kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
+	if (result && result != -EPROTO)
 		kgsl_cmdbatch_destroy(cmdbatch);
-		kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
-	}
 
 done:
 	kgsl_context_put(context);
@@ -3068,8 +3100,7 @@ error:
 	return result;
 }
 
-static int _kgsl_gpumem_sync_cache(struct kgsl_mem_entry *entry,
-				size_t offset, size_t length, unsigned int op)
+static int _kgsl_gpumem_sync_cache(struct kgsl_mem_entry *entry, int op)
 {
 	int ret = 0;
 	int cacheop;
@@ -3092,17 +3123,11 @@ static int _kgsl_gpumem_sync_cache(struct kgsl_mem_entry *entry,
 		goto done;
 	}
 
-	if (!(op & KGSL_GPUMEM_CACHE_RANGE)) {
-		offset = 0;
-		length = entry->memdesc.size;
-	}
-
 	mode = kgsl_memdesc_get_cachemode(&entry->memdesc);
 	if (mode != KGSL_CACHEMODE_UNCACHED
 		&& mode != KGSL_CACHEMODE_WRITECOMBINE) {
-		trace_kgsl_mem_sync_cache(entry, offset, length, op);
-		ret = kgsl_cache_range_op(&entry->memdesc, offset,
-					length, cacheop);
+		trace_kgsl_mem_sync_cache(entry, op);
+		kgsl_cache_range_op(&entry->memdesc, cacheop);
 	}
 
 done:
@@ -3139,8 +3164,7 @@ kgsl_ioctl_gpumem_sync_cache(struct kgsl_device_private *dev_priv,
 		return -EINVAL;
 	}
 
-	ret = _kgsl_gpumem_sync_cache(entry, param->offset,
-					param->length, param->op);
+	ret = _kgsl_gpumem_sync_cache(entry, param->op);
 	kgsl_mem_entry_put(entry);
 	return ret;
 }
@@ -3226,13 +3250,9 @@ kgsl_ioctl_gpumem_sync_cache_bulk(struct kgsl_device_private *dev_priv,
 		__cpuc_flush_kern_all();
 	}
 
-	param->op &= ~KGSL_GPUMEM_CACHE_RANGE;
-
 	for (i = 0; i < actual_count; i++) {
 		if (!full_flush)
-			_kgsl_gpumem_sync_cache(entries[i], 0,
-						entries[i]->memdesc.size,
-						param->op);
+			_kgsl_gpumem_sync_cache(entries[i], param->op);
 		kgsl_mem_entry_put(entries[i]);
 	}
 end:
@@ -3260,14 +3280,10 @@ kgsl_ioctl_sharedmem_flush_cache(struct kgsl_device_private *dev_priv,
 		return -EINVAL;
 	}
 
-	ret = _kgsl_gpumem_sync_cache(entry, 0, entry->memdesc.size,
-					KGSL_GPUMEM_CACHE_FLUSH);
+	ret = _kgsl_gpumem_sync_cache(entry, KGSL_GPUMEM_CACHE_FLUSH);
 	kgsl_mem_entry_put(entry);
 	return ret;
 }
-
-/* The largest allowable alignment for a GPU object is 32MB */
-#define KGSL_MAX_ALIGN (32 * SZ_1M)
 
 /*
  * The common parts of kgsl_ioctl_gpumem_alloc and kgsl_ioctl_gpumem_alloc_id.
@@ -3295,13 +3311,11 @@ _gpumem_alloc(struct kgsl_device_private *dev_priv,
 	/* Cap the alignment bits to the highest number we can handle */
 
 	align = (flags & KGSL_MEMALIGN_MASK) >> KGSL_MEMALIGN_SHIFT;
-	if (align >= ilog2(KGSL_MAX_ALIGN)) {
-		KGSL_CORE_ERR("Alignment too large; restricting to %dK\n",
-			KGSL_MAX_ALIGN >> 10);
+	if (align >= 32) {
+		KGSL_CORE_ERR("Alignment too big, restricting to 2^31\n");
 
 		flags &= ~KGSL_MEMALIGN_MASK;
-		flags |= (ilog2(KGSL_MAX_ALIGN) << KGSL_MEMALIGN_SHIFT) &
-			KGSL_MEMALIGN_MASK;
+		flags |= (31 << KGSL_MEMALIGN_SHIFT) & KGSL_MEMALIGN_MASK;
 	}
 
 	entry = kgsl_mem_entry_create();
