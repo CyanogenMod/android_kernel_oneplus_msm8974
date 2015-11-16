@@ -78,7 +78,6 @@ struct tvec_base {
 	struct timer_list *running_timer;
 	unsigned long timer_jiffies;
 	unsigned long next_timer;
-	unsigned long active_timers;
 	struct tvec_root tv1;
 	struct tvec tv2;
 	struct tvec tv3;
@@ -93,12 +92,12 @@ static DEFINE_PER_CPU(struct tvec_base *, tvec_bases) = &boot_tvec_bases;
 /* Functions below help us manage 'deferrable' flag */
 static inline unsigned int tbase_get_deferrable(struct tvec_base *base)
 {
-	return ((unsigned int)(unsigned long)base & TIMER_DEFERRABLE);
+	return ((unsigned int)(unsigned long)base & TBASE_DEFERRABLE_FLAG);
 }
 
 static inline struct tvec_base *tbase_get_base(struct tvec_base *base)
 {
-	return ((struct tvec_base *)((unsigned long)base & ~TIMER_FLAG_MASK));
+	return ((struct tvec_base *)((unsigned long)base & ~TBASE_DEFERRABLE_FLAG));
 }
 
 static inline void timer_set_deferrable(struct timer_list *timer)
@@ -109,9 +108,8 @@ static inline void timer_set_deferrable(struct timer_list *timer)
 static inline void
 timer_set_base(struct timer_list *timer, struct tvec_base *new_base)
 {
-	unsigned long flags = (unsigned long)timer->base & TIMER_FLAG_MASK;
-
-	timer->base = (struct tvec_base *)((unsigned long)(new_base) | flags);
+	timer->base = (struct tvec_base *)((unsigned long)(new_base) |
+				      tbase_get_deferrable(timer->base));
 }
 
 static unsigned long round_jiffies_common(unsigned long j, int cpu,
@@ -335,8 +333,7 @@ void set_timer_slack(struct timer_list *timer, int slack_hz)
 }
 EXPORT_SYMBOL_GPL(set_timer_slack);
 
-static void
-__internal_add_timer(struct tvec_base *base, struct timer_list *timer)
+static void internal_add_timer(struct tvec_base *base, struct timer_list *timer)
 {
 	unsigned long expires = timer->expires;
 	unsigned long idx = expires - base->timer_jiffies;
@@ -377,19 +374,6 @@ __internal_add_timer(struct tvec_base *base, struct timer_list *timer)
 	 * Timers are FIFO:
 	 */
 	list_add_tail(&timer->entry, vec);
-}
-
-static void internal_add_timer(struct tvec_base *base, struct timer_list *timer)
-{
-	__internal_add_timer(base, timer);
-	/*
-	 * Update base->active_timers and base->next_timer
-	 */
-	if (!tbase_get_deferrable(timer->base)) {
-		if (time_before(timer->expires, base->next_timer))
-			base->next_timer = timer->expires;
-		base->active_timers++;
-	}
 }
 
 #ifdef CONFIG_TIMER_STATS
@@ -675,7 +659,8 @@ void init_timer_deferrable_key(struct timer_list *timer,
 }
 EXPORT_SYMBOL(init_timer_deferrable_key);
 
-static inline void detach_timer(struct timer_list *timer, bool clear_pending)
+static inline void detach_timer(struct timer_list *timer,
+				int clear_pending)
 {
 	struct list_head *entry = &timer->entry;
 
@@ -685,29 +670,6 @@ static inline void detach_timer(struct timer_list *timer, bool clear_pending)
 	if (clear_pending)
 		entry->next = NULL;
 	entry->prev = LIST_POISON2;
-}
-
-static inline void
-detach_expired_timer(struct timer_list *timer, struct tvec_base *base)
-{
-	detach_timer(timer, true);
-	if (!tbase_get_deferrable(timer->base))
-		base->active_timers--;
-}
-
-static int detach_if_pending(struct timer_list *timer, struct tvec_base *base,
-			     bool clear_pending)
-{
-	if (!timer_pending(timer))
-		return 0;
-
-	detach_timer(timer, clear_pending);
-	if (!tbase_get_deferrable(timer->base)) {
-		base->active_timers--;
-		if (timer->expires == base->next_timer)
-			base->next_timer = base->timer_jiffies;
-	}
-	return 1;
 }
 
 /*
@@ -755,9 +717,16 @@ __mod_timer(struct timer_list *timer, unsigned long expires,
 
 	base = lock_timer_base(timer, &flags);
 
-	ret = detach_if_pending(timer, base, false);
-	if (!ret && pending_only)
-		goto out_unlock;
+	if (timer_pending(timer)) {
+		detach_timer(timer, 0);
+		if (timer->expires == base->next_timer &&
+		    !tbase_get_deferrable(timer->base))
+			base->next_timer = base->timer_jiffies;
+		ret = 1;
+	} else {
+		if (pending_only)
+			goto out_unlock;
+	}
 
 	debug_activate(timer, expires);
 
@@ -788,6 +757,9 @@ __mod_timer(struct timer_list *timer, unsigned long expires,
 	}
 
 	timer->expires = expires;
+	if (time_before(timer->expires, base->next_timer) &&
+	    !tbase_get_deferrable(timer->base))
+		base->next_timer = timer->expires;
 	internal_add_timer(base, timer);
 
 out_unlock:
@@ -953,6 +925,9 @@ void add_timer_on(struct timer_list *timer, int cpu)
 	spin_lock_irqsave(&base->lock, flags);
 	timer_set_base(timer, base);
 	debug_activate(timer, timer->expires);
+	if (time_before(timer->expires, base->next_timer) &&
+	    !tbase_get_deferrable(timer->base))
+		base->next_timer = timer->expires;
 	internal_add_timer(base, timer);
 	/*
 	 * Check whether the other CPU is idle and needs to be
@@ -989,7 +964,13 @@ int del_timer(struct timer_list *timer)
 	timer_stats_timer_clear_start_info(timer);
 	if (timer_pending(timer)) {
 		base = lock_timer_base(timer, &flags);
-		ret = detach_if_pending(timer, base, true);
+		if (timer_pending(timer)) {
+			detach_timer(timer, 1);
+			if (timer->expires == base->next_timer &&
+			    !tbase_get_deferrable(timer->base))
+				base->next_timer = base->timer_jiffies;
+			ret = 1;
+		}
 		spin_unlock_irqrestore(&base->lock, flags);
 	}
 
@@ -1014,10 +995,19 @@ int try_to_del_timer_sync(struct timer_list *timer)
 
 	base = lock_timer_base(timer, &flags);
 
-	if (base->running_timer != timer) {
-		timer_stats_timer_clear_start_info(timer);
-		ret = detach_if_pending(timer, base, true);
+	if (base->running_timer == timer)
+		goto out;
+
+	timer_stats_timer_clear_start_info(timer);
+	ret = 0;
+	if (timer_pending(timer)) {
+		detach_timer(timer, 1);
+		if (timer->expires == base->next_timer &&
+		    !tbase_get_deferrable(timer->base))
+			base->next_timer = base->timer_jiffies;
+		ret = 1;
 	}
+out:
 	spin_unlock_irqrestore(&base->lock, flags);
 
 	return ret;
@@ -1104,8 +1094,7 @@ static int cascade(struct tvec_base *base, struct tvec *tv, int index)
 	 */
 	list_for_each_entry_safe(timer, tmp, &tv_list, entry) {
 		BUG_ON(tbase_get_base(timer->base) != base);
-		/* No accounting, while moving them */
-		__internal_add_timer(base, timer);
+		internal_add_timer(base, timer);
 	}
 
 	return index;
@@ -1124,9 +1113,7 @@ static void call_timer_fn(struct timer_list *timer, void (*fn)(unsigned long),
 	 * warnings as well as problems when looking into
 	 * timer->lockdep_map, make a copy and use that here.
 	 */
-	struct lockdep_map lockdep_map;
-
-	lockdep_copy_map(&lockdep_map, &timer->lockdep_map);
+	struct lockdep_map lockdep_map = timer->lockdep_map;
 #endif
 	/*
 	 * Couple the lock chain with the lock chain at
@@ -1194,7 +1181,7 @@ static inline void __run_timers(struct tvec_base *base)
 			timer_stats_account_timer(timer);
 
 			base->running_timer = timer;
-			detach_expired_timer(timer, base);
+			detach_timer(timer, 1);
 
 			spin_unlock_irq(&base->lock);
 			call_timer_fn(timer, fn, data);
@@ -1332,21 +1319,18 @@ static unsigned long cmp_next_hrtimer_event(unsigned long now,
 unsigned long get_next_timer_interrupt(unsigned long now)
 {
 	struct tvec_base *base = __this_cpu_read(tvec_bases);
-	unsigned long expires = now + NEXT_TIMER_MAX_DELTA;
+	unsigned long expires;
 
 	/*
 	 * Pretend that there is no timer pending if the cpu is offline.
 	 * Possible pending timers will be migrated later to an active cpu.
 	 */
 	if (cpu_is_offline(smp_processor_id()))
-		return expires;
-
+		return now + NEXT_TIMER_MAX_DELTA;
 	spin_lock(&base->lock);
-	if (base->active_timers) {
-		if (time_before_eq(base->next_timer, base->timer_jiffies))
-			base->next_timer = __next_timer_interrupt(base);
-		expires = base->next_timer;
-	}
+	if (time_before_eq(base->next_timer, base->timer_jiffies))
+		base->next_timer = __next_timer_interrupt(base);
+	expires = base->next_timer;
 	spin_unlock(&base->lock);
 
 	if (time_before_eq(expires, now))
@@ -1723,7 +1707,6 @@ static int __cpuinit init_timers_cpu(int cpu)
 
 	base->timer_jiffies = jiffies;
 	base->next_timer = base->timer_jiffies;
-	base->active_timers = 0;
 	return 0;
 }
 
@@ -1734,9 +1717,11 @@ static void migrate_timer_list(struct tvec_base *new_base, struct list_head *hea
 
 	while (!list_empty(head)) {
 		timer = list_first_entry(head, struct timer_list, entry);
-		/* We ignore the accounting on the dying cpu */
-		detach_timer(timer, false);
+		detach_timer(timer, 0);
 		timer_set_base(timer, new_base);
+		if (time_before(timer->expires, new_base->next_timer) &&
+		    !tbase_get_deferrable(timer->base))
+			new_base->next_timer = timer->expires;
 		internal_add_timer(new_base, timer);
 	}
 }
@@ -1806,13 +1791,9 @@ static struct notifier_block __cpuinitdata timers_nb = {
 
 void __init init_timers(void)
 {
-	int err;
+	int err = timer_cpu_notify(&timers_nb, (unsigned long)CPU_UP_PREPARE,
+				(void *)(long)smp_processor_id());
 
-	/* ensure there are enough low bits for flags in timer->base pointer */
-	BUILD_BUG_ON(__alignof__(struct tvec_base) & TIMER_FLAG_MASK);
-
-	err = timer_cpu_notify(&timers_nb, (unsigned long)CPU_UP_PREPARE,
-			       (void *)(long)smp_processor_id());
 	init_timer_stats();
 
 	BUG_ON(err != NOTIFY_OK);
