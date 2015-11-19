@@ -2722,15 +2722,6 @@ unsigned int ieee80211_get_hdrlen_from_skb(const struct sk_buff *skb);
 unsigned int __attribute_const__ ieee80211_hdrlen(__le16 fc);
 
 /**
- * ieee80211_get_mesh_hdrlen - get mesh extension header length
- * @meshhdr: the mesh extension header, only the flags field
- *	(first byte) will be accessed
- * Returns the length of the extension header, which is always at
- * least 6 bytes and at most 18 if address 5 and 6 are present.
- */
-unsigned int ieee80211_get_mesh_hdrlen(struct ieee80211s_hdr *meshhdr);
-
-/**
  * DOC: Data path helpers
  *
  * In addition to generic utilities, cfg80211 also offers
@@ -3302,8 +3293,8 @@ void __cfg80211_send_event_skb(struct sk_buff *skb, gfp_t gfp);
 static inline struct sk_buff *
 cfg80211_vendor_cmd_alloc_reply_skb(struct wiphy *wiphy, int approxlen)
 {
-	return __cfg80211_alloc_reply_skb(wiphy, NL80211_CMD_TESTMODE,
-					  NL80211_ATTR_TESTDATA, approxlen);
+	return __cfg80211_alloc_reply_skb(wiphy, NL80211_CMD_VENDOR,
+					  NL80211_ATTR_VENDOR_DATA, approxlen);
 }
 
 /**
@@ -3444,7 +3435,7 @@ cfg80211_testmode_alloc_event_skb(struct wiphy *wiphy, int approxlen, gfp_t gfp)
 /**
  * cfg80211_testmode_event - send the event
  * @skb: The skb, must have been allocated with
- *  cfg80211_testmode_alloc_event_skb()
+ *	cfg80211_testmode_alloc_event_skb()
  * @gfp: allocation flags
  *
  * This function sends the given @skb, which must have been allocated

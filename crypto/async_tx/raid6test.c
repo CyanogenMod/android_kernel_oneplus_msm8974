@@ -52,7 +52,7 @@ static void makedata(int disks)
 		for (j = 0; j < PAGE_SIZE/sizeof(u32); j += sizeof(u32)) {
 			u32 *p = page_address(data[i]) + j;
 
-			*p = random32();
+			*p = prandom_u32();
 		}
 
 		dataptrs[i] = data[i];

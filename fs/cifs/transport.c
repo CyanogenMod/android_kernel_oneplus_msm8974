@@ -511,6 +511,13 @@ send_nt_cancel(struct TCP_Server_Info *server, struct smb_hdr *in_buf,
 		mutex_unlock(&server->srv_mutex);
 		return rc;
 	}
+
+	/*
+	 * The response to this call was already factored into the sequence
+	 * number when the call went out, so we must adjust it back downward
+	 * after signing here.
+	 */
+	--server->sequence_number;
 	rc = smb_send(server, in_buf, be32_to_cpu(in_buf->smb_buf_length));
 	mutex_unlock(&server->srv_mutex);
 
@@ -569,7 +576,7 @@ SendReceive2(const unsigned int xid, struct cifs_ses *ses,
 {
 	int rc = 0;
 	int long_op;
-	struct mid_q_entry *midQ;
+	struct mid_q_entry *midQ = NULL;
 	char *buf = iov[0].iov_base;
 
 	long_op = flags & CIFS_TIMEOUT_MASK;

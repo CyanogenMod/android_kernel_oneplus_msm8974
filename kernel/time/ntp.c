@@ -528,12 +528,13 @@ static void sync_cmos_clock(struct work_struct *work)
 		next.tv_sec++;
 		next.tv_nsec -= NSEC_PER_SEC;
 	}
-	schedule_delayed_work(&sync_cmos_work, timespec_to_jiffies(&next));
+	queue_delayed_work(system_power_efficient_wq,
+	&sync_cmos_work, timespec_to_jiffies(&next));
 }
 
 static void notify_cmos_timer(void)
 {
-	schedule_delayed_work(&sync_cmos_work, 0);
+	queue_delayed_work(system_power_efficient_wq, &sync_cmos_work, 0);
 }
 
 #else
@@ -658,6 +659,17 @@ int do_adjtimex(struct timex *txc)
 		result = timekeeping_inject_offset(&delta);
 		if (result)
 			return result;
+	}
+
+	/*
+	 * Check for potential multiplication overflows that can
+	 * only happen on 64-bit systems:
+	 */
+	if ((txc->modes & ADJ_FREQUENCY) && (BITS_PER_LONG == 64)) {
+		if (LLONG_MIN / PPM_SCALE > txc->freq)
+			return -EINVAL;
+		if (LLONG_MAX / PPM_SCALE < txc->freq)
+			return -EINVAL;
 	}
 
 	getnstimeofday(&ts);

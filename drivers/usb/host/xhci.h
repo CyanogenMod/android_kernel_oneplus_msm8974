@@ -88,9 +88,10 @@ struct xhci_cap_regs {
 #define HCS_IST(p)		(((p) >> 0) & 0xf)
 /* bits 4:7, max number of Event Ring segments */
 #define HCS_ERST_MAX(p)		(((p) >> 4) & 0xf)
+/* bits 21:25 Hi 5 bits of Scratchpad buffers SW must allocate for the HW */
 /* bit 26 Scratchpad restore - for save/restore HW state - not used yet */
-/* bits 27:31 number of Scratchpad buffers SW must allocate for the HW */
-#define HCS_MAX_SCRATCHPAD(p)   (((p) >> 27) & 0x1f)
+/* bits 27:31 Lo 5 bits of Scratchpad buffers SW must allocate for the HW */
+#define HCS_MAX_SCRATCHPAD(p)   ((((p) >> 16) & 0x3e0) | (((p) >> 27) & 0x1f))
 
 /* HCSPARAMS3 - hcs_params3 - bitmasks */
 /* bits 0:7, Max U1 to U0 latency for the roothub ports */
@@ -1231,7 +1232,7 @@ union xhci_trb {
  * since the command ring is 64-byte aligned.
  * It must also be greater than 16.
  */
-#define TRBS_PER_SEGMENT	64
+#define TRBS_PER_SEGMENT	256
 /* Allow two commands + a link TRB, along with any reserved command TRBs */
 #define MAX_RSVD_CMD_TRBS	(TRBS_PER_SEGMENT - 3)
 #define SEGMENT_SIZE		(TRBS_PER_SEGMENT*16)
@@ -1755,7 +1756,7 @@ void xhci_shutdown(struct usb_hcd *hcd);
 int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks);
 
 #ifdef	CONFIG_PM
-int xhci_suspend(struct xhci_hcd *xhci);
+int xhci_suspend(struct xhci_hcd *xhci, bool do_wakeup);
 int xhci_resume(struct xhci_hcd *xhci, bool hibernated);
 #else
 #define	xhci_suspend	NULL

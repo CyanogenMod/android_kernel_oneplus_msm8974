@@ -82,7 +82,6 @@
 		{ CP_DISCARD,	"Discard" })
 
 struct victim_sel_policy;
-struct f2fs_map_blocks;
 
 DECLARE_EVENT_CLASS(f2fs__inode,
 
@@ -447,35 +446,36 @@ TRACE_EVENT(f2fs_truncate_partial_nodes,
 		__entry->err)
 );
 
-TRACE_EVENT(f2fs_map_blocks,
-	TP_PROTO(struct inode *inode, struct f2fs_map_blocks *map, int ret),
+TRACE_EVENT(f2fs_get_data_block,
+	TP_PROTO(struct inode *inode, sector_t iblock,
+				struct buffer_head *bh, int ret),
 
-	TP_ARGS(inode, map, ret),
+	TP_ARGS(inode, iblock, bh, ret),
 
 	TP_STRUCT__entry(
 		__field(dev_t,	dev)
 		__field(ino_t,	ino)
-		__field(block_t,	m_lblk)
-		__field(block_t,	m_pblk)
-		__field(unsigned int,	m_len)
+		__field(sector_t,	iblock)
+		__field(sector_t,	bh_start)
+		__field(size_t,	bh_size)
 		__field(int,	ret)
 	),
 
 	TP_fast_assign(
 		__entry->dev		= inode->i_sb->s_dev;
 		__entry->ino		= inode->i_ino;
-		__entry->m_lblk		= map->m_lblk;
-		__entry->m_pblk		= map->m_pblk;
-		__entry->m_len		= map->m_len;
+		__entry->iblock		= iblock;
+		__entry->bh_start	= bh->b_blocknr;
+		__entry->bh_size	= bh->b_size;
 		__entry->ret		= ret;
 	),
 
 	TP_printk("dev = (%d,%d), ino = %lu, file offset = %llu, "
-		"start blkaddr = 0x%llx, len = 0x%llx, err = %d",
+		"start blkaddr = 0x%llx, len = 0x%llx bytes, err = %d",
 		show_dev_ino(__entry),
-		(unsigned long long)__entry->m_lblk,
-		(unsigned long long)__entry->m_pblk,
-		(unsigned long long)__entry->m_len,
+		(unsigned long long)__entry->iblock,
+		(unsigned long long)__entry->bh_start,
+		(unsigned long long)__entry->bh_size,
 		__entry->ret)
 );
 
@@ -1061,11 +1061,11 @@ TRACE_EVENT(f2fs_lookup_extent_tree_start,
 TRACE_EVENT_CONDITION(f2fs_lookup_extent_tree_end,
 
 	TP_PROTO(struct inode *inode, unsigned int pgofs,
-						struct extent_info *ei),
+						struct extent_node *en),
 
-	TP_ARGS(inode, pgofs, ei),
+	TP_ARGS(inode, pgofs, en),
 
-	TP_CONDITION(ei),
+	TP_CONDITION(en),
 
 	TP_STRUCT__entry(
 		__field(dev_t,	dev)
@@ -1080,9 +1080,9 @@ TRACE_EVENT_CONDITION(f2fs_lookup_extent_tree_end,
 		__entry->dev = inode->i_sb->s_dev;
 		__entry->ino = inode->i_ino;
 		__entry->pgofs = pgofs;
-		__entry->fofs = ei->fofs;
-		__entry->blk = ei->blk;
-		__entry->len = ei->len;
+		__entry->fofs = en->ei.fofs;
+		__entry->blk = en->ei.blk;
+		__entry->len = en->ei.len;
 	),
 
 	TP_printk("dev = (%d,%d), ino = %lu, pgofs = %u, "

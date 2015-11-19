@@ -276,8 +276,8 @@ static long div_round_rate(struct clk *c, unsigned long rate)
 static int div_set_rate(struct clk *c, unsigned long rate)
 {
 	struct div_clk *d = to_div_clk(c);
-	int div, rc = 0;
-	long rrate, old_prate, new_prate;
+	int div = 0, rc = 0;
+	long rrate, old_prate = 0, new_prate = 0;
 	struct div_data *data = &d->data;
 
 	rrate = __div_round_rate(data, rate, c->parent, &div, &new_prate);

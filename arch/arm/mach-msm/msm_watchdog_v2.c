@@ -281,6 +281,12 @@ static void pet_watchdog_work(struct work_struct *work)
 	struct msm_watchdog_data *wdog_dd = container_of(delayed_work,
 						struct msm_watchdog_data,
 							dogwork_struct);
+
+	if (test_taint(TAINT_DIE) || oops_in_progress) {
+		pr_info("MSM Watchdog Skip Pet Work.\n");
+		return;
+	}
+
 	delay_time = msecs_to_jiffies(wdog_dd->pet_time);
 	if (enable) {
 		if (wdog_dd->do_ipi_ping)
@@ -325,15 +331,15 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 	unsigned long long t = sched_clock();
 
 	nanosec_rem = do_div(t, 1000000000);
-	printk(KERN_INFO "Watchdog bark! Now = %lu.%06lu\n", (unsigned long) t,
-		nanosec_rem / 1000);
+	printk(KERN_INFO "Watchdog bark! Now = %lu.%06lu (IRQ %d)\n",
+		(unsigned long) t, nanosec_rem / 1000, irq);
 
 	nanosec_rem = do_div(wdog_dd->last_pet, 1000000000);
 	printk(KERN_INFO "Watchdog last pet at %lu.%06lu\n", (unsigned long)
 		wdog_dd->last_pet, nanosec_rem / 1000);
 	if (wdog_dd->do_ipi_ping)
 		dump_cpu_alive_mask(wdog_dd);
-	printk(KERN_INFO "Causing a watchdog bite!");
+	printk(KERN_INFO "Causing a watchdog bite! IRQ = %lu.\n", (unsigned long) irq);
 	__raw_writel(1, wdog_dd->base + WDT0_BITE_TIME);
 	mb();
 	__raw_writel(1, wdog_dd->base + WDT0_RST);

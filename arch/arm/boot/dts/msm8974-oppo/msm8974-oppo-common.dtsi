@@ -121,6 +121,7 @@
 	qcom,pad-drv-off = <0x0 0x0 0x0>; /* 2mA, 2mA, 2mA */
 
 	qcom,nonremovable;
+	qcom,wakeup-on-idle;
 	status = "ok";
 };
 

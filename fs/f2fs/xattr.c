@@ -498,11 +498,8 @@ static int __f2fs_setxattr(struct inode *inode, int index,
 
 	len = strlen(name);
 
-	if (len > F2FS_NAME_LEN)
+	if (len > F2FS_NAME_LEN || size > MAX_VALUE_LEN(inode))
 		return -ERANGE;
-
-	if (size > MAX_VALUE_LEN(inode))
-		return -E2BIG;
 
 	base_addr = read_all_xattrs(inode, ipage);
 	if (!base_addr)
@@ -586,9 +583,6 @@ static int __f2fs_setxattr(struct inode *inode, int index,
 		inode->i_ctime = CURRENT_TIME;
 		clear_inode_flag(fi, FI_ACL_MODE);
 	}
-	if (index == F2FS_XATTR_INDEX_ENCRYPTION &&
-			!strcmp(name, F2FS_XATTR_NAME_ENCRYPTION_CONTEXT))
-		f2fs_set_encrypted_inode(inode);
 
 	if (ipage)
 		update_inode(inode, ipage);

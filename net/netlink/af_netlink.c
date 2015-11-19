@@ -295,7 +295,7 @@ static int nl_pid_hash_rehash(struct nl_pid_hash *hash, int grow)
 	hash->table = table;
 	hash->mask = mask;
 	hash->shift = shift;
-	get_random_bytes(&hash->rnd, sizeof(hash->rnd));
+	prandom_bytes(&hash->rnd, sizeof(hash->rnd));
 
 	for (i = 0; i <= omask; i++) {
 		struct sock *sk;
@@ -1445,8 +1445,6 @@ static int netlink_recvmsg(struct kiocb *kiocb, struct socket *sock,
 			data_skb = skb_shinfo(skb)->frag_list;
 	}
 #endif
-
-	msg->msg_namelen = 0;
 
 	copied = data_skb->len;
 	if (len < copied) {

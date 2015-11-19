@@ -909,11 +909,13 @@ static int de_thread(struct task_struct *tsk)
 
 		sig->notify_count = -1;	/* for exit_notify() */
 		for (;;) {
+			threadgroup_change_begin(tsk);
 			write_lock_irq(&tasklist_lock);
 			if (likely(leader->exit_state))
 				break;
 			__set_current_state(TASK_UNINTERRUPTIBLE);
 			write_unlock_irq(&tasklist_lock);
+			threadgroup_change_end(tsk);
 			schedule();
 		}
 
@@ -950,6 +952,13 @@ static int de_thread(struct task_struct *tsk)
 		transfer_pid(leader, tsk, PIDTYPE_SID);
 
 		list_replace_rcu(&leader->tasks, &tsk->tasks);
+		/*
+		 * need to delete leader from adj tree, because it will not be
+		 * group leader (exit_signal = -1) soon. release_task(leader)
+		 * can't delete it.
+		 */
+		delete_from_adj_tree(leader);
+		add_2_adj_tree(tsk);
 		list_replace_init(&leader->sibling, &tsk->sibling);
 
 		tsk->group_leader = tsk;
@@ -969,6 +978,7 @@ static int de_thread(struct task_struct *tsk)
 		if (unlikely(leader->ptrace))
 			__wake_up_parent(leader, leader->parent);
 		write_unlock_irq(&tasklist_lock);
+		threadgroup_change_end(tsk);
 
 		release_task(leader);
 	}
@@ -2049,6 +2059,12 @@ static int __get_dumpable(unsigned long mm_flags)
 	return (ret >= 2) ? 2 : ret;
 }
 
+/*
+ * This returns the actual value of the suid_dumpable flag. For things
+ * that are using this for checking for privilege transitions, it must
+ * test against SUID_DUMP_USER rather than treating it as a boolean
+ * value.
+ */
 int get_dumpable(struct mm_struct *mm)
 {
 	return __get_dumpable(mm->flags);

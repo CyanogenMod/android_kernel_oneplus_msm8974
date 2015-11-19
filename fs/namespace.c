@@ -1066,6 +1066,9 @@ void umount_tree(struct mount *mnt, int propagate, struct list_head *kill)
 	for (p = mnt; p; p = next_mnt(p, mnt))
 		list_move(&p->mnt_hash, &tmp_list);
 
+	list_for_each_entry(p, &tmp_list, mnt_hash)
+		list_del_init(&p->mnt_child);
+
 	if (propagate)
 		propagate_umount(&tmp_list);
 
@@ -1076,7 +1079,6 @@ void umount_tree(struct mount *mnt, int propagate, struct list_head *kill)
 		if (p->mnt_ns)
 			__mnt_make_shortterm(p);
 		p->mnt_ns = NULL;
-		list_del_init(&p->mnt_child);
 		if (mnt_has_parent(p)) {
 			p->mnt_parent->mnt_ghosts++;
 			dentry_reset_mounted(p->mnt_mountpoint);
@@ -1152,6 +1154,8 @@ static int do_umount(struct mount *mnt, int flags)
 		 * Special case for "unmounting" root ...
 		 * we just try to remount it readonly.
 		 */
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
 		down_write(&sb->s_umount);
 		if (!(sb->s_flags & MS_RDONLY))
 			retval = do_remount_sb(sb, MS_RDONLY, NULL, 0);
@@ -2142,6 +2146,35 @@ long do_mount(char *dev_name, char *dir_name, char *type_page,
 	if (data_page)
 		((char *)data_page)[PAGE_SIZE - 1] = 0;
 
+#ifdef CONFIG_RESTRICT_ROOTFS_SLAVE
+	/* Check if this is an attempt to mark "/" as recursive-slave. */
+	if (strcmp(dir_name, "/") == 0 && flags == (MS_SLAVE | MS_REC)) {
+		static const char storage[] = "/storage";
+		static const char source[]  = "/mnt/shell/emulated";
+		long res;
+
+		/* Mark /storage as recursive-slave instead. */
+		if ((res = do_mount(NULL, (char *)storage, NULL, (MS_SLAVE | MS_REC), NULL)) == 0) {
+			/* Unfortunately bind mounts from outside /storage may retain the
+			 * recursive-shared property (bug?).  This means any additional
+			 * namespace-specific bind mounts (e.g., /storage/emulated/0/Android/obb)
+			 * will also appear, shared in all namespaces, at their respective source
+			 * paths (e.g., /mnt/shell/emulated/0/Android/obb), possibly leading to
+			 * hundreds of /proc/mounts-visible bind mounts.  As a workaround, mark
+			 * /mnt/shell/emulated also as recursive-slave so that subsequent bind
+			 * mounts are confined to their namespaces. */
+			if ((res = do_mount(NULL, (char *)source, NULL, (MS_SLAVE | MS_REC), NULL)) == 0)
+				/* Both paths successfully marked as slave, leave the rest of the
+				 * filesystem hierarchy alone. */
+				return 0;
+			else
+				pr_warn("Failed to mount %s as MS_SLAVE: %ld\n", source, res);
+		} else {
+			pr_warn("Failed to mount %s as MS_SLAVE: %ld\n", storage, res);
+		}
+		/* Fallback: Mark rootfs as recursive-slave as requested. */
+	}
+#endif	
 	/* ... and get the mountpoint */
 	retval = kern_path(dir_name, LOOKUP_FOLLOW, &path);
 	if (retval)
@@ -2152,9 +2185,9 @@ long do_mount(char *dev_name, char *dir_name, char *type_page,
 	if (retval)
 		goto dput_out;
 
-	/* Default to relatime unless overriden */
-	if (!(flags & MS_NOATIME))
-		mnt_flags |= MNT_RELATIME;
+	/* Default to noatime/nodiratime unless overriden */
+	if (!(flags & MS_RELATIME))
+		mnt_flags |= MNT_NOATIME;
 
 	/* Separate the per-mountpoint flags */
 	if (flags & MS_NOSUID)
@@ -2163,9 +2196,9 @@ long do_mount(char *dev_name, char *dir_name, char *type_page,
 		mnt_flags |= MNT_NODEV;
 	if (flags & MS_NOEXEC)
 		mnt_flags |= MNT_NOEXEC;
-	if (flags & MS_NOATIME)
+	//if (flags & MS_NOATIME)
 		mnt_flags |= MNT_NOATIME;
-	if (flags & MS_NODIRATIME)
+	//if (flags & MS_NODIRATIME)
 		mnt_flags |= MNT_NODIRATIME;
 	if (flags & MS_STRICTATIME)
 		mnt_flags &= ~(MNT_RELATIME | MNT_NOATIME);

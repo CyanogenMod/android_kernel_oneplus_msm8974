@@ -42,6 +42,8 @@
 #include <linux/lockdep.h>
 #include <linux/idr.h>
 #include <linux/bug.h>
+#include <linux/moduleparam.h>
+#include <linux/hashtable.h>
 
 #include "workqueue_sched.h"
 
@@ -83,8 +85,6 @@ enum {
 	NR_WORKER_POOLS		= 2,		/* # worker pools per gcwq */
 
 	BUSY_WORKER_HASH_ORDER	= 6,		/* 64 pointers */
-	BUSY_WORKER_HASH_SIZE	= 1 << BUSY_WORKER_HASH_ORDER,
-	BUSY_WORKER_HASH_MASK	= BUSY_WORKER_HASH_SIZE - 1,
 
 	MAX_IDLE_WORKERS_RATIO	= 4,		/* 1/4 of busy can be idle */
 	IDLE_WORKER_TIMEOUT	= 300 * HZ,	/* keep idle ones for 5 mins */
@@ -181,7 +181,7 @@ struct global_cwq {
 	unsigned int		flags;		/* L: GCWQ_* flags */
 
 	/* workers are chained either in busy_hash or pool idle_list */
-	struct hlist_head	busy_hash[BUSY_WORKER_HASH_SIZE];
+	DECLARE_HASHTABLE(busy_hash, BUSY_WORKER_HASH_ORDER);
 						/* L: hash of busy workers */
 
 	struct worker_pool	pools[NR_WORKER_POOLS];
@@ -267,6 +267,15 @@ struct workqueue_struct {
 	char			name[];		/* I: workqueue name */
 };
 
+/* see the comment above the definition of WQ_POWER_EFFICIENT */
+#ifdef CONFIG_WQ_POWER_EFFICIENT_DEFAULT
+static bool wq_power_efficient = true;
+#else
+static bool wq_power_efficient;
+#endif
+
+module_param_named(power_efficient, wq_power_efficient, bool, 0644);
+
 struct workqueue_struct *system_wq __read_mostly;
 EXPORT_SYMBOL_GPL(system_wq);
 struct workqueue_struct *system_highpri_wq __read_mostly;
@@ -277,6 +286,10 @@ struct workqueue_struct *system_unbound_wq __read_mostly;
 EXPORT_SYMBOL_GPL(system_unbound_wq);
 struct workqueue_struct *system_freezable_wq __read_mostly;
 EXPORT_SYMBOL_GPL(system_freezable_wq);
+struct workqueue_struct *system_power_efficient_wq __read_mostly;
+EXPORT_SYMBOL_GPL(system_power_efficient_wq);
+struct workqueue_struct *system_freezable_power_efficient_wq __read_mostly;
+EXPORT_SYMBOL_GPL(system_freezable_power_efficient_wq);
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/workqueue.h>
@@ -286,8 +299,7 @@ EXPORT_SYMBOL_GPL(system_freezable_wq);
 	     (pool) < &(gcwq)->pools[NR_WORKER_POOLS]; (pool)++)
 
 #define for_each_busy_worker(worker, i, pos, gcwq)			\
-	for (i = 0; i < BUSY_WORKER_HASH_SIZE; i++)			\
-		hlist_for_each_entry(worker, pos, &gcwq->busy_hash[i], hentry)
+	hash_for_each(gcwq->busy_hash, i, pos, worker, hentry)
 
 static inline int __next_gcwq_cpu(int cpu, const struct cpumask *mask,
 				  unsigned int sw)
@@ -860,63 +872,6 @@ static inline void worker_clr_flags(struct worker *worker, unsigned int flags)
 }
 
 /**
- * busy_worker_head - return the busy hash head for a work
- * @gcwq: gcwq of interest
- * @work: work to be hashed
- *
- * Return hash head of @gcwq for @work.
- *
- * CONTEXT:
- * spin_lock_irq(gcwq->lock).
- *
- * RETURNS:
- * Pointer to the hash head.
- */
-static struct hlist_head *busy_worker_head(struct global_cwq *gcwq,
-					   struct work_struct *work)
-{
-	const int base_shift = ilog2(sizeof(struct work_struct));
-	unsigned long v = (unsigned long)work;
-
-	/* simple shift and fold hash, do we need something better? */
-	v >>= base_shift;
-	v += v >> BUSY_WORKER_HASH_ORDER;
-	v &= BUSY_WORKER_HASH_MASK;
-
-	return &gcwq->busy_hash[v];
-}
-
-/**
- * __find_worker_executing_work - find worker which is executing a work
- * @gcwq: gcwq of interest
- * @bwh: hash head as returned by busy_worker_head()
- * @work: work to find worker for
- *
- * Find a worker which is executing @work on @gcwq.  @bwh should be
- * the hash head obtained by calling busy_worker_head() with the same
- * work.
- *
- * CONTEXT:
- * spin_lock_irq(gcwq->lock).
- *
- * RETURNS:
- * Pointer to worker which is executing @work if found, NULL
- * otherwise.
- */
-static struct worker *__find_worker_executing_work(struct global_cwq *gcwq,
-						   struct hlist_head *bwh,
-						   struct work_struct *work)
-{
-	struct worker *worker;
-	struct hlist_node *tmp;
-
-	hlist_for_each_entry(worker, tmp, bwh, hentry)
-		if (worker->current_work == work)
-			return worker;
-	return NULL;
-}
-
-/**
  * find_worker_executing_work - find worker which is executing a work
  * @gcwq: gcwq of interest
  * @work: work to find worker for
@@ -935,8 +890,14 @@ static struct worker *__find_worker_executing_work(struct global_cwq *gcwq,
 static struct worker *find_worker_executing_work(struct global_cwq *gcwq,
 						 struct work_struct *work)
 {
-	return __find_worker_executing_work(gcwq, busy_worker_head(gcwq, work),
-					    work);
+	struct worker *worker;
+	struct hlist_node *tmp;
+
+	hash_for_each_possible(gcwq->busy_hash, worker, tmp, hentry, (unsigned long)work)
+		if (worker->current_work == work)
+			return worker;
+
+	return NULL;
 }
 
 /**
@@ -1886,12 +1847,19 @@ static void destroy_worker(struct worker *worker)
 	if (worker->flags & WORKER_IDLE)
 		pool->nr_idle--;
 
+	/*
+	 * Once WORKER_DIE is set, the kworker may destroy itself at any
+	 * point.  Pin to ensure the task stays until we're done with it.
+	 */
+	get_task_struct(worker->task);
+
 	list_del_init(&worker->entry);
 	worker->flags |= WORKER_DIE;
 
 	spin_unlock_irq(&gcwq->lock);
 
 	kthread_stop(worker->task);
+	put_task_struct(worker->task);
 	kfree(worker);
 
 	spin_lock_irq(&gcwq->lock);
@@ -2170,7 +2138,6 @@ __acquires(&gcwq->lock)
 	struct cpu_workqueue_struct *cwq = get_work_cwq(work);
 	struct worker_pool *pool = worker->pool;
 	struct global_cwq *gcwq = pool->gcwq;
-	struct hlist_head *bwh = busy_worker_head(gcwq, work);
 	bool cpu_intensive = cwq->wq->flags & WQ_CPU_INTENSIVE;
 	work_func_t f = work->func;
 	int work_color;
@@ -2202,7 +2169,7 @@ __acquires(&gcwq->lock)
 	 * already processing the work.  If so, defer the work to the
 	 * currently executing one.
 	 */
-	collision = __find_worker_executing_work(gcwq, bwh, work);
+	collision = find_worker_executing_work(gcwq, work);
 	if (unlikely(collision)) {
 		move_linked_works(work, &collision->scheduled, NULL);
 		return;
@@ -2210,7 +2177,7 @@ __acquires(&gcwq->lock)
 
 	/* claim and dequeue */
 	debug_work_deactivate(work);
-	hlist_add_head(&worker->hentry, bwh);
+	hash_add(gcwq->busy_hash, &worker->hentry, (unsigned long)work);
 	worker->current_work = work;
 	worker->current_cwq = cwq;
 	work_color = get_work_color(work);
@@ -2262,6 +2229,15 @@ __acquires(&gcwq->lock)
 		dump_stack();
 	}
 
+	/*
+	 * The following prevents a kworker from hogging CPU on !PREEMPT
+	 * kernels, where a requeueing work item waiting for something to
+	 * happen could deadlock with stop_machine as such work item could
+	 * indefinitely requeue itself while all other CPUs are trapped in
+	 * stop_machine.
+	 */
+	cond_resched();
+
 	spin_lock_irq(&gcwq->lock);
 
 	/* clear cpu intensive status */
@@ -2269,7 +2245,7 @@ __acquires(&gcwq->lock)
 		worker_clr_flags(worker, WORKER_CPU_INTENSIVE);
 
 	/* we're done with it, release */
-	hlist_del_init(&worker->hentry);
+	hash_del(&worker->hentry);
 	worker->current_work = NULL;
 	worker->current_cwq = NULL;
 	cwq_dec_nr_in_flight(cwq, work_color, false);
@@ -2902,19 +2878,57 @@ bool flush_work(struct work_struct *work)
 }
 EXPORT_SYMBOL_GPL(flush_work);
 
+struct cwt_wait {
+	wait_queue_t		wait;
+	struct work_struct	*work;
+};
+
+static int cwt_wakefn(wait_queue_t *wait, unsigned mode, int sync, void *key)
+{
+	struct cwt_wait *cwait = container_of(wait, struct cwt_wait, wait);
+
+	if (cwait->work != key)
+		return 0;
+	return autoremove_wake_function(wait, mode, sync, key);
+}
+
 static bool __cancel_work_timer(struct work_struct *work, bool is_dwork)
 {
+	static DECLARE_WAIT_QUEUE_HEAD(cancel_waitq);
 	unsigned long flags;
 	int ret;
 
 	do {
 		ret = try_to_grab_pending(work, is_dwork, &flags);
 		/*
-		 * If someone else is canceling, wait for the same event it
-		 * would be waiting for before retrying.
+		 * If someone else is already canceling, wait for it to
+		 * finish.  flush_work() doesn't work for PREEMPT_NONE
+		 * because we may get scheduled between @work's completion
+		 * and the other canceling task resuming and clearing
+		 * CANCELING - flush_work() will return false immediately
+		 * as @work is no longer busy, try_to_grab_pending() will
+		 * return -ENOENT as @work is still being canceled and the
+		 * other canceling task won't be able to clear CANCELING as
+		 * we're hogging the CPU.
+		 *
+		 * Let's wait for completion using a waitqueue.  As this
+		 * may lead to the thundering herd problem, use a custom
+		 * wake function which matches @work along with exclusive
+		 * wait and wakeup.
 		 */
-		if (unlikely(ret == -ENOENT))
-			flush_work(work);
+		if (unlikely(ret == -ENOENT)) {
+			struct cwt_wait cwait;
+
+			init_wait(&cwait.wait);
+			cwait.wait.func = cwt_wakefn;
+			cwait.work = work;
+
+			prepare_to_wait_exclusive(&cancel_waitq, &cwait.wait,
+						  TASK_UNINTERRUPTIBLE);
+			if (work_is_canceling(work))
+				schedule();
+			finish_wait(&cancel_waitq, &cwait.wait);
+		}
 	} while (unlikely(ret < 0));
 
 	/* tell other tasks trying to grab @work to back off */
@@ -2923,6 +2937,16 @@ static bool __cancel_work_timer(struct work_struct *work, bool is_dwork)
 
 	flush_work(work);
 	clear_work_data(work);
+
+	/*
+	 * Paired with prepare_to_wait() above so that either
+	 * waitqueue_active() is visible here or !work_is_canceling() is
+	 * visible there.
+	 */
+	smp_mb();
+	if (waitqueue_active(&cancel_waitq))
+		__wake_up(&cancel_waitq, TASK_NORMAL, 1, work);
+
 	return ret;
 }
 
@@ -3241,6 +3265,10 @@ struct workqueue_struct *__alloc_workqueue_key(const char *fmt,
 	struct workqueue_struct *wq;
 	unsigned int cpu;
 	size_t namelen;
+
+	/* see the comment above the definition of WQ_POWER_EFFICIENT */
+	if ((flags & WQ_POWER_EFFICIENT) && wq_power_efficient)
+		flags |= WQ_UNBOUND;
 
 	/* determine namelen, allocate wq and format name */
 	va_start(args, lock_name);
@@ -3725,7 +3753,11 @@ void freeze_workqueues_begin(void)
 		gcwq->flags |= GCWQ_FREEZING;
 
 		list_for_each_entry(wq, &workqueues, list) {
-			struct cpu_workqueue_struct *cwq = get_cwq(cpu, wq);
+              struct cpu_workqueue_struct *cwq;
+              if (cpu < CONFIG_NR_CPUS)
+                cwq = get_cwq(cpu, wq);
+              else
+                continue;
 
 			if (cwq && wq->flags & WQ_FREEZABLE)
 				cwq->max_active = 0;
@@ -3766,7 +3798,11 @@ bool freeze_workqueues_busy(void)
 		 * to peek without lock.
 		 */
 		list_for_each_entry(wq, &workqueues, list) {
-			struct cpu_workqueue_struct *cwq = get_cwq(cpu, wq);
+              struct cpu_workqueue_struct *cwq;
+              if (cpu < CONFIG_NR_CPUS)
+                cwq = get_cwq(cpu, wq);
+              else
+                continue;
 
 			if (!cwq || !(wq->flags & WQ_FREEZABLE))
 				continue;
@@ -3836,7 +3872,6 @@ out_unlock:
 static int __init init_workqueues(void)
 {
 	unsigned int cpu;
-	int i;
 
 	/* make sure we have enough bits for OFFQ CPU number */
 	BUILD_BUG_ON((1LU << (BITS_PER_LONG - WORK_OFFQ_CPU_SHIFT)) <
@@ -3854,8 +3889,7 @@ static int __init init_workqueues(void)
 		gcwq->cpu = cpu;
 		gcwq->flags |= GCWQ_DISASSOCIATED;
 
-		for (i = 0; i < BUSY_WORKER_HASH_SIZE; i++)
-			INIT_HLIST_HEAD(&gcwq->busy_hash[i]);
+		hash_init(gcwq->busy_hash);
 
 		for_each_worker_pool(pool, gcwq) {
 			pool->gcwq = gcwq;
@@ -3900,8 +3934,14 @@ static int __init init_workqueues(void)
 					    WQ_UNBOUND_MAX_ACTIVE);
 	system_freezable_wq = alloc_workqueue("events_freezable",
 					      WQ_FREEZABLE, 0);
-	BUG_ON(!system_wq || !system_highpri_wq || !system_long_wq ||
-	       !system_unbound_wq || !system_freezable_wq);
+	system_power_efficient_wq = alloc_workqueue("events_power_efficient",
+					      WQ_POWER_EFFICIENT, 0);
+	system_freezable_power_efficient_wq = alloc_workqueue("events_freezable_power_efficient",
+					      WQ_FREEZABLE | WQ_POWER_EFFICIENT,
+					      0);
+BUG_ON(!system_wq || !system_highpri_wq || !system_long_wq ||
+	       !system_unbound_wq || !system_freezable_wq ||
+	       !system_freezable_power_efficient_wq || !system_power_efficient_wq );
 	return 0;
 }
 early_initcall(init_workqueues);

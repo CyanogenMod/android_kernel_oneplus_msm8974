@@ -1245,8 +1245,14 @@ static int mmc_blk_reset(struct mmc_blk_data *md, struct mmc_host *host,
 
 	md->reset_done |= type;
 	err = mmc_hw_reset(host);
+	if (err && err != -EOPNOTSUPP) {
+		/* We failed to reset so we need to abort the request */
+		pr_err("%s: %s: failed to reset %d\n", mmc_hostname(host),
+				__func__, err);
+		return -ENODEV;
+	}
 	/* Ensure we switch back to the correct partition */
-	if (err != -EOPNOTSUPP) {
+	if (host->card) {
 		struct mmc_blk_data *main_md = mmc_get_drvdata(host->card);
 		int part_err;
 
@@ -2665,13 +2671,12 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 
 	if (req && !mq->mqrq_prev->req) {
 		mmc_rpm_hold(host, &card->dev);
-#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
-	if (mmc_bus_needs_resume(card->host)) {
-		mmc_resume_bus(card->host);
-	}
-#endif
 		/* claim host only for the first request */
 		mmc_claim_host(card->host);
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+		if (mmc_bus_needs_resume(card->host))
+			mmc_resume_bus(card->host);
+#endif
 		if (card->ext_csd.bkops_en)
 			mmc_stop_bkops(card);
 	}

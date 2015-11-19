@@ -29,7 +29,6 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/irq.h>
 
-#include <asm/irq.h>
 /*
    - No shared variables, all the data are CPU local.
    - If a softirq needs serialization, let it serialize itself
@@ -106,7 +105,7 @@ static void __local_bh_disable(unsigned long ip, unsigned int cnt)
 	 * We must manually increment preempt_count here and manually
 	 * call the trace_preempt_off later.
 	 */
-	preempt_count() += cnt;
+	add_preempt_count_notrace(cnt);
 	/*
 	 * Were softirqs turned off above:
 	 */
@@ -135,7 +134,6 @@ EXPORT_SYMBOL(local_bh_disable);
 
 static void __local_bh_enable(unsigned int cnt)
 {
-	WARN_ON_ONCE(in_irq());
 	WARN_ON_ONCE(!irqs_disabled());
 
 	if (softirq_count() == cnt)
@@ -150,6 +148,7 @@ static void __local_bh_enable(unsigned int cnt)
  */
 void _local_bh_enable(void)
 {
+	WARN_ON_ONCE(in_irq());
 	__local_bh_enable(SOFTIRQ_DISABLE_OFFSET);
 }
 
@@ -172,8 +171,13 @@ static inline void _local_bh_enable_ip(unsigned long ip)
  	 */
 	sub_preempt_count(SOFTIRQ_DISABLE_OFFSET - 1);
 
-	if (unlikely(!in_interrupt() && local_softirq_pending()))
+	if (unlikely(!in_interrupt() && local_softirq_pending())) {
+		/*
+		 * Run softirq if any pending. And do it in its own stack
+		 * as we may be calling this deep in a task call stack already.
+		 */
 		do_softirq();
+	}
 
 	dec_preempt_count();
 #ifdef CONFIG_TRACE_IRQFLAGS
@@ -195,8 +199,12 @@ void local_bh_enable_ip(unsigned long ip)
 EXPORT_SYMBOL(local_bh_enable_ip);
 
 /*
- * We restart softirq processing for at most 2 ms,
- * and if need_resched() is not set.
+ * We restart softirq processing for at most MAX_SOFTIRQ_RESTART times,
+ * but break the loop if need_resched() is set or after 2 ms.
+ * The MAX_SOFTIRQ_TIME provides a nice upper bound in most cases, but in
+ * certain cases, such as stop_machine(), jiffies may cease to
+ * increment and so we need the MAX_SOFTIRQ_RESTART limit as
+ * well to make sure we eventually return from this method.
  *
  * These limits have been established via experimentation.
  * The two things to balance is latency against fairness -
@@ -204,13 +212,16 @@ EXPORT_SYMBOL(local_bh_enable_ip);
  * should not be able to lock up the box.
  */
 #define MAX_SOFTIRQ_TIME  msecs_to_jiffies(2)
+#define MAX_SOFTIRQ_RESTART 10
 
 asmlinkage void __do_softirq(void)
 {
 	struct softirq_action *h;
 	__u32 pending;
 	unsigned long end = jiffies + MAX_SOFTIRQ_TIME;
+	int softirq_bit;
 	int cpu;
+	int max_restart = MAX_SOFTIRQ_RESTART;
 
 	pending = local_softirq_pending();
 	account_system_vtime(current);
@@ -228,36 +239,37 @@ restart:
 
 	h = softirq_vec;
 
-	do {
-		if (pending & 1) {
-			unsigned int vec_nr = h - softirq_vec;
-			int prev_count = preempt_count();
+	while ((softirq_bit = ffs(pending))) {
+		unsigned int vec_nr;
+		int prev_count;
 
-			kstat_incr_softirqs_this_cpu(vec_nr);
+		h += softirq_bit - 1;
 
-			trace_softirq_entry(vec_nr);
-			h->action(h);
-			trace_softirq_exit(vec_nr);
-			if (unlikely(prev_count != preempt_count())) {
-				printk(KERN_ERR "huh, entered softirq %u %s %p"
-				       "with preempt_count %08x,"
-				       " exited with %08x?\n", vec_nr,
-				       softirq_to_name[vec_nr], h->action,
-				       prev_count, preempt_count());
-				preempt_count() = prev_count;
-			}
+		vec_nr = h - softirq_vec;
+		prev_count = preempt_count();
 
-			rcu_bh_qs(cpu);
+		kstat_incr_softirqs_this_cpu(vec_nr);
+
+		trace_softirq_entry(vec_nr);
+		h->action(h);
+		trace_softirq_exit(vec_nr);
+		if (unlikely(prev_count != preempt_count())) {
+			printk(KERN_ERR "huh, entered softirq %u %s %p with preempt_count %08x, exited with %08x?\n",
+			       vec_nr, softirq_to_name[vec_nr], h->action,
+			       prev_count, preempt_count());
+			preempt_count_set(prev_count);
 		}
+		rcu_bh_qs(cpu);
 		h++;
-		pending >>= 1;
-	} while (pending);
+		pending >>= softirq_bit;
+	}
 
 	local_irq_disable();
 
 	pending = local_softirq_pending();
 	if (pending) {
-		if (time_before(jiffies, end) && !need_resched())
+		if (time_before(jiffies, end) && !need_resched() &&
+		    --max_restart)
 			goto restart;
 
 		wakeup_softirqd();
@@ -267,9 +279,10 @@ restart:
 
 	account_system_vtime(current);
 	__local_bh_enable(SOFTIRQ_OFFSET);
+	WARN_ON_ONCE(in_interrupt());
 }
 
-#ifndef __ARCH_HAS_DO_SOFTIRQ
+
 
 asmlinkage void do_softirq(void)
 {
@@ -284,12 +297,10 @@ asmlinkage void do_softirq(void)
 	pending = local_softirq_pending();
 
 	if (pending)
-		__do_softirq();
+		do_softirq_own_stack();
 
 	local_irq_restore(flags);
 }
-
-#endif
 
 /*
  * Enter an interrupt context.
@@ -315,16 +326,23 @@ void irq_enter(void)
 static inline void invoke_softirq(void)
 {
 	if (!force_irqthreads) {
-#ifdef __ARCH_IRQ_EXIT_IRQS_DISABLED
+#ifdef CONFIG_HAVE_IRQ_EXIT_ON_IRQ_STACK
+		/*
+		 * We can safely execute softirq on the current stack if
+		 * it is the irq stack, because it should be near empty
+		 * at this stage.
+		 */
 		__do_softirq();
 #else
-		do_softirq();
+		/*
+		 * Otherwise, irq_exit() is called on the task stack that can
+		 * be potentially deep already. So call softirq in its own stack
+		 * to prevent from any overrun.
+		 */
+		do_softirq_own_stack();
 #endif
 	} else {
-		__local_bh_disable((unsigned long)__builtin_return_address(0),
-				SOFTIRQ_OFFSET);
 		wakeup_softirqd();
-		__local_bh_enable(SOFTIRQ_OFFSET);
 	}
 }
 
@@ -333,9 +351,15 @@ static inline void invoke_softirq(void)
  */
 void irq_exit(void)
 {
+#ifndef __ARCH_IRQ_EXIT_IRQS_DISABLED
+	local_irq_disable();
+#else
+	WARN_ON_ONCE(!irqs_disabled());
+#endif
+
 	account_system_vtime(current);
 	trace_hardirq_exit();
-	sub_preempt_count(IRQ_EXIT_OFFSET);
+	sub_preempt_count(HARDIRQ_OFFSET);
 	if (!in_interrupt() && local_softirq_pending())
 		invoke_softirq();
 
@@ -345,7 +369,6 @@ void irq_exit(void)
 		tick_nohz_irq_exit();
 #endif
 	rcu_irq_exit();
-	sched_preempt_enable_no_resched();
 }
 
 /*
@@ -744,6 +767,10 @@ static void run_ksoftirqd(unsigned int cpu)
 {
 	local_irq_disable();
 	if (local_softirq_pending()) {
+		/*
+		 * We can safely run softirq on inline stack, as we are not deep
+		 * in the task stack here.
+		 */
 		__do_softirq();
 		rcu_note_context_switch(cpu);
 		local_irq_enable();

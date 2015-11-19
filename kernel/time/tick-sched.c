@@ -37,7 +37,7 @@ spinlock_t rq_lock;
 static DEFINE_PER_CPU(struct tick_sched, tick_cpu_sched);
 
 /*
- * The time, when the last jiffy update happened. Protected by xtime_lock.
+ * The time, when the last jiffy update happened. Protected by jiffies_lock.
  */
 static ktime_t last_jiffies_update;
 
@@ -55,14 +55,14 @@ static void tick_do_update_jiffies64(ktime_t now)
 	ktime_t delta;
 
 	/*
-	 * Do a quick check without holding xtime_lock:
+	 * Do a quick check without holding jiffies_lock:
 	 */
 	delta = ktime_sub(now, last_jiffies_update);
 	if (delta.tv64 < tick_period.tv64)
 		return;
 
-	/* Reevalute with xtime_lock held */
-	write_seqlock(&xtime_lock);
+	/* Reevalute with jiffies_lock held */
+	write_seqlock(&jiffies_lock);
 
 	delta = ktime_sub(now, last_jiffies_update);
 	if (delta.tv64 >= tick_period.tv64) {
@@ -85,7 +85,7 @@ static void tick_do_update_jiffies64(ktime_t now)
 		/* Keep the tick_next_period variable up to date */
 		tick_next_period = ktime_add(last_jiffies_update, tick_period);
 	}
-	write_sequnlock(&xtime_lock);
+	write_sequnlock(&jiffies_lock);
 }
 
 /*
@@ -95,12 +95,12 @@ static ktime_t tick_init_jiffy_update(void)
 {
 	ktime_t period;
 
-	write_seqlock(&xtime_lock);
+	write_seqlock(&jiffies_lock);
 	/* Did we start the jiffies update yet ? */
 	if (last_jiffies_update.tv64 == 0)
 		last_jiffies_update = tick_next_period;
 	period = last_jiffies_update;
-	write_sequnlock(&xtime_lock);
+	write_sequnlock(&jiffies_lock);
 	return period;
 }
 
@@ -162,7 +162,7 @@ update_ts_time_stats(int cpu, struct tick_sched *ts, ktime_t now, u64 *last_upda
 {
 	ktime_t delta;
 
-	if (ts->idle_active) {
+	if (ts->idle_active && cpu_online(cpu)) {
 		delta = ktime_sub(now, ts->idle_entrytime);
 		if (nr_iowait_cpu(cpu) > 0)
 			ts->iowait_sleeptime = ktime_add(ts->iowait_sleeptime, delta);
@@ -223,7 +223,7 @@ u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time)
 		update_ts_time_stats(cpu, ts, now, last_update_time);
 		idle = ts->idle_sleeptime;
 	} else {
-		if (ts->idle_active && !nr_iowait_cpu(cpu)) {
+		if (ts->idle_active && !nr_iowait_cpu(cpu) && cpu_online(cpu)) {
 			ktime_t delta = ktime_sub(now, ts->idle_entrytime);
 
 			idle = ktime_add(ts->idle_sleeptime, delta);
@@ -264,7 +264,7 @@ u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time)
 		update_ts_time_stats(cpu, ts, now, last_update_time);
 		iowait = ts->iowait_sleeptime;
 	} else {
-		if (ts->idle_active && nr_iowait_cpu(cpu) > 0) {
+		if (ts->idle_active && nr_iowait_cpu(cpu) > 0 && cpu_online(cpu)) {
 			ktime_t delta = ktime_sub(now, ts->idle_entrytime);
 
 			iowait = ktime_add(ts->iowait_sleeptime, delta);
@@ -304,8 +304,10 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 		return;
 	}
 
-	if (unlikely(ts->nohz_mode == NOHZ_MODE_INACTIVE))
+	if (unlikely(ts->nohz_mode == NOHZ_MODE_INACTIVE)) {
+		ts->sleep_length = (ktime_t) { .tv64 = NSEC_PER_SEC/HZ };
 		return;
+	}
 
 	if (need_resched())
 		return;
@@ -313,7 +315,8 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 	if (unlikely(local_softirq_pending() && cpu_online(cpu))) {
 		static int ratelimit;
 
-		if (ratelimit < 10) {
+		if (ratelimit < 10 &&
+		(local_softirq_pending() & SOFTIRQ_STOP_IDLE_MASK)) {
 			printk(KERN_ERR "NOHZ: local_softirq_pending %02x\n",
 			       (unsigned int) local_softirq_pending());
 			ratelimit++;
@@ -324,11 +327,11 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 	ts->idle_calls++;
 	/* Read jiffies and the time when jiffies were updated last */
 	do {
-		seq = read_seqbegin(&xtime_lock);
+		seq = read_seqbegin(&jiffies_lock);
 		last_update = last_jiffies_update;
 		last_jiffies = jiffies;
 		time_delta = timekeeping_max_deferment();
-	} while (read_seqretry(&xtime_lock, seq));
+	} while (read_seqretry(&jiffies_lock, seq));
 
 	if (rcu_needs_cpu(cpu, &rcu_delta_jiffies) || printk_needs_cpu(cpu) ||
 	    arch_needs_cpu(cpu)) {
@@ -347,7 +350,7 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 	 * Do not stop the tick, if we are only one off
 	 * or if the cpu is required for rcu
 	 */
-	if (!ts->tick_stopped && delta_jiffies == 1)
+	if (!ts->tick_stopped && delta_jiffies <= 1)
 		goto out;
 
 	/* Schedule the tick, if we are at least one jiffie off */
@@ -454,6 +457,7 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 out:
 	ts->next_jiffies = next_jiffies;
 	ts->last_jiffies = last_jiffies;
+	ts->sleep_length = ktime_sub(dev->next_event, now);
 }
 
 /**
@@ -527,8 +531,8 @@ void tick_nohz_irq_exit(void)
 ktime_t tick_nohz_get_sleep_length(void)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
-	struct clock_event_device *dev = __get_cpu_var(tick_cpu_device).evtdev;
-	return ktime_sub(dev->next_event, ts->idle_entrytime);
+
+	return ts->sleep_length;
 }
 
 static void tick_nohz_restart(struct tick_sched *ts, ktime_t now)
@@ -593,6 +597,7 @@ void tick_nohz_idle_exit(void)
 	/* Update jiffies first */
 	select_nohz_load_balancer(0);
 	tick_do_update_jiffies64(now);
+	update_cpu_load_nohz();
 
 #ifndef CONFIG_VIRT_CPU_ACCOUNTING
 	/*
@@ -644,7 +649,7 @@ static void tick_nohz_handler(struct clock_event_device *dev)
 	 * concurrency: This happens only when the cpu in charge went
 	 * into a long sleep. If two cpus happen to assign themself to
 	 * this duty, then the jiffies update is still serialized by
-	 * xtime_lock.
+	 * jiffies_lock.
 	 */
 	if (unlikely(tick_do_timer_cpu == TICK_DO_TIMER_NONE))
 		tick_do_timer_cpu = cpu;
@@ -840,7 +845,7 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 	 * concurrency: This happens only when the cpu in charge went
 	 * into a long sleep. If two cpus happen to assign themself to
 	 * this duty, then the jiffies update is still serialized by
-	 * xtime_lock.
+	 * jiffies_lock.
 	 */
 	if (unlikely(tick_do_timer_cpu == TICK_DO_TIMER_NONE))
 		tick_do_timer_cpu = cpu;

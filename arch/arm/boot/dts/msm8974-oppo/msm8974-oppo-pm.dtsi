@@ -56,8 +56,8 @@
 	};
 
 	qcom,charger {
-		qcom,vddmax-mv = <4352>;
-		qcom,vddsafe-mv = <4350>;
+		qcom,vddmax-mv = <4320>;
+		qcom,vddsafe-mv = <4320>;
 		qcom,vinmin-mv = <4400>;
 		qcom,ibatmax-ma = <2000>;
 		qcom,ibatterm-ma = <150>;
@@ -67,6 +67,8 @@
 		qcom,ibatmax-warm-ma = <900>;
 		qcom,warm-bat-mv = <4100>;
 		qcom,ibatmax-cool-ma = <900>;
+                qcom,little-cool-bat-mv = <4320>;
+		qcom,ibatmax-little-cool-ma = <1400>;
 	};
 
 	qcom,pm8941_rtc {

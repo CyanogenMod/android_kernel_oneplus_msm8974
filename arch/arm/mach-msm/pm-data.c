@@ -133,3 +133,30 @@ struct msm_pm_platform_data msm_pm_sleep_modes[] = {
 		.suspend_enabled = 0,
 	},
 };
+
+// add enable/disable sleep mode
+// mode : msm_pm_sleep_mode @ /android/kernel/arch/arm/mach-msm/pm.h
+// Usage>>>
+//		enter_mode : msm_pm_sleep_mode_enable(MSM_PM_SLEEP_MODE_RETENTION, 0);
+//		exit_mode : msm_pm_sleep_mode_enable(MSM_PM_SLEEP_MODE_RETENTION, 1);
+void msm_pm_sleep_mode_enable(unsigned int mode, bool enable)
+{
+	unsigned int cpu;
+	int idx;
+
+	for_each_possible_cpu(cpu) {
+		idx = MSM_PM_MODE(cpu, mode);
+		msm_pm_sleep_modes[idx].idle_enabled = enable;
+	}
+
+}
+
+// add MSM_PM_SLEEP_MODE_RETENTION enable/disable sleep mode
+// mode : msm_pm_sleep_mode @ /android/kernel/arch/arm/mach-msm/pm.h
+// Usage>>>
+//		enter_mode : msm_pm_sleep_mode_enable(0);
+//		exit_mode : msm_pm_sleep_mode_enable(1);
+void msm_pm_retention_mode_enable(bool enable)
+{
+	msm_pm_sleep_mode_enable(MSM_PM_SLEEP_MODE_RETENTION, enable);
+}

@@ -1003,7 +1003,7 @@ int32_t qpnp_iadc_read(struct qpnp_iadc_chip *iadc,
 				enum qpnp_iadc_channels channel,
 				struct qpnp_iadc_result *result)
 {
-	int32_t rc, rsense_n_ohms, sign = 0, num, mode_sel = 0;
+	int32_t rc, rsense_n_ohms = 0, sign = 0, num, mode_sel = 0;
 	int32_t rsense_u_ohms = 0;
 	int64_t result_current;
 	uint16_t raw_data;

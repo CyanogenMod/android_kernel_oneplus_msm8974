@@ -2048,7 +2048,7 @@ static void fcoe_ctlr_vn_restart(struct fcoe_ctlr *fip)
 	 */
 	port_id = fip->port_id;
 	if (fip->probe_tries)
-		port_id = prandom32(&fip->rnd_state) & 0xffff;
+		port_id = prandom_u32_state(&fip->rnd_state) & 0xffff;
 	else if (!port_id)
 		port_id = fip->lp->wwpn & 0xffff;
 	if (!port_id || port_id == 0xffff)
@@ -2057,7 +2057,7 @@ static void fcoe_ctlr_vn_restart(struct fcoe_ctlr *fip)
 
 	if (fip->probe_tries < FIP_VN_RLIM_COUNT) {
 		fip->probe_tries++;
-		wait = random32() % FIP_VN_PROBE_WAIT;
+		wait = prandom_u32() % FIP_VN_PROBE_WAIT;
 	} else
 		wait = FIP_VN_RLIM_INT;
 	mod_timer(&fip->timer, jiffies + msecs_to_jiffies(wait));
@@ -2073,7 +2073,7 @@ static void fcoe_ctlr_vn_restart(struct fcoe_ctlr *fip)
 static void fcoe_ctlr_vn_start(struct fcoe_ctlr *fip)
 {
 	fip->probe_tries = 0;
-	prandom32_seed(&fip->rnd_state, fip->lp->wwpn);
+	prandom_seed_state(&fip->rnd_state, fip->lp->wwpn);
 	fcoe_ctlr_vn_restart(fip);
 }
 
@@ -2690,7 +2690,7 @@ static void fcoe_ctlr_vn_timeout(struct fcoe_ctlr *fip)
 					  fcoe_all_vn2vn, 0);
 			fip->port_ka_time = jiffies +
 				 msecs_to_jiffies(FIP_VN_BEACON_INT +
-					(random32() % FIP_VN_BEACON_FUZZ));
+					(prandom_u32() % FIP_VN_BEACON_FUZZ));
 		}
 		if (time_before(fip->port_ka_time, next_time))
 			next_time = fip->port_ka_time;

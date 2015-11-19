@@ -58,14 +58,15 @@ EXPORT_SYMBOL(vfs_getattr);
 
 int vfs_fstat(unsigned int fd, struct kstat *stat)
 {
-	struct file *f = fget_raw(fd);
+	int fput_needed;
+	struct file *f = fget_light(fd, &fput_needed);
 	int error = -EBADF;
 
 	if (f) {
 		error = vfs_getattr(f->f_path.mnt, f->f_path.dentry, stat);
 		if (!error)
 			zpath_realsize(f->f_path.dentry, &stat->size);
-		fput(f);
+		fput_light(f, fput_needed);
 	}
 	return error;
 }

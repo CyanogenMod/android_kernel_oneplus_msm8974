@@ -399,6 +399,24 @@ void path_put(struct path *path)
 }
 EXPORT_SYMBOL(path_put);
 
+/**
+ * path_connected - Verify that a path->dentry is below path->mnt.mnt_root
+ * @path: nameidate to verify
+ *
+ * Rename can sometimes move a file or directory outside of a bind
+ * mount, path_connected allows those cases to be detected.
+ */
+static bool path_connected(const struct path *path)
+{
+	struct vfsmount *mnt = path->mnt;
+
+	/* Only bind mounts can have disconnected paths */
+	if (mnt->mnt_root == mnt->mnt_sb->s_root)
+		return true;
+
+	return is_subdir(path->dentry, mnt->mnt_root);
+}
+
 /*
  * Path walking has 2 modes, rcu-walk and ref-walk (see
  * Documentation/filesystems/path-lookup.txt).  In situations when we can't
@@ -555,24 +573,22 @@ static int complete_walk(struct nameidata *nd)
 
 static __always_inline void set_root(struct nameidata *nd)
 {
-	if (!nd->root.mnt)
-		get_fs_root(current->fs, &nd->root);
+	get_fs_root(current->fs, &nd->root);
 }
 
 static int link_path_walk(const char *, struct nameidata *);
 
-static __always_inline void set_root_rcu(struct nameidata *nd)
+static __always_inline unsigned set_root_rcu(struct nameidata *nd)
 {
-	if (!nd->root.mnt) {
-		struct fs_struct *fs = current->fs;
-		unsigned seq;
+	struct fs_struct *fs = current->fs;
+	unsigned seq, res;
 
-		do {
-			seq = read_seqcount_begin(&fs->seq);
-			nd->root = fs->root;
-			nd->seq = __read_seqcount_begin(&nd->root.dentry->d_seq);
-		} while (read_seqcount_retry(&fs->seq, seq));
-	}
+	do {
+		seq = read_seqcount_begin(&fs->seq);
+		nd->root = fs->root;
+		res = __read_seqcount_begin(&nd->root.dentry->d_seq);
+	} while (read_seqcount_retry(&fs->seq, seq));
+	return res;
 }
 
 static __always_inline int __vfs_follow_link(struct nameidata *nd, const char *link)
@@ -583,7 +599,8 @@ static __always_inline int __vfs_follow_link(struct nameidata *nd, const char *l
 		goto fail;
 
 	if (*link == '/') {
-		set_root(nd);
+		if (!nd->root.mnt)
+			set_root(nd);
 		path_put(&nd->path);
 		nd->path = nd->root;
 		path_get(&nd->root);
@@ -930,7 +947,8 @@ static void follow_mount_rcu(struct nameidata *nd)
 
 static int follow_dotdot_rcu(struct nameidata *nd)
 {
-	set_root_rcu(nd);
+	if (!nd->root.mnt)
+		set_root_rcu(nd);
 
 	while (1) {
 		if (nd->path.dentry == nd->root.dentry &&
@@ -947,6 +965,8 @@ static int follow_dotdot_rcu(struct nameidata *nd)
 				goto failed;
 			nd->path.dentry = parent;
 			nd->seq = seq;
+			if (unlikely(!path_connected(&nd->path)))
+				goto failed;
 			break;
 		}
 		if (!follow_up_rcu(&nd->path))
@@ -1031,9 +1051,10 @@ static void follow_mount(struct path *path)
 	}
 }
 
-static void follow_dotdot(struct nameidata *nd)
+static int follow_dotdot(struct nameidata *nd)
 {
-	set_root(nd);
+	if (!nd->root.mnt)
+		set_root(nd);
 
 	while(1) {
 		struct dentry *old = nd->path.dentry;
@@ -1046,6 +1067,10 @@ static void follow_dotdot(struct nameidata *nd)
 			/* rare case of legitimate dget_parent()... */
 			nd->path.dentry = dget_parent(nd->path.dentry);
 			dput(old);
+			if (unlikely(!path_connected(&nd->path))) {
+				path_put(&nd->path);
+				return -ENOENT;
+			}
 			break;
 		}
 		if (!follow_up(&nd->path))
@@ -1053,6 +1078,7 @@ static void follow_dotdot(struct nameidata *nd)
 	}
 	follow_mount(&nd->path);
 	nd->inode = nd->path.dentry->d_inode;
+	return 0;
 }
 
 /*
@@ -1253,7 +1279,7 @@ static inline int handle_dots(struct nameidata *nd, int type)
 			if (follow_dotdot_rcu(nd))
 				return -ECHILD;
 		} else
-			follow_dotdot(nd);
+			return follow_dotdot(nd);
 	}
 	return 0;
 }
@@ -1315,7 +1341,8 @@ static inline int walk_component(struct nameidata *nd, struct path *path,
 	}
 	if (should_follow_link(inode, follow)) {
 		if (nd->flags & LOOKUP_RCU) {
-			if (unlikely(unlazy_walk(nd, path->dentry))) {
+			if (unlikely(nd->path.mnt != path->mnt ||
+				     unlazy_walk(nd, path->dentry))) {
 				terminate_walk(nd);
 				return -ECHILD;
 			}
@@ -1637,7 +1664,7 @@ static int path_init(int dfd, const char *name, unsigned int flags,
 		if (flags & LOOKUP_RCU) {
 			br_read_lock(vfsmount_lock);
 			rcu_read_lock();
-			set_root_rcu(nd);
+			nd->seq = set_root_rcu(nd);
 		} else {
 			set_root(nd);
 			path_get(&nd->root);
@@ -1736,7 +1763,7 @@ static int path_lookupat(int dfd, const char *name,
 	err = path_init(dfd, name, flags | LOOKUP_PARENT, nd, &base);
 
 	if (unlikely(err))
-		return err;
+		goto out;
 
 	current->total_link_count = 0;
 	err = link_path_walk(name, nd);
@@ -1764,6 +1791,7 @@ static int path_lookupat(int dfd, const char *name,
 		}
 	}
 
+out:
 	if (base)
 		fput(base);
 
@@ -2765,7 +2793,7 @@ out:
 static long do_rmdir(int dfd, const char __user *pathname)
 {
 	int error = 0;
-	char * name;
+	char * name = NULL;
 	struct dentry *dentry;
 	struct nameidata nd;
 
@@ -2860,8 +2888,8 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
  */
 static long do_unlinkat(int dfd, const char __user *pathname)
 {
-	int error;
-	char *name;
+	int error = 0;
+	char *name = NULL;
 	struct dentry *dentry;
 	struct nameidata nd;
 	struct inode *inode = NULL;
@@ -3049,6 +3077,8 @@ SYSCALL_DEFINE5(linkat, int, olddfd, const char __user *, oldname,
 	struct path old_path, new_path;
 	int how = 0;
 	int error;
+	old_path.dentry = 0;
+	old_path.mnt = 0;
 
 	if ((flags & ~(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH)) != 0)
 		return -EINVAL;
@@ -3261,8 +3291,8 @@ SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
 	struct dentry *old_dentry, *new_dentry;
 	struct dentry *trap;
 	struct nameidata oldnd, newnd;
-	char *from;
-	char *to;
+	char *from = NULL;
+	char *to = NULL;
 	int error;
 
 	error = user_path_parent(olddfd, oldname, &oldnd, &from);

@@ -83,11 +83,6 @@ static int recover_dentry(struct inode *inode, struct page *ipage)
 		goto out;
 	}
 
-	if (file_enc_name(inode)) {
-		iput(dir);
-		return 0;
-	}
-
 	name.len = le32_to_cpu(raw_inode->i_namelen);
 	name.name = raw_inode->i_name;
 
@@ -148,7 +143,6 @@ out:
 static void recover_inode(struct inode *inode, struct page *page)
 {
 	struct f2fs_inode *raw = F2FS_INODE(page);
-	char *name;
 
 	inode->i_mode = le16_to_cpu(raw->i_mode);
 	i_size_write(inode, le64_to_cpu(raw->i_size));
@@ -159,13 +153,8 @@ static void recover_inode(struct inode *inode, struct page *page)
 	inode->i_ctime.tv_nsec = le32_to_cpu(raw->i_ctime_nsec);
 	inode->i_mtime.tv_nsec = le32_to_cpu(raw->i_mtime_nsec);
 
-	if (file_enc_name(inode))
-		name = "<encrypted>";
-	else
-		name = F2FS_INODE(page)->i_name;
-
 	f2fs_msg(inode->i_sb, KERN_NOTICE, "recover_inode: ino = %x, name = %s",
-			ino_of_node(page), name);
+			ino_of_node(page), F2FS_INODE(page)->i_name);
 }
 
 static int find_fsync_dnodes(struct f2fs_sb_info *sbi, struct list_head *head)
@@ -185,7 +174,7 @@ static int find_fsync_dnodes(struct f2fs_sb_info *sbi, struct list_head *head)
 	while (1) {
 		struct fsync_inode_entry *entry;
 
-		if (!is_valid_blkaddr(sbi, blkaddr, META_POR))
+		if (blkaddr < MAIN_BLKADDR(sbi) || blkaddr >= MAX_BLKADDR(sbi))
 			return 0;
 
 		page = get_meta_page(sbi, blkaddr);
@@ -360,6 +349,7 @@ static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 	struct f2fs_inode_info *fi = F2FS_I(inode);
 	unsigned int start, end;
 	struct dnode_of_data dn;
+	struct f2fs_summary sum;
 	struct node_info ni;
 	int err = 0, recovered = 0;
 
@@ -399,35 +389,14 @@ static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 	f2fs_bug_on(sbi, ni.ino != ino_of_node(page));
 	f2fs_bug_on(sbi, ofs_of_node(dn.node_page) != ofs_of_node(page));
 
-	for (; start < end; start++, dn.ofs_in_node++) {
+	for (; start < end; start++) {
 		block_t src, dest;
 
 		src = datablock_addr(dn.node_page, dn.ofs_in_node);
 		dest = datablock_addr(page, dn.ofs_in_node);
 
-		/* skip recovering if dest is the same as src */
-		if (src == dest)
-			continue;
-
-		/* dest is invalid, just invalidate src block */
-		if (dest == NULL_ADDR) {
-			truncate_data_blocks_range(&dn, 1);
-			continue;
-		}
-
-		/*
-		 * dest is reserved block, invalidate src block
-		 * and then reserve one new block in dnode page.
-		 */
-		if (dest == NEW_ADDR) {
-			truncate_data_blocks_range(&dn, 1);
-			err = reserve_new_block(&dn);
-			f2fs_bug_on(sbi, err);
-			continue;
-		}
-
-		/* dest is valid block, try to recover from src to dest */
-		if (is_valid_blkaddr(sbi, dest, META_POR)) {
+		if (src != dest && dest != NEW_ADDR && dest != NULL_ADDR &&
+			dest >= MAIN_BLKADDR(sbi) && dest < MAX_BLKADDR(sbi)) {
 
 			if (src == NULL_ADDR) {
 				err = reserve_new_block(&dn);
@@ -440,11 +409,16 @@ static int do_recover_data(struct f2fs_sb_info *sbi, struct inode *inode,
 			if (err)
 				goto err;
 
+			set_summary(&sum, dn.nid, dn.ofs_in_node, ni.version);
+
 			/* write dummy data page */
-			f2fs_replace_block(sbi, &dn, src, dest,
-							ni.version, false);
+			recover_data_page(sbi, NULL, &sum, src, dest);
+			dn.data_blkaddr = dest;
+			set_data_blkaddr(&dn);
+			f2fs_update_extent_cache(&dn);
 			recovered++;
 		}
+		dn.ofs_in_node++;
 	}
 
 	if (IS_INODE(dn.node_page))
@@ -480,7 +454,7 @@ static int recover_data(struct f2fs_sb_info *sbi,
 	while (1) {
 		struct fsync_inode_entry *entry;
 
-		if (!is_valid_blkaddr(sbi, blkaddr, META_POR))
+		if (blkaddr < MAIN_BLKADDR(sbi) || blkaddr >= MAX_BLKADDR(sbi))
 			break;
 
 		ra_meta_pages_cond(sbi, blkaddr);
@@ -545,12 +519,14 @@ int recover_fsync_data(struct f2fs_sb_info *sbi)
 
 	INIT_LIST_HEAD(&inode_list);
 
+	/* step #1: find fsynced inode numbers */
+	set_sbi_flag(sbi, SBI_POR_DOING);
+
 	/* prevent checkpoint */
 	mutex_lock(&sbi->cp_mutex);
 
 	blkaddr = NEXT_FREE_BLKADDR(sbi, curseg);
 
-	/* step #1: find fsynced inode numbers */
 	err = find_fsync_dnodes(sbi, &inode_list);
 	if (err)
 		goto out;
@@ -579,20 +555,11 @@ out:
 
 	clear_sbi_flag(sbi, SBI_POR_DOING);
 	if (err) {
-		bool invalidate = false;
-
-		if (discard_next_dnode(sbi, blkaddr))
-			invalidate = true;
+		discard_next_dnode(sbi, blkaddr);
 
 		/* Flush all the NAT/SIT pages */
 		while (get_pages(sbi, F2FS_DIRTY_META))
 			sync_meta_pages(sbi, META, LONG_MAX);
-
-		/* invalidate temporary meta page */
-		if (invalidate)
-			invalidate_mapping_pages(META_MAPPING(sbi),
-							blkaddr, blkaddr);
-
 		set_ckpt_flags(sbi->ckpt, CP_ERROR_FLAG);
 		mutex_unlock(&sbi->cp_mutex);
 	} else if (need_writecp) {

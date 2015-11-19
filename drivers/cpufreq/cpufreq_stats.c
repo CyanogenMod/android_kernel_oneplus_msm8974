@@ -268,6 +268,10 @@ static void cpufreq_stats_free_table(unsigned int cpu)
 static void cpufreq_stats_free_sysfs(unsigned int cpu)
 {
 	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+
+	if (!cpufreq_frequency_get_table(cpu))
+		return;
+
 	if (policy && policy->cpu == cpu)
 		sysfs_remove_group(&policy->kobj, &stats_attr_group);
 	if (policy)
@@ -562,10 +566,6 @@ static int cpufreq_stat_cpu_callback(struct notifier_block *nfb,
 	case CPU_ONLINE:
 	case CPU_ONLINE_FROZEN:
 		cpufreq_update_policy(cpu);
-		break;
-	case CPU_DOWN_PREPARE:
-	case CPU_DOWN_PREPARE_FROZEN:
-		cpufreq_stats_free_sysfs(cpu);
 		break;
 	case CPU_DEAD:
 	case CPU_DEAD_FROZEN:

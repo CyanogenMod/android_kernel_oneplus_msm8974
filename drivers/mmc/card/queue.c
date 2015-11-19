@@ -61,6 +61,8 @@ static int mmc_queue_thread(void *d)
 	struct mmc_card *card = mq->card;
 
 	current->flags |= PF_MEMALLOC;
+	if (card->host->wakeup_on_idle)
+		set_wake_up_idle(true);
 
 	down(&mq->thread_sem);
 	do {
@@ -284,6 +286,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
 
 	blk_queue_prep_rq(mq->queue, mmc_prep_request);
 	queue_flag_set_unlocked(QUEUE_FLAG_NONROT, mq->queue);
+	queue_flag_clear_unlocked(QUEUE_FLAG_ADD_RANDOM, mq->queue);
 	if (mmc_can_erase(card))
 		mmc_queue_setup_discard(mq->queue, card);
 

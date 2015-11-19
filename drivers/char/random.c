@@ -272,10 +272,12 @@
 /*
  * Configuration information
  */
-#define INPUT_POOL_WORDS 128
-#define OUTPUT_POOL_WORDS 32
-#define SEC_XFER_SIZE 512
-#define EXTRACT_SIZE 10
+#define INPUT_POOL_SHIFT	12
+#define INPUT_POOL_WORDS	(1 << (INPUT_POOL_SHIFT-5))
+#define OUTPUT_POOL_SHIFT	10
+#define OUTPUT_POOL_WORDS	(1 << (OUTPUT_POOL_SHIFT-5))
+#define SEC_XFER_SIZE		512
+#define EXTRACT_SIZE		10
 
 #define LONGS(x) (((x) + sizeof(unsigned long) - 1)/sizeof(unsigned long))
 
@@ -309,45 +311,44 @@ static DEFINE_PER_CPU(int, trickle_count);
  * scaled squared error sum) except for the last tap, which is 1 to
  * get the twisting happening as fast as possible.
  */
+
 static struct poolinfo {
-	int poolwords;
+	int poolbitshift, poolwords, poolbytes, poolbits;
+#define S(x) ilog2(x)+5, (x), (x)*4, (x)*32
 	int tap1, tap2, tap3, tap4, tap5;
 } poolinfo_table[] = {
 	/* x^128 + x^103 + x^76 + x^51 +x^25 + x + 1 -- 105 */
-	{ 128,	103,	76,	51,	25,	1 },
+	{ S(128),	103,	76,	51,	25,	1 },
 	/* x^32 + x^26 + x^20 + x^14 + x^7 + x + 1 -- 15 */
-	{ 32,	26,	20,	14,	7,	1 },
+	{ S(32),	26,	20,	14,	7,	1 },
 #if 0
 	/* x^2048 + x^1638 + x^1231 + x^819 + x^411 + x + 1  -- 115 */
-	{ 2048,	1638,	1231,	819,	411,	1 },
+	{ S(2048),	1638,	1231,	819,	411,	1 },
 
 	/* x^1024 + x^817 + x^615 + x^412 + x^204 + x + 1 -- 290 */
-	{ 1024,	817,	615,	412,	204,	1 },
+	{ S(1024),	817,	615,	412,	204,	1 },
 
 	/* x^1024 + x^819 + x^616 + x^410 + x^207 + x^2 + 1 -- 115 */
-	{ 1024,	819,	616,	410,	207,	2 },
+	{ S(1024),	819,	616,	410,	207,	2 },
 
 	/* x^512 + x^411 + x^308 + x^208 + x^104 + x + 1 -- 225 */
-	{ 512,	411,	308,	208,	104,	1 },
+	{ S(512),	411,	308,	208,	104,	1 },
 
 	/* x^512 + x^409 + x^307 + x^206 + x^102 + x^2 + 1 -- 95 */
-	{ 512,	409,	307,	206,	102,	2 },
+	{ S(512),	409,	307,	206,	102,	2 },
 	/* x^512 + x^409 + x^309 + x^205 + x^103 + x^2 + 1 -- 95 */
-	{ 512,	409,	309,	205,	103,	2 },
+	{ S(512),	409,	309,	205,	103,	2 },
 
 	/* x^256 + x^205 + x^155 + x^101 + x^52 + x + 1 -- 125 */
-	{ 256,	205,	155,	101,	52,	1 },
+	{ S(256),	205,	155,	101,	52,	1 },
 
 	/* x^128 + x^103 + x^78 + x^51 + x^27 + x^2 + 1 -- 70 */
-	{ 128,	103,	78,	51,	27,	2 },
+	{ S(128),	103,	78,	51,	27,	2 },
 
 	/* x^64 + x^52 + x^39 + x^26 + x^14 + x + 1 -- 15 */
-	{ 64,	52,	39,	26,	14,	1 },
+	{ S(64),	52,	39,	26,	14,	1 },
 #endif
 };
-
-#define POOLBITS	poolwords*32
-#define POOLBYTES	poolwords*4
 
 /*
  * For the purposes of better mixing, we use the CRC-32 polynomial as
@@ -424,7 +425,7 @@ module_param(debug, bool, 0644);
 struct entropy_store;
 struct entropy_store {
 	/* read-only data: */
-	struct poolinfo *poolinfo;
+	const struct poolinfo *poolinfo;
 	__u32 *pool;
 	const char *name;
 	struct entropy_store *pull;
@@ -585,11 +586,13 @@ static void fast_mix(struct fast_pool *f, const void *in, int nbytes)
 }
 
 /*
- * Credit (or debit) the entropy store with n bits of entropy
+ * Credit (or debit) the entropy store with n bits of entropy.
+ * The nbits value is given in units of 2^-16 bits, i.e. 0x10000 == 1 bit.
  */
 static void credit_entropy_bits(struct entropy_store *r, int nbits)
 {
 	int entropy_count, orig;
+	const int pool_size = r->poolinfo->poolbits;
 
 	if (!nbits)
 		return;
@@ -598,19 +601,58 @@ static void credit_entropy_bits(struct entropy_store *r, int nbits)
 retry:
 	entropy_count = orig = ACCESS_ONCE(r->entropy_count);
 	entropy_count += nbits;
+	if (nbits < 0) {
+		/* Debit. */
+		entropy_count += nbits;
+	} else {
+		/*
+		 * Credit: we have to account for the possibility of
+		 * overwriting already present entropy.  Even in the
+		 * ideal case of pure Shannon entropy, new contributions
+		 * approach the full value asymptotically:
+		 *
+		 * entropy <- entropy + (pool_size - entropy) *
+		 *	(1 - exp(-add_entropy/pool_size))
+		 *
+		 * For add_entropy <= pool_size then
+		 * (1 - exp(-add_entropy/pool_size)) >=
+		 *    (add_entropy/pool_size)*0.632...
+		 * so we can approximate the exponential with
+		 * add_entropy/(pool_size*2) and still be on the
+		 * safe side by adding at most one pool_size at a time.
+		 *
+		 * The use of pool_size-1 in the while statement is to
+		 * prevent rounding artifacts from making the loop
+		 * arbitrarily long; this limits the loop to poolshift
+		 * turns no matter how large nbits is.
+		 */
+		int pnbits  = nbits;
+		const int s = r->poolinfo->poolbitshift + 1;
+
+		do {
+			int anbits = min(pnbits, pool_size);
+
+			entropy_count +=
+				((pool_size - entropy_count)*anbits) >> s;
+			pnbits -= anbits;
+		} while (unlikely(entropy_count < pool_size-1 && pnbits));
+	}
 
 	if (entropy_count < 0) {
 		DEBUG_ENT("negative entropy/overflow\n");
 		entropy_count = 0;
-	} else if (entropy_count > r->poolinfo->POOLBITS)
-		entropy_count = r->poolinfo->POOLBITS;
+	} else if (entropy_count > pool_size)
+		entropy_count = pool_size;
 	if (cmpxchg(&r->entropy_count, orig, entropy_count) != orig)
 		goto retry;
 
 	if (!r->initialized && nbits > 0) {
 		r->entropy_total += nbits;
-		if (r->entropy_total > 128)
+		if (r->entropy_total > 128) {
 			r->initialized = 1;
+			if (r == &nonblocking_pool)
+				prandom_reseed_late();
+		}
 	}
 
 	trace_credit_entropy_bits(r->name, nbits, entropy_count,
@@ -646,7 +688,7 @@ struct timer_rand_state {
  */
 void add_device_randomness(const void *buf, unsigned int size)
 {
-	unsigned long time = get_cycles() ^ jiffies;
+	unsigned long time = random_get_entropy() ^ jiffies;
 
 	mix_pool_bytes(&input_pool, buf, size, NULL);
 	mix_pool_bytes(&input_pool, &time, sizeof(time), NULL);
@@ -654,8 +696,6 @@ void add_device_randomness(const void *buf, unsigned int size)
 	mix_pool_bytes(&nonblocking_pool, &time, sizeof(time), NULL);
 }
 EXPORT_SYMBOL(add_device_randomness);
-
-static struct timer_rand_state input_timer_state;
 
 /*
  * This function adds entropy to the entropy "pool" by using timing
@@ -683,7 +723,7 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 		goto out;
 
 	sample.jiffies = jiffies;
-	sample.cycles = get_cycles();
+	sample.cycles = random_get_entropy();
 	sample.num = num;
 	mix_pool_bytes(&input_pool, &sample, sizeof(sample), NULL);
 
@@ -729,16 +769,7 @@ out:
 void add_input_randomness(unsigned int type, unsigned int code,
 				 unsigned int value)
 {
-	static unsigned char last_value;
-
-	/* ignore autorepeat and the like */
-	if (value == last_value)
-		return;
-
-	DEBUG_ENT("input event\n");
-	last_value = value;
-	add_timer_randomness(&input_timer_state,
-			     (type << 4) ^ code ^ (code >> 4) ^ value);
+	return;
 }
 EXPORT_SYMBOL_GPL(add_input_randomness);
 
@@ -750,7 +781,7 @@ void add_interrupt_randomness(int irq, int irq_flags)
 	struct fast_pool	*fast_pool = &__get_cpu_var(irq_randomness);
 	struct pt_regs		*regs = get_irq_regs();
 	unsigned long		now = jiffies;
-	__u32			input[4], cycles = get_cycles();
+	__u32			input[4], cycles = random_get_entropy();
 
 	input[0] = cycles ^ jiffies;
 	input[1] = irq;
@@ -818,7 +849,7 @@ static void xfer_secondary_pool(struct entropy_store *r, size_t nbytes)
 	__u32	tmp[OUTPUT_POOL_WORDS];
 
 	if (r->pull && r->entropy_count < nbytes * 8 &&
-	    r->entropy_count < r->poolinfo->POOLBITS) {
+	    r->entropy_count < r->poolinfo->poolbits) {
 		/* If we're limited, always leave two wakeup worth's BITS */
 		int rsvd = r->limit ? 0 : random_read_wakeup_thresh/4;
 		int bytes = nbytes;
@@ -859,7 +890,7 @@ static size_t account(struct entropy_store *r, size_t nbytes, int min,
 	/* Hold lock while accounting */
 	spin_lock_irqsave(&r->lock, flags);
 
-	BUG_ON(r->entropy_count > r->poolinfo->POOLBITS);
+	BUG_ON(r->entropy_count > r->poolinfo->poolbits);
 	DEBUG_ENT("trying to extract %d bits from %s\n",
 		  nbytes * 8, r->name);
 
@@ -932,8 +963,8 @@ static void extract_buf(struct entropy_store *r, __u8 *out)
 	 * pool while mixing, and hash one final time.
 	 */
 	sha_transform(hash.w, extract, workspace);
-	memset(extract, 0, sizeof(extract));
-	memset(workspace, 0, sizeof(workspace));
+	memzero_explicit(extract, sizeof(extract));
+	memzero_explicit(workspace, sizeof(workspace));
 
 	/*
 	 * In case the hash function has some recognizable output
@@ -956,7 +987,7 @@ static void extract_buf(struct entropy_store *r, __u8 *out)
 	}
 
 	memcpy(out, &hash, EXTRACT_SIZE);
-	memset(&hash, 0, sizeof(hash));
+	memzero_explicit(&hash, sizeof(hash));
 }
 
 static ssize_t extract_entropy(struct entropy_store *r, void *buf,
@@ -989,7 +1020,7 @@ static ssize_t extract_entropy(struct entropy_store *r, void *buf,
 	}
 
 	/* Wipe data just returned from memory */
-	memset(tmp, 0, sizeof(tmp));
+	memzero_explicit(tmp, sizeof(tmp));
 
 	return ret;
 }
@@ -1027,7 +1058,7 @@ static ssize_t extract_entropy_user(struct entropy_store *r, void __user *buf,
 	}
 
 	/* Wipe data just returned from memory */
-	memset(tmp, 0, sizeof(tmp));
+	memzero_explicit(tmp, sizeof(tmp));
 
 	return ret;
 }
@@ -1095,7 +1126,7 @@ static void init_std_data(struct entropy_store *r)
 	r->entropy_count = 0;
 	r->entropy_total = 0;
 	mix_pool_bytes(r, &now, sizeof(now), NULL);
-	for (i = r->poolinfo->POOLBYTES; i > 0; i -= sizeof(rv)) {
+	for (i = r->poolinfo->poolbytes; i > 0; i -= sizeof(rv)) {
 		if (!arch_get_random_long(&rv))
 			break;
 		mix_pool_bytes(r, &rv, sizeof(rv), NULL);
@@ -1466,7 +1497,7 @@ unsigned int get_random_int(void)
 
 	hash = get_cpu_var(get_random_int_hash);
 
-	hash[0] += current->pid + jiffies + get_cycles();
+	hash[0] += current->pid + jiffies + random_get_entropy();
 	md5_transform(hash, random_int_secret);
 	ret = hash[0];
 	put_cpu_var(get_random_int_hash);

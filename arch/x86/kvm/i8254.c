@@ -263,8 +263,10 @@ void __kvm_migrate_pit_timer(struct kvm_vcpu *vcpu)
 		return;
 
 	timer = &pit->pit_state.pit_timer.timer;
+	mutex_lock(&pit->pit_state.lock);
 	if (hrtimer_cancel(timer))
 		hrtimer_start_expires(timer, HRTIMER_MODE_ABS);
+	mutex_unlock(&pit->pit_state.lock);
 }
 
 static void destroy_pit_timer(struct kvm_pit *pit)
@@ -315,7 +317,7 @@ static void pit_do_work(struct work_struct *work)
 		 * LVT0 to NMI delivery. Other PIC interrupts are just sent to
 		 * VCPU0, and only if its LVT0 is in EXTINT mode.
 		 */
-		if (kvm->arch.vapics_in_nmi_mode > 0)
+		if (atomic_read(&kvm->arch.vapics_in_nmi_mode) > 0)
 			kvm_for_each_vcpu(i, vcpu, kvm)
 				kvm_apic_nmi_wd_deliver(vcpu);
 	}

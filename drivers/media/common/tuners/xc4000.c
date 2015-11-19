@@ -933,7 +933,7 @@ static int check_firmware(struct dvb_frontend *fe, unsigned int type,
 	struct xc4000_priv         *priv = fe->tuner_priv;
 	struct firmware_properties new_fw;
 	int			   rc = 0, is_retry = 0;
-	u16			   hwmodel;
+	u16			   hwmodel = 0;
 	v4l2_std_id		   std0;
 	u8			   hw_major, hw_minor, fw_major, fw_minor;
 
@@ -1095,12 +1095,12 @@ fail:
 
 static void xc_debug_dump(struct xc4000_priv *priv)
 {
-	u16	adc_envelope;
+	u16	adc_envelope = 0;
 	u32	freq_error_hz = 0;
-	u16	lock_status;
+	u16	lock_status = 0;
 	u32	hsync_freq_hz = 0;
-	u16	frame_lines;
-	u16	quality;
+	u16	frame_lines = 0;
+	u16	quality = 0;
 	u16	signal = 0;
 	u16	noise = 0;
 	u8	hw_majorversion = 0, hw_minorversion = 0;

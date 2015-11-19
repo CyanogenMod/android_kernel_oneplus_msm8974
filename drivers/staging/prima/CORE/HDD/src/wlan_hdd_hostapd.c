@@ -2175,12 +2175,6 @@ static __iw_softap_getassoc_stamacaddr(struct net_device *dev,
         return -EINVAL;
     }
 
-    /* allocate local buffer to build the response */
-    buf = kmalloc(wrqu->data.length, GFP_KERNEL);
-    if (!buf) {
-        hddLog(LOG1, "%s: failed to allocate response buffer", __func__);
-        return -ENOMEM;
-    }
     pVosContext = ( WLAN_HDD_GET_CTX(pHostapdAdapter))->pvosContext;
     pSapCtx = VOS_GET_SAP_CB(pVosContext);
     if(pSapCtx == NULL){
@@ -2188,6 +2182,14 @@ static __iw_softap_getassoc_stamacaddr(struct net_device *dev,
                   FL("psapCtx is NULL"));
         return  -EFAULT;
     }
+
+    /* allocate local buffer to build the response */
+    buf = kmalloc(wrqu->data.length, GFP_KERNEL);
+    if (!buf) {
+        hddLog(LOG1, "%s: failed to allocate response buffer", __func__);
+        return -ENOMEM;
+    }
+
     pStaInfo = pSapCtx->aStaInfo;
     /* start indexing beyond where the record count will be written */
     maclist_index = sizeof(maclist_index);

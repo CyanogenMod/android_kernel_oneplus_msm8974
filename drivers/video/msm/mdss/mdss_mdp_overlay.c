@@ -212,10 +212,12 @@ int mdss_mdp_overlay_req_check(struct msm_fb_data_type *mfd,
 	    req->src_rect.w < min_src_size || req->src_rect.h < min_src_size ||
 	    CHECK_BOUNDS(req->src_rect.x, req->src_rect.w, req->src.width) ||
 	    CHECK_BOUNDS(req->src_rect.y, req->src_rect.h, req->src.height)) {
+#if 0
 		pr_err("invalid source image img wh=%dx%d rect=%d,%d,%d,%d\n",
 		       req->src.width, req->src.height,
 		       req->src_rect.x, req->src_rect.y,
 		       req->src_rect.w, req->src_rect.h);
+#endif
 		return -EOVERFLOW;
 	}
 
@@ -443,6 +445,7 @@ static int __mdss_mdp_validate_pxl_extn(struct mdss_mdp_pipe *pipe)
 			pr_err("roi_w[%d]=%d, src_img:[%d, %d]\n",
 					plane, pipe->scale.roi_w[plane],
 					pipe->img_width, pipe->img_height);
+			pipe->scale.enable_pxl_ext = 0;
 			return -EINVAL;
 		}
 	}

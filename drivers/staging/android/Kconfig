@@ -21,8 +21,9 @@ config ASHMEM
 	  POSIX SHM but with different behavior and sporting a simpler
 	  file-based API.
 
-	  It is, in theory, a good memory allocator for low-memory devices,
-	  because it can discard shared memory units when under memory pressure.
+config ANDROID_LOGGER
+	tristate "Android log driver"
+	default n
 
 config LOGCAT_SIZE
 	int "Adjust android log buffer sizes"
@@ -82,6 +83,14 @@ config ANDROID_LOW_MEMORY_KILLER_AUTODETECT_OOM_ADJ_VALUES
 	  Detect oom_adj values written to
 	  /sys/module/lowmemorykiller/parameters/adj and convert them
 	  to oom_score_adj values.
+
+config ANDROID_LMK_ADJ_RBTREE
+	bool "Use RBTREE for Android Low Memory Killer"
+	depends on ANDROID_LOW_MEMORY_KILLER
+	default y
+	---help---
+	    Use oom_score_adj rbtree to select the best proecss to kill
+	    when system in low memory status.
 
 source "drivers/staging/android/switch/Kconfig"
 

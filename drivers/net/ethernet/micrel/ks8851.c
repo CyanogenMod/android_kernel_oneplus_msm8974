@@ -295,6 +295,7 @@ static void ks8851_rdreg(struct ks8851_net *ks, unsigned op,
 static unsigned ks8851_rdreg8(struct ks8851_net *ks, unsigned reg)
 {
 	u8 rxb[1];
+    rxb[0] = 0x00000000;
 
 	ks8851_rdreg(ks, MK_OP(1 << (reg & 3), reg), rxb, 1);
 	return rxb[0];

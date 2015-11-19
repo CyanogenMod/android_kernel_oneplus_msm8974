@@ -29,7 +29,7 @@ static void __uuid_gen_common(__u8 b[16])
 	u32 r;
 
 	for (i = 0; i < 4; i++) {
-		r = random32();
+		r = prandom_u32();
 		memcpy(b + i * 4, &r, 4);
 	}
 	/* reversion 0b10 */

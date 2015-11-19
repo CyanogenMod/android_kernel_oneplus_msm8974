@@ -36,8 +36,6 @@ extern void cpu_remove_dev_attr(struct device_attribute *attr);
 extern int cpu_add_dev_attr_group(struct attribute_group *attrs);
 extern void cpu_remove_dev_attr_group(struct attribute_group *attrs);
 
-extern int sched_create_sysfs_power_savings_entries(struct device *dev);
-
 #ifdef CONFIG_HOTPLUG_CPU
 extern void unregister_cpu(struct cpu *cpu);
 extern ssize_t arch_cpu_probe(const char *, size_t);
@@ -223,5 +221,8 @@ static inline void enable_nonboot_cpus(void) {}
 void idle_notifier_register(struct notifier_block *n);
 void idle_notifier_unregister(struct notifier_block *n);
 void idle_notifier_call_chain(unsigned long val);
+
+extern bool check_cpuboost(int cpu);
+extern bool wakeup_boost;
 
 #endif /* _LINUX_CPU_H_ */

@@ -108,7 +108,6 @@ config OPENRISC_HAVE_INST_DIV
 endmenu
 
 
-source "kernel/time/Kconfig"
 source kernel/Kconfig.hz
 source kernel/Kconfig.preempt
 source "mm/Kconfig"

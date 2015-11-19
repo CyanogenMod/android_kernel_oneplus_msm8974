@@ -2,6 +2,8 @@
  *  arch/arm/include/asm/processor.h
  *
  *  Copyright (C) 1995-1999 Russell King
+ * 
+ * Copyright (c) 2014, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -57,7 +59,6 @@ struct thread_struct {
 
 #define start_thread(regs,pc,sp)					\
 ({									\
-	unsigned long *stack = (unsigned long *)sp;			\
 	memset(regs->uregs, 0, sizeof(regs->uregs));			\
 	if (current->personality & ADDR_LIMIT_32BIT)			\
 		regs->ARM_cpsr = USR_MODE;				\
@@ -68,9 +69,6 @@ struct thread_struct {
 	regs->ARM_cpsr |= PSR_ENDSTATE;					\
 	regs->ARM_pc = pc & ~1;		/* pc */			\
 	regs->ARM_sp = sp;		/* sp */			\
-	regs->ARM_r2 = stack[2];	/* r2 (envp) */			\
-	regs->ARM_r1 = stack[1];	/* r1 (argv) */			\
-	regs->ARM_r0 = stack[0];	/* r0 (argc) */			\
 	nommu_start_thread(regs);					\
 })
 
@@ -130,5 +128,7 @@ static inline void prefetch(const void *ptr)
 #define HAVE_ARCH_PICK_MMAP_LAYOUT
 
 #endif
+
+#include <asm-generic/processor.h>
 
 #endif /* __ASM_ARM_PROCESSOR_H */

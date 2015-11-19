@@ -1873,14 +1873,20 @@ config MSM_CPU_FREQ_SET_MIN_MAX
 config MSM_CPU_FREQ_MAX
 	int "Max CPU Frequency"
 	depends on MSM_CPU_FREQ_SET_MIN_MAX
-	default 384000
+	default 300000
 
 config MSM_CPU_FREQ_MIN
 	int "Min CPU Frequency"
 	depends on MSM_CPU_FREQ_SET_MIN_MAX
-	default 245760
+	default 2457600
 
 endif # CPU_FREQ_MSM
+
+config CPU_VOLTAGE_TABLE
+	bool "Enable CPU Voltage Table via sysfs for adjustements"
+	default n
+	help
+	  DTS based kernel User Votlage Control
 
 config MSM_AVS_HW
 	bool "Enable Adaptive Voltage Scaling (AVS)"
@@ -3026,6 +3032,14 @@ config WALL_CLK_SYSFS
 	 Support the wallclk directory in sysfs filesystem to enable the
 	 wall clock simulation and read the current SFN.
 
+config BRICKED_HOTPLUG
+	bool "Enable kernel based mpdecision"
+	depends on MSM_RUN_QUEUE_STATS
+	default y
+	help
+	  This enables kernel based multi core control.
+	  (up/down hotplug based on load)
+
 config KRAIT_REGULATOR
 	bool "Support Kraits powered via ganged regulators in the pmic"
 	help
@@ -3034,9 +3048,83 @@ config KRAIT_REGULATOR
 	 regulators running in ganged mode inside the PMIC. Enable
 	 this option to support such configurations.
 
+config CHARGE_LEVEL
+	bool "Charge level interface"
+	default y
+	help
+	  Allows configuration of ac and usb charging levels		 
+
 config HAS_MACH_MEMUTILS
 	default n
 	bool "Motorola MSM memcpy enhancements"
 	help
 	Faster memcpy performance for Krait
+
+config PVS_LEVEL_INTERFACE
+	bool "Expose PVS level information in sys fs (Boeffla-Kernel)"
+	help
+	 Allow PVS level to be shown in Boeffla-Config app
+
+config SPEED_LEVEL_INTERFACE
+        bool "Expose SPEED level information in sys fs"
+        help
+         Allow SPEED level to be shown into specific kernel apps
+
+config MSM_LIMITER
+	bool "MSM Frequency Limiter Driver"
+	default y
+	help
+	  The MSM Frequency Limiter Driver controls max frequency limit for each CPU
+	  to desired value on suspend/resume
+
+config MSM_HOTPLUG
+	bool "MSM hotplug driver"
+	depends on HOTPLUG_CPU
+	default y
+	help
+	  The MSM hotplug driver controls on-/offlining of additional cores based
+	  on current cpu load.
+
+config INTELLI_HOTPLUG
+	bool "Intelli hotplug driver"
+	depends on HOTPLUG_CPU
+	default y
+	help
+	  An intelligent cpu hotplug driver for
+	  Low Latency Frequency Transition capable processors.
+
+config ALUCARD_HOTPLUG
+	bool "Enable alucard-hotplug cpu hotplug driver"
+	default n
+	help
+	  Generic Alucard-hotplug cpu hotplug driver for ARM SOCs
+
+config ZEN_DECISION
+	bool "Zen Decision: MSM Userspace Handler"
+	depends on SMP && FB
+	default y
+	help
+	  MSM/Qcomm devices have multiple userspace applications that handle
+	  CPU hotplugging and frequency operations.
+
+	  ZenDecision is a partial resolution to handling behavior caused by
+	  disabling some of these services.
+
+	  For example, If MPDecision is disabled and MSM-Thermal_Engine is 
+	  enabled in the userspace. Situations where CPUs go offline but never
+	  come back online occur.
+  
+	  ZenDecision ensures all CPUs are online when they are supposed to be by:
+	  - Enable all CPUs when screen comes on after zen_wake_delay
+	  - Ignore all CPU_UP operations when battery level is <= 15% to respect
+	    the decision made by MSMThermal (which disables cores at <= 15% battery)
+
+	  Thresholds and driver enable/disable for above values can be found in:
+	  /sys/kernel/zen_decision
+
+	  ZenDecision is not a direct replacement for any of the MSM userspace
+	  services.
+
+	  If unsure, say N.
+
 endif

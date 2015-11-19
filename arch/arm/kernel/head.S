@@ -104,7 +104,7 @@ ENTRY(stext)
 	and	r3, r3, #0xf			@ extract VMSA support
 	cmp	r3, #5				@ long-descriptor translation table format?
  THUMB( it	lo )				@ force fixup-able long branch encoding
-	blo	__error_p			@ only classic page table format
+	blo	__error_lpae			@ only classic page table format
 #endif
 
 #ifndef CONFIG_XIP_KERNEL
@@ -254,6 +254,7 @@ __create_page_tables:
 	/*
 	 * Then map boot params address in r2 or the first 1MB (2MB with LPAE)
 	 * of ram if boot params address is not specified.
+	 * We map 2 sections in case the ATAGs/DTB crosses a section boundary.
 	 */
 	mov	r0, r2, lsr #SECTION_SHIFT
 	movs	r0, r0, lsl #SECTION_SHIFT
@@ -262,6 +263,8 @@ __create_page_tables:
 	add	r3, r3, #PAGE_OFFSET
 	add	r3, r4, r3, lsr #(SECTION_SHIFT - PMD_ORDER)
 	orr	r6, r7, r0
+	str	r6, [r3], #1 << PMD_ORDER
+	add	r6, r6, #1 << SECTION_SHIFT
 	str	r6, [r3]
 
 #ifdef CONFIG_DEBUG_LL

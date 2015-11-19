@@ -72,13 +72,13 @@ static unsigned long bat_iv_ogm_emit_send_time(const struct bat_priv *bat_priv)
 {
 	return jiffies + msecs_to_jiffies(
 		   atomic_read(&bat_priv->orig_interval) -
-		   JITTER + (random32() % (2*JITTER)));
+		   JITTER + (prandom_u32() % (2*JITTER)));
 }
 
 /* when do we schedule a ogm packet to be sent */
 static unsigned long bat_iv_ogm_fwd_send_time(void)
 {
-	return jiffies + msecs_to_jiffies(random32() % (JITTER/2));
+	return jiffies + msecs_to_jiffies(prandom_u32() % (JITTER/2));
 }
 
 /* apply hop penalty for a normal link */

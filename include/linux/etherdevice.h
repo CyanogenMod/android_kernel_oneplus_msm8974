@@ -134,7 +134,7 @@ static inline int is_valid_ether_addr(const u8 *addr)
  */
 static inline void random_ether_addr(u8 *addr)
 {
-	get_random_bytes (addr, ETH_ALEN);
+	prandom_bytes(addr, ETH_ALEN);
 	addr [0] &= 0xfe;	/* clear multicast bit */
 	addr [0] |= 0x02;	/* set local assignment bit (IEEE802) */
 }

@@ -207,8 +207,10 @@ struct ftrace_probe_ops {
 	void			(*func)(unsigned long ip,
 					unsigned long parent_ip,
 					void **data);
-	int			(*callback)(unsigned long ip, void **data);
-	void			(*free)(void **data);
+	int			(*init)(struct ftrace_probe_ops *ops,
+					unsigned long ip, void **data);
+	void			(*free)(struct ftrace_probe_ops *ops,
+					unsigned long ip, void **data);
 	int			(*print)(struct seq_file *m,
 					 unsigned long ip,
 					 struct ftrace_probe_ops *ops,
@@ -244,6 +246,8 @@ struct dyn_ftrace {
 };
 
 int ftrace_force_update(void);
+int ftrace_set_filter_ip(struct ftrace_ops *ops, unsigned long ip,
+			 int remove, int reset);
 int ftrace_set_filter(struct ftrace_ops *ops, unsigned char *buf,
 		       int len, int reset);
 int ftrace_set_notrace(struct ftrace_ops *ops, unsigned char *buf,
@@ -286,6 +290,12 @@ struct ftrace_rec_iter *ftrace_rec_iter_start(void);
 struct ftrace_rec_iter *ftrace_rec_iter_next(struct ftrace_rec_iter *iter);
 struct dyn_ftrace *ftrace_rec_iter_record(struct ftrace_rec_iter *iter);
 
+#define for_ftrace_rec_iter(iter)		\
+	for (iter = ftrace_rec_iter_start();	\
+	     iter;				\
+	     iter = ftrace_rec_iter_next(iter))
+
+
 int ftrace_update_record(struct dyn_ftrace *rec, int enable);
 int ftrace_test_record(struct dyn_ftrace *rec, int enable);
 void ftrace_run_stop_machine(int command);
@@ -311,6 +321,8 @@ extern int ftrace_update_ftrace_func(ftrace_func_t func);
 extern void ftrace_caller(void);
 extern void ftrace_call(void);
 extern void mcount_call(void);
+
+void ftrace_modify_all_code(int command);
 
 #ifndef FTRACE_ADDR
 #define FTRACE_ADDR ((unsigned long)ftrace_caller)
@@ -374,15 +386,17 @@ extern int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr);
 extern int ftrace_arch_read_dyn_info(char *buf, int size);
 
 extern int skip_trace(unsigned long ip);
+extern void ftrace_module_init(struct module *mod);
 
 extern void ftrace_disable_daemon(void);
 extern void ftrace_enable_daemon(void);
-#else
+#else /* CONFIG_DYNAMIC_FTRACE */
 static inline int skip_trace(unsigned long ip) { return 0; }
 static inline int ftrace_force_update(void) { return 0; }
 static inline void ftrace_disable_daemon(void) { }
 static inline void ftrace_enable_daemon(void) { }
 static inline void ftrace_release_mod(struct module *mod) {}
+static inline void ftrace_module_init(struct module *mod) {}
 static inline int register_ftrace_command(struct ftrace_func_command *cmd)
 {
 	return -EINVAL;
@@ -395,6 +409,10 @@ static inline int ftrace_text_reserved(void *start, void *end)
 {
 	return 0;
 }
+static inline unsigned long ftrace_location(unsigned long ip)
+{
+	return 0;
+}
 
 /*
  * Again users of functions that have ftrace_ops may not
@@ -403,6 +421,7 @@ static inline int ftrace_text_reserved(void *start, void *end)
  */
 #define ftrace_regex_open(ops, flag, inod, file) ({ -ENODEV; })
 #define ftrace_set_early_filter(ops, buf, enable) do { } while (0)
+#define ftrace_set_filter_ip(ops, ip, remove, reset) ({ -ENODEV; })
 #define ftrace_set_filter(ops, buf, len, reset) ({ -ENODEV; })
 #define ftrace_set_notrace(ops, buf, len, reset) ({ -ENODEV; })
 #define ftrace_free_filter(ops) do { } while (0)
@@ -454,25 +473,27 @@ static inline void __ftrace_enabled_restore(int enabled)
 #endif
 }
 
-#ifndef HAVE_ARCH_CALLER_ADDR
+/* All archs should have this, but we define it for consistency */
+#ifndef ftrace_return_address0
+# define ftrace_return_address0 __builtin_return_address(0)
+#endif
+
+/* Archs may use other ways for ADDR1 and beyond */
+#ifndef ftrace_return_address
 # ifdef CONFIG_FRAME_POINTER
-#  define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
-#  define CALLER_ADDR1 ((unsigned long)__builtin_return_address(1))
-#  define CALLER_ADDR2 ((unsigned long)__builtin_return_address(2))
-#  define CALLER_ADDR3 ((unsigned long)__builtin_return_address(3))
-#  define CALLER_ADDR4 ((unsigned long)__builtin_return_address(4))
-#  define CALLER_ADDR5 ((unsigned long)__builtin_return_address(5))
-#  define CALLER_ADDR6 ((unsigned long)__builtin_return_address(6))
+#  define ftrace_return_address(n) __builtin_return_address(n)
 # else
-#  define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
-#  define CALLER_ADDR1 0UL
-#  define CALLER_ADDR2 0UL
-#  define CALLER_ADDR3 0UL
-#  define CALLER_ADDR4 0UL
-#  define CALLER_ADDR5 0UL
-#  define CALLER_ADDR6 0UL
+#  define ftrace_return_address(n) 0UL
 # endif
-#endif /* ifndef HAVE_ARCH_CALLER_ADDR */
+#endif
+
+#define CALLER_ADDR0 ((unsigned long)ftrace_return_address0)
+#define CALLER_ADDR1 ((unsigned long)ftrace_return_address(1))
+#define CALLER_ADDR2 ((unsigned long)ftrace_return_address(2))
+#define CALLER_ADDR3 ((unsigned long)ftrace_return_address(3))
+#define CALLER_ADDR4 ((unsigned long)ftrace_return_address(4))
+#define CALLER_ADDR5 ((unsigned long)ftrace_return_address(5))
+#define CALLER_ADDR6 ((unsigned long)ftrace_return_address(6))
 
 #ifdef CONFIG_IRQSOFF_TRACER
   extern void time_hardirqs_on(unsigned long a0, unsigned long a1);
@@ -486,8 +507,12 @@ static inline void __ftrace_enabled_restore(int enabled)
   extern void trace_preempt_on(unsigned long a0, unsigned long a1);
   extern void trace_preempt_off(unsigned long a0, unsigned long a1);
 #else
-  static inline void trace_preempt_on(unsigned long a0, unsigned long a1) { }
-  static inline void trace_preempt_off(unsigned long a0, unsigned long a1) { }
+/*
+ * Use defines instead of static inlines because some arches will make code out
+ * of the CALLER_ADDR, when we really want these to be a real nop.
+ */
+# define trace_preempt_on(a0, a1) do { } while (0)
+# define trace_preempt_off(a0, a1) do { } while (0)
 #endif
 
 #ifdef CONFIG_FTRACE_MCOUNT_RECORD

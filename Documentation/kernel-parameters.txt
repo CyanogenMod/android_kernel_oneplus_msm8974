@@ -416,6 +416,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Format: <io>,<irq>,<mode>
 			See header of drivers/net/hamradio/baycom_ser_hdx.c.
 
+	boot_cpus=	[SMP]
+			Rather than attempting to online all possible CPUs at
+			boot time, only online the specified set of CPUs.
+
 	boot_delay=	Milliseconds to delay each printk during boot.
 			Values larger than 10 seconds (10000) are changed to
 			no delay (0).
@@ -782,6 +786,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 	edd=		[EDD]
 			Format: {"off" | "on" | "skip[mbr]"}
 
+	efi_no_storage_paranoia [EFI; X86]
+			Using this parameter you can use more than 50% of
+			your efi variable storage. Use this parameter only if
+			you are really sure that your UEFI does sane gc and
+			fulfills the spec otherwise your board may brick.
+
 	eisa_irq_edge=	[PARISC,HW]
 			See header of drivers/parisc/eisa.c.
 
@@ -982,6 +992,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 	i8042.notimeout	[HW] Ignore timeout condition signalled by controller
 	i8042.reset	[HW] Reset the controller during init and cleanup
 	i8042.unlock	[HW] Unlock (ignore) the keylock
+	i8042.kbdreset  [HW] Reset device connected to KBD port
 
 	i810=		[HW,DRM]
 
@@ -995,6 +1006,20 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			(disabled by default)
 	i8k.restricted	[HW] Allow controlling fans only if SYS_ADMIN
 			capability is set.
+
+	i915.invert_brightness=
+			[DRM] Invert the sense of the variable that is used to
+			set the brightness of the panel backlight. Normally a
+			brightness value of 0 indicates backlight switched off,
+			and the maximum of the brightness value sets the backlight
+			to maximum brightness. If this parameter is set to 0
+			(default) and the machine requires it, or this parameter
+			is set to 1, a brightness value of 0 sets the backlight
+			to maximum brightness, and the maximum of the brightness
+			value switches the backlight off.
+			-1 -- never invert brightness
+			 0 -- machine default
+			 1 -- force brightness inversion
 
 	icn=		[HW,ISDN]
 			Format: <io>[,<membase>[,<icn_id>[,<icn_id2>]]]
@@ -2953,6 +2978,21 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			see Documentation/watchdog/watchdog-parameters.txt
 			or other driver-specific files in the
 			Documentation/watchdog/ directory.
+
+	workqueue.power_efficient
+			Per-cpu workqueues are generally preferred because
+			they show better performance thanks to cache
+			locality; unfortunately, per-cpu workqueues tend to
+			be more power hungry than unbound workqueues.
+
+			Enabling this makes the per-cpu workqueues which
+			were observed to contribute significantly to power
+			consumption unbound, leading to measurably lower
+			power usage at the cost of small performance
+			overhead.
+
+			The default value of this parameter is determined by
+			the config option CONFIG_WQ_POWER_EFFICIENT_DEFAULT.
 
 	x2apic_phys	[X86-64,APIC] Use x2apic physical mode instead of
 			default x2apic cluster mode on platforms

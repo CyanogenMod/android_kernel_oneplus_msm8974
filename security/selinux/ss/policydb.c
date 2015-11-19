@@ -133,6 +133,26 @@ static struct policydb_compat_info policydb_compat[] = {
 		.sym_num	= SYM_NUM,
 		.ocon_num	= OCON_NUM,
 	},
+	{
+		.version	= POLICYDB_VERSION_NEW_OBJECT_DEFAULTS,
+		.sym_num	= SYM_NUM,
+		.ocon_num	= OCON_NUM,
+	},
+	{
+		.version	= POLICYDB_VERSION_DEFAULT_TYPE,
+		.sym_num	= SYM_NUM,
+		.ocon_num	= OCON_NUM,
+	},
+	{
+		.version	= POLICYDB_VERSION_CONSTRAINT_NAMES,
+		.sym_num	= SYM_NUM,
+		.ocon_num	= OCON_NUM,
+	},
+	{
+		.version	= POLICYDB_VERSION_IOCTL_OPERATIONS,
+		.sym_num	= SYM_NUM,
+		.ocon_num	= OCON_NUM,
+	},
 };
 
 static struct policydb_compat_info *policydb_lookup_compat(int version)
@@ -603,6 +623,19 @@ static int common_destroy(void *key, void *datum, void *p)
 	return 0;
 }
 
+static void constraint_expr_destroy(struct constraint_expr *expr)
+{
+	if (expr) {
+		ebitmap_destroy(&expr->names);
+		if (expr->type_names) {
+			ebitmap_destroy(&expr->type_names->types);
+			ebitmap_destroy(&expr->type_names->negset);
+			kfree(expr->type_names);
+		}
+		kfree(expr);
+	}
+}
+
 static int cls_destroy(void *key, void *datum, void *p)
 {
 	struct class_datum *cladatum;
@@ -618,10 +651,9 @@ static int cls_destroy(void *key, void *datum, void *p)
 		while (constraint) {
 			e = constraint->expr;
 			while (e) {
-				ebitmap_destroy(&e->names);
 				etmp = e;
 				e = e->next;
-				kfree(etmp);
+				constraint_expr_destroy(etmp);
 			}
 			ctemp = constraint;
 			constraint = constraint->next;
@@ -632,16 +664,14 @@ static int cls_destroy(void *key, void *datum, void *p)
 		while (constraint) {
 			e = constraint->expr;
 			while (e) {
-				ebitmap_destroy(&e->names);
 				etmp = e;
 				e = e->next;
-				kfree(etmp);
+				constraint_expr_destroy(etmp);
 			}
 			ctemp = constraint;
 			constraint = constraint->next;
 			kfree(ctemp);
 		}
-
 		kfree(cladatum->comkey);
 	}
 	kfree(datum);
@@ -1146,8 +1176,34 @@ bad:
 	return rc;
 }
 
-static int read_cons_helper(struct constraint_node **nodep, int ncons,
-			    int allowxtarget, void *fp)
+static void type_set_init(struct type_set *t)
+{
+	ebitmap_init(&t->types);
+	ebitmap_init(&t->negset);
+}
+
+static int type_set_read(struct type_set *t, void *fp)
+{
+	__le32 buf[1];
+	int rc;
+
+	if (ebitmap_read(&t->types, fp))
+		return -EINVAL;
+	if (ebitmap_read(&t->negset, fp))
+		return -EINVAL;
+
+	rc = next_entry(buf, fp, sizeof(u32));
+	if (rc < 0)
+		return -EINVAL;
+	t->flags = le32_to_cpu(buf[0]);
+
+	return 0;
+}
+
+
+static int read_cons_helper(struct policydb *p,
+				struct constraint_node **nodep,
+				int ncons, int allowxtarget, void *fp)
 {
 	struct constraint_node *c, *lc;
 	struct constraint_expr *e, *le;
@@ -1215,6 +1271,18 @@ static int read_cons_helper(struct constraint_node **nodep, int ncons,
 				rc = ebitmap_read(&e->names, fp);
 				if (rc)
 					return rc;
+				if (p->policyvers >=
+					POLICYDB_VERSION_CONSTRAINT_NAMES) {
+						e->type_names = kzalloc(sizeof
+						(*e->type_names),
+						GFP_KERNEL);
+					if (!e->type_names)
+						return -ENOMEM;
+					type_set_init(e->type_names);
+					rc = type_set_read(e->type_names, fp);
+					if (rc)
+						return rc;
+				}
 				break;
 			default:
 				return -EINVAL;
@@ -1291,7 +1359,7 @@ static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 			goto bad;
 	}
 
-	rc = read_cons_helper(&cladatum->constraints, ncons, 0, fp);
+	rc = read_cons_helper(p, &cladatum->constraints, ncons, 0, fp);
 	if (rc)
 		goto bad;
 
@@ -1301,9 +1369,27 @@ static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 		if (rc)
 			goto bad;
 		ncons = le32_to_cpu(buf[0]);
-		rc = read_cons_helper(&cladatum->validatetrans, ncons, 1, fp);
+		rc = read_cons_helper(p, &cladatum->validatetrans,
+				ncons, 1, fp);
 		if (rc)
 			goto bad;
+	}
+
+	if (p->policyvers >= POLICYDB_VERSION_NEW_OBJECT_DEFAULTS) {
+		rc = next_entry(buf, fp, sizeof(u32) * 3);
+		if (rc)
+			goto bad;
+
+		cladatum->default_user = le32_to_cpu(buf[0]);
+		cladatum->default_role = le32_to_cpu(buf[1]);
+		cladatum->default_range = le32_to_cpu(buf[2]);
+	}
+
+	if (p->policyvers >= POLICYDB_VERSION_DEFAULT_TYPE) {
+		rc = next_entry(buf, fp, sizeof(u32) * 1);
+		if (rc)
+			goto bad;
+		cladatum->default_type = le32_to_cpu(buf[0]);
 	}
 
 	rc = hashtab_insert(h, key, cladatum);
@@ -1914,7 +2000,19 @@ static int filename_trans_read(struct policydb *p, void *fp)
 		if (rc)
 			goto out;
 
-		hashtab_insert(p->filename_trans, ft, otype);
+		rc = hashtab_insert(p->filename_trans, ft, otype);
+		if (rc) {
+			/*
+			 * Do not return -EEXIST to the caller, or the system
+			 * will not boot.
+			 */
+			if (rc != -EEXIST)
+				goto out;
+			/* But free memory to avoid memory leak. */
+			kfree(ft);
+			kfree(name);
+			kfree(otype);
+		}
 	}
 	hash_eval(p->filename_trans, "filenametr");
 	return 0;
@@ -2512,7 +2610,7 @@ static int mls_write_range_helper(struct mls_range *r, void *fp)
 	if (!eq)
 		buf[2] = cpu_to_le32(r->level[1].sens);
 
-	BUG_ON(items > (sizeof(buf)/sizeof(buf[0])));
+	BUG_ON(items > ARRAY_SIZE(buf));
 
 	rc = put_entry(buf, sizeof(u32), items, fp);
 	if (rc)
@@ -2723,6 +2821,24 @@ static int common_write(void *vkey, void *datum, void *ptr)
 	return 0;
 }
 
+static int type_set_write(struct type_set *t, void *fp)
+{
+	int rc;
+	__le32 buf[1];
+
+	if (ebitmap_write(&t->types, fp))
+		return -EINVAL;
+	if (ebitmap_write(&t->negset, fp))
+		return -EINVAL;
+
+	buf[0] = cpu_to_le32(t->flags);
+	rc = put_entry(buf, sizeof(u32), 1, fp);
+	if (rc)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int write_cons_helper(struct policydb *p, struct constraint_node *node,
 			     void *fp)
 {
@@ -2754,6 +2870,12 @@ static int write_cons_helper(struct policydb *p, struct constraint_node *node,
 				rc = ebitmap_write(&e->names, fp);
 				if (rc)
 					return rc;
+				if (p->policyvers >=
+					POLICYDB_VERSION_CONSTRAINT_NAMES) {
+					rc = type_set_write(e->type_names, fp);
+					if (rc)
+						return rc;
+				}
 				break;
 			default:
 				break;
@@ -2832,6 +2954,23 @@ static int class_write(void *vkey, void *datum, void *ptr)
 	if (rc)
 		return rc;
 
+	if (p->policyvers >= POLICYDB_VERSION_NEW_OBJECT_DEFAULTS) {
+		buf[0] = cpu_to_le32(cladatum->default_user);
+		buf[1] = cpu_to_le32(cladatum->default_role);
+		buf[2] = cpu_to_le32(cladatum->default_range);
+
+		rc = put_entry(buf, sizeof(uint32_t), 3, fp);
+		if (rc)
+			return rc;
+	}
+
+	if (p->policyvers >= POLICYDB_VERSION_DEFAULT_TYPE) {
+		buf[0] = cpu_to_le32(cladatum->default_type);
+		rc = put_entry(buf, sizeof(uint32_t), 1, fp);
+		if (rc)
+			return rc;
+	}
+
 	return 0;
 }
 
@@ -2853,7 +2992,7 @@ static int role_write(void *vkey, void *datum, void *ptr)
 	if (p->policyvers >= POLICYDB_VERSION_BOUNDARY)
 		buf[items++] = cpu_to_le32(role->bounds);
 
-	BUG_ON(items > (sizeof(buf)/sizeof(buf[0])));
+	BUG_ON(items > ARRAY_SIZE(buf));
 
 	rc = put_entry(buf, sizeof(u32), items, fp);
 	if (rc)
@@ -2903,7 +3042,7 @@ static int type_write(void *vkey, void *datum, void *ptr)
 	} else {
 		buf[items++] = cpu_to_le32(typdatum->primary);
 	}
-	BUG_ON(items > (sizeof(buf) / sizeof(buf[0])));
+	BUG_ON(items > ARRAY_SIZE(buf));
 	rc = put_entry(buf, sizeof(u32), items, fp);
 	if (rc)
 		return rc;
@@ -2932,7 +3071,7 @@ static int user_write(void *vkey, void *datum, void *ptr)
 	buf[items++] = cpu_to_le32(usrdatum->value);
 	if (p->policyvers >= POLICYDB_VERSION_BOUNDARY)
 		buf[items++] = cpu_to_le32(usrdatum->bounds);
-	BUG_ON(items > (sizeof(buf) / sizeof(buf[0])));
+	BUG_ON(items > ARRAY_SIZE(buf));
 	rc = put_entry(buf, sizeof(u32), items, fp);
 	if (rc)
 		return rc;
@@ -3202,10 +3341,10 @@ static int filename_write_helper(void *key, void *data, void *ptr)
 	if (rc)
 		return rc;
 
-	buf[0] = ft->stype;
-	buf[1] = ft->ttype;
-	buf[2] = ft->tclass;
-	buf[3] = otype->otype;
+	buf[0] = cpu_to_le32(ft->stype);
+	buf[1] = cpu_to_le32(ft->ttype);
+	buf[2] = cpu_to_le32(ft->tclass);
+	buf[3] = cpu_to_le32(otype->otype);
 
 	rc = put_entry(buf, sizeof(u32), 4, fp);
 	if (rc)

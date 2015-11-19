@@ -588,7 +588,7 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			if (file == ppp->owner)
 				ppp_shutdown_interface(ppp);
 		}
-		if (atomic_long_read(&file->f_count) <= 2) {
+		if (atomic_long_read(&file->f_count) < 2) {
 			ppp_release(NULL, file);
 			err = 0;
 		} else
@@ -741,7 +741,7 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 #ifdef CONFIG_PPP_FILTER
 	case PPPIOCSPASS:
 	{
-		struct sock_filter *code;
+		struct sock_filter *code = NULL;
 		err = get_filter(argp, &code);
 		if (err >= 0) {
 			ppp_lock(ppp);
@@ -755,7 +755,7 @@ static long ppp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	}
 	case PPPIOCSACTIVE:
 	{
-		struct sock_filter *code;
+		struct sock_filter *code = NULL;
 		err = get_filter(argp, &code);
 		if (err >= 0) {
 			ppp_lock(ppp);

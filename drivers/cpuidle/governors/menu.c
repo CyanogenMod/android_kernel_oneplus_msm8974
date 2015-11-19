@@ -293,7 +293,7 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	 * unless the timer is happening really really soon.
 	 */
 	if (data->expected_us > 5 &&
-		drv->states[CPUIDLE_DRIVER_STATE_START].disable == 0)
+		dev->states_usage[CPUIDLE_DRIVER_STATE_START].disable == 0)
 		data->last_state_idx = CPUIDLE_DRIVER_STATE_START;
 
 	/*
@@ -302,8 +302,9 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	 */
 	for (i = CPUIDLE_DRIVER_STATE_START; i < drv->state_count; i++) {
 		struct cpuidle_state *s = &drv->states[i];
+		struct cpuidle_state_usage *su = &dev->states_usage[i];
 
-		if (s->disable)
+		if (su->disable)
 			continue;
 		if (s->target_residency > data->predicted_us)
 			continue;
@@ -432,14 +433,4 @@ static int __init init_menu(void)
 	return cpuidle_register_governor(&menu_governor);
 }
 
-/**
- * exit_menu - exits the governor
- */
-static void __exit exit_menu(void)
-{
-	cpuidle_unregister_governor(&menu_governor);
-}
-
-MODULE_LICENSE("GPL");
-module_init(init_menu);
-module_exit(exit_menu);
+postcore_initcall(init_menu);

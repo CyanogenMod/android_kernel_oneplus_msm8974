@@ -30684,7 +30684,7 @@ WDI_ProcessHT40OBSSScanInd
 
   /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-  WPAL_TRACE(eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_ERROR,
+  WPAL_TRACE(eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_INFO,
          "%s", __func__);
 
   /*-------------------------------------------------------------------------

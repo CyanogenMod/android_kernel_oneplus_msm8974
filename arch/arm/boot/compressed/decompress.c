@@ -13,8 +13,6 @@ extern void error(char *);
 #define STATIC static
 #define STATIC_RW_DATA	/* non-static please */
 
-#define ARCH_HAS_DECOMP_WDOG
-
 /* Diagnostic functions */
 #ifdef DEBUG
 #  define Assert(cond,msg) {if(!(cond)) error(msg);}
@@ -31,6 +29,9 @@ extern void error(char *);
 #  define Tracec(c,x)
 #  define Tracecv(c,x)
 #endif
+
+/* Not needed, but used in some headers pulled in by decompressors */
+extern char * strstr(const char * s1, const char *s2);
 
 #ifdef CONFIG_KERNEL_GZIP
 #include "../../../../lib/decompress_inflate.c"

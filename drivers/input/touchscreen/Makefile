@@ -88,3 +88,4 @@ obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_S3508_I2C_RMI)	+= synaptics_dsx_fw_update.o
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_S3508_I2C_RMI)	+= synaptics_dsx_rmi_dev.o
 
 obj-$(CONFIG_TOUCHSCREEN_GT9XX)		+= gt9xx/
+obj-$(CONFIG_STATE_NOTIFIER)		+= state_notifier.o

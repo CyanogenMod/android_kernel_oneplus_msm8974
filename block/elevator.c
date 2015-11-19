@@ -46,11 +46,6 @@ static LIST_HEAD(elv_list);
 /*
  * Merge hash stuff.
  */
-static const int elv_hash_shift = 6;
-#define ELV_HASH_BLOCK(sec)	((sec) >> 3)
-#define ELV_HASH_FN(sec)	\
-		(hash_long(ELV_HASH_BLOCK((sec)), elv_hash_shift))
-#define ELV_HASH_ENTRIES	(1 << elv_hash_shift)
 #define rq_hash_key(rq)		(blk_rq_pos(rq) + blk_rq_sectors(rq))
 
 /*
@@ -187,7 +182,6 @@ static struct elevator_queue *elevator_alloc(struct request_queue *q,
 				  struct elevator_type *e)
 {
 	struct elevator_queue *eq;
-	int i;
 
 	eq = kmalloc_node(sizeof(*eq), GFP_KERNEL | __GFP_ZERO, q->node);
 	if (unlikely(!eq))
@@ -196,14 +190,7 @@ static struct elevator_queue *elevator_alloc(struct request_queue *q,
 	eq->type = e;
 	kobject_init(&eq->kobj, &elv_ktype);
 	mutex_init(&eq->sysfs_lock);
-
-	eq->hash = kmalloc_node(sizeof(struct hlist_head) * ELV_HASH_ENTRIES,
-					GFP_KERNEL, q->node);
-	if (!eq->hash)
-		goto err;
-
-	for (i = 0; i < ELV_HASH_ENTRIES; i++)
-		INIT_HLIST_HEAD(&eq->hash[i]);
+	hash_init(eq->hash);
 
 	return eq;
 err:
@@ -218,7 +205,6 @@ static void elevator_release(struct kobject *kobj)
 
 	e = container_of(kobj, struct elevator_queue, kobj);
 	elevator_put(e->type);
-	kfree(e->hash);
 	kfree(e);
 }
 
@@ -287,7 +273,7 @@ EXPORT_SYMBOL(elevator_exit);
 
 static inline void __elv_rqhash_del(struct request *rq)
 {
-	hlist_del_init(&rq->hash);
+	hash_del(&rq->hash);
 }
 
 static void elv_rqhash_del(struct request_queue *q, struct request *rq)
@@ -301,7 +287,7 @@ static void elv_rqhash_add(struct request_queue *q, struct request *rq)
 	struct elevator_queue *e = q->elevator;
 
 	BUG_ON(ELV_ON_HASH(rq));
-	hlist_add_head(&rq->hash, &e->hash[ELV_HASH_FN(rq_hash_key(rq))]);
+	hash_add(e->hash, &rq->hash, rq_hash_key(rq));
 }
 
 static void elv_rqhash_reposition(struct request_queue *q, struct request *rq)
@@ -313,11 +299,10 @@ static void elv_rqhash_reposition(struct request_queue *q, struct request *rq)
 static struct request *elv_rqhash_find(struct request_queue *q, sector_t offset)
 {
 	struct elevator_queue *e = q->elevator;
-	struct hlist_head *hash_list = &e->hash[ELV_HASH_FN(offset)];
 	struct hlist_node *entry, *next;
 	struct request *rq;
 
-	hlist_for_each_entry_safe(rq, entry, next, hash_list, hash) {
+	hash_for_each_possible_safe(e->hash, rq, entry, next, hash, offset) {
 		BUG_ON(!ELV_ON_HASH(rq));
 
 		if (unlikely(!rq_mergeable(rq))) {
@@ -919,6 +904,8 @@ int __elv_register_queue(struct request_queue *q, struct elevator_queue *e)
 		}
 		kobject_uevent(&e->kobj, KOBJ_ADD);
 		e->registered = 1;
+		if (e->type->ops.elevator_registered_fn)
+			e->type->ops.elevator_registered_fn(q);
 	}
 	return error;
 }
@@ -1063,7 +1050,7 @@ fail_register:
 /*
  * Switch this queue to the given IO scheduler.
  */
-int elevator_change(struct request_queue *q, const char *name)
+static int __elevator_change(struct request_queue *q, const char *name)
 {
 	char elevator_name[ELV_NAME_MAX];
 	struct elevator_type *e;
@@ -1085,6 +1072,18 @@ int elevator_change(struct request_queue *q, const char *name)
 
 	return elevator_switch(q, e);
 }
+
+int elevator_change(struct request_queue *q, const char *name)
+{
+	int ret;
+
+	/* Protect q->elevator from elevator_init() */
+	mutex_lock(&q->sysfs_lock);
+	ret = __elevator_change(q, name);
+	mutex_unlock(&q->sysfs_lock);
+
+	return ret;
+}
 EXPORT_SYMBOL(elevator_change);
 
 ssize_t elv_iosched_store(struct request_queue *q, const char *name,
@@ -1095,7 +1094,7 @@ ssize_t elv_iosched_store(struct request_queue *q, const char *name,
 	if (!q->elevator)
 		return count;
 
-	ret = elevator_change(q, name);
+	ret = __elevator_change(q, name);
 	if (!ret)
 		return count;
 

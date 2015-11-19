@@ -288,7 +288,11 @@ COMPILING the kernel:
    alternatively the LILO boot options when appropriate).  No need to
    recompile the kernel to change these parameters. 
 
- - Reboot with the new kernel and enjoy. 
+BUILD USING RADIOACTIVE SCRIPTS:
+
+ -1- Build only zimage: run radioactive-bacon-build.sh
+ -2- Build boot.img   : go to ramdisk original folder and open a command window and type "find . | cpio -o -H newc | gzip > boot.img-ramdisk.gz" without quotes this create the ramdisk needed for the boot.img then run rbuild.sh.
+ -3- Reboot with the new kernel and enjoy. 
 
 IF SOMETHING GOES WRONG:
 

@@ -823,6 +823,7 @@ static void handle_session_error(enum command_response cmd, void *data)
 	struct msm_vidc_cb_cmd_done *response = data;
 	struct hfi_device *hdev = NULL;
 	struct msm_vidc_inst *inst = NULL;
+	int rc;
 
 	if (!response) {
 		dprintk(VIDC_ERR,
@@ -842,6 +843,15 @@ static void handle_session_error(enum command_response cmd, void *data)
 	hdev = inst->core->device;
 	dprintk(VIDC_WARN, "Session error received for session %p\n", inst);
 	change_inst_state(inst, MSM_VIDC_CORE_INVALID);
+
+	mutex_lock(&inst->lock);
+	dprintk(VIDC_DBG, "cleaning up inst: %p\n", inst);
+	rc = call_hfi_op(hdev, session_clean, inst->session);
+	if (rc)
+		dprintk(VIDC_ERR, "Session (%p) clean failed: %d\n", inst, rc);
+
+	inst->session = NULL;
+	mutex_unlock(&inst->lock);
 
 	if (response->status == VIDC_ERR_MAX_CLIENTS) {
 		dprintk(VIDC_WARN,
@@ -3441,7 +3451,8 @@ int msm_vidc_check_session_supported(struct msm_vidc_inst *inst)
 	}
 	if (rc) {
 		change_inst_state(inst, MSM_VIDC_CORE_INVALID);
-		msm_comm_kill_session(inst);
+		msm_vidc_queue_v4l2_event(inst,
+					V4L2_EVENT_MSM_VIDC_HW_OVERLOAD);
 		dprintk(VIDC_WARN,
 			"%s: Hardware is overloaded\n", __func__);
 	}
@@ -3496,9 +3507,8 @@ int msm_comm_kill_session(struct msm_vidc_inst *inst)
 	 * the session send session_abort to firmware to clean up and release
 	 * the session, else just kill the session inside the driver.
 	 */
-	if ((inst->state >= MSM_VIDC_OPEN_DONE &&
-			inst->state < MSM_VIDC_CLOSE_DONE) ||
-			inst->state == MSM_VIDC_CORE_INVALID) {
+	if (inst->state >= MSM_VIDC_OPEN_DONE &&
+			inst->state < MSM_VIDC_CLOSE_DONE) {
 		struct hfi_device *hdev = inst->core->device;
 		int abort_completion = SESSION_MSG_INDEX(SESSION_ABORT_DONE);
 

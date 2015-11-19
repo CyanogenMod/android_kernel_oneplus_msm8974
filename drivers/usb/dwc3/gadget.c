@@ -638,12 +638,11 @@ static int __dwc3_gadget_ep_enable(struct dwc3_ep *dep,
 		if (!usb_endpoint_xfer_isoc(desc))
 			return 0;
 
-		memset(&trb_link, 0, sizeof(trb_link));
-
 		/* Link TRB for ISOC. The HWO bit is never reset */
 		trb_st_hw = &dep->trb_pool[0];
 
 		trb_link = &dep->trb_pool[DWC3_TRB_NUM - 1];
+		memset(trb_link, 0, sizeof(*trb_link));
 
 		trb_link->bpl = lower_32_bits(dwc3_trb_dma_offset(dep, trb_st_hw));
 		trb_link->bph = upper_32_bits(dwc3_trb_dma_offset(dep, trb_st_hw));
@@ -691,6 +690,10 @@ static int __dwc3_gadget_ep_disable(struct dwc3_ep *dep)
 	u32			reg;
 
 	dwc3_remove_requests(dwc, dep);
+
+	/* make sure HW endpoint isn't stalled */
+	if (dep->flags & DWC3_EP_STALL)
+		__dwc3_gadget_ep_set_halt(dep, 0);
 
 	reg = dwc3_readl(dwc->regs, DWC3_DALEPENA);
 	reg &= ~DWC3_DALEPENA_EP(dep->number);
@@ -1389,21 +1392,25 @@ int __dwc3_gadget_ep_set_halt(struct dwc3_ep *dep, int value)
 	if (value) {
 		ret = dwc3_send_gadget_ep_cmd(dwc, dep->number,
 			DWC3_DEPCMD_SETSTALL, &params);
-		if (ret)
-			dev_err(dwc->dev, "failed to %s STALL on %s\n",
+		if (ret) {
+			dbg_event(dep->number, "SETSTAL", ret);
+			dev_dbg(dwc->dev, "failed to %s STALL on %s\n",
 					value ? "set" : "clear",
 					dep->name);
-		else
+		} else {
 			dep->flags |= DWC3_EP_STALL;
+		}
 	} else {
 		ret = dwc3_send_gadget_ep_cmd(dwc, dep->number,
 			DWC3_DEPCMD_CLEARSTALL, &params);
-		if (ret)
-			dev_err(dwc->dev, "failed to %s STALL on %s\n",
+		if (ret) {
+			dbg_event(dep->number, "CLRSTAL", ret);
+			dev_dbg(dwc->dev, "failed to %s STALL on %s\n",
 					value ? "set" : "clear",
 					dep->name);
-		else
+		} else {
 			dep->flags &= ~(DWC3_EP_STALL | DWC3_EP_WEDGE);
+		}
 	}
 
 	return ret;
@@ -2039,11 +2046,19 @@ static void dwc3_gadget_free_endpoints(struct dwc3 *dwc)
 		dep = dwc->eps[epnum];
 		if (!dep)
 			continue;
-
-		dwc3_free_trb_pool(dep);
-
-		if (epnum != 0 && epnum != 1)
+		/*
+		* Physical endpoints 0 and 1 are special; they form the
+		* bi-directional USB endpoint 0.
+		*
+		* For those two physical endpoints, we don't allocate a TRB
+		* pool nor do we add them the endpoints list. Due to that, we
+		* shouldn't do these two operations otherwise we would end up
+		* with all sorts of bugs when removing dwc3.ko.
+		*/
+		if (epnum != 0 && epnum != 1) {
+			dwc3_free_trb_pool(dep);
 			list_del(&dep->endpoint.ep_list);
+		}
 
 		kfree(dep);
 	}
@@ -2967,8 +2982,24 @@ int __devinit dwc3_gadget_init(struct dwc3 *dwc)
 
 	dev_set_name(&dwc->gadget.dev, "gadget");
 
+	switch (dwc->maximum_speed) {
+		case DWC3_DCFG_SUPERSPEED:
+			dwc->gadget.max_speed = USB_SPEED_SUPER;
+			break;
+		case DWC3_DCFG_HIGHSPEED:
+			dwc->gadget.max_speed = USB_SPEED_HIGH;
+			break;
+		case DWC3_DCFG_FULLSPEED1:
+			dwc->gadget.max_speed = USB_SPEED_FULL;
+			break;
+		case DWC3_DCFG_LOWSPEED:
+			dwc->gadget.max_speed = USB_SPEED_LOW;
+			break;
+		default:
+			dwc->gadget.max_speed = USB_SPEED_SUPER;
+			break;
+	}
 	dwc->gadget.ops			= &dwc3_gadget_ops;
-	dwc->gadget.max_speed		= USB_SPEED_SUPER;
 	dwc->gadget.speed		= USB_SPEED_UNKNOWN;
 	dwc->gadget.dev.parent		= dwc->dev;
 	dwc->gadget.sg_supported	= true;

@@ -31,6 +31,10 @@
 #include <linux/of.h>
 #include <trace/events/power.h>
 
+#ifdef CONFIG_CPU_VOLTAGE_TABLE
+static struct cpufreq_frequency_table *dts_freq_table;
+#endif
+
 static DEFINE_MUTEX(l2bw_lock);
 
 static struct clk *cpu_clk[NR_CPUS];
@@ -100,6 +104,11 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 
 	mutex_lock(&per_cpu(cpufreq_suspend, policy->cpu).suspend_mutex);
 
+	if (target_freq == policy->cur) {
+		ret = 0;
+		goto done;
+	}
+
 	if (per_cpu(cpufreq_suspend, policy->cpu).device_suspended) {
 		pr_debug("cpufreq: cpu%d scheduling frequency change "
 				"in suspend.\n", policy->cpu);
@@ -157,9 +166,18 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 		if (cpu_clk[cpu] == cpu_clk[policy->cpu])
 			cpumask_set_cpu(cpu, policy->cpus);
 
-	if (cpufreq_frequency_table_cpuinfo(policy, table))
+	if (cpufreq_frequency_table_cpuinfo(policy, table)) {
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+		policy->cpuinfo.min_freq = CONFIG_MSM_CPU_FREQ_MIN;
+		policy->cpuinfo.max_freq = CONFIG_MSM_CPU_FREQ_MAX;
+#else
 		pr_err("cpufreq: failed to get policy min/max\n");
-
+#endif
+	}
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+        policy->min = CONFIG_MSM_CPU_FREQ_MIN;
+        policy->max = CONFIG_MSM_CPU_FREQ_MAX;
+#endif
 	cur_freq = clk_get_rate(cpu_clk[policy->cpu])/1000;
 
 	if (cpufreq_frequency_table_target(policy, table, cur_freq,
@@ -178,9 +196,15 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 			   table[index].index);
 	if (ret)
 		return ret;
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+	pr_debug("cpufreq: cpu%d init at %d switching to %d\n",
+			policy->cpu, cur_freq, policy->max);
+	policy->cur = policy->max;
+#else
 	pr_debug("cpufreq: cpu%d init at %d switching to %d\n",
 			policy->cpu, cur_freq, table[index].frequency);
 	policy->cur = table[index].frequency;
+#endif
 	cpufreq_frequency_table_get_attr(table, policy->cpu);
 
 	return 0;
@@ -366,10 +390,43 @@ static struct cpufreq_frequency_table *cpufreq_parse_dt(struct device *dev,
 	ftbl[i].index = i;
 	ftbl[i].frequency = CPUFREQ_TABLE_END;
 
+#ifdef CONFIG_CPU_VOLTAGE_TABLE
+	dts_freq_table =
+		devm_kzalloc(dev, (nf + 1) *
+			sizeof(struct cpufreq_frequency_table),
+			GFP_KERNEL);
+
+	if (!dts_freq_table)
+		return ERR_PTR(-ENOMEM);
+
+	*dts_freq_table = *ftbl;
+
+	for (i = 0; i < nf; i++)
+		dts_freq_table[i].frequency = data[i];
+
+	dts_freq_table[i].frequency = CPUFREQ_TABLE_END;
+#endif
+
 	devm_kfree(dev, data);
 
 	return ftbl;
 }
+
+#ifdef CONFIG_CPU_VOLTAGE_TABLE
+bool is_used_by_scaling(unsigned int freq)
+{
+	unsigned int i, cpu_freq;
+
+	for (i = 0; dts_freq_table[i].frequency != CPUFREQ_TABLE_END; i++) {
+		cpu_freq = dts_freq_table[i].frequency;
+		if (cpu_freq == CPUFREQ_ENTRY_INVALID)
+			continue;
+		if (freq == cpu_freq)
+			return true;
+	}
+	return false;
+}
+#endif
 
 static int __init msm_cpufreq_probe(struct platform_device *pdev)
 {

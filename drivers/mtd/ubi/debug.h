@@ -135,7 +135,7 @@ static inline int ubi_dbg_is_bgt_disabled(const struct ubi_device *ubi)
 static inline int ubi_dbg_is_bitflip(const struct ubi_device *ubi)
 {
 	if (ubi->dbg->emulate_bitflips)
-		return !(random32() % 200);
+		return !(prandom_u32() % 200);
 	return 0;
 }
 
@@ -149,7 +149,7 @@ static inline int ubi_dbg_is_bitflip(const struct ubi_device *ubi)
 static inline int ubi_dbg_is_write_failure(const struct ubi_device *ubi)
 {
 	if (ubi->dbg->emulate_io_failures)
-		return !(random32() % 500);
+		return !(prandom_u32() % 500);
 	return 0;
 }
 
@@ -163,7 +163,7 @@ static inline int ubi_dbg_is_write_failure(const struct ubi_device *ubi)
 static inline int ubi_dbg_is_erase_failure(const struct ubi_device *ubi)
 {
 	if (ubi->dbg->emulate_io_failures)
-		return !(random32() % 400);
+		return !(prandom_u32() % 400);
 	return 0;
 }
 

@@ -72,7 +72,7 @@
 #define RPMB_SERVICE			0x2000
 
 #define QSEECOM_SEND_CMD_CRYPTO_TIMEOUT	2000
-#define QSEECOM_LOAD_APP_CRYPTO_TIMEOUT	4000
+#define QSEECOM_LOAD_APP_CRYPTO_TIMEOUT	2000
 
 enum qseecom_clk_definitions {
 	CLK_DFAB = 0,
@@ -748,12 +748,6 @@ static int qseecom_set_client_mem_param(struct qseecom_dev_handle *data,
 		pr_err("Cannot get phys_addr for the Ion Client, ret = %d\n",
 			ret);
 		return ret;
-	}
-
-	if (len < req.sb_len) {
-		pr_err("Requested length (0x%x) is > allocated (0x%x)\n",
-			req.sb_len, len);
-		return -EINVAL;
 	}
 	/* Populate the structure for sending scm call to load image */
 	data->client.sb_virt = (char *) ion_map_kernel(qseecom.ion_clnt,
@@ -4411,7 +4405,7 @@ static int __devinit qseecom_probe(struct platform_device *pdev)
 		if (qseecom.support_pfe) {
 			if (of_property_read_u32((&pdev->dev)->of_node,
 				"qcom,file-encrypt-pipe-pair",
-				&qseecom.ce_info.file_encrypt_pipe)) {
+				&qseecom.ce_info.disk_encrypt_pipe)) {
 				pr_err("Fail to get PFE pipe information.\n");
 				rc = -EINVAL;
 				goto exit_destroy_ion_client;

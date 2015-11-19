@@ -70,7 +70,7 @@ static struct workqueue_struct *workqueue;
  * So we allow it it to be disabled.
  */
 bool use_spi_crc = 1;
-module_param(use_spi_crc, bool, 0);
+module_param(use_spi_crc, bool, 0644);
 
 /*
  * We normally treat cards as removed during suspend if they are not
@@ -154,8 +154,8 @@ static void mmc_should_fail_request(struct mmc_host *host,
 	    !should_fail(&host->fail_mmc_request, data->blksz * data->blocks))
 		return;
 
-	data->error = data_errors[random32() % ARRAY_SIZE(data_errors)];
-	data->bytes_xfered = (random32() % (data->bytes_xfered >> 9)) << 9;
+	data->error = data_errors[prandom_u32() % ARRAY_SIZE(data_errors)];
+	data->bytes_xfered = (prandom_u32() % (data->bytes_xfered >> 9)) << 9;
 	data->fault_injected = true;
 }
 
@@ -2040,7 +2040,7 @@ int mmc_resume_bus(struct mmc_host *host)
 	if (!mmc_bus_needs_resume(host))
 		return -EINVAL;
 
-	printk("%s: Starting deferred resume\n", mmc_hostname(host));
+	pr_debug("%s: Starting deferred resume\n", mmc_hostname(host));
 	spin_lock_irqsave(&host->lock, flags);
 	host->bus_resume_flags &= ~MMC_BUSRESUME_NEEDS_RESUME;
 	host->rescan_disable = 0;
@@ -2054,7 +2054,7 @@ int mmc_resume_bus(struct mmc_host *host)
 	}
 
 	mmc_bus_put(host);
-	printk("%s: Deferred resume completed\n", mmc_hostname(host));
+	pr_debug("%s: Deferred resume completed\n", mmc_hostname(host));
 	return 0;
 }
 
@@ -2870,11 +2870,14 @@ static bool mmc_is_vaild_state_for_clk_scaling(struct mmc_host *host,
 	 * If the current partition type is RPMB, clock switching may not
 	 * work properly as sending tuning command (CMD21) is illegal in
 	 * this mode.
+	 * In case invalid_state is set, we forbid clock scaling, unless,
+	 * its down-scale and "scale_down_in_low_wr_load" is set.
 	 */
 	if (!card || (mmc_card_mmc(card) &&
-			card->part_curr == EXT_CSD_PART_CONFIG_ACC_RPMB)
-			|| (state != MMC_LOAD_LOW &&
-				host->clk_scaling.invalid_state))
+		card->part_curr == EXT_CSD_PART_CONFIG_ACC_RPMB) ||
+		(host->clk_scaling.invalid_state &&
+		!(state == MMC_LOAD_LOW &&
+		host->clk_scaling.scale_down_in_low_wr_load)))
 		goto out;
 
 	if (mmc_send_status(card, &status)) {
@@ -3220,13 +3223,6 @@ void mmc_rescan(struct work_struct *work)
 		host->bus_ops->detect(host);
 
 	host->detect_change = 0;
-	/* If the card was removed the bus will be marked
-	 * as dead - extend the wakelock so userspace
-	 * can respond */
-	if (host->bus_dead)
-		extend_wakelock = 1;
-
-
 	/* If the card was removed the bus will be marked
 	 * as dead - extend the wakelock so userspace
 	 * can respond */

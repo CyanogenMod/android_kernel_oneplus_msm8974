@@ -823,6 +823,7 @@ int mmc_sd_get_cid(struct mmc_host *host, u32 ocr, u32 *cid, u32 *rocr)
 	 * state.  We wait 1ms to give cards time to
 	 * respond.
 	 */
+try_again:
 	mmc_go_idle(host);
 
 	/*
@@ -848,7 +849,6 @@ int mmc_sd_get_cid(struct mmc_host *host, u32 ocr, u32 *cid, u32 *rocr)
 	    MMC_CAP_SET_XPC_180))
 		ocr |= SD_OCR_XPC;
 
-try_again:
 	err = mmc_send_app_op_cond(host, ocr, rocr);
 	if (err)
 		return err;

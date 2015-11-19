@@ -19,6 +19,7 @@
 
 #include <linux/atomic.h>
 #include <asm/ptrace.h>
+#include <asm/irq.h>
 
 /*
  * These correspond to the IORESOURCE_IRQ_* defines in
@@ -199,6 +200,11 @@ devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler,
 	return devm_request_threaded_irq(dev, irq, handler, NULL, irqflags,
 					 devname, dev_id);
 }
+
+extern int __must_check
+devm_request_any_context_irq(struct device *dev, unsigned int irq,
+		 irq_handler_t handler, unsigned long irqflags,
+		 const char *devname, void *dev_id);
 
 extern void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
 
@@ -465,6 +471,8 @@ enum
 	NR_SOFTIRQS
 };
 
+#define SOFTIRQ_STOP_IDLE_MASK (~(1 << RCU_SOFTIRQ))
+
 /* map softirq index to softirq name. update 'softirq_to_name' in
  * kernel/softirq.c when adding a new softirq.
  */
@@ -481,6 +489,16 @@ struct softirq_action
 
 asmlinkage void do_softirq(void);
 asmlinkage void __do_softirq(void);
+
+#ifdef __ARCH_HAS_DO_SOFTIRQ
+void do_softirq_own_stack(void);
+#else
+static inline void do_softirq_own_stack(void)
+{
+	__do_softirq();
+}
+#endif
+
 extern void open_softirq(int nr, void (*action)(struct softirq_action *));
 extern void softirq_init(void);
 extern void __raise_softirq_irqoff(unsigned int nr);

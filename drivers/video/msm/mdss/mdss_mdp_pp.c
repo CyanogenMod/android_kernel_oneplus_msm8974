@@ -1436,7 +1436,9 @@ static int pp_histogram_setup(u32 *op, u32 block, struct mdss_mdp_mixer *mix)
 		goto error;
 	}
 
-	mutex_lock(&hist_info->hist_mutex);
+	if (!mutex_is_locked(&hist_info->hist_mutex))
+		mutex_lock(&hist_info->hist_mutex);
+
 	spin_lock_irqsave(&hist_info->hist_lock, flag);
 	if (hist_info->col_en) {
 		*op |= op_flags;
@@ -4297,7 +4299,7 @@ int mdss_mdp_ad_input(struct msm_fb_data_type *mfd,
 	mutex_lock(&ad->lock);
 	if ((!PP_AD_STATE_IS_INITCFG(ad->state) &&
 			!PP_AD_STS_IS_DIRTY(ad->sts)) &&
-			!input->mode == MDSS_AD_MODE_CALIB) {
+			((input->mode) == MDSS_AD_MODE_CALIB)) {
 		pr_warn("AD not initialized or configured.");
 		ret = -EPERM;
 		goto error;

@@ -11,7 +11,7 @@
 
 static void inject_single_bit_error(void *data, size_t size)
 {
-	unsigned long offset = random32() % (size * BITS_PER_BYTE);
+	unsigned long offset = prandom_u32() % (size * BITS_PER_BYTE);
 
 	__change_bit(offset, data);
 }

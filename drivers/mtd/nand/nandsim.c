@@ -1405,7 +1405,7 @@ int do_read_error(struct nandsim *ns, int num)
 		int i;
 		memset(ns->buf.byte, 0xFF, num);
 		for (i = 0; i < num; ++i)
-			ns->buf.byte[i] = random32();
+			ns->buf.byte[i] = prandom_u32();
 		NS_WARN("simulating read error in page %u\n", page_no);
 		return 1;
 	}
@@ -1414,12 +1414,12 @@ int do_read_error(struct nandsim *ns, int num)
 
 void do_bit_flips(struct nandsim *ns, int num)
 {
-	if (bitflips && random32() < (1 << 22)) {
+	if (bitflips && prandom_u32() < (1 << 22)) {
 		int flips = 1;
 		if (bitflips > 1)
-			flips = (random32() % (int) bitflips) + 1;
+			flips = (prandom_u32() % (int) bitflips) + 1;
 		while (flips--) {
-			int pos = random32() % (num * 8);
+			int pos = prandom_u32() % (num * 8);
 			ns->buf.byte[pos / 8] ^= (1 << (pos % 8));
 			NS_WARN("read_page: flipping bit %d in page %d "
 				"reading from %d ecc: corrected=%u failed=%u\n",

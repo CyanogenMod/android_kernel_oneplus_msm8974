@@ -426,6 +426,12 @@ static int lock_output_data(struct qpnp_bms_chip *chip)
 		pr_err("couldnt lock bms output rc = %d\n", rc);
 		return rc;
 	}
+	/*
+	 * Sleep for at least 60 microseconds here to make sure there has
+	 * been at least two cycles of the sleep clock so that the registers
+	 * are correctly locked.
+	 */
+	usleep_range(60, 2000);
 	return 0;
 }
 
@@ -605,12 +611,14 @@ static int get_battery_current(struct qpnp_bms_chip *chip, int *result_ua)
 	temp_current = div_s64((vsense_uv * 1000000LL),
 				(int)chip->r_sense_uohm);
 
+	*result_ua = temp_current;
 	rc = qpnp_iadc_comp_result(chip->iadc_dev, &temp_current);
 	if (rc)
 		pr_debug("error compensation failed: %d\n", rc);
 
+	pr_debug("%d uA err compensated ibat=%llduA\n",
+			*result_ua, temp_current);
 	*result_ua = temp_current;
-	pr_debug("err compensated ibat=%duA\n", *result_ua);
 	return 0;
 }
 
@@ -1028,7 +1036,7 @@ static int read_soc_params_raw(struct qpnp_bms_chip *chip,
 	}
 
 	rc = read_cc_raw(chip, &raw->cc, CC);
-	rc = read_cc_raw(chip, &raw->shdw_cc, SHDW_CC);
+	rc |= read_cc_raw(chip, &raw->shdw_cc, SHDW_CC);
 	if (rc) {
 		pr_err("Failed to read raw cc data, rc = %d\n", rc);
 		return rc;
@@ -2527,7 +2535,12 @@ static int recalculate_raw_soc(struct qpnp_bms_chip *chip)
 			batt_temp = (int)result.physical;
 
 			mutex_lock(&chip->last_ocv_uv_mutex);
-			read_soc_params_raw(chip, &raw, batt_temp);
+			rc = read_soc_params_raw(chip, &raw, batt_temp);
+			if (rc) {
+				pr_err("Unable to read params, rc: %d\n", rc);
+				soc = 0;
+				goto done;
+			}
 			calculate_soc_params(chip, &raw, &params, batt_temp);
 			if (!is_battery_present(chip)) {
 				pr_debug("battery gone\n");
@@ -2541,6 +2554,7 @@ static int recalculate_raw_soc(struct qpnp_bms_chip *chip)
 				soc = calculate_raw_soc(chip, &raw,
 							&params, batt_temp);
 			}
+done:
 			mutex_unlock(&chip->last_ocv_uv_mutex);
 		}
 	}
@@ -2579,8 +2593,14 @@ static int recalculate_soc(struct qpnp_bms_chip *chip)
 			batt_temp = (int)result.physical;
 
 			mutex_lock(&chip->last_ocv_uv_mutex);
-			read_soc_params_raw(chip, &raw, batt_temp);
-			soc = calculate_state_of_charge(chip, &raw, batt_temp);
+			rc = read_soc_params_raw(chip, &raw, batt_temp);
+			if (rc) {
+				pr_err("Unable to read params, rc: %d\n", rc);
+				soc = chip->calculated_soc;
+			} else {
+				soc = calculate_state_of_charge(chip,
+						&raw, batt_temp);
+			}
 			mutex_unlock(&chip->last_ocv_uv_mutex);
 		}
 	}

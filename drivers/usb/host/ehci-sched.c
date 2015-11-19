@@ -829,7 +829,7 @@ static int qh_schedule(struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
 	int		status;
 	unsigned	uframe;
-	__hc32		c_mask;
+	__hc32		c_mask = 0;
 	unsigned	frame;		/* 0..(qh->period - 1), or NO_FRAME */
 	struct ehci_qh_hw	*hw = qh->hw;
 
@@ -1684,7 +1684,7 @@ itd_link_urb (
 
 	/* don't need that schedule data any more */
 	iso_sched_free (stream, iso_sched);
-	urb->hcpriv = NULL;
+	urb->hcpriv = stream;
 
 	timer_action (ehci, TIMER_IO_WATCHDOG);
 	return enable_periodic(ehci);
@@ -2094,7 +2094,7 @@ sitd_link_urb (
 
 	/* don't need that schedule data any more */
 	iso_sched_free (stream, sched);
-	urb->hcpriv = NULL;
+	urb->hcpriv = stream;
 
 	timer_action (ehci, TIMER_IO_WATCHDOG);
 	return enable_periodic(ehci);
