@@ -214,6 +214,32 @@ config CPU_FREQ_DEFAULT_GOV_ONDEMANDPLUS
 	help
 	Use the CPUFreq governor 'ondemandplus' as default.
 
+config CPU_FREQ_DEFAULT_GOV_ADAPTIVE
+	bool "adaptive"
+	select CPU_FREQ_GOV_ADAPTIVE
+	---help---
+	  Use the CPUFreq governor 'adaptive' as default. This allows
+	  you to get a full dynamic cpu frequency capable system by simply
+	  loading your cpufreq low-level hardware driver, using the
+	  'adaptive' governor for latency-sensitive workloads and demanding
+	  performance.
+
+config CPU_FREQ_DEFAULT_GOV_BLU_ACTIVE
+	bool "blu_active"
+	select CPU_FREQ_GOV_BLU_ACTIVE
+	help
+
+config CPU_FREQ_DEFAULT_GOV_BARRY_ALLEN
+	bool "barry_allen"
+	select CPU_FREQ_GOV_BARRY_ALLEN
+	help
+
+config CPU_FREQ_DEFAULT_GOV_HYPER
+	bool "HYPER"
+	select CPU_FREQ_GOV_HYPER
+	---help---
+	  Use the CPUFreq governor 'HYPER' as default.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -428,7 +454,25 @@ config CPU_FREQ_GOV_PEGASUSQ
 	  
 config CPU_FREQ_GOV_ONDEMANDPLUS
 	tristate "'ondemandplus' cpufreq governor"
-	depends on CPU_FREQ	  
+	depends on CPU_FREQ
+
+config CPU_FREQ_GOV_ADAPTIVE
+	tristate "'adaptive' cpufreq policy governor"
+	help
+
+config CPU_FREQ_GOV_BLU_ACTIVE
+	tristate "'blu_active' cpufreq governor"
+	depends on CPU_FREQ
+
+config CPU_FREQ_GOV_BARRY_ALLEN
+	tristate "'barry_allen' cpufreq policy governor"
+	help
+
+config CPU_FREQ_GOV_HYPER
+	tristate "'HYPER' cpufreq governor"
+	depends on CPU_FREQ
+	---help---
+	  'HYPER' - a tweaked "ondemand" based smart and smooth optimized governor!	  
             
 menu "x86 CPU frequency scaling drivers"
 depends on X86
