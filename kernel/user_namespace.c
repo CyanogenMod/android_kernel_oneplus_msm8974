@@ -11,6 +11,7 @@
 #include <linux/user_namespace.h>
 #include <linux/highuid.h>
 #include <linux/cred.h>
+#include <linux/proc_fs.h>
 
 static struct kmem_cache *user_ns_cachep __read_mostly;
 
@@ -27,10 +28,17 @@ int create_user_ns(struct cred *new)
 	struct user_namespace *ns;
 	struct user_struct *root_user;
 	int n;
+	int ret;
 
 	ns = kmem_cache_alloc(user_ns_cachep, GFP_KERNEL);
 	if (!ns)
 		return -ENOMEM;
+
+	ret = proc_alloc_inum(&ns->proc_inum);
+	if (ret) {
+		kmem_cache_free(user_ns_cachep, ns);
+		return ret;
+	}
 
 	kref_init(&ns->kref);
 
@@ -73,6 +81,7 @@ static void free_user_ns_work(struct work_struct *work)
 	struct user_namespace *ns =
 		container_of(work, struct user_namespace, destroyer);
 	free_uid(ns->creator);
+	proc_free_inum(ns->proc_inum);
 	kmem_cache_free(user_ns_cachep, ns);
 }
 

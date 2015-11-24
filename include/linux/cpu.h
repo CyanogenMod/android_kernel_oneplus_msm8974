@@ -29,6 +29,7 @@ struct cpu {
 extern int register_cpu(struct cpu *cpu, int num);
 extern struct device *get_cpu_device(unsigned cpu);
 extern bool cpu_is_hotpluggable(unsigned cpu);
+extern bool arch_match_cpu_phys_id(int cpu, u64 phys_id);
 
 extern int cpu_add_dev_attr(struct device_attribute *attr);
 extern void cpu_remove_dev_attr(struct device_attribute *attr);
@@ -73,9 +74,8 @@ enum {
 	/* migration should happen before other stuff but after perf */
 	CPU_PRI_PERF		= 20,
 	CPU_PRI_MIGRATION	= 10,
-	/* bring up workqueues before normal notifiers and down after */
-	CPU_PRI_WORKQUEUE_UP	= 5,
-	CPU_PRI_WORKQUEUE_DOWN	= -5,
+	/* prepare workqueues for other notifiers */
+	CPU_PRI_WORKQUEUE	= 5,
 };
 
 #define CPU_ONLINE		0x0002 /* CPU (unsigned)v is up */

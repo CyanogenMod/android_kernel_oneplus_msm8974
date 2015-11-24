@@ -67,6 +67,7 @@ struct avc_operation_decision_node {
 struct avc_operation_node {
 	struct operation ops;
 	struct list_head od_head; /* list of operation_decision_node */
+
 };
 
 struct avc_cache {
@@ -105,6 +106,7 @@ static struct kmem_cache *avc_operation_perm_cachep;
 
 static bool force_audit = false;
 module_param(force_audit, bool, 0644);
+
 
 static inline int avc_hash(u32 ssid, u32 tsid, u16 tclass)
 {
@@ -206,6 +208,7 @@ void __init avc_init(void)
 	avc_operation_perm_cachep = kmem_cache_create("avc_operation_perm",
 				sizeof(struct operation_perm),
 				0, SLAB_PANIC, NULL);
+
 
 	audit_log(current->audit_context, GFP_KERNEL, AUDIT_KERNEL, "AVC INITIALIZED\n");
 }
@@ -345,6 +348,7 @@ static void avc_copy_operation_decision(struct operation_decision *dest,
 static inline void avc_quick_copy_operation_decision(u16 cmd,
 			struct operation_decision *dest,
 			struct operation_decision *src)
+
 {
 	/*
 	 * compute index of the u32 of the 256 bits (8 u32s) that contain this
@@ -451,6 +455,7 @@ static int avc_operation_populate(struct avc_node *node,
 	return 0;
 error:
 	avc_operation_free(dest);
+
 	return -ENOMEM;
 
 }
@@ -459,6 +464,7 @@ static inline u32 avc_operation_audit_required(u32 requested,
 					struct av_decision *avd,
 					struct operation_decision *od,
 					u16 cmd,
+
 					int result,
 					u32 *deniedp)
 {
@@ -479,6 +485,7 @@ static inline u32 avc_operation_audit_required(u32 requested,
 		if (audited && od) {
 			if (!avc_operation_has_perm(od, cmd,
 						OPERATION_AUDITALLOW))
+
 				audited &= ~requested;
 		}
 	}
@@ -491,6 +498,7 @@ static void avc_node_free(struct rcu_head *rhead)
 {
 	struct avc_node *node = container_of(rhead, struct avc_node, rhead);
 	avc_operation_free(node->ae.ops_node);
+
 	kmem_cache_free(avc_node_cachep, node);
 	avc_cache_stats_incr(frees);
 }
@@ -505,6 +513,7 @@ static void avc_node_delete(struct avc_node *node)
 static void avc_node_kill(struct avc_node *node)
 {
 	avc_operation_free(node->ae.ops_node);
+
 	kmem_cache_free(avc_node_cachep, node);
 	avc_cache_stats_incr(frees);
 	atomic_dec(&avc_cache.active_nodes);
@@ -798,6 +807,7 @@ static inline int avc_operation_audit(u32 ssid, u32 tsid, u16 tclass,
 		return 0;
 	return slow_avc_audit(ssid, tsid, tclass, requested,
 			      audited, denied, result, ad, 0);
+
 }
 
 /**
@@ -1083,6 +1093,7 @@ static noinline struct avc_node *avc_compute_av(u32 ssid, u32 tsid,
 	security_compute_av(ssid, tsid, tclass, avd, &ops_node->ops);
 	rcu_read_lock();
 	return avc_insert(ssid, tsid, tclass, avd, ops_node);
+
 }
 
 static noinline int avc_denied(u32 ssid, u32 tsid,
@@ -1113,6 +1124,7 @@ static noinline int avc_denied(u32 ssid, u32 tsid,
  */
 int avc_has_operation(u32 ssid, u32 tsid, u16 tclass, u32 requested,
 			u16 cmd, struct common_audit_data *ad)
+
 {
 	struct avc_node *node;
 	struct av_decision avd;
@@ -1128,6 +1140,7 @@ int avc_has_operation(u32 ssid, u32 tsid, u16 tclass, u32 requested,
 	int rc = 0, rc2;
 
 	ops_node = &local_ops_node;
+
 	BUG_ON(!requested);
 
 	rcu_read_lock();
@@ -1152,6 +1165,7 @@ int avc_has_operation(u32 ssid, u32 tsid, u16 tclass, u32 requested,
 	if (unlikely(!od)) {
 		/* Compute operation decision if type is flagged */
 		if (!security_operation_test(ops_node->ops.type, type)) {
+
 			avd.allowed &= ~requested;
 			goto decision;
 		}
@@ -1178,6 +1192,7 @@ decision:
 
 	rc2 = avc_operation_audit(ssid, tsid, tclass, requested,
 			&avd, od, cmd, rc, ad);
+
 	if (rc2)
 		return rc2;
 	return rc;

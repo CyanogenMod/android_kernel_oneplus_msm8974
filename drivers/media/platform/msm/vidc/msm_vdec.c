@@ -328,6 +328,26 @@ static struct msm_vidc_ctrl msm_vdec_ctrls[] = {
 		.menu_skip_mask = 0,
 		.qmenu = NULL,
 	},
+	{
+		.id = V4L2_CID_MPEG_VIDC_VIDEO_PRIORITY,
+		.name = "Session Priority",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.minimum = V4L2_MPEG_VIDC_VIDEO_PRIORITY_REALTIME_ENABLE,
+		.maximum = V4L2_MPEG_VIDC_VIDEO_PRIORITY_REALTIME_DISABLE,
+		.default_value = V4L2_MPEG_VIDC_VIDEO_PRIORITY_REALTIME_DISABLE,
+		.step = 1,
+		.qmenu = NULL,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDC_VIDEO_OPERATING_RATE,
+		.name = "Set Decoder Operating rate",
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.minimum = 0,
+		.maximum = 300 << 16,  /* 300 fps in Q16 format*/
+		.default_value = 0,
+		.step = 1,
+		.qmenu = NULL,
+	},
 };
 
 #define NUM_CTRLS ARRAY_SIZE(msm_vdec_ctrls)
@@ -1051,6 +1071,7 @@ int msm_vdec_s_fmt(struct msm_vidc_inst *inst, struct v4l2_format *f)
 		rc = msm_comm_try_state(inst, MSM_VIDC_OPEN_DONE);
 		if (rc) {
 			dprintk(VIDC_ERR, "Failed to open instance\n");
+			msm_comm_session_clean(inst);
 			goto err_invalid_fmt;
 		}
 		frame_sz.buffer_type = HAL_BUFFER_INPUT;
@@ -1180,6 +1201,7 @@ static int msm_vdec_queue_setup(struct vb2_queue *q,
 		rc = msm_comm_try_state(inst, MSM_VIDC_OPEN_DONE);
 		if (rc) {
 			dprintk(VIDC_ERR, "Failed to open instance\n");
+			msm_comm_session_clean(inst);
 			break;
 		}
 		rc = msm_comm_try_get_bufreqs(inst);
@@ -1752,6 +1774,14 @@ static int try_set_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 			"Limiting input buffer size to :%u\n", ctrl->val);
 		break;
 	}
+	case V4L2_CID_MPEG_VIDC_VIDEO_PRIORITY:
+		property_id = HAL_CONFIG_REALTIME;
+		hal_property.enable = ctrl->val;
+		pdata = &hal_property;
+		break;
+	case V4L2_CID_MPEG_VIDC_VIDEO_OPERATING_RATE:
+		property_id = 0;
+		break;
 	default:
 		break;
 	}

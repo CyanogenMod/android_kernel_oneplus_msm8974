@@ -4480,6 +4480,7 @@ static inline void setup_usemap(struct pglist_data *pgdat, struct zone *zone,
 
 /* Initialise the number of pages represented by NR_PAGEBLOCK_BITS */
 static inline void __init set_pageblock_order(void)
+
 {
 	unsigned int order;
 
@@ -4508,6 +4509,7 @@ static inline void __init set_pageblock_order(void)
  * the kernel config
  */
 static inline void set_pageblock_order(void)
+
 {
 }
 

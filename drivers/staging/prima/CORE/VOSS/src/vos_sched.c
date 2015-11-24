@@ -29,9 +29,6 @@
   @file vos_sched.c
   @brief VOS Scheduler Implementation
 
-  Copyright (c) 2011 QUALCOMM Incorporated.
-  All Rights Reserved.
-  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 /*===========================================================================
                        EDIT HISTORY FOR FILE
@@ -423,9 +420,6 @@ VosMCThread
         /*
         ** Service the WDI message queue
         */
-        VOS_TRACE(VOS_MODULE_ID_WDI, VOS_TRACE_LEVEL_INFO,
-                  ("Servicing the VOS MC WDI Message queue"));
-
         pMsgWrapper = vos_mq_get(&pSchedContext->wdiMcMq);
 
         if (pMsgWrapper == NULL)
@@ -624,20 +618,6 @@ VosMCThread
   complete_and_exit(&pSchedContext->McShutdown, 0);
 } /* VosMCThread() */
 
-v_BOOL_t isWDresetInProgress(void)
-{
-   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
-                "%s: Reset is in Progress...",__func__);
-   if(gpVosWatchdogContext!=NULL)
-   {
-      return gpVosWatchdogContext->resetInProgress;
-   }
-   else
-   {
-      return FALSE;
-   }
-}
-
 v_BOOL_t isSsrPanicOnFailure(void)
 {
     hdd_context_t *pHddCtx = NULL;
@@ -820,6 +800,8 @@ VosWDThread
         else
         {
           pWdContext->isFatalError = false;
+          pHddCtx->isLogpInProgress = FALSE;
+          vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, FALSE);
         }
         atomic_set(&pHddCtx->isRestartInProgress, 0);
         pWdContext->resetInProgress = false;
@@ -1575,7 +1557,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->sysMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_ERROR,
+               VOS_TRACE_LEVEL_INFO,
                "%s: Freeing MC SYS message type %d ",__func__,
                pMsgWrapper->pVosMsg->type );
     sysMcFreeMsg(pSchedContext->pVContext, pMsgWrapper->pVosMsg);
@@ -1586,7 +1568,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   {
     if(pMsgWrapper->pVosMsg != NULL) 
     {
-        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                    "%s: Freeing MC WDA MSG message type %d",
                    __func__, pMsgWrapper->pVosMsg->type );
         if (pMsgWrapper->pVosMsg->bodyptr) {
@@ -1605,7 +1587,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   {
     if(pMsgWrapper->pVosMsg != NULL)
     {
-        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                    "%s: Freeing MC WDI MSG message type %d",
                    __func__, pMsgWrapper->pVosMsg->type );
 
@@ -1638,7 +1620,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->peMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_ERROR,
+               VOS_TRACE_LEVEL_INFO,
                "%s: Freeing MC PE MSG message type %d",__func__,
                pMsgWrapper->pVosMsg->type );
     peFreeMsg(vosCtx->pMACContext, (tSirMsgQ*)pMsgWrapper->pVosMsg);
@@ -1648,7 +1630,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->smeMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_ERROR,
+               VOS_TRACE_LEVEL_INFO,
                "%s: Freeing MC SME MSG message type %d", __func__,
                pMsgWrapper->pVosMsg->type );
     sme_FreeMsg(vosCtx->pMACContext, pMsgWrapper->pVosMsg);
@@ -1658,7 +1640,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->tlMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_ERROR,
+               VOS_TRACE_LEVEL_INFO,
                "%s: Freeing MC TL message type %d",__func__,
                pMsgWrapper->pVosMsg->type );
     WLANTL_McFreeMsg(pSchedContext->pVContext, pMsgWrapper->pVosMsg);
@@ -1907,6 +1889,7 @@ VOS_STATUS vos_watchdog_wlan_shutdown(void)
         /* wcnss has crashed, and SSR has alredy been started by Kernel driver.
          * So disable SSR from WLAN driver */
         hdd_set_ssr_required( HDD_SSR_DISABLED );
+
         /* Release the lock here before returning */
         spin_unlock(&gpVosWatchdogContext->wdLock);
         return VOS_STATUS_E_FAILURE;
@@ -1972,8 +1955,6 @@ void vos_ssr_protect(const char *caller_func)
 {
      int count;
      count = atomic_inc_return(&ssr_protect_entry_count);
-     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-               "%s: ENTRY ACTIVE %d", caller_func, count);
 }
 
 /**
@@ -1988,6 +1969,4 @@ void vos_ssr_unprotect(const char *caller_func)
 {
    int count;
    count = atomic_dec_return(&ssr_protect_entry_count);
-   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-               "%s: ENTRY INACTIVE %d", caller_func, count);
 }

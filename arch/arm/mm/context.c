@@ -21,6 +21,8 @@
 #include <asm/thread_notify.h>
 #include <asm/tlbflush.h>
 
+#include <mach/msm_rtb.h>
+
 /*
  * On ARMv6, we have the following structure in the Context ID:
  *

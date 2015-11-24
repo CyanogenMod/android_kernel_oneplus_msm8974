@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,12 +19,11 @@
 #include <linux/io.h>
 #include <linux/list.h>
 #include <linux/delay.h>
-#include <linux/avtimer.h>
+#include <linux/avtimer_kernel.h>
 #include <media/v4l2-subdev.h>
 #include <media/msmb_isp.h>
 #include <mach/msm_bus.h>
 #include <mach/msm_bus_board.h>
-
 #include "msm_buf_mgr.h"
 
 #define MAX_IOMMU_CTX 2
@@ -35,10 +34,6 @@
 #define MAX_NUM_STATS_COMP_MASK 2
 #define MAX_INIT_FRAME_DROP 31
 #define ISP_Q2 (1 << 2)
-
-#define AVTIMER_MSW_PHY_ADDR 0xFE05300C
-#define AVTIMER_LSW_PHY_ADDR 0xFE053008
-#define AVTIMER_ITERATION_CTR 16
 
 #define VFE_PING_FLAG 0xFFFFFFFF
 #define VFE_PONG_FLAG 0x0
@@ -69,6 +64,12 @@ enum msm_isp_camif_update_state {
 	ENABLE_CAMIF,
 	DISABLE_CAMIF,
 	DISABLE_CAMIF_IMMEDIATELY
+};
+
+enum msm_isp_reset_type {
+	ISP_RST_HARD,
+	ISP_RST_SOFT,
+	ISP_RST_MAX
 };
 
 struct msm_isp_timestamp {
@@ -142,12 +143,13 @@ struct msm_vfe_axi_ops {
 	uint32_t (*get_wm_mask) (uint32_t irq_status0, uint32_t irq_status1);
 	uint32_t (*get_comp_mask) (uint32_t irq_status0, uint32_t irq_status1);
 	uint32_t (*get_pingpong_status) (struct vfe_device *vfe_dev);
-	long (*halt) (struct vfe_device *vfe_dev);
+	long (*halt) (struct vfe_device *vfe_dev, uint32_t blocking);
 };
 
 struct msm_vfe_core_ops {
 	void (*reg_update) (struct vfe_device *vfe_dev);
-	long (*reset_hw) (struct vfe_device *vfe_dev);
+	long (*reset_hw) (struct vfe_device *vfe_dev,
+		enum msm_isp_reset_type reset_type, uint32_t blocking);
 	int (*init_hw) (struct vfe_device *vfe_dev);
 	void (*init_hw_reg) (struct vfe_device *vfe_dev);
 	void (*release_hw) (struct vfe_device *vfe_dev);
@@ -161,6 +163,12 @@ struct msm_vfe_core_ops {
 	int (*get_platform_data) (struct vfe_device *vfe_dev);
 	void (*get_error_mask) (uint32_t *error_mask0, uint32_t *error_mask1);
 	void (*process_error_status) (struct vfe_device *vfe_dev);
+	void (*get_overflow_mask) (uint32_t *overflow_mask);
+	void (*get_irq_mask) (struct vfe_device *vfe_dev,
+		uint32_t *irq0_mask, uint32_t *irq1_mask);
+	void (*restore_irq_mask) (struct vfe_device *vfe_dev);
+	void (*get_halt_restart_mask) (uint32_t *irq0_mask,
+		uint32_t *irq1_mask);
 };
 struct msm_vfe_stats_ops {
 	int (*get_stats_idx) (enum msm_isp_stats_type stats_type);
@@ -270,7 +278,6 @@ struct msm_vfe_axi_stream {
 	uint32_t stream_handle;
 	uint8_t buf_divert;
 	enum msm_vfe_axi_stream_type stream_type;
-	uint32_t vt_enable;
 	uint32_t frame_based;
 	uint32_t framedrop_period;
 	uint32_t framedrop_pattern;
@@ -292,6 +299,15 @@ struct msm_vfe_axi_stream {
 	uint32_t runtime_num_burst_capture;
 	uint8_t runtime_framedrop_update;
 	uint32_t runtime_output_format;
+	enum msm_vfe_frame_skip_pattern frame_skip_pattern;
+
+};
+
+enum msm_vfe_overflow_state {
+	NO_OVERFLOW,
+	OVERFLOW_DETECTED,
+	HALT_REQUESTED,
+	RESTART_REQUESTED,
 };
 
 struct msm_vfe_axi_composite_info {
@@ -374,6 +390,7 @@ struct msm_vfe_stats_shared_data {
 	atomic_t stats_comp_mask;
 	uint16_t stream_handle_cnt;
 	atomic_t stats_update;
+	uint32_t stats_mask;
 };
 
 struct msm_vfe_tasklet_queue_cmd {
@@ -387,6 +404,9 @@ struct msm_vfe_tasklet_queue_cmd {
 #define MSM_VFE_TASKLETQ_SIZE 200
 
 struct msm_vfe_error_info {
+	atomic_t overflow_state;
+	uint32_t overflow_recover_irq_mask0;
+	uint32_t overflow_recover_irq_mask1;
 	uint32_t error_mask0;
 	uint32_t error_mask1;
 	uint32_t violation_status;
@@ -395,6 +415,29 @@ struct msm_vfe_error_info {
 	uint32_t stats_framedrop_count[MSM_ISP_STATS_MAX];
 	uint32_t info_dump_frame_count;
 	uint32_t error_count;
+};
+
+struct msm_vfe_frame_ts {
+	struct timeval buf_time;
+	uint32_t frame_id;
+};
+
+struct msm_isp_statistics {
+	int32_t imagemaster0_overflow;
+	int32_t imagemaster1_overflow;
+	int32_t imagemaster2_overflow;
+	int32_t imagemaster3_overflow;
+	int32_t imagemaster4_overflow;
+	int32_t imagemaster5_overflow;
+	int32_t imagemaster6_overflow;
+	int32_t be_overflow;
+	int32_t bg_overflow;
+	int32_t bf_overflow;
+	int32_t awb_overflow;
+	int32_t rs_overflow;
+	int32_t cs_overflow;
+	int32_t ihist_overflow;
+	int32_t skinbhist_overflow;
 };
 
 struct vfe_device {
@@ -439,14 +482,14 @@ struct vfe_device {
 	struct msm_vfe_axi_shared_data axi_data;
 	struct msm_vfe_stats_shared_data stats_data;
 	struct msm_vfe_error_info error_info;
+	struct msm_vfe_frame_ts frame_ts;
 	struct msm_isp_buf_mgr *buf_mgr;
 	int dump_reg;
 	int vfe_clk_idx;
 	uint32_t vfe_open_cnt;
 	uint8_t vt_enable;
-	void __iomem *p_avtimer_msw;
-	void __iomem *p_avtimer_lsw;
 	uint8_t ignore_error;
+	struct msm_isp_statistics *stats;
 };
 
 #endif

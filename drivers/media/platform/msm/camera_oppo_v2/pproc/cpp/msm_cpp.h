@@ -79,7 +79,7 @@
 #define MSM_CPP_START_ADDRESS		0x0
 #define MSM_CPP_END_ADDRESS			0x3F00
 
-#define MSM_CPP_POLL_RETRIES		20
+#define MSM_CPP_POLL_RETRIES		200
 #define MSM_CPP_TASKLETQ_SIZE		16
 #define MSM_CPP_TX_FIFO_LEVEL		16
 
@@ -182,6 +182,7 @@ struct cpp_device {
 	char *fw_name_bin;
 	struct workqueue_struct *timer_wq;
 	struct msm_cpp_work_t *work;
+	uint32_t fw_version;
 	uint8_t stream_cnt;
 	uint8_t timeout_trial_cnt;
 

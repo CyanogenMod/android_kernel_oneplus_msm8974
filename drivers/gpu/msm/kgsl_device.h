@@ -17,6 +17,7 @@
 #include <linux/idr.h>
 #include <linux/pm_qos.h>
 #include <linux/sched.h>
+#include <linux/workqueue.h>
 
 #include "kgsl.h"
 #include "kgsl_mmu.h"
@@ -54,13 +55,17 @@
 
 #define KGSL_IS_PAGE_ALIGNED(addr) (!((addr) & (~PAGE_MASK)))
 
-/*
- * KGSL event types - these are passed to the event callback when the event
- * expires or is cancelled
+/**
+ * enum kgsl_event_results - result codes passed to an event callback when the
+ * event is retired or cancelled
+ * @KGSL_EVENT_RETIRED: The timestamp associated with the event retired
+ * successflly
+ * @KGSL_EVENT_CANCELLED: The event was cancelled before the event was fired
  */
-
-#define KGSL_EVENT_TIMESTAMP_RETIRED 0
-#define KGSL_EVENT_CANCELLED 1
+enum kgsl_event_results {
+	KGSL_EVENT_RETIRED = 1,
+	KGSL_EVENT_CANCELLED = 2,
+};
 
 #define KGSL_FLAG_WAKE_ON_TOUCH BIT(0)
 
@@ -69,8 +74,11 @@
  */
 
 #define KGSL_EVENT_TYPES \
-	{ KGSL_EVENT_TIMESTAMP_RETIRED, "retired" }, \
+	{ KGSL_EVENT_RETIRED, "retired" }, \
 	{ KGSL_EVENT_CANCELLED, "cancelled" }
+
+#define KGSL_CONTEXT_ID(_context) \
+	((_context != NULL) ? (_context)->id : KGSL_MEMSTORE_GLOBAL)
 
 struct kgsl_device;
 struct platform_device;
@@ -150,16 +158,67 @@ struct kgsl_mh {
 	int              mpu_range;
 };
 
-typedef void (*kgsl_event_func)(struct kgsl_device *, void *, u32, u32, u32);
+typedef void (*kgsl_event_func)(struct kgsl_device *, struct kgsl_context *,
+		void *, int);
 
+/**
+ * struct kgsl_event - KGSL GPU timestamp event
+ * @device: Pointer to the KGSL device that owns the event
+ * @context: Pointer to the context that owns the event
+ * @timestamp: Timestamp for the event to expire
+ * @func: Callback function for for the event when it expires
+ * @priv: Private data passed to the callback function
+ * @node: List node for the kgsl_event_group list
+ * @created: Jiffies when the event was created
+ * @work: Work struct for dispatching the callback
+ * @result: KGSL event result type to pass to the callback
+ */
 struct kgsl_event {
+	struct kgsl_device *device;
 	struct kgsl_context *context;
-	uint32_t timestamp;
+	unsigned int timestamp;
 	kgsl_event_func func;
 	void *priv;
-	struct list_head list;
-	void *owner;
+	struct list_head node;
 	unsigned int created;
+	struct work_struct work;
+	int result;
+};
+
+/**
+ * struct event_group - A list of GPU events
+ * @context: Pointer to the active context for the events
+ * @lock: Spinlock for protecting the list
+ * @events: List of active GPU events
+ * @group: Node for the master group list
+ * @processed: Last processed timestamp
+ */
+struct kgsl_event_group {
+	struct kgsl_context *context;
+	spinlock_t lock;
+	struct list_head events;
+	struct list_head group;
+	unsigned int processed;
+};
+
+/* Flag to mark the memobj_node as a preamble */
+#define MEMOBJ_PREAMBLE BIT(0)
+/* Flag to mark that the memobj_node should not go to the hadrware */
+#define MEMOBJ_SKIP BIT(1)
+
+/**
+ * struct kgsl_memobj_node - Memory object descriptor
+ * @node: Local list node for the cmdbatch
+ * @cmdbatch: Cmdbatch the node belongs to
+ * @addr: memory start address
+ * @sizedwords: size of memory @addr
+ * @flags: any special case flags
+ */
+struct kgsl_memobj_node {
+	struct list_head node;
+	unsigned long gpuaddr;
+	size_t sizedwords;
+	unsigned long priv;
 };
 
 /**
@@ -172,12 +231,14 @@ struct kgsl_event {
  * @fault_policy: Internal policy describing how to handle this command in case
  * of a fault
  * @fault_recovery: recovery actions actually tried for this batch
- * @ibcount: Number of IBs in the command list
- * @ibdesc: Pointer to the list of IBs
  * @expires: Point in time when the cmdbatch is considered to be hung
  * @refcount: kref structure to maintain the reference count
+ * @cmdlist: List of IBs to issue
+ * @memlist: List of all memory used in this command batch
  * @synclist: List of context/timestamp tuples to wait for before issuing
  * @timer: a timer used to track possible sync timeouts for this cmdbatch
+ * @marker_timestamp: For markers, the timestamp of the last "real" command that
+ * was queued
  *
  * This struture defines an atomic batch of command buffers issued from
  * userspace.
@@ -191,12 +252,13 @@ struct kgsl_cmdbatch {
 	unsigned long priv;
 	unsigned long fault_policy;
 	unsigned long fault_recovery;
-	uint32_t ibcount;
-	struct kgsl_ibdesc *ibdesc;
 	unsigned long expires;
 	struct kref refcount;
+	struct list_head cmdlist;
+	struct list_head memlist;
 	struct list_head synclist;
 	struct timer_list timer;
+	unsigned int marker_timestamp;
 };
 
 /**
@@ -293,27 +355,25 @@ struct kgsl_device {
 	int pwr_log;
 	struct kgsl_pwrscale pwrscale;
 	struct kobject pwrscale_kobj;
-	struct work_struct ts_expired_ws;
-	struct list_head events;
-	struct list_head events_pending_list;
-	unsigned int events_last_timestamp;
+	struct work_struct event_work;
 
 	int reset_counter; /* Track how many GPU core resets have occured */
 	int cff_dump_enable;
+	struct workqueue_struct *events_wq;
+
+	struct kgsl_event_group global_events;
+	struct kgsl_event_group iommu_events;
 };
 
-void kgsl_process_events(struct work_struct *work);
 
 #define KGSL_DEVICE_COMMON_INIT(_dev) \
 	.hwaccess_gate = COMPLETION_INITIALIZER((_dev).hwaccess_gate),\
 	.cmdbatch_gate = COMPLETION_INITIALIZER((_dev).cmdbatch_gate),\
 	.idle_check_ws = __WORK_INITIALIZER((_dev).idle_check_ws,\
 			kgsl_idle_check),\
-	.ts_expired_ws  = __WORK_INITIALIZER((_dev).ts_expired_ws,\
+	.event_work  = __WORK_INITIALIZER((_dev).event_work,\
 			kgsl_process_events),\
 	.context_idr = IDR_INIT((_dev).context_idr),\
-	.events = LIST_HEAD_INIT((_dev).events),\
-	.events_pending_list = LIST_HEAD_INIT((_dev).events_pending_list), \
 	.wait_queue = __WAIT_QUEUE_HEAD_INITIALIZER((_dev).wait_queue),\
 	.active_cnt_wq = __WAIT_QUEUE_HEAD_INITIALIZER((_dev).active_cnt_wq),\
 	.mutex = __MUTEX_INITIALIZER((_dev).mutex),\
@@ -341,8 +401,8 @@ struct kgsl_process_private;
  * bad timestamp
  * @timeline: sync timeline used to create fences that can be signaled when a
  * sync_pt timestamp expires
- * @events: list head of pending events for this context
- * @events_list: list node for the list of all contexts that have pending events
+ * @events: A kgsl_event_group for this context - contains the list of GPU
+ * events
  * @pid: process that owns this context.
  * @tid: task that created this context.
  * @pagefault_ts: global timestamp of the pagefault, if KGSL_CONTEXT_PAGEFAULT
@@ -364,8 +424,7 @@ struct kgsl_context {
 	unsigned int reset_status;
 	bool wait_on_invalid_ts;
 	struct sync_timeline *timeline;
-	struct list_head events;
-	struct list_head events_list;
+	struct kgsl_event_group events;
 	unsigned int pagefault_ts;
 	unsigned int flags;
 	struct kgsl_pwr_constraint pwr_constraint;
@@ -425,12 +484,6 @@ struct kgsl_device_private {
 };
 
 struct kgsl_device *kgsl_get_device(int dev_idx);
-
-int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
-	kgsl_event_func func, void *priv, void *owner);
-
-void kgsl_cancel_event(struct kgsl_device *device, struct kgsl_context *context,
-		unsigned int timestamp, kgsl_event_func func, void *priv);
 
 static inline void kgsl_process_add_stats(struct kgsl_process_private *priv,
 	unsigned int type, size_t size)
@@ -531,6 +584,27 @@ const char *kgsl_pwrstate_to_str(unsigned int state);
 int kgsl_device_snapshot_init(struct kgsl_device *device);
 int kgsl_device_snapshot(struct kgsl_device *device, int hang);
 void kgsl_device_snapshot_close(struct kgsl_device *device);
+
+void kgsl_events_init(void);
+void kgsl_events_exit(void);
+
+void kgsl_del_event_group(struct kgsl_event_group *group);
+void kgsl_add_event_group(struct kgsl_event_group *group,
+		struct kgsl_context *context);
+
+void kgsl_cancel_events_timestamp(struct kgsl_device *device,
+		struct kgsl_event_group *group, unsigned int timestamp);
+void kgsl_cancel_events(struct kgsl_device *device,
+		struct kgsl_event_group *group);
+void kgsl_cancel_event(struct kgsl_device *device,
+		struct kgsl_event_group *group, unsigned int timestamp,
+		kgsl_event_func func, void *priv);
+int kgsl_add_event(struct kgsl_device *device, struct kgsl_event_group *group,
+		unsigned int timestamp, kgsl_event_func func, void *priv);
+void kgsl_process_event_group(struct kgsl_device *device,
+	struct kgsl_event_group *group);
+
+void kgsl_process_events(struct work_struct *work);
 
 static inline struct kgsl_device_platform_data *
 kgsl_device_get_drvdata(struct kgsl_device *dev)
@@ -669,32 +743,6 @@ static inline struct kgsl_context *kgsl_context_get_owner(
 	return context;
 }
 
-/**
- * kgsl_context_cancel_events() - Cancel all events for a context
- * @device:  Pointer to the KGSL device structure for the GPU
- * @context: Pointer to the KGSL context
- *
- * Signal all pending events on the context with KGSL_EVENT_CANCELLED
- */
-static inline void kgsl_context_cancel_events(struct kgsl_device *device,
-	struct kgsl_context *context)
-{
-	kgsl_signal_events(device, context, KGSL_EVENT_CANCELLED);
-}
-
-/**
- * kgsl_context_cancel_events_timestamp() - cancel events for a given timestamp
- * @device: Pointer to the KGSL device that owns the context
- * @context: Pointer to the context that owns the event or NULL for global
- * @timestamp: Timestamp to cancel events for
- *
- * Cancel events pending for a specific timestamp
- */
-static inline void kgsl_cancel_events_timestamp(struct kgsl_device *device,
-	struct kgsl_context *context, unsigned int timestamp)
-{
-	kgsl_signal_event(device, context, timestamp, KGSL_EVENT_CANCELLED);
-}
 void kgsl_dump_syncpoints(struct kgsl_device *device,
 	struct kgsl_cmdbatch *cmdbatch);
 

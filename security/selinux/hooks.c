@@ -2642,9 +2642,9 @@ static int selinux_sb_statfs(struct dentry *dentry)
 	return superblock_has_perm(cred, dentry->d_sb, FILESYSTEM__GETATTR, &ad);
 }
 
-static int selinux_mount(char *dev_name,
+static int selinux_mount(const char *dev_name,
 			 struct path *path,
-			 char *type,
+			 const char *type,
 			 unsigned long flags,
 			 void *data)
 {
@@ -3152,6 +3152,8 @@ int ioctl_has_perm(const struct cred *cred, struct file *file,
 	u32 ssid = cred_sid(cred);
 	struct selinux_audit_data sad = {0,};
 	int rc;
+	u8 driver = cmd >> 8;
+	u8 xperm = cmd & 0xff;
 
 	COMMON_AUDIT_DATA_INIT(&ad, IOCTL_OP);
 	ad.u.op = &ioctl;

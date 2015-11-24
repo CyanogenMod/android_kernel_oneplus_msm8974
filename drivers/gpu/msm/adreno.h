@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -43,6 +43,7 @@
 #define KGSL_CMD_FLAGS_WFI              BIT(2)
 #define KGSL_CMD_FLAGS_PROFILE		BIT(3)
 #define KGSL_CMD_FLAGS_PWRON_FIXUP      BIT(4)
+#define KGSL_CMD_FLAGS_MEMLIST          BIT(5)
 
 /* Command identifiers */
 #define KGSL_CONTEXT_TO_MEM_IDENTIFIER	0x2EADBEEF
@@ -128,7 +129,6 @@ enum coresight_debug_reg {
  * submitted operation
  * @work: work_struct to put the dispatcher in a work queue
  * @kobj: kobject for the dispatcher directory in the device sysfs node
- * @idle_gate: Gate to wait on for dispatcher to idle
  */
 struct adreno_dispatcher {
 	struct mutex mutex;
@@ -144,12 +144,10 @@ struct adreno_dispatcher {
 	unsigned int tail;
 	struct work_struct work;
 	struct kobject kobj;
-	struct completion idle_gate;
 };
 
 enum adreno_dispatcher_flags {
 	ADRENO_DISPATCHER_POWER = 0,
-	ADRENO_DISPATCHER_ACTIVE = 1,
 };
 
 struct adreno_gpudev;
@@ -208,7 +206,6 @@ struct adreno_device {
 
 	struct work_struct input_work;
 	unsigned int ram_cycles_lo;
-	atomic_t halt;
 };
 
 /**
@@ -222,7 +219,6 @@ enum adreno_device_flags {
 	ADRENO_DEVICE_PWRON_FIXUP = 1,
 	ADRENO_DEVICE_INITIALIZED = 2,
 	ADRENO_DEVICE_STARTED = 3,
-	ADRENO_DEVICE_HANG_INTR = 4,
 };
 
 #define PERFCOUNTER_FLAG_NONE 0x0
@@ -316,7 +312,6 @@ enum adreno_regs {
 	ADRENO_REG_CP_IB2_BASE,
 	ADRENO_REG_CP_IB2_BUFSZ,
 	ADRENO_REG_CP_TIMESTAMP,
-	ADRENO_REG_CP_HW_FAULT,
 	ADRENO_REG_SCRATCH_ADDR,
 	ADRENO_REG_SCRATCH_UMSK,
 	ADRENO_REG_SCRATCH_REG2,
@@ -445,6 +440,12 @@ struct log_field {
 	{ BIT(KGSL_FT_THROTTLE), "throttle"}, \
 	{ BIT(KGSL_FT_SKIPCMD), "skipcmd" }
 
+#define ADRENO_CMDBATCH_FLAGS \
+	{ KGSL_CMDBATCH_CTX_SWITCH, "CTX_SWITCH" }, \
+	{ KGSL_CMDBATCH_SYNC, "SYNC" }, \
+	{ KGSL_CMDBATCH_END_OF_FRAME, "EOF" }, \
+	{ KGSL_CMDBATCH_PWR_CONSTRAINT, "PWR_CONSTRAINT" }
+
 extern struct adreno_gpudev adreno_a3xx_gpudev;
 
 /* A3XX register set defined in adreno_a3xx.c */
@@ -465,7 +466,6 @@ void adreno_coresight_remove(struct platform_device *pdev);
 int adreno_coresight_init(struct platform_device *pdev);
 
 bool adreno_hw_isidle(struct kgsl_device *device);
-int adreno_spin_idle(struct kgsl_device *device);
 int adreno_idle(struct kgsl_device *device);
 bool adreno_isidle(struct kgsl_device *device);
 
@@ -490,8 +490,8 @@ void *adreno_snapshot(struct kgsl_device *device, void *snapshot, int *remain,
 void adreno_dispatcher_start(struct kgsl_device *device);
 int adreno_dispatcher_init(struct adreno_device *adreno_dev);
 void adreno_dispatcher_close(struct adreno_device *adreno_dev);
-int adreno_dispatcher_idle(struct adreno_device *adreno_dev);
-int adreno_dispatcher_idle_unsafe(struct adreno_device *adreno_dev);
+int adreno_dispatcher_idle(struct adreno_device *adreno_dev,
+		unsigned int timeout);
 void adreno_dispatcher_irq_fault(struct kgsl_device *device);
 void adreno_dispatcher_stop(struct adreno_device *adreno_dev);
 
@@ -771,7 +771,7 @@ static inline void adreno_debugfs_init(struct kgsl_device *device) { }
 
 /**
  * adreno_gpu_fault() - Return the current state of the GPU
- * @adreno_dev: A pointer to the adreno_device to query
+ * @adreno_dev: A ponter to the adreno_device to query
  *
  * Return 0 if there is no fault or positive with the last type of fault that
  * occurred
@@ -796,7 +796,6 @@ static inline void adreno_set_gpu_fault(struct adreno_device *adreno_dev,
 	smp_wmb();
 }
 
-
 /**
  * adreno_clear_gpu_fault() - Clear the GPU fault register
  * @adreno_dev: A pointer to an adreno_device structure
@@ -809,47 +808,6 @@ static inline void adreno_clear_gpu_fault(struct adreno_device *adreno_dev)
 	atomic_set(&adreno_dev->dispatcher.fault, 0);
 	smp_wmb();
 }
-
-/**
- * adreno_gpu_halt() - Return the GPU halt refcount
- * @adreno_dev: A pointer to the adreno_device
- */
-static inline int adreno_gpu_halt(struct adreno_device *adreno_dev)
-{
-	smp_rmb();
-	return atomic_read(&adreno_dev->halt);
-}
-
-
-/**
- * adreno_clear_gpu_halt() - Clear the GPU halt refcount
- * @adreno_dev: A pointer to the adreno_device
- */
-static inline void adreno_clear_gpu_halt(struct adreno_device *adreno_dev)
-{
-	atomic_set(&adreno_dev->halt, 0);
-	smp_wmb();
-}
-
-/**
- * adreno_get_gpu_halt() - Increment GPU halt refcount
- * @adreno_dev: A pointer to the adreno_device
- */
-static inline void adreno_get_gpu_halt(struct adreno_device *adreno_dev)
-{
-	atomic_inc(&adreno_dev->halt);
-}
-
-/**
- * adreno_put_gpu_halt() - Decrement GPU halt refcount
- * @adreno_dev: A pointer to the adreno_device
- */
-static inline void adreno_put_gpu_halt(struct adreno_device *adreno_dev)
-{
-	if (atomic_dec_return(&adreno_dev->halt) < 0)
-		BUG();
-}
-
 
 /*
  * adreno_bootstrap_ucode() - Checks if Ucode bootstrapping is supported

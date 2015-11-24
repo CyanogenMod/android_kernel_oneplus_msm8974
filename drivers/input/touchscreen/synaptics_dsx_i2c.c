@@ -2429,7 +2429,7 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 		case SYNA_ONE_FINGER_DOUBLE_TAP:
 			gesturemode = DouTap;
 			if (atomic_read(&syna_rmi4_data->double_tap_enable))
-				keyvalue = KEY_DOUBLE_TAP;
+				keyvalue = KEY_POWER;
 			break;
 
 		case SYNA_ONE_FINGER_DIRECTION:
@@ -3844,7 +3844,7 @@ static void synaptics_rmi4_set_params(struct synaptics_rmi4_data *rmi4_data)
 	set_bit(KEY_MENU, rmi4_data->input_dev->keybit);
 	set_bit(KEY_HOMEPAGE, rmi4_data->input_dev->keybit);
 	set_bit(KEY_F3, rmi4_data->input_dev->keybit);
-	set_bit(KEY_DOUBLE_TAP, rmi4_data->input_dev->keybit);
+	set_bit(KEY_POWER, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_CIRCLE, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_SWIPE_DOWN, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_V, rmi4_data->input_dev->keybit);
