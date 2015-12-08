@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013,2015 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -56,7 +56,6 @@
 #define WCNSS_ENABLE_PC_LATENCY	PM_QOS_DEFAULT_VALUE
 #define WCNSS_PM_QOS_TIMEOUT	15000
 #define WAIT_FOR_CBC_IND     2
-#define IS_CAL_DATA_PRESENT     0
 
 /* module params */
 #define WCNSS_CONFIG_UNSPECIFIED (-1)
@@ -894,21 +893,6 @@ static void wcnss_log_iris_regs(void)
 	}
 }
 
-int wcnss_get_mux_control(void)
-{
-	void __iomem *pmu_conf_reg;
-	u32 reg = 0;
-
-	if (NULL == penv)
-		return 0;
-
-	pmu_conf_reg = penv->msm_wcnss_base + PRONTO_PMU_OFFSET;
-	reg = readl_relaxed(pmu_conf_reg);
-	reg |= WCNSS_PMU_CFG_GC_BUS_MUX_SEL_TOP;
-	writel_relaxed(reg, pmu_conf_reg);
-	return 1;
-}
-
 void wcnss_log_debug_regs_on_bite(void)
 {
 	struct platform_device *pdev = wcnss_get_platform_device();
@@ -931,10 +915,6 @@ void wcnss_log_debug_regs_on_bite(void)
 
 		if (clk_rate) {
 			wcnss_pronto_log_debug_regs();
-#ifdef CONFIG_WCNSS_REGISTER_DUMP_ON_BITE
-			if (wcnss_get_mux_control())
-				wcnss_log_iris_regs();
-#endif
 		} else {
 			pr_err("clock frequency is zero, cannot access PMU or other registers\n");
 			wcnss_log_iris_regs();
@@ -948,10 +928,6 @@ void wcnss_reset_intr(void)
 {
 	if (wcnss_hardware_type() == WCNSS_PRONTO_HW) {
 		wcnss_pronto_log_debug_regs();
-#ifdef CONFIG_WCNSS_REGISTER_DUMP_ON_BITE
-		if (wcnss_get_mux_control())
-			wcnss_log_iris_regs();
-#endif
 		wmb();
 		__raw_writel(1 << 16, penv->fiq_reg);
 	} else {
@@ -961,27 +937,6 @@ void wcnss_reset_intr(void)
 	}
 }
 EXPORT_SYMBOL(wcnss_reset_intr);
-
-void wcnss_reset_fiq(bool clk_chk_en)
-{
-	if (wcnss_hardware_type() == WCNSS_PRONTO_HW) {
-		if (clk_chk_en) {
-			wcnss_log_debug_regs_on_bite();
-		} else {
-			wcnss_pronto_log_debug_regs();
-#ifdef CONFIG_WCNSS_REGISTER_DUMP_ON_BITE
-			if (wcnss_get_mux_control())
-				wcnss_log_iris_regs();
-#endif
-		}
-		/* Insert memory barrier before writing fiq register */
-		wmb();
-		__raw_writel(1 << 16, penv->fiq_reg);
-	} else {
-		wcnss_riva_log_debug_regs();
-	}
-}
-EXPORT_SYMBOL(wcnss_reset_fiq);
 
 static int wcnss_create_sysfs(struct device *dev)
 {
@@ -1030,20 +985,20 @@ static void wcnss_remove_sysfs(struct device *dev)
 
 static void wcnss_pm_qos_add_request(void)
 {
-	pr_info("%s: add request\n", __func__);
+	pr_info("%s: add request", __func__);
 	pm_qos_add_request(&penv->wcnss_pm_qos_request, PM_QOS_CPU_DMA_LATENCY,
 			PM_QOS_DEFAULT_VALUE);
 }
 
 static void wcnss_pm_qos_remove_request(void)
 {
-	pr_info("%s: remove request\n", __func__);
+	pr_info("%s: remove request", __func__);
 	pm_qos_remove_request(&penv->wcnss_pm_qos_request);
 }
 
 void wcnss_pm_qos_update_request(int val)
 {
-	pr_info("%s: update request %d\n", __func__, val);
+	pr_info("%s: update request %d", __func__, val);
 	pm_qos_update_request(&penv->wcnss_pm_qos_request, val);
 }
 
@@ -1861,10 +1816,8 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 		smd_read(penv->smd_ch, NULL, len);
 		return;
 	}
-	if (len < sizeof(struct smd_msg_hdr)) {
-		pr_err("wcnss: incomplete header available len = %d\n", len);
+	if (len <= 0)
 		return;
-	}
 
 	rc = smd_read(penv->smd_ch, buf, sizeof(struct smd_msg_hdr));
 	if (rc < sizeof(struct smd_msg_hdr)) {
@@ -2261,7 +2214,7 @@ static void wcnss_nvbin_dnld_main(struct work_struct *worker)
 	if (!FW_CALDATA_CAPABLE())
 		goto nv_download;
 
-	if (!penv->fw_cal_available && IS_CAL_DATA_PRESENT
+	if (!penv->fw_cal_available && WCNSS_CONFIG_UNSPECIFIED
 		!= has_calibrated_data && !penv->user_cal_available) {
 		while (!penv->user_cal_available && retry++ < 5)
 			msleep(500);
@@ -2680,30 +2633,6 @@ fail_gpio_res:
 	penv = NULL;
 	return ret;
 }
-
-/* wlan prop driver cannot invoke cancel_work_sync
- * function directly, so to invoke this function it
- * call wcnss_flush_work function
- */
-void wcnss_flush_work(struct work_struct *work)
-{
-	struct work_struct *cnss_work = work;
-	if (cnss_work != NULL)
-		cancel_work_sync(cnss_work);
-}
-EXPORT_SYMBOL(wcnss_flush_work);
-
-/* wlan prop driver cannot invoke cancel_delayed_work_sync
- * function directly, so to invoke this function it call
- * wcnss_flush_delayed_work function
- */
-void wcnss_flush_delayed_work(struct delayed_work *dwork)
-{
-	struct delayed_work *cnss_dwork = dwork;
-	if (cnss_dwork != NULL)
-		cancel_delayed_work_sync(cnss_dwork);
-}
-EXPORT_SYMBOL(wcnss_flush_delayed_work);
 
 static int wcnss_node_open(struct inode *inode, struct file *file)
 {

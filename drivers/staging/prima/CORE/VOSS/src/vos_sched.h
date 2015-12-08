@@ -42,6 +42,9 @@
    by vOSS.
     
   
+   Copyright 2008 (c) Qualcomm, Incorporated.  All Rights Reserved.
+   
+   Qualcomm Confidential and Proprietary.
   
   ========================================================================*/
 
@@ -334,11 +337,6 @@ typedef struct _VosContextType
    /* NV BIN Version */
    eNvVersionType     nvVersion;
 
-   /* Roam delay statistic enabled in ini*/
-   v_U8_t             roamDelayStatsEnabled;
-
-   /*Fw log complete Event*/
-   vos_event_t fwLogsComplete;
 } VosContextType, *pVosContextType;
 
 
@@ -501,6 +499,7 @@ void clearWlanResetReason(void);
 void vos_timer_module_init( void );
 VOS_STATUS vos_watchdog_wlan_shutdown(void);
 VOS_STATUS vos_watchdog_wlan_re_init(void);
+v_BOOL_t isWDresetInProgress(void);
 v_BOOL_t isSsrPanicOnFailure(void);
 void vos_ssr_protect(const char *caller_func);
 void vos_ssr_unprotect(const char *caller_func);

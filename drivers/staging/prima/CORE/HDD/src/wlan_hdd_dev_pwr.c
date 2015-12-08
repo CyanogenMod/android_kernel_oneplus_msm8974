@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -47,7 +47,6 @@
  * Include Files
  * -------------------------------------------------------------------------*/
 #include <wlan_hdd_dev_pwr.h>
-#include <vos_sched.h>
 #ifdef ANI_BUS_TYPE_PLATFORM
 #include <linux/wcnss_wlan.h>
 #else
@@ -322,21 +321,21 @@ static void wlan_resume(hdd_context_t* pHddCtx)
    @return None
 
 ----------------------------------------------------------------------------*/
-int __hddDevSuspendHdlr(struct device *dev)
+int hddDevSuspendHdlr(struct device *dev)
 {
    int ret = 0;
    hdd_context_t* pHddCtx = NULL;
 
-   ENTER();
-
    pHddCtx =  (hdd_context_t*)wcnss_wlan_get_drvdata(dev);
 
+   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: WLAN suspended by platform driver",__func__);
+
    /* Get the HDD context */
-   ret = wlan_hdd_validate_context(pHddCtx);
-   if (0 != ret)
-   {
-       return ret;
+   if(!pHddCtx) {
+      VOS_TRACE(VOS_MODULE_ID_HDD,VOS_TRACE_LEVEL_FATAL,"%s: HDD context is Null",__func__);
+      return 0;
    }
+
    if(pHddCtx->isWlanSuspended == TRUE)
    {
       VOS_TRACE(VOS_MODULE_ID_HDD,VOS_TRACE_LEVEL_FATAL,"%s: WLAN is already in suspended state",__func__);
@@ -358,19 +357,7 @@ int __hddDevSuspendHdlr(struct device *dev)
       suspend_notify_sent = true;
    }
 #endif
-
-   EXIT();
    return 0;
-}
-
-int hddDevSuspendHdlr(struct device *dev)
-{
-    int ret;
-    vos_ssr_protect(__func__);
-    ret = __hddDevSuspendHdlr(dev);
-    vos_ssr_unprotect(__func__);
-
-    return ret;
 }
 
 /*----------------------------------------------------------------------------
@@ -384,19 +371,14 @@ int hddDevSuspendHdlr(struct device *dev)
    @return None
 
 ----------------------------------------------------------------------------*/
-int __hddDevResumeHdlr(struct device *dev)
+int hddDevResumeHdlr(struct device *dev)
 {
    hdd_context_t* pHddCtx = NULL;
-   int ret = 0;
-
-   ENTER();
 
    pHddCtx =  (hdd_context_t*)wcnss_wlan_get_drvdata(dev);
-   ret = wlan_hdd_validate_context(pHddCtx);
-   if (0 != ret)
-   {
-       return ret;
-   }
+
+   VOS_TRACE(VOS_MODULE_ID_HDD,VOS_TRACE_LEVEL_INFO, "%s: WLAN being resumed by Android OS",__func__);
+
    if(pHddCtx->isWlanSuspended != TRUE)
    {
       VOS_TRACE(VOS_MODULE_ID_HDD,VOS_TRACE_LEVEL_FATAL,"%s: WLAN is already in resumed state",__func__);
@@ -412,19 +394,8 @@ int __hddDevResumeHdlr(struct device *dev)
       suspend_notify_sent = false;
    }
 #endif
-   EXIT();
+
    return 0;
-}
-
-int hddDevResumeHdlr(struct device *dev)
-{
-    int ret;
-
-    vos_ssr_protect(__func__);
-    ret = __hddDevResumeHdlr(dev);
-    vos_ssr_unprotect(__func__);
-
-    return ret;
 }
 
 static const struct dev_pm_ops pm_ops = {
@@ -448,7 +419,10 @@ static const struct dev_pm_ops pm_ops = {
 ----------------------------------------------------------------------------*/
 VOS_STATUS hddRegisterPmOps(hdd_context_t *pHddCtx)
 {
+    wcnss_wlan_set_drvdata(pHddCtx->parent_dev, pHddCtx);
+#ifndef FEATURE_R33D
     wcnss_wlan_register_pm_ops(pHddCtx->parent_dev, &pm_ops);
+#endif /* FEATURE_R33D */
     return VOS_STATUS_SUCCESS;
 }
 
@@ -467,7 +441,9 @@ VOS_STATUS hddRegisterPmOps(hdd_context_t *pHddCtx)
 ----------------------------------------------------------------------------*/
 VOS_STATUS hddDeregisterPmOps(hdd_context_t *pHddCtx)
 {
+#ifndef FEATURE_R33D
     wcnss_wlan_unregister_pm_ops(pHddCtx->parent_dev, &pm_ops);
+#endif /* FEATURE_R33D */
     return VOS_STATUS_SUCCESS;
 }
 
@@ -486,19 +462,21 @@ void hddDevTmTxBlockTimeoutHandler(void *usrData)
 {
    hdd_context_t        *pHddCtx = (hdd_context_t *)usrData;
    hdd_adapter_t        *staAdapater;
-
-   ENTER();
-   if (0 != (wlan_hdd_validate_context(pHddCtx)))
+   /* Sanity, This should not happen */
+   if(NULL == pHddCtx)
    {
-       return;
+      VOS_TRACE(VOS_MODULE_ID_HDD,VOS_TRACE_LEVEL_ERROR,
+                "%s: NULL Context", __func__);
+      VOS_ASSERT(0);
+      return;
    }
 
    staAdapater = hdd_get_adapter(pHddCtx, WLAN_HDD_INFRA_STATION);
 
-   if ((NULL == staAdapater) || (WLAN_HDD_ADAPTER_MAGIC != staAdapater->magic))
+   if(NULL == staAdapater)
    {
       VOS_TRACE(VOS_MODULE_ID_HDD,VOS_TRACE_LEVEL_ERROR,
-                FL("invalid Adapter %p"), staAdapater);
+                "%s: NULL Adapter", __func__);
       VOS_ASSERT(0);
       return;
    }
@@ -512,12 +490,11 @@ void hddDevTmTxBlockTimeoutHandler(void *usrData)
    pHddCtx->tmInfo.txFrameCount = 0;
 
    /* Resume TX flow */
-   hddLog(VOS_TRACE_LEVEL_INFO, FL("Enabling queues"));
+    
    netif_tx_wake_all_queues(staAdapater->dev);
    pHddCtx->tmInfo.qBlocked = VOS_FALSE;
    mutex_unlock(&pHddCtx->tmInfo.tmOperationLock);
 
-   EXIT();
    return;
 }
 

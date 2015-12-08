@@ -796,20 +796,22 @@ EXPORT_SYMBOL(usb_wwan_release);
 int usb_wwan_suspend(struct usb_serial *serial, pm_message_t message)
 {
 	struct usb_wwan_intf_private *intfdata = serial->private;
+	int b;
 
 	dbg("%s entered", __func__);
 
-	spin_lock_irq(&intfdata->susp_lock);
 	if (PMSG_IS_AUTO(message)) {
-		if (intfdata->in_flight || pm_runtime_autosuspend_expiration(&serial->dev->dev))
-			spin_unlock_irq(&intfdata->susp_lock);
+		spin_lock_irq(&intfdata->susp_lock);
+		b = intfdata->in_flight;
+		spin_unlock_irq(&intfdata->susp_lock);
+
+		if (b || pm_runtime_autosuspend_expiration(&serial->dev->dev))
 			return -EBUSY;
-		}
 	}
 
+	spin_lock_irq(&intfdata->susp_lock);
 	intfdata->suspended = 1;
 	spin_unlock_irq(&intfdata->susp_lock);
-
 	stop_read_write_urbs(serial);
 
 	return 0;
@@ -817,12 +819,11 @@ int usb_wwan_suspend(struct usb_serial *serial, pm_message_t message)
 EXPORT_SYMBOL(usb_wwan_suspend);
 
 static void play_delayed(struct usb_serial_port *port)
-
 {
 	struct usb_wwan_intf_private *data;
 	struct usb_wwan_port_private *portdata;
 	struct urb *urb;
-	int err = 0;
+	int err;
 
 	portdata = usb_get_serial_port_data(port);
 	data = port->serial->private;
@@ -841,8 +842,6 @@ static void play_delayed(struct usb_serial_port *port)
 			break;
 		}
 	}
-
-	return err;
 }
 
 int usb_wwan_resume(struct usb_serial *serial)
@@ -852,8 +851,7 @@ int usb_wwan_resume(struct usb_serial *serial)
 	struct usb_wwan_intf_private *intfdata = serial->private;
 	struct usb_wwan_port_private *portdata;
 	struct urb *urb;
-	int err;
-	int err_count = 0;
+	int err = 0;
 
 	dbg("%s entered", __func__);
 
@@ -865,7 +863,7 @@ int usb_wwan_resume(struct usb_serial *serial)
 		portdata = usb_get_serial_port_data(port);
 
 		/* skip closed ports */
-		if (!portdata || !portdata->opened)
+		if (!portdata->opened)
 			continue;
 
 		if (port->interrupt_in_urb) {
@@ -875,7 +873,6 @@ int usb_wwan_resume(struct usb_serial *serial)
 				dev_err(&port->dev,
 					"%s: submit int urb failed: %d\n",
 					__func__, err);
-
 			}
 		}
 
@@ -894,17 +891,16 @@ int usb_wwan_resume(struct usb_serial *serial)
 				    __func__, err, j, urb, i);
 				usb_unanchor_urb(urb);
 				intfdata->suspended = 1;
-				err_count++;
+				spin_unlock_irq(&intfdata->susp_lock);
+				goto err_out;
 			}
 		}
+		play_delayed(port);
 	}
-	intfdata->suspended = 0;
 	spin_unlock_irq(&intfdata->susp_lock);
 
-	if (err_count)
-		return -EIO;
-
-	return 0;
+err_out:
+	return err;
 }
 EXPORT_SYMBOL(usb_wwan_resume);
 #endif

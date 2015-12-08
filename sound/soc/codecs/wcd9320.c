@@ -3792,6 +3792,7 @@ static int taiko_codec_enable_anc(struct snd_soc_dapm_widget *w,
 			snd_soc_write(codec, reg, (old_val & ~mask) |
 				(val & mask));
 		}
+		release_firmware(fw);
 		if (!hwdep_cal)
 			release_firmware(fw);
 		break;

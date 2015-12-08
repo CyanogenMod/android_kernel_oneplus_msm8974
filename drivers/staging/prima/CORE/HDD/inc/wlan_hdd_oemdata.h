@@ -33,6 +33,9 @@
   
   \brief Internal includes for the oem data
   
+               Copyright 2008 (c) Qualcomm, Incorporated.
+               All Rights Reserved.
+               Qualcomm Confidential and Proprietary.
   
   ==========================================================================*/
 

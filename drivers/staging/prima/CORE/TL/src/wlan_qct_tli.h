@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -122,7 +122,6 @@ when        who    what, where, why
 
 /*WAPI protocol type */
 #define WLANTL_LLC_WAI_TYPE              0x88b4
-#define WLANTL_ETHERTYPE_ARP             0x0806
 
 #ifdef FEATURE_WLAN_TDLS
 #define WLANTL_LLC_TDLS_TYPE             0x890d
@@ -168,8 +167,6 @@ when        who    what, where, why
 #define WLANTL_MGMT_FRAME_TYPE       0x00
 #define WLANTL_CTRL_FRAME_TYPE       0x10
 #define WLANTL_DATA_FRAME_TYPE       0x20
-
-#define WLANTL_MGMT_PROBE_REQ_FRAME_TYPE    0x04
 
 /*Value of the data type field in the 802.11 frame */
 #define WLANTL_80211_DATA_TYPE         0x02
@@ -579,7 +576,7 @@ typedef struct
   v_U8_t                        ucMPDUHeaderLen;
 
   /* Enabled ACs currently serviced by TL (automatic setup in TL)*/
-  v_U8_t                        aucACMask[WLANTL_NUM_TX_QUEUES];
+  v_U8_t                        aucACMask[WLANTL_MAX_AC];
 
   /* Current AC to be retrieved */
   WLANTL_ACEnumType             ucCurrentAC;
@@ -696,9 +693,6 @@ typedef struct
 
   WLANTL_InterfaceStatsType         interfaceStats;
 #endif
-  /* BD Rate for transmitting ARP packets */
-  v_U8_t arpRate;
-  v_BOOL_t arpOnWQ5;
 }WLANTL_STAClientType;
 
 /*---------------------------------------------------------------------------
@@ -871,8 +865,6 @@ typedef struct
   /* Current served station ID in round-robin method to traverse all stations.*/
   WLANTL_ACEnumType uCurServedAC;
 
-  WLANTL_SpoofMacAddr   spoofMacAddr;
-
   /* How many weights have not been served in current AC. */
   v_U8_t ucCurLeftWeight;
 
@@ -894,9 +886,6 @@ typedef struct
   v_BOOL_t                  isBMPS;
   /* Whether WDA_DS_TX_START_XMIT msg is pending or not */
   v_BOOL_t   isTxTranmitMsgPending;
-  WLANTL_MonRxCBType           pfnMonRx;
-  v_BOOL_t              isConversionReq;
-
 }WLANTL_CbType;
 
 /*==========================================================================
@@ -1393,15 +1382,9 @@ WLANTL_Translate80211To8023Header
   v_U8_t          ucHeaderLen,
   WLANTL_CbType*  pTLCb,
   v_U8_t          ucSTAId,
-  v_BOOL_t       bForwardIAPPwithLLC
+  v_BOOL_t	  bForwardIAPPwithLLC
 );
 
-VOS_STATUS
-WLANTL_MonTranslate80211To8023Header
-(
-  vos_pkt_t*      vosDataBuff,
-  WLANTL_CbType*  pTLCb
-);
 /*==========================================================================
   FUNCTION    WLANTL_FindFrameTypeBcMcUc
 

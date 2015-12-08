@@ -32,9 +32,6 @@
 
 #define USB_QUIRK_OTG_PET		0x00000080
 
-/* device generates spurious wakeup, ignore remote wakeup capability */
-#define USB_QUIRK_IGNORE_REMOTE_WAKEUP	0x00000200
-
 /* device can't handle device_qualifier descriptor requests */
 #define USB_QUIRK_DEVICE_QUALIFIER	0x00000100
 

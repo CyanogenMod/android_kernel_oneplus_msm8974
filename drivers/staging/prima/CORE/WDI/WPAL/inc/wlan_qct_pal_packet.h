@@ -76,7 +76,7 @@
 #define VPKT_SIZE_BUFFER  ((30 * 128) + 32)
 
 /* Transport channel count to report DIAG */
-#define WPT_NUM_TRPT_CHANNEL      8
+#define WPT_NUM_TRPT_CHANNEL      4
 /* Transport channel name string size */
 #define WPT_TRPT_CHANNEL_NAME     4
 
@@ -412,40 +412,4 @@ void wpalPacketStallDumpLog
 );
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 
-/*---------------------------------------------------------------------------
-    wpalLogPktSerialize - Serialize Logging data to logger thread
-
-    Param:
-    wpt_packet pFrame - The packet which contains the logging data.
-                        This packet has to be a VALID packet, as this
-                        API will not do any checks on the validity of
-                        the packet.
-
-    Return:
-        NONE
-
----------------------------------------------------------------------------*/
-void wpalLogPktSerialize
-(
-   wpt_packet *pFrame
-);
-
-
-/*---------------------------------------------------------------------------
-    wpalFwLogPktSerialize - Serialize Logging data to logger thread
-
-    Param:
-    wpt_packet pFrame - The packet which contains the logging data.
-                        This packet has to be a VALID packet, as this
-                        API will not do any checks on the validity of
-                        the packet.
-
-    Return:
-        NONE
-
----------------------------------------------------------------------------*/
-void wpalFwLogPktSerialize
-(
-   wpt_packet *pFrame
-);
 #endif // __WLAN_QCT_PAL_PACKET_H

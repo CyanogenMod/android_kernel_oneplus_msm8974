@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013,2015 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,7 +29,7 @@ enum wcnss_hw_type {
 struct wcnss_wlan_config {
 	int		use_48mhz_xo;
 	int	is_pronto_v3;
-	int	iris_id;
+	void __iomem	*msm_wcnss_base;
 };
 
 enum {
@@ -45,8 +45,6 @@ enum {
 #define HAVE_CBC_DONE 1
 #define HAVE_WCNSS_RX_BUFF_COUNT 1
 #define WLAN_MAC_ADDR_SIZE (6)
-#define PRONTO_PMU_OFFSET       0x1004
-#define WCNSS_PMU_CFG_GC_BUS_MUX_SEL_TOP   BIT(5)
 
 void wcnss_get_monotonic_boottime(struct timespec *ts);
 struct device *wcnss_wlan_get_device(void);
@@ -78,7 +76,6 @@ int wcnss_hardware_type(void);
 void *wcnss_prealloc_get(unsigned int size);
 int wcnss_prealloc_put(void *ptr);
 void wcnss_reset_intr(void);
-void wcnss_reset_fiq(bool clk_chk_en);
 void wcnss_suspend_notify(void);
 void wcnss_resume_notify(void);
 void wcnss_riva_log_debug_regs(void);
@@ -91,10 +88,6 @@ void wcnss_riva_dump_pmic_regs(void);
 int wcnss_xo_auto_detect_enabled(void);
 u32 wcnss_get_wlan_rx_buff_count(void);
 int wcnss_wlan_iris_xo_mode(void);
-void wcnss_flush_work(struct work_struct *work);
-void wcnss_flush_delayed_work(struct delayed_work *dwork);
-int wcnss_get_iris_name(char *iris_version);
-
 #ifdef CONFIG_WCNSS_REGISTER_DUMP_ON_BITE
 void wcnss_log_debug_regs_on_bite(void);
 #else

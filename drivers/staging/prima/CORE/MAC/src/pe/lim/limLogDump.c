@@ -33,6 +33,9 @@ limLogDump.c
 
 Implements the dump commands specific to the lim module. 
 
+Copyright (c) 2007 QUALCOMM Incorporated.
+All Rights Reserved.
+Qualcomm Confidential and Proprietary
  ============================================================================*/
 
 #include "vos_types.h"

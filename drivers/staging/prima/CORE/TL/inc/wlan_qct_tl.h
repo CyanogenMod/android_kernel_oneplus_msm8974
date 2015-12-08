@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -102,10 +102,7 @@ when        who    what, where, why
 #define WLANTL_LLC_SNAP_OFFSET                0
 
 /*Size of the LLC/SNAP header*/
-#define WLANTL_LLC_SNAP_SIZE                  8
-
-/* Number of Tx Queues, this should be same as NUM_TX_QUEUES in HDD */
-#define WLANTL_NUM_TX_QUEUES                  5
+#define WLANTL_LLC_SNAP_SIZE                   8
 
 /*============================================================================
  *     GENERIC STRUCTURES - not belonging to TL 
@@ -156,25 +153,11 @@ when        who    what, where, why
  --------------------------------------------------------------------------*/
 typedef enum
 {
-  /* The values from 0-3 correspond both to the TL tx queue
-   * id and the also the AC corresponding to the packets queued
-   */
   WLANTL_AC_BK = 0,
   WLANTL_AC_BE = 1,
   WLANTL_AC_VI = 2,
-  WLANTL_AC_VO = 3,
-  /* WLANTL_AC_HIGH_PRIO corresponds to the new queue
-   * added for handling eapol/wapi/dhcp packets. The AC for the
-   * packets in this queue has to be extracted separately
-   */
-  WLANTL_AC_HIGH_PRIO = 4
+  WLANTL_AC_VO = 3
 }WLANTL_ACEnumType; 
-
-typedef struct
-{
-   v_MACADDR_t    selfMac;
-   v_MACADDR_t    spoofMac;
-}WLANTL_SpoofMacAddr;
 
 /*---------------------------------------------------------------------------
   STA Type
@@ -319,7 +302,7 @@ typedef struct
 typedef struct
 {
   /*AC weight for WFQ*/
-  v_U8_t   ucAcWeights[WLANTL_NUM_TX_QUEUES];
+  v_U8_t   ucAcWeights[WLANTL_MAX_AC]; 
 
   /*Delayed trigger frame timmer: - used by TL to send trigger frames less 
     often when it has established that the App is suspended*/
@@ -406,9 +389,6 @@ typedef enum
 ---------------------------------------------------------------------------*/      
 typedef struct
 {
-  /* Save the AC of the packet */
-  WLANTL_ACEnumType ac;
-
   /* TID of the packet being sent */
   v_U8_t    ucTID;
 
@@ -440,7 +420,6 @@ typedef struct
   v_BOOL_t  bMorePackets;
   /* notifying TL if this is an ARP frame or not */
   v_U8_t    ucIsArp;
-  v_U32_t   ucTxBdToken;
 }WLANTL_MetaInfoType;
 
 /*---------------------------------------------------------------------------
@@ -691,9 +670,6 @@ typedef VOS_STATUS (*WLANTL_STAFetchPktCBType)(
                                             vos_pkt_t**           vosDataBuff,
                                             WLANTL_MetaInfoType*  tlMetaInfo);
 
-typedef VOS_STATUS (*WLANTL_MonRxCBType)( v_PVOID_t              pvosGCtx,
-                                          vos_pkt_t*             vosDataBuff,
-                                          int                    conversion);
 /*----------------------------------------------------------------------------
 
   DESCRIPTION   
@@ -1118,8 +1094,6 @@ WLANTL_ConfigureSwFrameTXXlationForAll
   v_BOOL_t enableFrameXlation
 );
 
-VOS_STATUS WLANTL_SetMonRxCbk(v_PVOID_t pvosGCtx, WLANTL_MonRxCBType pfnMonRx);
-void WLANTL_SetIsConversionReq(v_PVOID_t pvosGCtx, v_BOOL_t isConversionReq);
 /*===========================================================================
 
   FUNCTION    WLANTL_RegisterSTAClient
@@ -1836,42 +1810,6 @@ WLANTL_FlushStaTID
 
 /*==========================================================================
 
-  FUNCTION    WLANTL_updateSpoofMacAddr
-
-  DESCRIPTION
-    Called by HDD to update macaddr
-
-  DEPENDENCIES
-    TL must be initialized before this API can be called.
-
-  PARAMETERS
-
-    IN
-    pvosGCtx:           pointer to the global vos context; a handle to
-                        TL's control block can be extracted from its context
-    spoofMacAddr:     spoofed mac adderess
-    selfMacAddr:        self Mac Address
-
-  RETURN VALUE
-    The result code associated with performing the operation
-
-    VOS_STATUS_E_INVAL:  Input parameters are invalid
-    VOS_STATUS_E_FAULT:  pointer to TL cb is NULL ; access would cause a
-                         page fault
-    VOS_STATUS_SUCCESS:  Everything is good :)
-
-  SIDE EFFECTS
-
-============================================================================*/
-VOS_STATUS
-WLANTL_updateSpoofMacAddr
-(
-  v_PVOID_t               pvosGCtx,
-  v_MACADDR_t*            spoofMacAddr,
-  v_MACADDR_t*            selfMacAddr
-);
-/*==========================================================================
-
   FUNCTION    WLANTL_RegisterMgmtFrmClient
 
   DESCRIPTION 
@@ -2008,8 +1946,7 @@ WLANTL_TxMgmtFrm
   v_U8_t               tid,
   WLANTL_TxCompCBType  pfnCompTxFunc,
   v_PVOID_t            voosBDHeader,
-  v_U32_t              ucAckResponse,
-  v_U32_t              ucTxBdToken
+  v_U32_t              ucAckResponse
 );
 
 
@@ -2222,41 +2159,6 @@ WLANTL_GetRxPktCount
   v_U8_t         ucSTAId,
   v_U8_t         ucTid,
   v_U32_t*       puRxPktCount
-);
-
-/*==========================================================================
-
-  FUNCTION    WLANTL_IsEAPOLPending
-
-  DESCRIPTION
-
-    HDD calls this function when hdd_tx_timeout occurs. This checks whether
-    EAPOL is pending.
-
-  DEPENDENCIES
-
-    HDD must have registered with TL at least one STA before this function
-    can be called.
-
-  PARAMETERS
-
-    IN
-    pvosGCtx:       pointer to the global vos context
-
-  RETURN VALUE
-
-    The result code associated with performing the operation
-
-    Success : Indicates EAPOL frame is pending and sta is in connected state
-
-    Failure : EAPOL frame is not pending
-
-  SIDE EFFECTS
-============================================================================*/
-VOS_STATUS
-WLANTL_IsEAPOLPending
-(
-  v_PVOID_t     pvosGCtx
 );
 
 /*==========================================================================
@@ -2945,15 +2847,15 @@ void WLANTL_PostResNeeded(v_PVOID_t pvosGCtx);
 
   DESCRIPTION
      This function is used by HDD to notify TL to finish Upper layer authentication
-     incase the last EAPOL packet is pending in the TL queue.
-     To avoid the race condition between sme set key and the last EAPOL packet
+     incase the last EAPOL packet is pending in the TL queue. 
+     To avoid the race condition between sme set key and the last EAPOL packet 
      the HDD module calls this function just before calling the sme_RoamSetKey.
-
+   
   DEPENDENCIES
 
     TL must have been initialized before this gets called.
 
-
+   
   PARAMETERS
 
    callbackRoutine:   HDD Callback function.
@@ -2962,9 +2864,9 @@ void WLANTL_PostResNeeded(v_PVOID_t pvosGCtx);
   RETURN VALUE
 
    VOS_STATUS_SUCCESS/VOS_STATUS_FAILURE
-
+   
   SIDE EFFECTS
-
+   
 ============================================================================*/
 
 VOS_STATUS WLANTL_Finish_ULA( void (*callbackRoutine) (void *callbackContext),

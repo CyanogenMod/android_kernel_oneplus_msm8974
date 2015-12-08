@@ -185,7 +185,6 @@ void prandom_seed(u32 entropy)
 
 		state->s1 = __seed(state->s1 ^ entropy, 2U);
 		prandom_warmup(state);
-
 	}
 }
 EXPORT_SYMBOL(prandom_seed);
@@ -206,7 +205,6 @@ static int __init prandom_init(void)
 
 		prandom_seed_early(state, weak_seed, true);
 		prandom_warmup(state);
-
 	}
 
 	return 0;
@@ -277,7 +275,6 @@ static void __prandom_reseed(bool late)
 		state->s2 = __seed(seeds[1],   8U);
 		state->s3 = __seed(seeds[2],  16U);
 		state->s4 = __seed(seeds[3], 128U);
-
 
 		prandom_warmup(state);
 	}

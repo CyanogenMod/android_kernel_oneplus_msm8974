@@ -38,6 +38,9 @@
   
   \brief prototype for SME internal structures and APIs used for SME and MAC
   
+   Copyright 2008 (c) Qualcomm, Incorporated.  All Rights Reserved.
+   
+   Qualcomm Confidential and Proprietary.
   
   ========================================================================*/
 
@@ -52,7 +55,6 @@
 #include "vos_memory.h"
 #include "vos_types.h"
 #include "csrLinkList.h"
-#include "vos_diag_core_event.h"
 
 /*-------------------------------------------------------------------------- 
   Type declarations
@@ -73,8 +75,6 @@ typedef enum eSmeCommandType
     eSmeCommandAddStaSession,
     eSmeCommandDelStaSession,
     eSmeCommandPnoReq,
-    eSmeCommandMacSpoofRequest,
-    eSmeCommandGetFrameLogRequest,
 #ifdef FEATURE_WLAN_TDLS
     //eSmeTdlsCommandMask = 0x80000,  //To identify TDLS commands <TODO>
     //These can be considered as csr commands. 
@@ -83,8 +83,14 @@ typedef enum eSmeCommandType
     eSmeCommandTdlsDelPeer, 
     eSmeCommandTdlsLinkEstablish,
     eSmeCommandTdlsChannelSwitch, // tdlsoffchan
+#ifdef FEATURE_WLAN_TDLS_INTERNAL
+    eSmeCommandTdlsDiscovery,
+    eSmeCommandTdlsLinkSetup,
+    eSmeCommandTdlsLinkTear,
+    eSmeCommandTdlsEnterUapsd,
+    eSmeCommandTdlsExitUapsd,
 #endif
-    eSmeCommandNanReq,
+#endif
     //PMC
     eSmePmcCommandMask = 0x20000, //To identify PMC commands
     eSmeCommandEnterImps,
@@ -163,8 +169,6 @@ typedef struct tagSmeStruct
    void *pEXTScanCallbackContext;
 #endif /* WLAN_FEATURE_EXTSCAN */
    tSmeEncMsgHddCbkInfo pEncMsgInfoParams;
-   void (*pBtCoexTDLSNotification) (void *pAdapter, int);
-   void (*nanCallback) (void*, tSirNanEvent*);
 
 } tSmeStruct, *tpSmeStruct;
 

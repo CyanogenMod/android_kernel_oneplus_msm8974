@@ -33,6 +33,9 @@
                
    Definitions for platform Windows and with legacy UMAC.
   
+   Copyright 2010 (c) Qualcomm, Incorporated.  All Rights Reserved.
+   
+   Qualcomm Confidential and Proprietary.
   
   ========================================================================*/
 

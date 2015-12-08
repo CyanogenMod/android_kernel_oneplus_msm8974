@@ -3645,7 +3645,6 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 				return err;
 			}
 		}
-	case PM_RESTORE_PREPARE:
 
 		spin_lock_irqsave(&host->lock, flags);
 		if (mmc_bus_needs_resume(host)) {

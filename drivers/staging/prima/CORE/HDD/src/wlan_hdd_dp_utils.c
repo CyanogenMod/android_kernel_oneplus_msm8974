@@ -31,6 +31,9 @@
   \brief      Utility functions for data path module
   
   Description...
+               Copyright 2008 (c) Qualcomm, Incorporated.
+               All Rights Reserved.
+               Qualcomm Confidential and Proprietary.
   
   ==============================================================================**/
 /* $HEADER$ */

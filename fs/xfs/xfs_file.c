@@ -629,11 +629,8 @@ restart:
 	 * lock above.  Eventually we should look into a way to avoid
 	 * the pointless lock roundtrip.
 	 */
-	if (likely(!(file->f_mode & FMODE_NOCMTIME))) {
-		error = file_update_time(file);
-		if (error)
-			return error;
-	}
+	if (likely(!(file->f_mode & FMODE_NOCMTIME)))
+		file_update_time(file);
 
 	/*
 	 * If we're writing the file then make sure to clear the setuid and

@@ -34,6 +34,8 @@
 
   \brief Android WLAN HDD Host Offload API
 
+  Copyright 2011 (c) QUALCOMM Incorporated. All Rights Reserved.
+  QUALCOMM Proprietary and Confidential.
 
   ==========================================================================*/
 

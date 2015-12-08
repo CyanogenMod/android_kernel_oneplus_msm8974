@@ -603,10 +603,16 @@ void ipv6_select_ident(struct frag_hdr *fhdr, struct rt6_info *rt)
 	static atomic_t ipv6_fragmentation_id;
 	int ident;
 
+	if (rt && !(rt->dst.flags & DST_NOPEER)) {
+		struct inet_peer *peer;
 
-	if (unlikely(!hashrnd_initialized)) {
-		hashrnd_initialized = true;
-		get_random_bytes(&ip6_idents_hashrnd, sizeof(ip6_idents_hashrnd));
+		if (!rt->rt6i_peer)
+			rt6_bind_peer(rt, 1);
+		peer = rt->rt6i_peer;
+		if (peer) {
+			fhdr->identification = htonl(inet_getid(peer, 0));
+			return;
+		}
 	}
 	ident = atomic_inc_return(&ipv6_fragmentation_id);
 	fhdr->identification = htonl(ident);

@@ -131,8 +131,6 @@ struct snd_compr_codec_caps {
 enum {
 	SNDRV_COMPRESS_ENCODER_PADDING = 1,
 	SNDRV_COMPRESS_ENCODER_DELAY = 2,
-	SNDRV_COMPRESS_MIN_BLK_SIZE = 3,
-	SNDRV_COMPRESS_MAX_BLK_SIZE = 4,
 };
 
 /**
@@ -192,8 +190,6 @@ struct snd_compr_audio_info {
 #define SNDRV_COMPRESS_DRAIN		_IO('C', 0x34)
 #define SNDRV_COMPRESS_NEXT_TRACK	_IO('C', 0x35)
 #define SNDRV_COMPRESS_PARTIAL_DRAIN	_IO('C', 0x36)
-#define SNDRV_COMPRESS_SET_NEXT_TRACK_PARAM\
-                                        _IOW('C', 0x37, union snd_codec_options)
 /*
  * TODO
  * 1. add mmap support

@@ -128,7 +128,6 @@ struct operation_decision {
 struct operation {
 	u16 len;	/* length of operation decision chain */
 	u32 type[8];	/* 256 types */
-
 };
 
 /* definitions of av_decision.flags */

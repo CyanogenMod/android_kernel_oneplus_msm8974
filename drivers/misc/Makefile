@@ -73,4 +73,3 @@ obj-$(CONFIG_QPNP_MISC) += qpnp-misc.o
 obj-$(CONFIG_SN3193_SLED) += shineled/
 
 obj-y				+= sound_control.o
-obj-$(CONFIG_UID_CPUTIME) += uid_cputime.o

@@ -50,7 +50,7 @@
 #include <cfgApi.h>
 #include "cfgDef.h"
 
-    #include <wniCfg.h>
+    #include <wniCfgSta.h>
 
 /*--------------------------------------------------------------------*/
 /* CFG miscellaneous definition                                       */

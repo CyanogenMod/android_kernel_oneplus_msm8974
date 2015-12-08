@@ -745,22 +745,18 @@ static int alarm_timer_create(struct k_itimer *new_timer)
  * @new_timer: k_itimer pointer
  * @cur_setting: itimerspec data to fill
  *
- * Copies out the current itimerspec data
+ * Copies the itimerspec data out from the k_itimer
  */
 static void alarm_timer_get(struct k_itimer *timr,
 				struct itimerspec *cur_setting)
 {
-	ktime_t relative_expiry_time =
-		alarm_expires_remaining(&(timr->it.alarm.alarmtimer));
+	memset(cur_setting, 0, sizeof(struct itimerspec));
 
-	if (ktime_to_ns(relative_expiry_time) > 0) {
-		cur_setting->it_value = ktime_to_timespec(relative_expiry_time);
-	} else {
-		cur_setting->it_value.tv_sec = 0;
-		cur_setting->it_value.tv_nsec = 0;
-	}
-
-	cur_setting->it_interval = ktime_to_timespec(timr->it.alarm.interval);
+	cur_setting->it_interval =
+			ktime_to_timespec(timr->it.alarm.interval);
+	cur_setting->it_value =
+		ktime_to_timespec(timr->it.alarm.alarmtimer.node.expires);
+	return;
 }
 
 /**

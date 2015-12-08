@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -31,6 +31,8 @@
 *
 * Description: Routines that make up the BTC API.
 *
+* Copyright 2008 (c) Qualcomm, Incorporated. All Rights Reserved.
+* Qualcomm Confidential and Proprietary.
 *
 ******************************************************************************/
 #include "wlan_qct_wda.h"
@@ -41,7 +43,6 @@
 #include "cfgApi.h"
 #include "pmc.h"
 #include "smeQosInternal.h"
-#include "sme_Trace.h"
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 #include "vos_diag_core_event.h"
 #include "vos_diag_core_log.h"
@@ -274,8 +275,6 @@ static VOS_STATUS btcSendBTEvent(tpAniSirGlobal pMac, tpSmeBtEvent pBtEvent)
    msg.type = WDA_SIGNAL_BT_EVENT;
    msg.reserved = 0;
    msg.bodyptr = ptrSmeBtEvent;
-   MTRACE(vos_trace(VOS_MODULE_ID_SME,
-                 TRACE_CODE_SME_TX_WDA_MSG, NO_SESSION, msg.type));
    if(VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA, &msg))
    {
       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: "
@@ -471,22 +470,9 @@ void btcEnableUapsdTimerExpiryHandler(tHalHandle hHal)
 {
     tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
 
-    if (IS_DYNAMIC_WMM_PS_ENABLED)
-    {
-        if (pMac->btc.btcUapsdOk == VOS_FALSE)
-        {
-            pMac->btc.btcUapsdOk = VOS_TRUE;
-            smsLog(pMac, LOG1, FL("Uapsd Timer Expired, Enable Uapsd"));
-            sme_QoSUpdateUapsdBTEvent(pMac);
-        }
-    }
-
-    if (pMac->sme.pBtCoexTDLSNotification)
-    {
-        smsLog(pMac, LOG1, FL("btCoex notification, Enable TDLS"));
-        pMac->sme.pBtCoexTDLSNotification(pMac->pAdapter,
-                                          SIR_COEX_IND_TYPE_TDLS_ENABLE);
-    }
+    pMac->btc.btcUapsdOk = VOS_TRUE;
+    smsLog(pMac, LOG1, FL("Uapsd Timer Expired, Enable Uapsd"));
+    sme_QoSUpdateUapsdBTEvent(pMac);
 }
 
 /* ---------------------------------------------------------------------------
@@ -558,8 +544,6 @@ VOS_STATUS btcSendCfgMsg(tHalHandle hHal, tpSmeBtcConfig pSmeBtcConfig)
    msg.type = WDA_BTC_SET_CFG;
    msg.reserved = 0;
    msg.bodyptr = ptrSmeBtcConfig;
-   MTRACE(vos_trace(VOS_MODULE_ID_SME,
-                 TRACE_CODE_SME_TX_WDA_MSG, NO_SESSION, msg.type));
    if(VOS_STATUS_SUCCESS != vos_mq_post_message(VOS_MODULE_ID_WDA, &msg))
    {
       VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "btcSendCfgMsg: "
@@ -2030,31 +2014,31 @@ eHalStatus btcHandleCoexInd(tHalHandle hHal, void* pMsg)
      else if (pSmeCoexInd->coexIndType == SIR_COEX_IND_TYPE_DISABLE_UAPSD)
      {
          smsLog(pMac, LOG1, FL("DISABLE UAPSD BT Event received"));
-         if (VOS_TIMER_STATE_RUNNING ==
-             vos_timer_getCurrentState(&pMac->btc.enableUapsdTimer)) {
-             smsLog(pMac, LOG1, FL("Stop Uapsd Timer"));
-             vos_timer_stop(&pMac->btc.enableUapsdTimer);
-         }
 
          if (IS_DYNAMIC_WMM_PS_ENABLED) {
              if (pMac->btc.btcUapsdOk == VOS_TRUE) {
                  pMac->btc.btcUapsdOk = VOS_FALSE;
                  sme_QoSUpdateUapsdBTEvent(pMac);
              }
-         }
-
-         if (pMac->sme.pBtCoexTDLSNotification)
-         {
-             smsLog(pMac, LOG1, FL("btCoex notification, Disable TDLS"));
-             pMac->sme.pBtCoexTDLSNotification(pMac->pAdapter,
-                                               SIR_COEX_IND_TYPE_TDLS_DISABLE);
+             else {
+                 if (VOS_TIMER_STATE_RUNNING ==
+                     vos_timer_getCurrentState(&pMac->btc.enableUapsdTimer)) {
+                     smsLog(pMac, LOG1, FL("Stop Uapsd Timer"));
+                     vos_timer_stop(&pMac->btc.enableUapsdTimer);
+                 }
+             }
          }
      }
      else if (pSmeCoexInd->coexIndType == SIR_COEX_IND_TYPE_ENABLE_UAPSD)
      {
          smsLog(pMac, LOG1, FL("ENABLE UAPSD BT Event received"));
-         vos_timer_start(&pMac->btc.enableUapsdTimer,
-                         (pMac->fBtcEnableIndTimerVal * 1000));
+
+         if (IS_DYNAMIC_WMM_PS_ENABLED) {
+             if (pMac->btc.btcUapsdOk == VOS_FALSE) {
+                smsLog(pMac, LOG1, FL("Start Uapsd Timer"));
+                vos_timer_start(&pMac->btc.enableUapsdTimer, BTC_MAX_ENABLE_UAPSD_TIMER);
+             }
+         }
      }
      else // unknown indication type
      {

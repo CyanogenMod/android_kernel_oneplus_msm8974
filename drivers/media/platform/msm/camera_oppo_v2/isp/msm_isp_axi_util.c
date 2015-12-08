@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,7 +11,6 @@
  */
 #include <linux/io.h>
 #include <media/v4l2-subdev.h>
-#include <asm/div64.h>
 #include "msm_isp_util.h"
 #include "msm_isp_axi_util.h"
 
@@ -231,21 +230,6 @@ static uint32_t msm_isp_axi_get_plane_size(
 	return size;
 }
 
-static void msm_isp_get_buffer_ts(struct vfe_device *vfe_dev,
-	struct msm_isp_timestamp *irq_ts, struct msm_isp_timestamp *ts)
-{
-	struct msm_vfe_frame_ts *frame_ts = &vfe_dev->frame_ts;
-	uint32_t frame_count = vfe_dev->error_info.info_dump_frame_count;
-
-	*ts = *irq_ts;
-	if (frame_count == frame_ts->frame_id) {
-		ts->buf_time = frame_ts->buf_time;
-	} else {
-		frame_ts->buf_time = irq_ts->buf_time;
-		frame_ts->frame_id = frame_count;
-	}
-}
-
 void msm_isp_axi_reserve_wm(struct msm_vfe_axi_shared_data *axi_data,
 	struct msm_vfe_axi_stream *stream_info)
 {
@@ -325,8 +309,8 @@ int msm_isp_axi_check_stream_state(
 	}
 
 	for (i = 0; i < stream_cfg_cmd->num_streams; i++) {
-		if (HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i]) >=
-			MAX_NUM_STREAM) {
+		if (HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i])
+		> MAX_NUM_STREAM) {
 			return -EINVAL;
 		}
 		stream_info = &axi_data->stream_info[
@@ -452,8 +436,7 @@ void msm_isp_calculate_framedrop(
 		HANDLE_TO_IDX(stream_cfg_cmd->axi_stream_handle)];
 	uint32_t framedrop_period = msm_isp_get_framedrop_period(
 	   stream_cfg_cmd->frame_skip_pattern);
-	stream_info->frame_skip_pattern =
-			stream_cfg_cmd->frame_skip_pattern;
+
 	if (stream_cfg_cmd->frame_skip_pattern == SKIP_ALL)
 		stream_info->framedrop_pattern = 0x0;
 	else
@@ -502,51 +485,6 @@ void msm_isp_calculate_bandwidth(
 	}
 }
 
-#ifdef CONFIG_MSM_AVTIMER
-void msm_isp_start_avtimer(void)
-{
-    avcs_core_open();
-    avcs_core_disable_power_collapse(1);
-}
-static inline void msm_isp_get_avtimer_ts(
-               struct msm_isp_timestamp *time_stamp)
-{
-       int rc = 0;
-       uint32_t avtimer_usec = 0;
-       uint64_t avtimer_tick = 0;
-
-       rc = avcs_core_query_timer(&avtimer_tick);
-       if (rc < 0) {
-               pr_err("%s: Error: Invalid AVTimer Tick, rc=%d\n",
-                          __func__, rc);
-               /* In case of error return zero AVTimer Tick Value */
-               time_stamp->vt_time.tv_sec = 0;
-               time_stamp->vt_time.tv_usec = 0;
-       } else {
-               avtimer_usec = do_div(avtimer_tick, USEC_PER_SEC);
-               time_stamp->vt_time.tv_sec = (uint32_t)(avtimer_tick);
-               time_stamp->vt_time.tv_usec = avtimer_usec;
-               pr_debug("%s: AVTimer TS = %u:%u\n", __func__,
-                       (uint32_t)(avtimer_tick), avtimer_usec);
-       }
-}
-#else
-void msm_isp_start_avtimer(void)
-{
-    pr_err("AV Timer is not supported\n");
-}
-
-static inline void msm_isp_get_avtimer_ts(
-               struct msm_isp_timestamp *time_stamp)
-{
-       pr_err("%s: Error: AVTimer driver not available\n",__func__);
-       time_stamp->vt_time.tv_sec = 0;
-       time_stamp->vt_time.tv_usec = 0;
-}
-
-#endif
-
-
 int msm_isp_request_axi_stream(struct vfe_device *vfe_dev, void *arg)
 {
 	int rc = 0, i;
@@ -565,11 +503,8 @@ int msm_isp_request_axi_stream(struct vfe_device *vfe_dev, void *arg)
 		&vfe_dev->axi_data, stream_cfg_cmd);
 	if (rc) {
 		pr_err("%s: Request validation failed\n", __func__);
-		if (HANDLE_TO_IDX(stream_cfg_cmd->axi_stream_handle) <
-			MAX_NUM_STREAM) {
-			msm_isp_axi_destroy_stream(&vfe_dev->axi_data,
-				HANDLE_TO_IDX(stream_cfg_cmd->axi_stream_handle));
-		}
+		msm_isp_axi_destroy_stream(&vfe_dev->axi_data,
+			HANDLE_TO_IDX(stream_cfg_cmd->axi_stream_handle));
 		return rc;
 	}
 
@@ -602,10 +537,15 @@ int msm_isp_request_axi_stream(struct vfe_device *vfe_dev, void *arg)
 	}
 
 	msm_isp_calculate_framedrop(&vfe_dev->axi_data, stream_cfg_cmd);
-
-	if (stream_cfg_cmd->vt_enable && !vfe_dev->vt_enable) {
-		vfe_dev->vt_enable = stream_cfg_cmd->vt_enable;
-		msm_isp_start_avtimer();
+	stream_info->vt_enable = stream_cfg_cmd->vt_enable;
+	if (stream_info->vt_enable) {
+		vfe_dev->vt_enable = stream_info->vt_enable;
+	#ifdef CONFIG_MSM_AVTIMER
+		avcs_core_open();
+		avcs_core_disable_power_collapse(1);
+	#endif
+		vfe_dev->p_avtimer_lsw = ioremap(AVTIMER_LSW_PHY_ADDR, 4);
+		vfe_dev->p_avtimer_msw = ioremap(AVTIMER_MSW_PHY_ADDR, 4);
 	}
 	if (stream_info->num_planes > 1) {
 		msm_isp_axi_reserve_comp_mask(
@@ -632,17 +572,11 @@ int msm_isp_release_axi_stream(struct vfe_device *vfe_dev, void *arg)
 	int rc = 0, i;
 	struct msm_vfe_axi_stream_release_cmd *stream_release_cmd = arg;
 	struct msm_vfe_axi_shared_data *axi_data = &vfe_dev->axi_data;
-	struct msm_vfe_axi_stream *stream_info;
+	struct msm_vfe_axi_stream *stream_info =
+		&axi_data->stream_info[
+		HANDLE_TO_IDX(stream_release_cmd->stream_handle)];
 	struct msm_vfe_axi_stream_cfg_cmd stream_cfg;
 
-	if(HANDLE_TO_IDX(stream_release_cmd->stream_handle) >=
-	        MAX_NUM_STREAM) {
-	        pr_err("%s: Invalid stream handle\n", __func__);
-	        return -EINVAL;
-	}
-
-	stream_info = &axi_data->stream_info[
-		HANDLE_TO_IDX(stream_release_cmd->stream_handle)];
 	if (stream_info->state == AVALIABLE) {
 		pr_err("%s: Stream already released\n", __func__);
 		return -EINVAL;
@@ -837,21 +771,6 @@ static int msm_isp_cfg_ping_pong_address(struct vfe_device *vfe_dev,
 	uint32_t pingpong_bit = 0;
 	uint32_t bufq_handle = stream_info->bufq_handle;
 	uint32_t stream_idx = HANDLE_TO_IDX(stream_info->stream_handle);
-	uint32_t src_intf = SRC_TO_INTF(stream_info->stream_src);
-	uint32_t frame_id = 0;
-	if (stream_idx >= MAX_NUM_STREAM) {
-		pr_err("%s: Invalid stream_idx", __func__);
-		return rc;
-	}
-	if (src_intf < VFE_SRC_MAX)
-		frame_id = vfe_dev->axi_data.src_info[src_intf].frame_id;
-
-	if (frame_id && (stream_info->frame_id >= frame_id)) {
-		pr_err("%s: duplicate frame_id, Session frm id %d cur frm id %d\n",
-		__func__, frame_id, stream_info->frame_id);
-		vfe_dev->error_info.stream_framedrop_count[stream_idx]++;
-		return rc;
-	}
 
 	rc = vfe_dev->buf_mgr->ops->get_buf(vfe_dev->buf_mgr,
 			vfe_dev->pdev->id, bufq_handle, &buf);
@@ -892,16 +811,9 @@ static void msm_isp_process_done_buf(struct vfe_device *vfe_dev,
 	uint32_t stream_idx = HANDLE_TO_IDX(stream_info->stream_handle);
 	uint32_t frame_id = vfe_dev->axi_data.
 		src_info[SRC_TO_INTF(stream_info->stream_src)].frame_id;
-	memset(&buf_event, 0, sizeof(buf_event) );
-
-	if(stream_idx >= MAX_NUM_STREAM) {
-		pr_err("%s: Invalid stream_idx \n", __func__);
-		return;
-	}
 
 	if (buf && ts) {
 		if (vfe_dev->vt_enable) {
-                        msm_isp_get_avtimer_ts(ts);
 			time_stamp = &ts->vt_time;
 		} else {
 			time_stamp = &ts->buf_time;
@@ -990,7 +902,7 @@ static void msm_isp_update_camif_output_count(
 
 	for (i = 0; i < stream_cfg_cmd->num_streams; i++) {
 		if (HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i])
-		>= MAX_NUM_STREAM) {
+		> MAX_NUM_STREAM) {
 			return;
 		}
 		stream_info =
@@ -1016,68 +928,6 @@ static void msm_isp_update_camif_output_count(
 					raw_stream_count--;
 		}
 	}
-}
-
-static void msm_isp_update_rdi_output_count(
-	  struct vfe_device *vfe_dev,
-	  struct msm_vfe_axi_stream_cfg_cmd *stream_cfg_cmd)
-{
-	int i;
-	struct msm_vfe_axi_stream *stream_info;
-	struct msm_vfe_axi_shared_data *axi_data = &vfe_dev->axi_data;
-
-	if (stream_cfg_cmd->num_streams > MAX_NUM_STREAM) {
-		return;
-	}
-
-	for (i = 0; i < stream_cfg_cmd->num_streams; i++) {
-		if (HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i])
-		>= MAX_NUM_STREAM) {
-			return;
-		}
-		stream_info =
-			&axi_data->stream_info[
-			HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i])];
-		if (stream_info->stream_src < RDI_INTF_0)
-			continue;
-		if (stream_info->stream_src == RDI_INTF_0) {
-			if (stream_cfg_cmd->cmd == START_STREAM)
-				vfe_dev->axi_data.src_info[VFE_RAW_0].
-					raw_stream_count++;
-			else
-				vfe_dev->axi_data.src_info[VFE_RAW_0].
-					raw_stream_count--;
-		} else if (stream_info->stream_src == RDI_INTF_1) {
-			if (stream_cfg_cmd->cmd == START_STREAM)
-				vfe_dev->axi_data.src_info[VFE_RAW_1].
-					raw_stream_count++;
-			else
-				vfe_dev->axi_data.src_info[VFE_RAW_1].
-					raw_stream_count--;
-		} else if (stream_info->stream_src == RDI_INTF_2) {
-		       if (stream_cfg_cmd->cmd == START_STREAM)
-				vfe_dev->axi_data.src_info[VFE_RAW_2].
-					raw_stream_count++;
-			else
-				vfe_dev->axi_data.src_info[VFE_RAW_2].
-					raw_stream_count--;
-		}
-
-	}
-}
-
-static uint8_t msm_isp_get_curr_stream_cnt(
-	  struct vfe_device *vfe_dev)
-{
-         uint8_t curr_stream_cnt = 0;
-	  curr_stream_cnt = vfe_dev->axi_data.src_info[VFE_RAW_0].
-					raw_stream_count + vfe_dev->axi_data.src_info[VFE_RAW_1].
-					raw_stream_count + vfe_dev->axi_data.src_info[VFE_RAW_2].
-					raw_stream_count + vfe_dev->axi_data.src_info[VFE_PIX_0].
-					pix_stream_count  + vfe_dev->axi_data.src_info[VFE_PIX_0].
-					raw_stream_count;
-
-	  return curr_stream_cnt;
 }
 
 void msm_camera_io_dump_2(void __iomem *addr, int size)
@@ -1251,12 +1101,11 @@ static int msm_isp_start_axi_stream(struct vfe_device *vfe_dev,
 
 	for (i = 0; i < stream_cfg_cmd->num_streams; i++) {
 		if (HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i])
-		>= MAX_NUM_STREAM) {
+		> MAX_NUM_STREAM) {
 			return -EINVAL;
 		}
 		stream_info = &axi_data->stream_info[
 			HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i])];
-		stream_info->frame_id = 0;
 		src_state = axi_data->src_info[
 			SRC_TO_INTF(stream_info->stream_src)].active;
 
@@ -1282,21 +1131,17 @@ static int msm_isp_start_axi_stream(struct vfe_device *vfe_dev,
 			msm_isp_axi_stream_enable_cfg(vfe_dev, stream_info);
 			stream_info->state = ACTIVE;
 		}
-		vfe_dev->axi_data.src_info[
-			SRC_TO_INTF(stream_info->stream_src)].frame_id = 0;
 	}
 	msm_isp_update_stream_bandwidth(vfe_dev);
 	vfe_dev->hw_info->vfe_ops.axi_ops.reload_wm(vfe_dev, wm_reload_mask);
 	vfe_dev->hw_info->vfe_ops.core_ops.reg_update(vfe_dev);
 
 	msm_isp_update_camif_output_count(vfe_dev, stream_cfg_cmd);
-	msm_isp_update_rdi_output_count(vfe_dev, stream_cfg_cmd);
 	if (camif_update == ENABLE_CAMIF) {
 		vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id = 0;
 		vfe_dev->hw_info->vfe_ops.core_ops.
 			update_camif_state(vfe_dev, camif_update);
 	}
-
 	if (wait_for_complete)
 		rc = msm_isp_axi_wait_for_cfg_done(vfe_dev, camif_update);
 
@@ -1308,7 +1153,7 @@ static int msm_isp_stop_axi_stream(struct vfe_device *vfe_dev,
 			enum msm_isp_camif_update_state camif_update)
 {
 	int i, rc = 0;
-	uint8_t wait_for_complete = 0, cur_stream_cnt = 0;
+	uint8_t wait_for_complete = 0;
 	struct msm_vfe_axi_stream *stream_info;
 	struct msm_vfe_axi_shared_data *axi_data = &vfe_dev->axi_data;
 
@@ -1318,7 +1163,7 @@ static int msm_isp_stop_axi_stream(struct vfe_device *vfe_dev,
 
 	for (i = 0; i < stream_cfg_cmd->num_streams; i++) {
 		if (HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i])
-		>= MAX_NUM_STREAM) {
+		> MAX_NUM_STREAM) {
 			return -EINVAL;
 		}
 		stream_info = &axi_data->stream_info[
@@ -1364,15 +1209,6 @@ static int msm_isp_stop_axi_stream(struct vfe_device *vfe_dev,
 		vfe_dev->hw_info->vfe_ops.core_ops.
 			update_camif_state(vfe_dev, DISABLE_CAMIF_IMMEDIATELY);
 	msm_isp_update_camif_output_count(vfe_dev, stream_cfg_cmd);
-	msm_isp_update_rdi_output_count(vfe_dev, stream_cfg_cmd);
-	cur_stream_cnt = msm_isp_get_curr_stream_cnt(vfe_dev);
-	if (cur_stream_cnt == 0) {
-		if (camif_update == DISABLE_CAMIF_IMMEDIATELY) {
-			vfe_dev->hw_info->vfe_ops.axi_ops.halt(vfe_dev, 1);
-		}
-		vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev, ISP_RST_HARD, 1);
-		vfe_dev->hw_info->vfe_ops.core_ops.init_hw_reg(vfe_dev);
-	}
 
 	for (i = 0; i < stream_cfg_cmd->num_streams; i++) {
 		stream_info = &axi_data->stream_info[
@@ -1437,7 +1273,7 @@ int msm_isp_update_axi_stream(struct vfe_device *vfe_dev, void *arg)
 		update_info = &update_cmd->update_info[i];
 		/*check array reference bounds*/
 		if (HANDLE_TO_IDX(update_info->stream_handle)
-		 >= MAX_NUM_STREAM) {
+		 > MAX_NUM_STREAM) {
 			return -EINVAL;
 		}
 		stream_info = &axi_data->stream_info[
@@ -1448,10 +1284,7 @@ int msm_isp_update_axi_stream(struct vfe_device *vfe_dev, void *arg)
 			return -EINVAL;
 		}
 		if (stream_info->state == ACTIVE &&
-			stream_info->stream_type == BURST_STREAM &&
-			(1 != update_cmd->num_streams ||
-				UPDATE_STREAM_FRAMEDROP_PATTERN !=
-					update_cmd->update_type)) {
+			stream_info->stream_type == BURST_STREAM) {
 			pr_err("%s: Cannot update active burst stream\n",
 				__func__);
 			return -EINVAL;
@@ -1478,10 +1311,7 @@ int msm_isp_update_axi_stream(struct vfe_device *vfe_dev, void *arg)
 				msm_isp_get_framedrop_period(
 				   update_info->skip_pattern);
 			stream_info->runtime_init_frame_drop = 0;
-			if (update_info->skip_pattern == SKIP_ALL)
-				stream_info->framedrop_pattern = 0x0;
-			else
-				stream_info->framedrop_pattern = 0x1;
+			stream_info->framedrop_pattern = 0x1;
 			stream_info->framedrop_period = framedrop_period - 1;
 			vfe_dev->hw_info->vfe_ops.axi_ops.
 				cfg_framedrop(vfe_dev, stream_info);
@@ -1528,7 +1358,6 @@ void msm_isp_process_axi_irq(struct vfe_device *vfe_dev,
 	struct msm_vfe_axi_stream *stream_info;
 	struct msm_vfe_axi_composite_info *comp_info;
 	struct msm_vfe_axi_shared_data *axi_data = &vfe_dev->axi_data;
-	struct msm_isp_timestamp buf_ts;
 
 	comp_mask = vfe_dev->hw_info->vfe_ops.axi_ops.
 		get_comp_mask(irq_status0, irq_status1);
@@ -1541,13 +1370,10 @@ void msm_isp_process_axi_irq(struct vfe_device *vfe_dev,
 	pingpong_status =
 		vfe_dev->hw_info->vfe_ops.axi_ops.get_pingpong_status(vfe_dev);
 
-	msm_isp_get_buffer_ts(vfe_dev, ts, &buf_ts);
 	for (i = 0; i < axi_data->hw_info->num_comp_mask; i++) {
 		comp_info = &axi_data->composite_info[i];
 		if (comp_mask & (1 << i)) {
-			stream_idx = HANDLE_TO_IDX(comp_info->stream_handle);
-			if ((!comp_info->stream_handle) ||
-				(stream_idx >= MAX_NUM_STREAM)) {
+			if (!comp_info->stream_handle) {
 				pr_err("%s: Invalid handle for composite irq\n",
 					__func__);
 			} else {
@@ -1558,6 +1384,7 @@ void msm_isp_process_axi_irq(struct vfe_device *vfe_dev,
 				ISP_DBG("%s: stream%d frame id: 0x%x\n",
 					__func__,
 					stream_idx, stream_info->frame_id);
+				stream_info->frame_id++;
 
 				if (stream_info->stream_type == BURST_STREAM)
 					stream_info->
@@ -1573,14 +1400,9 @@ void msm_isp_process_axi_irq(struct vfe_device *vfe_dev,
 							vfe_dev, stream_info,
 							pingpong_status);
 				}
-				if ((stream_info->stream_src < RDI_INTF_0) &&
-					SRC_TO_INTF(stream_info->stream_src) < VFE_SRC_MAX) {
-					stream_info->frame_id = vfe_dev->axi_data.
-						src_info[SRC_TO_INTF(stream_info->stream_src)].frame_id;
-				}
 				if (done_buf && !rc)
 					msm_isp_process_done_buf(vfe_dev,
-					stream_info, done_buf, &buf_ts);
+					stream_info, done_buf, ts);
 			}
 		}
 		wm_mask &= ~(comp_info->stream_composite_mask);
@@ -1588,17 +1410,17 @@ void msm_isp_process_axi_irq(struct vfe_device *vfe_dev,
 
 	for (i = 0; i < axi_data->hw_info->num_wm; i++) {
 		if (wm_mask & (1 << i)) {
-			stream_idx = HANDLE_TO_IDX(axi_data->free_wm[i]);
-			if ((!axi_data->free_wm[i]) ||
-				(stream_idx >= MAX_NUM_STREAM)) {
+			if (!axi_data->free_wm[i]) {
 				pr_err("%s: Invalid handle for wm irq\n",
 					__func__);
 				continue;
 			}
+			stream_idx = HANDLE_TO_IDX(axi_data->free_wm[i]);
 			stream_info = &axi_data->stream_info[stream_idx];
 			ISP_DBG("%s: stream%d frame id: 0x%x\n",
 				__func__,
 				stream_idx, stream_info->frame_id);
+			stream_info->frame_id++;
 
 			if (stream_info->stream_type == BURST_STREAM)
 				stream_info->runtime_num_burst_capture--;
@@ -1610,13 +1432,9 @@ void msm_isp_process_axi_irq(struct vfe_device *vfe_dev,
 				rc = msm_isp_cfg_ping_pong_address(vfe_dev,
 					stream_info, pingpong_status);
 			}
-			if ((stream_info->stream_src < RDI_INTF_0) &&
-				SRC_TO_INTF(stream_info->stream_src) < VFE_SRC_MAX)
-				stream_info->frame_id = vfe_dev->axi_data.
-					src_info[SRC_TO_INTF(stream_info->stream_src)].frame_id;
 			if (done_buf && !rc)
 				msm_isp_process_done_buf(vfe_dev,
-				stream_info, done_buf, &buf_ts);
+				stream_info, done_buf, ts);
 		}
 	}
 	return;

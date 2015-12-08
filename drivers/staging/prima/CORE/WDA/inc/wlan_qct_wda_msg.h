@@ -38,6 +38,8 @@ DESCRIPTION
   This file contains the external API exposed by the wlan adaptation layer 
   
       
+  Copyright (c) 2008 QUALCOMM Incorporated. All Rights Reserved.
+  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 
 

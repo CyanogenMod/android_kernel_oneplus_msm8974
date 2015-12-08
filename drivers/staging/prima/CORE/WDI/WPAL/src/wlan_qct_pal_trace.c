@@ -33,6 +33,9 @@
                
    Definitions for Linux/Android platform
   
+   Copyright 2010-2011 (c) Qualcomm, Incorporated.  All Rights Reserved.
+   
+   Qualcomm Confidential and Proprietary.
   
   ========================================================================*/
 

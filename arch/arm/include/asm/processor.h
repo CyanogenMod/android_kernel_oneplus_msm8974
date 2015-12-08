@@ -112,7 +112,9 @@ static inline void prefetch(const void *ptr)
 {
 	__asm__ __volatile__(
 		"pld\t%a0"
-		:: "p" (ptr));
+		:
+		: "p" (ptr)
+		: "cc");
 }
 
 #define ARCH_HAS_PREFETCHW

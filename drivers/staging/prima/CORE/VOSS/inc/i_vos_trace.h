@@ -38,6 +38,9 @@
   
   \brief Linux-specific definitions for VOSS trace
   
+   Copyright 2008 (c) Qualcomm, Incorporated.  All Rights Reserved.
+   
+   Qualcomm Confidential and Proprietary.
   
   ========================================================================*/
 

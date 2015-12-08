@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -35,6 +35,8 @@ DESCRIPTION
   in the Gen6 host software.
 
 
+  Copyright (c) 2008 QUALCOMM Incorporated. All Rights Reserved.
+  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 
 /*===========================================================================
@@ -71,7 +73,6 @@ when        who         what, where, why
 #include "wlan_qct_wda.h"
 #include "sme_Api.h"
 #include "macInitApi.h"
-#include "vos_sched.h"
 
 VOS_STATUS WLANFTM_McProcessMsg (v_VOID_t *message);
 
@@ -394,9 +395,7 @@ VOS_STATUS sysMcProcessMsg( v_CONTEXT_t pVosContext, vos_msg_t *pMsg )
 
             if (NULL != timerCB)
             {
-               vos_ssr_protect(__func__);
                timerCB(pMsg->bodyptr);
-               vos_ssr_unprotect(__func__);
             }
             break;
          }

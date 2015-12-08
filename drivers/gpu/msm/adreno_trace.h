@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,6 +18,7 @@
 #define TRACE_SYSTEM kgsl
 #undef TRACE_INCLUDE_PATH
 #define TRACE_INCLUDE_PATH .
+#undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_FILE adreno_trace
 
 #include <linux/tracepoint.h>
@@ -41,7 +42,9 @@ TRACE_EVENT(adreno_cmdbatch_queued,
 		"ctx=%u ts=%u queued=%u flags=%s",
 			__entry->id, __entry->timestamp, __entry->queued,
 			__entry->flags ? __print_flags(__entry->flags, "|",
-				ADRENO_CMDBATCH_FLAGS) : "none"
+				{ KGSL_CONTEXT_SYNC, "SYNC" },
+				{ KGSL_CONTEXT_END_OF_FRAME, "EOF" })
+				: "none"
 	)
 );
 
@@ -51,21 +54,17 @@ DECLARE_EVENT_CLASS(adreno_cmdbatch_template,
 	TP_STRUCT__entry(
 		__field(unsigned int, id)
 		__field(unsigned int, timestamp)
-		__field(int, inflight)
-		__field(unsigned int, flags)
+		__field(unsigned int, inflight)
 	),
 	TP_fast_assign(
 		__entry->id = cmdbatch->context->id;
 		__entry->timestamp = cmdbatch->timestamp;
 		__entry->inflight = inflight;
-		__entry->flags = cmdbatch->flags;
 	),
 	TP_printk(
-		"ctx=%u ts=%u inflight=%d flags=%s",
+		"ctx=%u ts=%u inflight=%u",
 			__entry->id, __entry->timestamp,
-			__entry->inflight,
-			__entry->flags ? __print_flags(__entry->flags, "|",
-							{ KGSL_CMDBATCH_MARKER, "MARKER" }) : "none"
+			__entry->inflight
 	)
 );
 
@@ -80,26 +79,22 @@ TRACE_EVENT(adreno_cmdbatch_retired,
 	TP_STRUCT__entry(
 		__field(unsigned int, id)
 		__field(unsigned int, timestamp)
-		__field(int, inflight)
+		__field(unsigned int, inflight)
 		__field(unsigned int, recovery)
-		__field(unsigned int, flags)
 	),
 	TP_fast_assign(
 		__entry->id = cmdbatch->context->id;
 		__entry->timestamp = cmdbatch->timestamp;
 		__entry->inflight = inflight;
 		__entry->recovery = cmdbatch->fault_recovery;
-		__entry->flags = cmdbatch->flags;
 	),
 	TP_printk(
-		"ctx=%u ts=%u inflight=%d recovery=%s flags=%s",
+		"ctx=%u ts=%u inflight=%u recovery=%s",
 			__entry->id, __entry->timestamp,
 			__entry->inflight,
 			__entry->recovery ?
 				__print_flags(__entry->recovery, "|",
-				ADRENO_FT_TYPES) : "none",
-			__entry->flags ? __print_flags(__entry->flags, "|",
-				{ KGSL_CMDBATCH_MARKER, "MARKER" }) : "none"
+				ADRENO_FT_TYPES) : "none"
 	)
 );
 

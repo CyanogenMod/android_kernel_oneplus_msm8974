@@ -35,6 +35,9 @@
 
   DEPENDENCIES:
 
+                Copyright (c) 2007 QUALCOMM Incorporated.
+                All Rights Reserved.
+                Qualcomm Confidential and Proprietary
 ============================================================================*/
 
 /*============================================================================

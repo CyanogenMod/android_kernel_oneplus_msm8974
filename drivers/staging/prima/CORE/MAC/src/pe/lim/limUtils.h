@@ -61,8 +61,6 @@ typedef enum
 #define LIM_MAX_REASSOC_RETRY_LIMIT            2
 #endif
 
-#define LIM_MAX_BANDS ( 48 )
-
 // classifier ID is coded as 0-3: tsid, 4-5:direction
 #define LIM_MAKE_CLSID(tsid, dir) (((tsid) & 0x0F) | (((dir) & 0x03) << 4))
 
@@ -105,7 +103,6 @@ typedef enum offset {
     BW20,
     BW40PLUS,
     BW40MINUS,
-    BW80,
     BWALL
 } offset_t;
 
@@ -113,10 +110,9 @@ typedef struct op_class_map {
     tANI_U8 op_class;
     tANI_U8 ch_spacing;
     offset_t    offset;
-    tANI_U8 channels[25];
+    tANI_U8 channels[15];
 }op_class_map_t;
 // LIM utility functions
-tANI_BOOLEAN limCheck11BRateBitmap(tANI_U16 RateBitmap);
 void limGetBssidFromPkt(tpAniSirGlobal, tANI_U8 *, tANI_U8 *, tANI_U32 *);
 char * limMlmStateStr(tLimMlmStates state);
 char * limSmeStateStr(tLimSmeStates state);
@@ -512,6 +508,12 @@ void peSetResumeChannel(tpAniSirGlobal pMac, tANI_U16 channel, ePhyChanBondState
   --------------------------------------------------------------------------*/
 void peGetResumeChannel(tpAniSirGlobal pMac, tANI_U8* resumeChannel, ePhyChanBondState* resumePhyCbState);
 
+#ifdef FEATURE_WLAN_TDLS_INTERNAL
+tANI_U8 limTdlsFindLinkPeer(tpAniSirGlobal pMac, tSirMacAddr peerMac, tLimTdlsLinkSetupPeer  **setupPeer);
+void limTdlsDelLinkPeer(tpAniSirGlobal pMac, tSirMacAddr peerMac);
+void limStartTdlsTimer(tpAniSirGlobal pMac, tANI_U8 sessionId, TX_TIMER *timer, tANI_U32 timerId, 
+                                      tANI_U16 timerType, tANI_U32 timerMsg);
+#endif
 void limGetShortSlotFromPhyMode(tpAniSirGlobal pMac, tpPESession psessionEntry, tANI_U32 phyMode,
                                 tANI_U8 *pShortSlotEnable);
 
@@ -548,14 +550,5 @@ tANI_U8 limGetOPClassFromChannel(tANI_U8 *country,
 void limParseBeaconForTim(tpAniSirGlobal pMac, tANI_U8* pRxPacketInfo,
                           tpPESession psessionEntry);
 
-void limUpdateMaxRateFlag(tpAniSirGlobal pMac,
-                          tANI_U8 smeSessionId,
-                          tANI_U32 maxRateFlag);
-
-extern tANI_U32 limGetMaxRateFlags(tpDphHashNode pStaDs,
-                                   tpPESession psessionEntry);
-
 void limDecrementPendingMgmtCount (tpAniSirGlobal pMac);
-
-eHalStatus limTxBdComplete(tpAniSirGlobal pMac, void *pData);
 #endif /* __LIM_UTILS_H */

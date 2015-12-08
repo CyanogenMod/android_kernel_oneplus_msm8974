@@ -36,6 +36,9 @@
                
    Definitions for platform dependent(Windows XP). 
   
+   Copyright 2010 (c) Qualcomm, Incorporated.  All Rights Reserved.
+   
+   Qualcomm Confidential and Proprietary.
   
   ========================================================================*/
 

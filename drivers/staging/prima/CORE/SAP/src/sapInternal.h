@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, 2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -39,6 +39,8 @@ DESCRIPTION
   module.
 
 
+  Copyright (c) 2008 QUALCOMM Incorporated. All Rights Reserved.
+  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 
 
@@ -80,8 +82,6 @@ when           who        what, where, why
 #include "sapFsm_ext.h"
 #include "sapChSelect.h"
 #include "wlan_hdd_dp_utils.h"
-#include "wlan_hdd_main.h"
-
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
  * -------------------------------------------------------------------------*/
@@ -162,13 +162,16 @@ typedef struct {
     WLANTL_STAStateType tlSTAState;
 
    /** Transmit queues for each AC (VO,VI,BE etc). */
-   hdd_list_t wmm_tx_queue[NUM_TX_QUEUES];
+   //hdd_list_t wmm_tx_queue[NUM_TX_QUEUES];
+   hdd_list_t wmm_tx_queue[4];
 
    /** Might need to differentiate queue depth in contention case */
-   v_U16_t aTxQueueDepth[NUM_TX_QUEUES];
+   //v_U16_t aTxQueueDepth[NUM_TX_QUEUES];
+   v_U16_t aTxQueueDepth[4];
 
    /**Track whether OS TX queue has been disabled.*/
-   v_BOOL_t txSuspended[NUM_TX_QUEUES];
+   //v_BOOL_t txSuspended[NUM_TX_QUEUES];
+   v_BOOL_t txSuspended[4];
 
    /**Track whether 3/4th of resources are used */
    v_BOOL_t vosLowResource;
@@ -178,11 +181,6 @@ typedef struct {
 
    /** The station entry for which Deauth is in progress  */
    v_BOOL_t isDeauthInProgress;
-
-#ifdef WLAN_FEATURE_AP_HT40_24G
-   /** Track HT40 Intolerant station */
-   v_BOOL_t isHT40IntolerantSet;
-#endif
 } hdd_station_info_t;
 
 typedef struct sSapContext {
@@ -262,15 +260,6 @@ typedef struct sSapContext {
     tSapAcsChannelInfo acsBestChannelInfo;
     spinlock_t staInfo_lock; //To protect access to station Info
     hdd_station_info_t aStaInfo[WLAN_MAX_STA_COUNT];
-#ifdef WLAN_FEATURE_AP_HT40_24G
-    v_U8_t            affected_start;
-    v_U8_t            affected_end;
-    v_U8_t            sap_sec_chan;
-    v_U8_t            numHT40IntoSta;
-    vos_timer_t       sap_HT2040_timer;
-    v_U8_t            ObssScanInterval;
-    v_U8_t            ObssTransitionDelayFactor;
-#endif
 } *ptSapContext;
 
 
@@ -294,32 +283,6 @@ typedef struct sWLAN_SAPEvent {
 /*----------------------------------------------------------------------------
  * Function Declarations and Documentation
  * -------------------------------------------------------------------------*/
-#ifdef WLAN_FEATURE_AP_HT40_24G
-/*==========================================================================
-
-  FUNCTION    sapGet24GOBSSAffectedChannel()
-
-  DESCRIPTION
-    Get OBSS Affected Channel no for SAP
-
-  DEPENDENCIES
-    NA.
-
-  PARAMETERS
-
-    IN
-    tHalHandle:  the tHalHandle passed in with the scan request
-    ptSapContext: Pointer to SAP context
-
-  RETURN VALUE
-
-  SIDE EFFECTS
-
-============================================================================*/
-
-eHalStatus sapGet24GOBSSAffectedChannel(tHalHandle halHandle,
-                                                ptSapContext psapCtx);
-#endif
 
 /*==========================================================================
 
@@ -614,53 +577,6 @@ sapconvertToCsrProfile(tsap_Config_t *pconfig_params, eCsrRoamBssType bssType, t
 ============================================================================*/
 void sapFreeRoamProfile(tCsrRoamProfile *profile);
 
-
-#ifdef WLAN_FEATURE_AP_HT40_24G
-/*==========================================================================
-  FUNCTION    sapAddHT40IntolerantSta
-
-  DESCRIPTION
-    Add HT40 Intolerant STA & Move SAP from HT40 to HT20
-
-  DEPENDENCIES
-    NA.
-
-  PARAMETERS
-
-    IN
-    sapContext   : Sap Context value
-    pCsrRoamInfo : Pointer to CSR info
-
-  RETURN VALUE
-
-  SIDE EFFECTS
-============================================================================*/
-
-void sapAddHT40IntolerantSta(ptSapContext sapContext, tCsrRoamInfo *pCsrRoamInfo);
-
-/*==========================================================================
-  FUNCTION    sapRemoveHT40IntolerantSta
-
-  DESCRIPTION
-    Remove HT40 Intolerant STA & Move SAP from HT40 to HT20
-
-  DEPENDENCIES
-    NA.
-
-  PARAMETERS
-
-    IN
-    sapContext   : Sap Context value
-    pCsrRoamInfo : Pointer to CSR info
-
-  RETURN VALUE
-
-  SIDE EFFECTS
-============================================================================*/
-
-void sapRemoveHT40IntolerantSta(ptSapContext sapContext, tCsrRoamInfo *pCsrRoamInfo);
-#endif
-
 /*==========================================================================
 
   FUNCTION    sapIsPeerMacAllowed
@@ -886,27 +802,6 @@ RETURN VALUE If SUCCESS or FAILURE
 SIDE EFFECTS
 ============================================================================*/
 eCsrPhyMode sapConvertSapPhyModeToCsrPhyMode( eSapPhyMode sapPhyMode );
-
-#ifdef WLAN_FEATURE_AP_HT40_24G
-/*==========================================================================
-FUNCTION  sap_ht2040_timer_cb
-
-DESCRIPTION Function to implement ht2040 timer callback implementation
-
-SIDE EFFECTS
-============================================================================*/
-void sap_ht2040_timer_cb(v_PVOID_t usrDataForCallback);
-
-/*==========================================================================
-FUNCTION  sapCheckHT40SecondaryIsNotAllowed
-
-DESCRIPTION Function to check HT40 secondary channel is allowed or not
-
-SIDE EFFECTS
-============================================================================*/
-
-eHalStatus sapCheckHT40SecondaryIsNotAllowed(ptSapContext psapCtx);
-#endif
 
 #ifdef __cplusplus
 }

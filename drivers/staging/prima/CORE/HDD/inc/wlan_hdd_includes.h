@@ -34,6 +34,9 @@
   
   \brief Internal includes for the Linux HDD 
   
+               Copyright 2008 (c) Qualcomm, Incorporated.
+               All Rights Reserved.
+               Qualcomm Confidential and Proprietary.
   
   ==========================================================================*/
   

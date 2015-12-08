@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -33,6 +33,9 @@
 
   \author Sunit Bhatia
 
+   Copyright 2008 (c) Qualcomm, Incorporated.  All Rights Reserved.
+
+   Qualcomm Confidential and Proprietary.
 
   ========================================================================*/
 
@@ -82,6 +85,7 @@ static tANI_U8* __limTraceGetTimerString( tANI_U16 timerId )
 #ifdef WLAN_FEATURE_VOWIFI_11R
         CASE_RETURN_STRING(eLIM_FT_PREAUTH_RSP_TIMER);
 #endif
+        CASE_RETURN_STRING(eLIM_REMAIN_CHN_TIMER);
         CASE_RETURN_STRING(eLIM_PERIODIC_PROBE_REQ_TIMER);
 #ifdef FEATURE_WLAN_ESE
         CASE_RETURN_STRING(eLIM_TSM_TIMER);
@@ -91,7 +95,6 @@ static tANI_U8* __limTraceGetTimerString( tANI_U16 timerId )
         CASE_RETURN_STRING(eLIM_PERIODIC_JOIN_PROBE_REQ_TIMER);
         CASE_RETURN_STRING(eLIM_INSERT_SINGLESHOT_NOA_TIMER);
         CASE_RETURN_STRING(eLIM_CONVERT_ACTIVE_CHANNEL_TO_PASSIVE);
-        CASE_RETURN_STRING(eLIM_AUTH_RETRY_TIMER);
         default:
             return( "UNKNOWN" );
             break;
@@ -274,9 +277,6 @@ void macTraceMsgTx(tpAniSirGlobal pMac, tANI_U8 session, tANI_U32 data)
         case SIR_CFG_MODULE_ID:
             macTrace(pMac, TRACE_CODE_TX_CFG_MSG, session, data);
             break;
-        default:
-            macTrace(pMac, moduleId, session, data);
-            break;
     }
 }
 
@@ -299,9 +299,6 @@ void macTraceMsgTxNew(tpAniSirGlobal pMac, tANI_U8 module, tANI_U8 session, tANI
             break;
         case SIR_CFG_MODULE_ID:
             macTraceNew(pMac, module, TRACE_CODE_TX_CFG_MSG, session, data);
-            break;
-        default:
-            macTrace(pMac, moduleId, session, data);
             break;
         }
 }
@@ -329,9 +326,6 @@ void macTraceMsgRx(tpAniSirGlobal pMac, tANI_U8 session, tANI_U32 data)
             break;
         case SIR_CFG_MODULE_ID:
             macTrace(pMac, TRACE_CODE_RX_CFG_MSG, session, data);
-            break;
-        default:
-            macTrace(pMac, moduleId, session, data);
             break;
         }
 }
@@ -361,9 +355,6 @@ void macTraceMsgRxNew(tpAniSirGlobal pMac, tANI_U8 module, tANI_U8 session, tANI
             break;
         case SIR_CFG_MODULE_ID:
             macTraceNew(pMac, module, TRACE_CODE_RX_CFG_MSG, session, data);
-            break;
-        default:
-            macTrace(pMac, moduleId, session, data);
             break;
         }
 }
@@ -408,11 +399,6 @@ tANI_U8* limTraceGetMlmStateString( tANI_U32 mlmState )
         CASE_RETURN_STRING( eLIM_MLM_WT_REMOVE_BSS_KEY_STATE);
         CASE_RETURN_STRING( eLIM_MLM_WT_REMOVE_STA_KEY_STATE);
         CASE_RETURN_STRING( eLIM_MLM_WT_SET_MIMOPS_STATE);
-#if defined WLAN_FEATURE_VOWIFI_11R
-        CASE_RETURN_STRING(eLIM_MLM_WT_ADD_BSS_RSP_FT_REASSOC_STATE);
-        CASE_RETURN_STRING(eLIM_MLM_WT_FT_REASSOC_RSP_STATE);
-#endif
-        CASE_RETURN_STRING(eLIM_MLM_P2P_LISTEN_STATE);
         default:
             return( "UNKNOWN" );
             break;
