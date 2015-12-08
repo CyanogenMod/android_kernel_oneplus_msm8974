@@ -589,7 +589,7 @@ void vosTraceDumpAll(void *pMac, v_U8_t code, v_U8_t session,
         return;
     }
 
-    VOS_TRACE( VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_ERROR,
+    VOS_TRACE( VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_INFO,
                "Total Records: %d, Head: %d, Tail: %d",
                gvosTraceData.num, gvosTraceData.head, gvosTraceData.tail);
 

@@ -1793,7 +1793,7 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                          hddLog(VOS_TRACE_LEVEL_INFO,
                             "%s: sending connect indication to nl80211:"
                             " for bssid " MAC_ADDRESS_STR
-                            " reason:%d and Status:%d\n",
+                            " result:%d and Status:%d",
                             __func__, MAC_ADDR_ARRAY(pRoamInfo->bssid),
                             roamResult, roamStatus);
 
@@ -1887,12 +1887,12 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
         hdd_wext_state_t *pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
         if (pRoamInfo)
             pr_info("wlan: connection failed with " MAC_ADDRESS_STR
-                    " reason:%d and Status:%d\n",
+                    " result:%d and Status:%d",
                     MAC_ADDR_ARRAY(pRoamInfo->bssid),
                     roamResult, roamStatus);
         else
             pr_info("wlan: connection failed with " MAC_ADDRESS_STR
-                    " reason:%d and Status:%d\n",
+                    " result:%d and Status:%d",
                     MAC_ADDR_ARRAY(pWextState->req_bssId),
                     roamResult, roamStatus);
 
@@ -1968,19 +1968,16 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                 hddLog(VOS_TRACE_LEVEL_ERROR,
                      "%s: send connect failure to nl80211:"
                      " for bssid " MAC_ADDRESS_STR
-                     " reason:%d and Status:%d\n" ,
+                     " result:%d and Status:%d reasonCode %d" ,
                      __func__, MAC_ADDR_ARRAY(pRoamInfo->bssid),
-                     roamResult, roamStatus);
+                     roamResult, roamStatus, pRoamInfo->reasonCode);
              else
                  hddLog(VOS_TRACE_LEVEL_ERROR,
                      "%s: connect failed:"
                      " for bssid " MAC_ADDRESS_STR
-                     " reason:%d and Status:%d\n" ,
+                     " result:%d and Status:%d" ,
                      __func__, MAC_ADDR_ARRAY(pWextState->req_bssId),
                      roamResult, roamStatus);
-
-            /*Clear the roam profile*/
-            hdd_clearRoamProfileIe( pAdapter );
 
             /* inform association failure event to nl80211 */
             if ( eCSR_ROAM_RESULT_ASSOC_FAIL_CON_CHANNEL == roamResult )
@@ -2001,8 +1998,18 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                 if (pRoamInfo){
                     eCsrAuthType authType =
                         pWextState->roamProfile.AuthType.authType[0];
-                    v_BOOL_t isWep = (authType == eCSR_AUTH_TYPE_OPEN_SYSTEM) ||
-                                     (authType == eCSR_AUTH_TYPE_SHARED_KEY);
+                    eCsrEncryptionType encryptionType =
+                     pWextState->roamProfile.EncryptionType.encryptionType[0];
+                    v_BOOL_t isWep =
+                         (((authType == eCSR_AUTH_TYPE_OPEN_SYSTEM) ||
+                           (authType == eCSR_AUTH_TYPE_SHARED_KEY)) &&
+                           ((encryptionType == eCSR_ENCRYPT_TYPE_WEP40) ||
+                            (encryptionType == eCSR_ENCRYPT_TYPE_WEP104) ||
+                            (encryptionType ==
+                                     eCSR_ENCRYPT_TYPE_WEP40_STATICKEY) ||
+                            (encryptionType ==
+                                     eCSR_ENCRYPT_TYPE_WEP104_STATICKEY)));
+
 
                      /* In case of OPEN-WEP or SHARED-WEP authentication,
                      * send exact protocol reason code. This enables user
@@ -2011,7 +2018,8 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                      */
                     cfg80211_connect_result ( dev, pRoamInfo->bssid,
                         NULL, 0, NULL, 0,
-                        isWep ? pRoamInfo->reasonCode :
+                        (isWep && pRoamInfo->reasonCode) ?
+                        pRoamInfo->reasonCode :
                         WLAN_STATUS_UNSPECIFIED_FAILURE,
                         GFP_KERNEL );
               } else
@@ -2020,6 +2028,8 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                         WLAN_STATUS_UNSPECIFIED_FAILURE,
                         GFP_KERNEL );
             }
+            /*Clear the roam profile*/
+            hdd_clearRoamProfileIe( pAdapter );
         }
 
         hdd_wmm_init( pAdapter );

@@ -64,10 +64,12 @@ static v_U8_t* tlTraceGetEventString(v_U32_t code)
 
 void tlTraceDump(void *pMac, tpvosTraceRecord pRecord, v_U16_t recIndex)
 {
-   TLLOGE( VOS_TRACE (VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
-                       "%04d    %012u  S%-3d    %-14s  %-30s(0x%x)",
-                       recIndex, pRecord->time, pRecord->session, "  TL Event:  ",
-                       tlTraceGetEventString (pRecord->code), pRecord->data));
+   TLLOGE( VOS_TRACE (VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO,
+                       "%04d %012u S%-3d %-14s %-30s(0x%x)",
+                       recIndex, pRecord->time, pRecord->session,
+                       "  TL Event:  ",
+                       tlTraceGetEventString (pRecord->code),
+                       pRecord->data));
 }
 
 void tlTraceInit()

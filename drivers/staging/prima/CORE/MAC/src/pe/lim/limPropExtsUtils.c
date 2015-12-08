@@ -196,6 +196,12 @@ limExtractApCapability(tpAniSirGlobal pMac, tANI_U8 *pIE, tANI_U16 ieLen,
         {
             psessionEntry->countryInfoPresent = TRUE;
         }
+        /* Check if Extended caps are present in probe resp or not */
+        if (pBeaconStruct->ExtCap.present)
+        {
+            psessionEntry->is_ext_caps_present = TRUE;
+        }
+
     }
     vos_mem_free(pBeaconStruct);
     return;

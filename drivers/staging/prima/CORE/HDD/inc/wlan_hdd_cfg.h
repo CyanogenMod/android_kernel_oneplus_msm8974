@@ -2339,10 +2339,15 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ENABLE_DEAUTH_BEFORE_CONNECTION_MAX              (1)
 #define CFG_ENABLE_DEAUTH_BEFORE_CONNECTION_DEFAULT          (0)
 
+/* gEnableMacAddrSpoof = 0 => disable mac spoofing
+                       = 1 => enable mac spoofing in both HOST and FW
+                       = 2 => enable mac spoofing in FW and
+                              disable mac spoofing in HOST
+ */
 #define CFG_ENABLE_MAC_ADDR_SPOOFING                         "gEnableMacAddrSpoof"
 #define CFG_ENABLE_MAC_ADDR_SPOOFING_MIN                     (0)
-#define CFG_ENABLE_MAC_ADDR_SPOOFING_MAX                     (1)
-#define CFG_ENABLE_MAC_ADDR_SPOOFING_DEFAULT                 (1)
+#define CFG_ENABLE_MAC_ADDR_SPOOFING_MAX                     (2)
+#define CFG_ENABLE_MAC_ADDR_SPOOFING_DEFAULT                 (0)
 
 /* Disable Mac Spoof for p2p Scan */
 #define CFG_DISABLE_P2P_MAC_ADDR_SPOOFING              "gDisableP2PMacAddrSpoof"
@@ -3001,7 +3006,7 @@ typedef struct
 #endif
    v_U32_t                     deferImpsTime;
    v_BOOL_t                    sendDeauthBeforeCon;
-   v_BOOL_t                    enableMacSpoofing;
+   v_U8_t                      enableMacSpoofing;
    v_BOOL_t                    disableP2PMacSpoofing;
    v_BOOL_t                    enableMgmtLogging;
    v_BOOL_t                    enableBMUHWtracing;

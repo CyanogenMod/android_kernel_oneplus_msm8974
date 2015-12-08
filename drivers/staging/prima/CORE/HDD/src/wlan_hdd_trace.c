@@ -119,13 +119,13 @@ void hddTraceDump(void *pMac, tpvosTraceRecord pRecord, tANI_U16 recIndex)
 {
     if (TRACE_CODE_HDD_RX_SME_MSG == pRecord->code)
     {
-        hddLog(LOGE, "%04d    %012u  S%d    %-14s  %-30s(0x%x) ",
+        hddLog(LOG1, "%04d %012u S%d %-14s %-30s(0x%x)",
             recIndex, pRecord->time, pRecord->session, "RX SME MSG:",
             get_eRoamCmdStatus_str(pRecord->data), pRecord->data);
     }
     else
     {
-        hddLog(LOGE, "%04d    %012u  S%d    %-14s  %-30s(0x%x) ",
+        hddLog(LOG1, "%04d %012u S%d %-14s %-30s(0x%x)",
             recIndex, pRecord->time, pRecord->session, "HDD Event:",
             hddTraceGetEventString(pRecord->code), pRecord->data);
     }

@@ -959,7 +959,7 @@ VOS_STATUS wlan_hdd_get_frame_logs(hdd_adapter_t *pAdapter, v_U8_t flag)
    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
    if (!pHddCtx->mgmt_frame_logging)
    {
-      hddLog(VOS_TRACE_LEVEL_DEBUG,"%s: Frame Logging not init!", __func__);
+      hddLog(VOS_TRACE_LEVEL_ERROR,"%s: Frame Logging not init!", __func__);
       return VOS_STATUS_E_AGAIN;
    }
 
@@ -2390,8 +2390,8 @@ static int __iw_set_genie(struct net_device *dev,
             case IE_EID_VENDOR:
                 if ((IE_LEN_SIZE+IE_EID_SIZE+IE_VENDOR_OUI_SIZE) > eLen) /* should have at least OUI */
                 {
-                    kfree(base_genie);
-                    return -EINVAL;
+                    ret = -EINVAL;
+                    goto exit;
                 }
 
                 if (0 == memcmp(&genie[0], "\x00\x50\xf2\x04", 4))
@@ -2405,8 +2405,8 @@ static int __iw_set_genie(struct net_device *dev,
                        hddLog(VOS_TRACE_LEVEL_FATAL, "Cannot accommodate genIE. "
                                                       "Need bigger buffer space");
                        VOS_ASSERT(0);
-                       kfree(base_genie);
-                       return -ENOMEM;
+                       ret = -EINVAL;
+                       goto exit;
                     }
                     // save to Additional IE ; it should be accumulated to handle WPS IE + other IE
                     memcpy( pWextState->genIE.addIEdata + curGenIELen, genie - 2, eLen + 2);
@@ -2415,6 +2415,14 @@ static int __iw_set_genie(struct net_device *dev,
                 else if (0 == memcmp(&genie[0], "\x00\x50\xf2", 3))
                 {
                     hddLog (VOS_TRACE_LEVEL_INFO, "%s Set WPA IE (len %d)",__func__, eLen + 2);
+                    if ((eLen + 2) > (sizeof(pWextState->WPARSNIE)))
+                    {
+                       hddLog(VOS_TRACE_LEVEL_FATAL, "Cannot accommodate genIE. "
+                                                      "Need bigger buffer space");
+                       ret = -EINVAL;
+                       VOS_ASSERT(0);
+                       goto exit;
+                    }
                     memset( pWextState->WPARSNIE, 0, MAX_WPA_RSN_IE_LEN );
                     memcpy( pWextState->WPARSNIE, genie - 2, (eLen + 2));
                     pWextState->roamProfile.pWPAReqIE = pWextState->WPARSNIE;
@@ -2431,8 +2439,8 @@ static int __iw_set_genie(struct net_device *dev,
                        hddLog(VOS_TRACE_LEVEL_FATAL, "Cannot accommodate genIE. "
                                                       "Need bigger buffer space");
                        VOS_ASSERT(0);
-                       kfree(base_genie);
-                       return -ENOMEM;
+                       ret = -ENOMEM;
+                       goto exit;
                     }
                     // save to Additional IE ; it should be accumulated to handle WPS IE + other IE
                     memcpy( pWextState->genIE.addIEdata + curGenIELen, genie - 2, eLen + 2);
@@ -2441,6 +2449,14 @@ static int __iw_set_genie(struct net_device *dev,
               break;
          case DOT11F_EID_RSN:
                 hddLog (LOG1, "%s Set RSN IE (len %d)",__func__, eLen+2);
+                if ((eLen + 2) > (sizeof(pWextState->WPARSNIE)))
+                {
+                    hddLog(VOS_TRACE_LEVEL_FATAL, "Cannot accommodate genIE. "
+                                                  "Need bigger buffer space");
+                    ret = -EINVAL;
+                    VOS_ASSERT(0);
+                    goto exit;
+                }
                 memset( pWextState->WPARSNIE, 0, MAX_WPA_RSN_IE_LEN );
                 memcpy( pWextState->WPARSNIE, genie - 2, (eLen + 2));
                 pWextState->roamProfile.pRSNReqIE = pWextState->WPARSNIE;
@@ -2449,16 +2465,16 @@ static int __iw_set_genie(struct net_device *dev,
 
          default:
                 hddLog (LOGE, "%s Set UNKNOWN IE %X",__func__, elementId);
-            kfree(base_genie);
-            return 0;
+                goto exit;
     }
         genie += eLen;
         remLen -= eLen;
     }
 
+exit:
     EXIT();
     kfree(base_genie);
-    return 0;
+    return ret;
 }
 
 static int iw_set_genie(struct net_device *dev,
@@ -3911,11 +3927,20 @@ VOS_STATUS  wlan_hdd_enter_bmps(hdd_adapter_t *pAdapter, int mode)
    }
    else if (DRIVER_POWER_MODE_AUTO == mode)
    {
-       if (VOS_FALSE == pHddStaCtx->conn_info.uIsAuthenticated)
+       /* If this is called by hdd_suspend_wlan or hdd_resume_wlan, driver
+        * was already in BMPS state and thus either STA or P2P-CLI is in
+        * associated state and authenticated, so even if STA connState is
+        * not associated it can be assumed that P2P-CLI is associated and
+        * authenticated. Thus driver can enter BMPS. And even if we try to enter
+        * BMPS with no adaptor in associated state, pmcRequestBmps will check
+        * if all condition are satisfied for entering BMPS.
+        */
+       if ((eConnectionState_Associated  == pHddStaCtx->conn_info.connState) &&
+           (VOS_FALSE == pHddStaCtx->conn_info.uIsAuthenticated))
        {
-           hddLog(VOS_TRACE_LEVEL_ERROR,
-                   "%s:station is in still not Authenticated ignore the "
-                   "power save mode", __func__);
+           hddLog(LOGE,
+              FL("Station is associated but, still not Authenticated ignore "
+               "power save mode"));
            return VOS_STATUS_E_AGAIN;
        }
 
@@ -5964,6 +5989,14 @@ static int __iw_setchar_getnone(struct net_device *dev,
     tSirpkt80211 *pkt;
 
     ENTER();
+
+    if (!capable(CAP_NET_ADMIN))
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("permission check failed"));
+        return -EPERM;
+    }
+
     pAdapter = (netdev_priv(dev));
     if (NULL == pAdapter)
     {
@@ -6290,6 +6323,14 @@ int __iw_set_three_ints_getnone(struct net_device *dev,
     int ret = 0;
 
     ENTER();
+
+    if (!capable(CAP_NET_ADMIN))
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("permission check failed"));
+        return -EPERM;
+    }
+
     pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     if (NULL == pAdapter)
     {
@@ -7491,6 +7532,13 @@ static int iw_hdd_set_var_ints_getnone(struct net_device *dev,
     int apps_args[MAX_VAR_ARGS] = {0};
     int num_args;
 
+    if (!capable(CAP_NET_ADMIN))
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("permission check failed"));
+        return -EPERM;
+    }
+
     /* helper function to get iwreq_data with compat handling. */
     if (hdd_priv_get_data(&u_priv_wrqu.data, wrqu))
     {
@@ -8095,6 +8143,13 @@ static int __iw_clear_dynamic_mcbc_filter(struct net_device *dev,
     int ret = 0;
 
     ENTER();
+
+    if (!capable(CAP_NET_ADMIN))
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("permission check failed"));
+        return -EPERM;
+    }
 
     pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     if (NULL == pAdapter)
@@ -8729,6 +8784,14 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
     struct iw_point s_priv_data;
 
     ENTER();
+
+    if (!capable(CAP_NET_ADMIN))
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("permission check failed"));
+        return -EPERM;
+    }
+
     pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     if (NULL == pAdapter)
     {
@@ -9728,6 +9791,13 @@ static int __iw_set_band_config(struct net_device *dev,
 
     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s: ", __func__);
 
+    if (!capable(CAP_NET_ADMIN))
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("permission check failed"));
+        return -EPERM;
+    }
+
     return hdd_setBand(dev, value[0]);
 }
 
@@ -9750,8 +9820,17 @@ static int __iw_set_power_params_priv(struct net_device *dev,
 {
   int ret;
   char *ptr;
+
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                 "Set power params Private");
+
+  if (!capable(CAP_NET_ADMIN))
+  {
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                FL("permission check failed"));
+      return -EPERM;
+  }
+
   /* ODD number is used for set, copy data using copy_from_user */
   ptr = mem_alloc_copy_from_user_helper(wrqu->data.pointer,
                                           wrqu->data.length);
