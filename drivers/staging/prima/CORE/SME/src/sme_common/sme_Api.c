@@ -11729,11 +11729,13 @@ void activeListCmdTimeoutHandle(void *userData)
         csrLLCount(&pMac->sme.smeCmdActiveList) );
     smeGetCommandQStatus(hHal);
 
-    vosTraceDumpAll(pMac,0,0,0,0);
     /* Initiate SSR to recover */
     if (!(vos_isLoadUnloadInProgress() ||
         vos_is_logp_in_progress(VOS_MODULE_ID_SME, NULL)))
+    {
+       vosTraceDumpAll(pMac,0,0,0,0);
        vos_wlanRestart();
+    }
 }
 
 #ifdef FEATURE_WLAN_CH_AVOID

@@ -4911,6 +4911,13 @@ static int __iw_ftm_setchar_getnone(struct net_device *dev, struct iw_request_in
 
     ENTER();
 
+    if (!capable(CAP_NET_ADMIN))
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("permission check failed"));
+        return -EPERM;
+    }
+
     ret =0;
     /* helper function to get iwreq_data with compat handling. */
     if (hdd_priv_get_data(&s_priv_data, wrqu))
@@ -5585,6 +5592,13 @@ static int iw_ftm_set_var_ints_getnone(struct net_device *dev, struct iw_request
         union iwreq_data *wrqu, char *extra)
 {
    int ret;
+
+   if (!capable(CAP_NET_ADMIN))
+   {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+           FL("permission check failed"));
+        return -EPERM;
+   }
 
    vos_ssr_protect(__func__);
    ret = __iw_ftm_set_var_ints_getnone(dev, info, wrqu, extra);

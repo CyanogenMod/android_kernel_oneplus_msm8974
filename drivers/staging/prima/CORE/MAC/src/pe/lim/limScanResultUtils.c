@@ -518,6 +518,8 @@ limCheckAndAddBssDescription(tpAniSirGlobal pMac,
         return;
     }
 
+    vos_mem_zero(pBssDescr, frameLen);
+
     // In scan state, store scan result.
 #if defined WLAN_FEATURE_VOWIFI
     status = limCollectBssDescription(pMac, &pBssDescr->bssDescription,

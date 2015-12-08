@@ -1977,6 +1977,7 @@ void limProcessStaMlmAddStaRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ ,tpPESess
           //either assoc cnf or reassoc cnf handler.
           mlmAssocCnf.resultCode =
               (tSirResultCodes) eSIR_SME_JOIN_DEAUTH_FROM_AP_DURING_ADD_STA;
+          mlmAssocCnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
           psessionEntry->staId = pAddStaParams->staIdx;
           goto end;
       }
@@ -2048,6 +2049,7 @@ void limProcessStaMlmAddStaRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ ,tpPESess
         if(psessionEntry->limSmeState == eLIM_SME_WT_REASSOC_STATE)
            mesgType = LIM_MLM_REASSOC_CNF;
         mlmAssocCnf.resultCode = (tSirResultCodes) eSIR_SME_REFUSED;
+        mlmAssocCnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
     }
 end:
     if( 0 != limMsgQ->bodyptr )
@@ -3263,6 +3265,7 @@ limProcessStaMlmAddBssRsp( tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,tpPESession ps
     {
         limLog( pMac, LOGP, FL( "SessionId:%d ADD_BSS failed! mlmState = %d" ),
                 psessionEntry->peSessionId,  psessionEntry->limMlmState);
+        mlmAssocCnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
         // Return Assoc confirm to SME with failure
         if(eLIM_MLM_WT_ADD_BSS_RSP_FT_REASSOC_STATE == psessionEntry->limMlmState)
             mlmAssocCnf.resultCode = (tSirResultCodes) eSIR_SME_FT_REASSOC_FAILURE;
@@ -5198,11 +5201,20 @@ void limProcessRxScanEvent(tpAniSirGlobal pMac, void *buf)
 
 void limProcessMlmSpoofMacAddrRsp(tpAniSirGlobal pMac, tSirRetStatus rspStatus)
 {
+    tANI_U32 val;
 
-    if ((rspStatus != eSIR_SUCCESS) ||
+    if (wlan_cfgGetInt(pMac, WNI_CFG_ENABLE_MAC_ADDR_SPOOFING, &val)
+                        != eSIR_SUCCESS)
+    {
+        limLog(pMac, LOGP, FL("fail to Get WNI_CFG_ENABLE_MAC_ADDR_SPOOFING"));
+        /*If we here means mac spoofing is enable. So enable both Host and
+          FW spoofing */
+        val = 1;
+    }
+    if ((rspStatus != eSIR_SUCCESS) || (val != 1) ||
        (TRUE == vos_is_macaddr_zero((v_MACADDR_t *)&pMac->lim.spoofMacAddr)))
     {
-        limLog(pMac, LOG1, FL(" LIM Disabling Spoofing"));
+        limLog(pMac, LOG1, FL(" LIM Disabling Spoofing %d"), val);
         pMac->lim.isSpoofingEnabled = FALSE;
     } else {
         limLog(pMac, LOG1, FL(" LIM Enabling Spoofing"));

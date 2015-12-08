@@ -213,24 +213,24 @@ static void smeTraceDump(tpAniSirGlobal pMac, tpvosTraceRecord pRecord,
 {
     switch (pRecord->code) {
         case TRACE_CODE_SME_COMMAND:
-            smsLog(pMac, LOGE, "%04d %012u S%d %-14s %-30s(0x%x)",
+            smsLog(pMac, LOG1, "%04d %012u S%d %-14s %-30s(0x%x)",
                 recIndex, pRecord->time, pRecord->session, "SME COMMAND:",
                  smeTraceGetCommandString(pRecord->data), pRecord->data);
             break;
         case TRACE_CODE_SME_TX_WDA_MSG:
-           smsLog(pMac, LOGE, "%04d %012u S%d %-14s %-30s(0x%x)",
+           smsLog(pMac, LOG1, "%04d %012u S%d %-14s %-30s(0x%x)",
                 recIndex, pRecord->time, pRecord->session, "TX WDA Msg:",
                 macTraceGetWdaMsgString((tANI_U16)pRecord->data),
                                               pRecord->data);
             break;
         case TRACE_CODE_SME_RX_WDA_MSG:
-            smsLog(pMac, LOGE, "%04d %012u S%d %-14s %-30s(0x%x)",
+            smsLog(pMac, LOG1, "%04d %012u S%d %-14s %-30s(0x%x)",
                 recIndex, pRecord->time, pRecord->session, "RX WDA Msg:",
                 macTraceGetSmeMsgString((tANI_U16)pRecord->data),
                                               pRecord->data);
             break;
         default:
-            smsLog(pMac, LOGE, "%04d %012u S%d %-14s %-30s(0x%x)",
+            smsLog(pMac, LOG1, "%04d %012u S%d %-14s %-30s(0x%x)",
                 recIndex, pRecord->time, pRecord->session, "RX HDD MSG:",
                 smeTraceGetRxMsgString(pRecord->code), pRecord->data);
         break;
