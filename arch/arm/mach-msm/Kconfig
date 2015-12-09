@@ -3112,6 +3112,12 @@ config INTELLI_HOTPLUG
 	  An intelligent cpu hotplug driver for
 	  Low Latency Frequency Transition capable processors.
 
+config ALUCARD_HOTPLUG
+	bool "Enable alucard-hotplug cpu hotplug driver"
+	default y
+	help
+	  Generic Alucard-hotplug cpu hotplug driver for ARM SOCs
+
 config BRICKED_HOTPLUG
 	bool "Enable kernel based mpdecision"
 	depends on MSM_RUN_QUEUE_STATS
@@ -3119,6 +3125,13 @@ config BRICKED_HOTPLUG
 	help
 	  This enables kernel based multi core control.
 	  (up/down hotplug based on load)
+
+config ALUCARD_HOTPLUG_USE_CPU_UTIL
+	bool "Enable alucard-hotplug cpu statistics utilization"
+	depends on (ALUCARD_HOTPLUG)
+	default n
+	help
+	  Alucard-hotplug cpu statistics utilization
 
 endif
 
