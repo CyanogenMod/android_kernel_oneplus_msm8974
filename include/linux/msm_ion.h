@@ -5,9 +5,7 @@
 
 enum msm_ion_heap_types {
 	ION_HEAP_TYPE_MSM_START = ION_HEAP_TYPE_CUSTOM + 1,
-	ION_HEAP_TYPE_DMA = ION_HEAP_TYPE_MSM_START,
-	ION_HEAP_TYPE_CP,
-	ION_HEAP_TYPE_SECURE_DMA,
+	ION_HEAP_TYPE_SECURE_DMA = ION_HEAP_TYPE_MSM_START,
 	ION_HEAP_TYPE_REMOVED,
 	/*
 	 * if you add a heap type here you should also add it to
@@ -66,9 +64,6 @@ enum cp_mem_usage {
 	UNKNOWN = 0x7FFFFFFF,
 };
 
-#define ION_HEAP_CP_MASK		(1 << ION_HEAP_TYPE_CP)
-#define ION_HEAP_TYPE_DMA_MASK         (1 << ION_HEAP_TYPE_DMA)
-
 /**
  * Flag to use when allocating to indicate that a heap is secure.
  */
@@ -121,6 +116,12 @@ enum cp_mem_usage {
 
 #ifdef __KERNEL__
 
+enum ion_permission_type {
+	IPT_TYPE_MM_CARVEOUT = 0,
+	IPT_TYPE_MFC_SHAREDMEM = 1,
+	IPT_TYPE_MDP_WRITEBACK = 2,
+};
+
 /*
  * This flag allows clients when mapping into the IOMMU to specify to
  * defer un-mapping from the IOMMU until the buffer memory is freed.
@@ -152,7 +153,6 @@ enum cp_mem_usage {
  * @release_region:	function to be called when the number of allocations
  *			goes from 1 -> 0
  * @setup_region:	function to be called upon ion registration
- * @memory_type:Memory type used for the heap
  * @allow_nonsecure_alloc: allow non-secure allocations from this heap. For
  *			secure heaps, this flag must be set so allow non-secure
  *			allocations. For non-secure heaps, this flag is ignored.
@@ -170,7 +170,6 @@ struct ion_cp_heap_pdata {
 	int (*request_region)(void *);
 	int (*release_region)(void *);
 	void *(*setup_region)(void);
-	enum ion_memory_types memory_type;
 	int allow_nonsecure_alloc;
 };
 
@@ -194,7 +193,6 @@ struct ion_co_heap_pdata {
 	int (*request_region)(void *);
 	int (*release_region)(void *);
 	void *(*setup_region)(void);
-	enum ion_memory_types memory_type;
 };
 
 /*
@@ -253,7 +251,7 @@ int ion_handle_get_flags(struct ion_client *client, struct ion_handle *handle,
  */
 int ion_map_iommu(struct ion_client *client, struct ion_handle *handle,
 			int domain_num, int partition_num, unsigned long align,
-			unsigned long iova_length, unsigned long *iova,
+			unsigned long iova_length, ion_phys_addr_t *iova,
 			unsigned long *buffer_size,
 			unsigned long flags, unsigned long iommu_flags);
 
@@ -289,35 +287,6 @@ int ion_handle_get_size(struct ion_client *client, struct ion_handle *handle,
 void ion_unmap_iommu(struct ion_client *client, struct ion_handle *handle,
 			int domain_num, int partition_num);
 
-
-/**
- * ion_secure_heap - secure a heap
- *
- * @client - a client that has allocated from the heap heap_id
- * @heap_id - heap id to secure.
- * @version - version of content protection
- * @data - extra data needed for protection
- *
- * Secure a heap
- * Returns 0 on success
- */
-int ion_secure_heap(struct ion_device *dev, int heap_id, int version,
-			void *data);
-
-/**
- * ion_unsecure_heap - un-secure a heap
- *
- * @client - a client that has allocated from the heap heap_id
- * @heap_id - heap id to un-secure.
- * @version - version of content protection
- * @data - extra data needed for protection
- *
- * Un-secure a heap
- * Returns 0 on success
- */
-int ion_unsecure_heap(struct ion_device *dev, int heap_id, int version,
-			void *data);
-
 /**
  * msm_ion_do_cache_op - do cache operations.
  *
@@ -334,50 +303,6 @@ int ion_unsecure_heap(struct ion_device *dev, int heap_id, int version,
  */
 int msm_ion_do_cache_op(struct ion_client *client, struct ion_handle *handle,
 			void *vaddr, unsigned long len, unsigned int cmd);
-
-/**
- * msm_ion_secure_heap - secure a heap. Wrapper around ion_secure_heap.
- *
- * @heap_id - heap id to secure.
- *
- * Secure a heap
- * Returns 0 on success
- */
-int msm_ion_secure_heap(int heap_id);
-
-/**
- * msm_ion_unsecure_heap - unsecure a heap. Wrapper around ion_unsecure_heap.
- *
-  * @heap_id - heap id to secure.
- *
- * Un-secure a heap
- * Returns 0 on success
- */
-int msm_ion_unsecure_heap(int heap_id);
-
-/**
- * msm_ion_secure_heap_2_0 - secure a heap using 2.0 APIs
- *  Wrapper around ion_secure_heap.
- *
- * @heap_id - heap id to secure.
- * @usage - usage hint to TZ
- *
- * Secure a heap
- * Returns 0 on success
- */
-int msm_ion_secure_heap_2_0(int heap_id, enum cp_mem_usage usage);
-
-/**
- * msm_ion_unsecure_heap - unsecure a heap secured with 3.0 APIs.
- * Wrapper around ion_unsecure_heap.
- *
- * @heap_id - heap id to secure.
- * @usage - usage hint to TZ
- *
- * Un-secure a heap
- * Returns 0 on success
- */
-int msm_ion_unsecure_heap_2_0(int heap_id, enum cp_mem_usage usage);
 
 /**
  * msm_ion_secure_buffer - secure an individual buffer
@@ -408,7 +333,7 @@ static inline struct ion_client *msm_ion_client_create(unsigned int heap_mask,
 static inline int ion_map_iommu(struct ion_client *client,
 			struct ion_handle *handle, int domain_num,
 			int partition_num, unsigned long align,
-			unsigned long iova_length, unsigned long *iova,
+			unsigned long iova_length, ion_phys_addr_t *iova,
 			unsigned long *buffer_size,
 			unsigned long flags,
 			unsigned long iommu_flags)
@@ -429,48 +354,9 @@ static inline void ion_unmap_iommu(struct ion_client *client,
 	return;
 }
 
-static inline int ion_secure_heap(struct ion_device *dev, int heap_id,
-					int version, void *data)
-{
-	return -ENODEV;
-
-}
-
-static inline int ion_unsecure_heap(struct ion_device *dev, int heap_id,
-					int version, void *data)
-{
-	return -ENODEV;
-}
-
-static inline void ion_mark_dangling_buffers_locked(struct ion_device *dev)
-{
-}
-
 static inline int msm_ion_do_cache_op(struct ion_client *client,
 			struct ion_handle *handle, void *vaddr,
 			unsigned long len, unsigned int cmd)
-{
-	return -ENODEV;
-}
-
-static inline int msm_ion_secure_heap(int heap_id)
-{
-	return -ENODEV;
-
-}
-
-static inline int msm_ion_unsecure_heap(int heap_id)
-{
-	return -ENODEV;
-}
-
-static inline int msm_ion_secure_heap_2_0(int heap_id, enum cp_mem_usage usage)
-{
-	return -ENODEV;
-}
-
-static inline int msm_ion_unsecure_heap_2_0(int heap_id,
-					enum cp_mem_usage usage)
 {
 	return -ENODEV;
 }
@@ -505,7 +391,7 @@ static inline int msm_ion_unsecure_buffer(struct ion_client *client,
  * the cache operations performed
  */
 struct ion_flush_data {
-	struct ion_handle *handle;
+	ion_user_handle_t handle;
 	int fd;
 	void *vaddr;
 	unsigned int offset;

@@ -58,7 +58,7 @@
 #include "mdss_debug.h"
 
 #define CREATE_TRACE_POINTS
-#include "mdss_mdp_trace.h"
+#include <trace/mdss_mdp_trace.h>
 
 struct mdss_data_type *mdss_res;
 

@@ -50,9 +50,6 @@ struct ion_heap *ion_cp_heap_create(struct ion_platform_heap *);
 void ion_cp_heap_destroy(struct ion_heap *);
 
 #ifdef CONFIG_CMA
-struct ion_heap *ion_cma_heap_create(struct ion_platform_heap *);
-void ion_cma_heap_destroy(struct ion_heap *);
-
 struct ion_heap *ion_secure_cma_heap_create(struct ion_platform_heap *);
 void ion_secure_cma_heap_destroy(struct ion_heap *);
 
@@ -104,13 +101,6 @@ void ion_cp_heap_get_base(struct ion_heap *heap, unsigned long *base,
 			unsigned long *size);
 
 void ion_mem_map_show(struct ion_heap *heap);
-
-
-
-int ion_secure_handle(struct ion_client *client, struct ion_handle *handle,
-			int version, void *data, int flags);
-
-int ion_unsecure_handle(struct ion_client *client, struct ion_handle *handle);
 
 int ion_heap_allow_secure_allocation(enum ion_heap_type type);
 

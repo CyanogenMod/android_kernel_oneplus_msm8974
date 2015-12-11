@@ -56,8 +56,8 @@ static int mdss_mdp_splash_alloc_memory(struct msm_fb_data_type *mfd,
 
 	rc = ion_map_iommu(mdata->iclient, sinfo->ion_handle,
 			mdss_get_iommu_domain(MDSS_IOMMU_DOMAIN_UNSECURE),
-			0, SZ_4K, 0, (unsigned long *)&sinfo->iova,
-				(unsigned long *)&buf_size, 0, 0);
+			0, SZ_4K, 0, &sinfo->iova,
+				&buf_size, 0, 0);
 	if (rc) {
 		pr_err("ion memory map failed\n");
 		goto imap_err;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -43,7 +43,7 @@ struct videobuf2_msm_offset {
 struct videobuf2_contig_pmem {
 	u32 magic;
 	void *vaddr;
-	int phyaddr;
+	dma_addr_t *phyaddr;
 	unsigned long size;
 	int is_userptr;
 	/* Offset of the plane inside the buffer */
@@ -56,7 +56,7 @@ struct videobuf2_contig_pmem {
 	int dirty;
 	unsigned int count;
 	void *alloc_ctx;
-	unsigned long mapped_phyaddr;
+	dma_addr_t *mapped_phyaddr;
 	struct ion_handle *ion_handle;
 	struct ion_client *client;
 };
@@ -76,7 +76,7 @@ int videobuf2_pmem_contig_user_get(struct videobuf2_contig_pmem *mem,
 					int domain_num);
 void videobuf2_pmem_contig_user_put(struct videobuf2_contig_pmem *mem,
 				struct ion_client *client, int domain_num);
-unsigned long videobuf2_to_pmem_contig(struct vb2_buffer *buf,
+dma_addr_t* videobuf2_to_pmem_contig(struct vb2_buffer *buf,
 					unsigned int plane_no);
 
 #endif /* _VIDEOBUF2_PMEM_CONTIG_H */

@@ -365,8 +365,8 @@ static struct mdss_mdp_wb_data *get_local_node(struct mdss_mdp_wb *wb,
 	if (!list_empty(&wb->register_queue)) {
 		list_for_each_entry(node, &wb->register_queue, registered_entry)
 		if (node->buf_info.iova == data->iova) {
-			pr_debug("found node iova=%x addr=%x\n",
-				 data->iova, node->buf_data.p[0].addr);
+			pr_debug("found node iova=%pa addr=%pa\n",
+				 &data->iova, &node->buf_data.p[0].addr);
 			return node;
 		}
 	}
@@ -391,7 +391,8 @@ static struct mdss_mdp_wb_data *get_local_node(struct mdss_mdp_wb *wb,
 		return NULL;
 	}
 
-	pr_debug("register node iova=0x%x addr=0x%x\n", data->iova, buf->addr);
+	pr_debug("register node iova=0x%pa addr=0x%pa\n", &data->iova,
+								&buf->addr);
 
 	return node;
 }
@@ -425,10 +426,9 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 		list_for_each_entry(node, &wb->register_queue, registered_entry)
 			if ((node->buf_data.p[0].srcp_ihdl == ihdl) &&
 				    (node->buf_info.offset == data->offset)) {
-				pr_debug("found fd=%d hdl=%p off=%x addr=%x\n",
-						data->memory_id, ihdl,
-						data->offset,
-						node->buf_data.p[0].addr);
+				pr_debug("found node fd=%x off=%x addr=%pa\n",
+						data->memory_id, data->offset,
+						&node->buf_data.p[0].addr);
 				return node;
 			}
 	}
@@ -466,8 +466,8 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 		goto register_fail;
 	}
 
-	pr_debug("register node mem_id=%d offset=%u addr=0x%x len=%d\n",
-		 data->memory_id, data->offset, buf->addr, buf->len);
+	pr_debug("register node mem_id=%d offset=%u addr=0x%pa len=%d\n",
+		 data->memory_id, data->offset, &buf->addr, buf->len);
 
 	return node;
 
@@ -482,11 +482,11 @@ static void mdss_mdp_wb_free_node(struct mdss_mdp_wb_data *node)
 
 	if (node->user_alloc) {
 		buf = &node->buf_data.p[0];
-		pr_debug("free user mem_id=%d ihdl=%p, offset=%u addr=0x%x\n",
+		pr_debug("free user mem_id=%d ihdl=%p, offset=%u addr=0x%pa\n",
 				node->buf_info.memory_id,
 				buf->srcp_ihdl,
 				node->buf_info.offset,
-				buf->addr);
+				&buf->addr);
 
 		mdss_mdp_put_img(&node->buf_data.p[0]);
 		node->user_alloc = false;
@@ -600,7 +600,7 @@ static int mdss_mdp_wb_dequeue(struct msm_fb_data_type *mfd,
 		memcpy(data, &node->buf_info, sizeof(*data));
 
 		buf = &node->buf_data.p[0];
-		pr_debug("found node addr=%x len=%d\n", buf->addr, buf->len);
+		pr_debug("found node addr=%pa len=%d\n", &buf->addr, buf->len);
 	} else {
 		pr_debug("node is NULL, wait for next\n");
 		ret = -ENOBUFS;

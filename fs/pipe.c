@@ -654,8 +654,11 @@ out:
 		wake_up_interruptible_sync_poll(&pipe->wait, POLLIN | POLLRDNORM);
 		kill_fasync(&pipe->fasync_readers, SIGIO, POLL_IN);
 	}
-	if (ret > 0)
-		file_update_time(filp);
+	if (ret > 0) {
+		int err = file_update_time(filp);
+		if (err)
+			ret = err;
+	}
 	return ret;
 }
 
@@ -859,6 +862,9 @@ static int
 pipe_rdwr_open(struct inode *inode, struct file *filp)
 {
 	int ret = -ENOENT;
+
+	if (!(filp->f_mode & (FMODE_READ|FMODE_WRITE)))
+		return -EINVAL;
 
 	mutex_lock(&inode->i_mutex);
 

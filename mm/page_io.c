@@ -21,6 +21,7 @@
 #include <linux/writeback.h>
 #include <linux/blkdev.h>
 #include <linux/ratelimit.h>
+#include <linux/aio.h>
 #include <asm/pgtable.h>
 
 /*

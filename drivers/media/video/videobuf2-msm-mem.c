@@ -45,9 +45,9 @@
 #define D(fmt, args...) do {} while (0)
 #endif
 
-static unsigned long msm_mem_allocate(struct videobuf2_contig_pmem *mem)
+static dma_addr_t* msm_mem_allocate(struct videobuf2_contig_pmem *mem)
 {
-	unsigned long phyaddr;
+	dma_addr_t *phyaddr;
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 	int rc, len;
 	mem->client = msm_ion_client_create(-1, "camera");
@@ -63,7 +63,7 @@ static unsigned long msm_mem_allocate(struct videobuf2_contig_pmem *mem)
 	}
 	rc = ion_map_iommu(mem->client, mem->ion_handle,
 			-1, 0, SZ_4K, 0,
-			(unsigned long *)&phyaddr,
+			phyaddr,
 			(unsigned long *)&len, 0, 0);
 	if (rc < 0) {
 		pr_err("%s Could not get physical address\n", __func__);
@@ -181,7 +181,7 @@ int videobuf2_pmem_contig_user_get(struct videobuf2_contig_pmem *mem,
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 	unsigned long len;
 #endif
-	unsigned long paddr = 0;
+	dma_addr_t *paddr;
 	if (mem->phyaddr != 0)
 		return 0;
 #if defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
@@ -191,7 +191,7 @@ int videobuf2_pmem_contig_user_get(struct videobuf2_contig_pmem *mem,
 		return PTR_ERR(mem->ion_handle);
 	}
 	rc = ion_map_iommu(client, mem->ion_handle, domain_num, 0,
-		SZ_4K, 0, (unsigned long *)&mem->phyaddr, &len, 0, 0);
+		SZ_4K, 0, mem->phyaddr, &len, 0, 0);
 	if (rc < 0)
 		ion_free(client, mem->ion_handle);
 #else
@@ -276,7 +276,7 @@ static int msm_vb2_mem_ops_mmap(void *buf_priv, struct vm_area_struct *vma)
 	size = (size < mem->size) ? size : mem->size;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	retval = remap_pfn_range(vma, vma->vm_start,
-			mem->phyaddr >> PAGE_SHIFT,
+			*mem->phyaddr >> PAGE_SHIFT,
 			size, vma->vm_page_prot);
 	if (retval) {
 		pr_err("mmap: remap failed with error %d. ", retval);
@@ -325,7 +325,7 @@ void videobuf2_queue_pmem_contig_init(struct vb2_queue *q,
 }
 EXPORT_SYMBOL_GPL(videobuf2_queue_pmem_contig_init);
 
-unsigned long videobuf2_to_pmem_contig(struct vb2_buffer *vb,
+dma_addr_t* videobuf2_to_pmem_contig(struct vb2_buffer *vb,
 				unsigned int plane_no)
 {
 	struct videobuf2_contig_pmem *mem;

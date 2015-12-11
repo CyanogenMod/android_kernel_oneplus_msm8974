@@ -56,7 +56,7 @@ struct nlm_host *nlmclnt_init(const struct nlmclnt_initdata *nlm_init)
 	u32 nlm_version = (nlm_init->nfs_version == 2) ? 1 : 4;
 	int status;
 
-	status = lockd_up();
+	status = lockd_up(nlm_init->net);
 	if (status < 0)
 		return ERR_PTR(status);
 
@@ -65,7 +65,7 @@ struct nlm_host *nlmclnt_init(const struct nlmclnt_initdata *nlm_init)
 				   nlm_init->hostname, nlm_init->noresvport,
 				   nlm_init->net);
 	if (host == NULL) {
-		lockd_down();
+		lockd_down(nlm_init->net);
 		return ERR_PTR(-ENOLCK);
 	}
 
@@ -80,8 +80,10 @@ EXPORT_SYMBOL_GPL(nlmclnt_init);
  */
 void nlmclnt_done(struct nlm_host *host)
 {
+	struct net *net = host->net;
+
 	nlmclnt_release_host(host);
-	lockd_down();
+	lockd_down(net);
 }
 EXPORT_SYMBOL_GPL(nlmclnt_done);
 
@@ -142,6 +144,9 @@ int nlmclnt_block(struct nlm_wait *block, struct nlm_rqst *req, long timeout)
 			timeout);
 	if (ret < 0)
 		return -ERESTARTSYS;
+	/* Reset the lock status after a server reboot so we resend */
+	if (block->b_status == nlm_lck_denied_grace_period)
+		block->b_status = nlm_lck_blocked;
 	req->a_res.status = block->b_status;
 	return 0;
 }
@@ -220,11 +225,12 @@ reclaimer(void *ptr)
 	struct nlm_wait	  *block;
 	struct file_lock *fl, *next;
 	u32 nsmstate;
+	struct net *net = host->net;
 
 	allow_signal(SIGKILL);
 
 	down_write(&host->h_rwsem);
-	lockd_up();	/* note: this cannot fail as lockd is already running */
+	lockd_up(net);	/* note: this cannot fail as lockd is already running */
 
 	dprintk("lockd: reclaiming locks for host %s\n", host->h_name);
 
@@ -275,6 +281,6 @@ restart:
 
 	/* Release host handle after use */
 	nlmclnt_release_host(host);
-	lockd_down();
+	lockd_down(net);
 	return 0;
 }

@@ -35,6 +35,7 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/qpnp/pin.h>
+#include <linux/wakelock.h>
 
 /* Interrupt offsets */
 #define INT_RT_STS(base)			(base + 0x10)
