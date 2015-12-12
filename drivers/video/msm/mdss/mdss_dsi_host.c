@@ -1103,20 +1103,20 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 	bp = tp->data;
 
 	len = ALIGN(tp->len, 4);
-	size = ALIGN(tp->len, SZ_4K);
+	ctrl->dma_size = ALIGN(tp->len, SZ_4K);
 
 
 	if (is_mdss_iommu_attached()) {
 		ret = msm_iommu_map_contig_buffer(tp->dmap,
 					mdss_get_iommu_domain(domain), 0,
-					size, SZ_4K, 0, &(addr));
+					ctrl->dma_size, SZ_4K, 0, &(ctrl->dma_addr));
 		if (IS_ERR_VALUE(ret)) {
 			pr_err("unable to map dma memory to iommu(%d)\n", ret);
 			return -ENOMEM;
 		}
 		ctrl->dmap_iommu_map = true;
 	} else {
-		addr = tp->dmap;
+		ctrl->dma_addr = tp->dmap;
 	}
 
 	INIT_COMPLETION(ctrl->dma_comp);
@@ -1125,16 +1125,16 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 	if (mdss_dsi_is_slave_ctrl(ctrl)) {
 		mctrl = mdss_dsi_get_master_ctrl();
 		if (mctrl) {
-			MIPI_OUTP(mctrl->ctrl_base + 0x048, addr);
-			MIPI_OUTP(mctrl->ctrl_base + 0x04c, len);
+			MIPI_OUTP(mctrl->ctrl_base + 0x048, ctrl->dma_addr);
+			MIPI_OUTP(mctrl->ctrl_base + 0x04c, ctrl->dma_size);
 		} else {
 			pr_warn("%s: Unable to get master control\n",
 				__func__);
 		}
 	}
 
-	MIPI_OUTP((ctrl->ctrl_base) + 0x048, addr);
-	MIPI_OUTP((ctrl->ctrl_base) + 0x04c, len);
+	MIPI_OUTP((ctrl->ctrl_base) + 0x048, ctrl->dma_addr);
+	MIPI_OUTP((ctrl->ctrl_base) + 0x04c, ctrl->dma_size);
 	wmb();
 
 	/* Trigger on master controller as well */
@@ -1152,11 +1152,14 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 		ret = tp->len;
 
 	if (ctrl->dmap_iommu_map) {
-		msm_iommu_unmap_contig_buffer(addr,
-			mdss_get_iommu_domain(domain), 0, size);
+		msm_iommu_unmap_contig_buffer(mctrl->dma_addr,
+			mdss_get_iommu_domain(domain), 0, mctrl->dma_size);
 		ctrl->dmap_iommu_map = false;
 	}
 
+	ctrl->dma_addr = 0;
+	ctrl->dma_size = 0;
+	
 	return ret;
 }
 
