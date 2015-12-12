@@ -2151,7 +2151,11 @@ qpnp_chg_regulator_batfet_set(struct qpnp_chg_chip *chip, bool enable)
 	return rc;
 }
 
-#define USB_WALL_THRESHOLD_MA	500
+#ifdef CONFIG_MACH_OPPO
+#define USB_WALL_THRESHOLD_MA 2000
+#else
+#define USB_WALL_THRESHOLD_MA 500
+#endif
 #define ENUM_T_STOP_BIT		BIT(0)
 #define USB_5V_UV	5000000
 #define USB_9V_UV	9000000
@@ -2575,7 +2579,6 @@ bypass_vbatdet_comp(struct qpnp_chg_chip *chip, bool bypass)
 		pr_err("Failed to bypass vbatdet comp rc = %d\n", rc);
 		return rc;
 	}
-#endif
 
 	return rc;
 }
@@ -2908,9 +2911,6 @@ module_param(ext_ovp_present, int, 0444);
 
 #ifdef CONFIG_MACH_OPPO
 static int qpnp_charger_type_get(struct qpnp_chg_chip *chip);
-#define USB_WALL_THRESHOLD_MA	2000
-#else
-#define USB_WALL_THRESHOLD_MA	500
 #endif
 
 static int
@@ -3546,9 +3546,9 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 #endif
 					} else {
 						qpnp_chg_iusbmax_set(chip,
-							OVP_USB_WALL_THRESHOLD_MA);
+							OVP_USB_WALL_TRSH_MA);
 #ifdef CONFIG_BQ24196_CHARGER
-						qpnp_chg_ibatmax_set(chip, OVP_USB_WALL_THRESHOLD_MA);
+						qpnp_chg_ibatmax_set(chip, OVP_USB_WALL_TRSH_MA);
 #endif
 					}
 				} else {
@@ -4393,6 +4393,7 @@ qpnp_chg_regulator_boost_enable(struct regulator_dev *rdev)
 		pr_err("failed to enable boost rc = %d\n", rc);
 		return rc;
 	}
+#ifndef CONFIG_BQ24196_CHARGER
 	/*
 	 * update battery status when charger is connected and state is full
 	 */
@@ -4401,7 +4402,7 @@ qpnp_chg_regulator_boost_enable(struct regulator_dev *rdev)
 			|| (get_prop_batt_status(chip) ==
 			POWER_SUPPLY_STATUS_FULL)))
 		power_supply_changed(&chip->batt_psy);
-
+#endif
 	return rc;
 }
 
@@ -4498,7 +4499,7 @@ qpnp_chg_regulator_boost_disable(struct regulator_dev *rdev)
 		qpnp_chg_usb_suspend_enable(chip, 0);
 #endif
 	}
-
+#ifndef CONFIG_BQ24196_CHARGER
 	/*
 	 * When a charger is connected,if state of charge is not full
 	 * resumeing charging else update battery status
@@ -4512,6 +4513,7 @@ qpnp_chg_regulator_boost_disable(struct regulator_dev *rdev)
 			power_supply_changed(&chip->batt_psy);
 		}
 	}
+#endif
 
 	if (ext_ovp_isns_present && chip->ext_ovp_ic_gpio_enabled) {
 		pr_debug("EXT OVP IC ISNS enable\n");

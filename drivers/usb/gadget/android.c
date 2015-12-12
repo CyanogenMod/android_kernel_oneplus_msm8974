@@ -2556,7 +2556,7 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 	struct android_configuration *conf;
 	char *conf_str;
 	struct android_usb_function_holder *f_holder;
-	char *name;
+	char *name = NULL;
 	char buf[256], *b;
 	char aliases[256], *a;
 	int err;

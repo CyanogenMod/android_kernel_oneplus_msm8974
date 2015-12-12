@@ -2403,11 +2403,6 @@ static int dwc3_msm_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TYPE:
 		val->intval = psy->type;
 		break;
-#ifdef CONFIG_MACH_OPPO
-	case POWER_SUPPLY_PROP_POWER_NOW:
-		val->intval = mdwc->power_now;
-		break;
-#endif
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = get_prop_usbin_voltage_now(mdwc);
 		break;
