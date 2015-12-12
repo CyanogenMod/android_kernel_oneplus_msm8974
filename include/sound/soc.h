@@ -190,6 +190,21 @@
 	.get = xhandler_get, .put = xhandler_put, \
 	.private_value = (unsigned long)&xenum }
 
+#define SND_SOC_BYTES(xname, xbase, xregs)            \
+{   .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname,   \
+	.info = snd_soc_bytes_info, .get = snd_soc_bytes_get, \
+	.put = snd_soc_bytes_put, .private_value =        \
+		((unsigned long)&(struct soc_bytes)           \
+		{.base = xbase, .num_regs = xregs }) }
+
+#define SND_SOC_BYTES_MASK(xname, xbase, xregs, xmask)        \
+{   .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname,   \
+	.info = snd_soc_bytes_info, .get = snd_soc_bytes_get, \
+	.put = snd_soc_bytes_put, .private_value =        \
+		((unsigned long)&(struct soc_bytes)           \
+		{.base = xbase, .num_regs = xregs,        \
+		 .mask = xmask }) }
+
 #define SOC_DOUBLE_R_SX_TLV(xname, xreg_left, xreg_right, xshift,\
 		xmin, xmax, tlv_array) \
 {	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = (xname), \
@@ -1018,6 +1033,13 @@ struct soc_mixer_control {
 	int min, max, platform_max;
 	unsigned int reg, rreg, shift, rshift, invert;
 };
+
+struct soc_bytes {
+	int base;
+	int num_regs;
+	u32 mask;
+};
+
 struct soc_multi_mixer_control {
 	int min, max, platform_max, count;
 	unsigned int reg, rreg, shift, rshift, invert;

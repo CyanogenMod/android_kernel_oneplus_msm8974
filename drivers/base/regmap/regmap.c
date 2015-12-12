@@ -48,7 +48,7 @@ bool regmap_readable(struct regmap *map, unsigned int reg)
 
 bool regmap_volatile(struct regmap *map, unsigned int reg)
 {
-	if (!regmap_readable(map, reg))
+	if (!map->format.format_write && !regmap_readable(map, reg))
 		return false;
 
 	if (map->volatile_reg)
@@ -600,6 +600,11 @@ int regmap_bulk_write(struct regmap *map, unsigned int reg, const void *val,
 	if (val_bytes == 1) {
 		wval = (void *)val;
 	} else {
+		if (!val_count) {
+			ret = -EINVAL;
+			goto out;
+		}
+
 		wval = kmemdup(val, val_count * val_bytes, GFP_KERNEL);
 		if (!wval) {
 			ret = -ENOMEM;
@@ -779,7 +784,7 @@ int regmap_bulk_read(struct regmap *map, unsigned int reg, void *val,
 			ret = regmap_read(map, reg + i, &ival);
 			if (ret != 0)
 				return ret;
-			memcpy(val + (i * val_bytes), &ival, val_bytes);
+			map->format.format_val(val + (i * val_bytes), ival);
 		}
 	}
 

@@ -4,7 +4,7 @@
  * Copyright (C) 2000 Ralph Metzler & Marcus Metzler
  *		      for convergence integrated media GmbH
  *
- * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
@@ -1784,8 +1784,7 @@ static int dvb_dmxdev_reuse_decoder_buf(struct dmxdev_filter *dmxdevfilter,
 {
 	struct dmxdev_feed *feed;
 
-	if (dmxdevfilter->state != DMXDEV_STATE_GO ||
-		(dmxdevfilter->type != DMXDEV_TYPE_PES) ||
+	if ((dmxdevfilter->type != DMXDEV_TYPE_PES) ||
 		(dmxdevfilter->params.pes.output != DMX_OUT_DECODER) ||
 		(dmxdevfilter->events.event_mask.disable_mask &
 			DMX_EVENT_NEW_ES_DATA))
@@ -1794,7 +1793,8 @@ static int dvb_dmxdev_reuse_decoder_buf(struct dmxdev_filter *dmxdevfilter,
 	/* Only one feed should be in the list in case of decoder */
 	feed = list_first_entry(&dmxdevfilter->feed.ts,
 				struct dmxdev_feed, next);
-	if (feed && feed->ts && feed->ts->reuse_decoder_buffer)
+
+	if (feed->ts->reuse_decoder_buffer)
 		return feed->ts->reuse_decoder_buffer(feed->ts, cookie);
 
 	return -ENODEV;
@@ -2117,11 +2117,6 @@ static int dvb_dmxdev_ts_fullness_callback(struct dmx_ts_feed *filter,
 	struct dmxdev_events_queue *events;
 	int ret;
 
-	if (!dmxdevfilter) {
-		pr_err("%s: NULL demux filter object!\n", __func__);
-		return -ENODEV;
-	}
-
 	if (dmxdevfilter->params.pes.output != DMX_OUT_TS_TAP) {
 		src = &dmxdevfilter->buffer;
 		events = &dmxdevfilter->events;
@@ -2175,17 +2170,9 @@ static int dvb_dmxdev_sec_fullness_callback(
 				int required_space)
 {
 	struct dmxdev_filter *dmxdevfilter = filter->priv;
-	struct dvb_ringbuffer *src;
-	struct dmxdev_events_queue *events;
+	struct dvb_ringbuffer *src = &dmxdevfilter->buffer;
+	struct dmxdev_events_queue *events = &dmxdevfilter->events;
 	int ret;
-
-	if (!dmxdevfilter) {
-		pr_err("%s: NULL demux filter object!\n", __func__);
-		return -ENODEV;
-	}
-
-	src = &dmxdevfilter->buffer;
-	events = &dmxdevfilter->events;
 
 	do {
 		ret = 0;
@@ -3884,12 +3871,7 @@ dvb_demux_read(struct file *file, char __user *buf, size_t count,
 	if (ret > 0) {
 		dvb_dmxdev_notify_data_read(dmxdevfilter, ret);
 		spin_lock_irq(&dmxdevfilter->dev->lock);
-		/*
-		 * Updating the events in case of overflow might remove the
-		 * overflow event, so avoid that.
-		 */
-		if (dmxdevfilter->buffer.error != -EOVERFLOW)
-			dvb_dmxdev_update_events(&dmxdevfilter->events, ret);
+		dvb_dmxdev_update_events(&dmxdevfilter->events, ret);
 		spin_unlock_irq(&dmxdevfilter->dev->lock);
 
 		/*
