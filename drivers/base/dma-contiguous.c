@@ -233,7 +233,6 @@ int __init cma_fdt_scan(unsigned long node, const char *uname,
 	unsigned long size_cells = dt_root_size_cells;
 	unsigned long addr_cells = dt_root_addr_cells;
 	bool remove;
-	phys_addr_t limit = MEMBLOCK_ALLOC_ANYWHERE;
 	char *status;
 
 	if (!of_get_flat_dt_prop(node, "linux,reserve-contiguous-region", NULL))

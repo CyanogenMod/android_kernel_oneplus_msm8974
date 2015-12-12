@@ -51,13 +51,6 @@ void cpu_set_reserved_ttbr0(void)
 }
 #endif
 
-static void write_contextidr(u32 contextidr)
-{
-	uncached_logk(LOGK_CTXID, (void *)contextidr);
-	asm("mcr	p15, 0, %0, c13, c0, 1" : : "r" (contextidr));
-	isb();
-}
-
 #ifdef CONFIG_PID_IN_CONTEXTIDR
 static u32 read_contextidr(void)
 {
