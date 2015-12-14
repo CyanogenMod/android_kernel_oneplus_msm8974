@@ -21,7 +21,7 @@ RADIOACTIVE_VER="$BASE_RADIOACTIVE_VER$VER"
 
 # Vars
 export LOCALVERSION=~`echo $RADIOACTIVE_VER`
-export CROSS_COMPILE=${HOME}/Android/toolchains/uber4.9/bin/arm-eabi-
+export CROSS_COMPILE=${HOME}/Android/toolchains/uber5.3/bin/arm-eabi-
 export ARCH=arm
 export SUBARCH=arm
 export KBUILD_BUILD_USER=R.Cuenca
