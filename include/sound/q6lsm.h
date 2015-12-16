@@ -46,6 +46,7 @@ struct lsm_client {
 	uint16_t	connect_to_port;
 	uint16_t	user_sensitivity;
 	uint16_t	kw_sensitivity;
+	bool		opened;
 	bool		started;
 	dma_addr_t	lsm_cal_phy_addr;
 	uint32_t	lsm_cal_size;
