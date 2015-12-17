@@ -1247,7 +1247,7 @@ static void perf_retry_remove(struct remove_event *rep)
 		       event->cpu, up_ret);
 }
 #else
-static void perf_retry_remove(struct remove_event *rep)
+static void perf_retry_remove(struct release_event *rep)
 {
 }
 #endif

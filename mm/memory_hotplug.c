@@ -533,8 +533,8 @@ int __ref online_pages(unsigned long pfn, unsigned long nr_pages)
 
 	zone->present_pages += onlined_pages;
 	zone->zone_pgdat->node_present_pages += onlined_pages;
-	drain_all_pages();
 	if (onlined_pages) {
+		drain_all_pages();
 		node_set_state(zone_to_nid(zone), N_HIGH_MEMORY);
 		if (need_zonelists_rebuild)
 			build_all_zonelists(zone);
