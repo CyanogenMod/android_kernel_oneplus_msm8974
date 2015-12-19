@@ -87,3 +87,4 @@ GTAGS
 
 # Generated source files
 smd_rpc_sym.c
+bswapsdi2.S
