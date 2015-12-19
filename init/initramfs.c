@@ -164,7 +164,7 @@ static __initdata enum state {
 } state, next_state;
 
 static __initdata char *victim;
-static __initdata unsigned count;
+static unsigned long count __initdata;
 static __initdata loff_t this_header, next_header;
 
 static inline void __init eat(unsigned n)
@@ -176,7 +176,7 @@ static inline void __init eat(unsigned n)
 
 static __initdata char *vcollected;
 static __initdata char *collected;
-static __initdata int remains;
+static long remains __initdata;
 static __initdata char *collect;
 
 static void __init read_into(char *buf, unsigned size, enum state next)
@@ -203,7 +203,7 @@ static int __init do_start(void)
 
 static int __init do_collect(void)
 {
-	unsigned n = remains;
+	unsigned long n = remains;
 	if (count < n)
 		n = count;
 	memcpy(collect, victim, n);
@@ -374,7 +374,7 @@ static __initdata int (*actions[])(void) = {
 	[Reset]		= do_reset,
 };
 
-static int __init write_buffer(char *buf, unsigned len)
+static long __init write_buffer(char *buf, unsigned long len)
 {
 	count = len;
 	victim = buf;
@@ -384,11 +384,11 @@ static int __init write_buffer(char *buf, unsigned len)
 	return len - count;
 }
 
-static int __init flush_buffer(void *bufv, unsigned len)
+static long __init flush_buffer(void *bufv, unsigned long len)
 {
 	char *buf = (char *) bufv;
-	int written;
-	int origLen = len;
+	long written;
+	long origLen = len;
 	if (message)
 		return -1;
 	while ((written = write_buffer(buf, len)) < len && !message) {
@@ -407,13 +407,13 @@ static int __init flush_buffer(void *bufv, unsigned len)
 	return origLen;
 }
 
-static unsigned my_inptr;   /* index of next byte to be processed in inbuf */
+static unsigned long my_inptr; /* index of next byte to be processed in inbuf */
 
 #include <linux/decompress/generic.h>
 
-static char * __init unpack_to_rootfs(char *buf, unsigned len)
+static char * __init unpack_to_rootfs(char *buf, unsigned long len)
 {
-	int written, res;
+	long written;
 	decompress_fn decompress;
 	const char *compress_name;
 	static __initdata char msg_buf[64];
@@ -446,7 +446,7 @@ static char * __init unpack_to_rootfs(char *buf, unsigned len)
 		this_header = 0;
 		decompress = decompress_method(buf, len, &compress_name);
 		if (decompress) {
-			res = decompress(buf, len, NULL, flush_buffer, NULL,
+			int res = decompress(buf, len, NULL, flush_buffer, NULL,
 				   &my_inptr, error);
 			if (res)
 				error("decompressor failed");

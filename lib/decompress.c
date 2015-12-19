@@ -50,7 +50,7 @@ static const struct compress_format {
 	{ {0, 0}, NULL, NULL }
 };
 
-decompress_fn decompress_method(const unsigned char *inbuf, int len,
+decompress_fn decompress_method(const unsigned char *inbuf, long len,
 				const char **name)
 {
 	const struct compress_format *cf;
