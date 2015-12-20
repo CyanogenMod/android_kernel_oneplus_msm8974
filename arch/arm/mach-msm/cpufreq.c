@@ -104,11 +104,6 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 
 	mutex_lock(&per_cpu(cpufreq_suspend, policy->cpu).suspend_mutex);
 
-	if (target_freq == policy->cur) {
-		ret = 0;
-		goto done;
-	}
-
 	if (per_cpu(cpufreq_suspend, policy->cpu).device_suspended) {
 		pr_debug("cpufreq: cpu%d scheduling frequency change "
 				"in suspend.\n", policy->cpu);
@@ -170,13 +165,18 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 		policy->cpuinfo.min_freq = CONFIG_MSM_CPU_FREQ_MIN;
 		policy->cpuinfo.max_freq = CONFIG_MSM_CPU_FREQ_MAX;
-#else
-		pr_err("cpufreq: failed to get policy min/max\n");
 #endif
+		pr_err("cpufreq: failed to get policy min/max\n");
 	}
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
-        policy->min = CONFIG_MSM_CPU_FREQ_MIN;
-        policy->max = CONFIG_MSM_CPU_FREQ_MAX;
+	policy->min = CONFIG_MSM_CPU_FREQ_MIN;
+	policy->max = CONFIG_MSM_CPU_FREQ_MAX;
+#else
+#ifdef CONFIG_ARCH_MSM8974
+	/* Predefine max/min frequencies used for device boot */
+	policy->max = 2457600;
+	policy->min = 300000;
+#endif
 #endif
 	cur_freq = clk_get_rate(cpu_clk[policy->cpu])/1000;
 
@@ -196,17 +196,21 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 			   table[index].index);
 	if (ret)
 		return ret;
-#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+	/* Use user max frequency instead of max available frequency */
 	pr_debug("cpufreq: cpu%d init at %d switching to %d\n",
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 			policy->cpu, cur_freq, policy->max);
 	policy->cur = policy->max;
 #else
-	pr_debug("cpufreq: cpu%d init at %d switching to %d\n",
 			policy->cpu, cur_freq, table[index].frequency);
 	policy->cur = table[index].frequency;
 #endif
 	cpufreq_frequency_table_get_attr(table, policy->cpu);
-
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
+	/* set safe default min and max speeds */
+	policy->max = CONFIG_MSM_CPU_FREQ_MAX;
+	policy->min = CONFIG_MSM_CPU_FREQ_MIN;
+#endif
 	return 0;
 }
 
@@ -364,6 +368,11 @@ static struct cpufreq_frequency_table *cpufreq_parse_dt(struct device *dev,
 		if (IS_ERR_VALUE(f))
 			break;
 		f /= 1000;
+
+                /*
+                 * override clk_round_rate calculated value for min freq
+                */
+		if (f < 300000 && f > data[i]) f = data[i];
 
 		/*
 		 * Check if this is the last feasible frequency in the table.

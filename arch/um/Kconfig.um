@@ -10,6 +10,7 @@ config STATIC_LINK
 	  2.75G) for UML.
 
 source "mm/Kconfig"
+source "kernel/time/Kconfig"
 
 config LD_SCRIPT_STATIC
 	bool

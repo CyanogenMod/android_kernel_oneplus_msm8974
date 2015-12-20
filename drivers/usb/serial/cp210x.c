@@ -535,7 +535,7 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 	unsigned int *cflagp, unsigned int *baudp)
 {
 	unsigned int cflag, modem_ctl[4];
-	unsigned int baud = 0;
+	unsigned int baud;
 	unsigned int bits;
 
 	dbg("%s - port %d", __func__, port->number);
@@ -872,7 +872,7 @@ static void cp210x_dtr_rts(struct usb_serial_port *p, int on)
 static int cp210x_tiocmget (struct tty_struct *tty)
 {
 	struct usb_serial_port *port = tty->driver_data;
-	unsigned int control = 0;
+	unsigned int control;
 	int result;
 
 	dbg("%s - port %d", __func__, port->number);

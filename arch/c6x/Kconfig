@@ -137,6 +137,7 @@ source "mm/Kconfig"
 source "kernel/Kconfig.preempt"
 
 source "kernel/Kconfig.hz"
+source "kernel/time/Kconfig"
 
 endmenu
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -31,9 +31,6 @@
   @brief Virtual Operating System Services Memory API
 
   
-  Copyright (c) 2008 QUALCOMM Incorporated.
-  All Rights Reserved.
-  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 
 /*=========================================================================== 
@@ -58,6 +55,7 @@
  * ------------------------------------------------------------------------*/
 #include "vos_memory.h"
 #include "vos_trace.h"
+#include <vmalloc.h>
 
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
 #include <linux/wcnss_wlan.h>
@@ -193,14 +191,14 @@ v_VOID_t * vos_mem_malloc_debug( v_SIZE_t size, char* fileName, v_U32_t lineNum)
    unsigned long IrqFlags;
 
 
-   if (size > (1024*1024))
+   if (size > (1024*1024) || size == 0)
    {
        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-               "%s: called with arg > 1024K; passed in %d !!!", __func__,size); 
+               "%s: called with invalid arg %u !!!", __func__, size);
        return NULL;
    }
 
-   if (in_interrupt())
+   if (in_interrupt() || irqs_disabled() || in_atomic())
    {
       flags = GFP_ATOMIC;
    }
@@ -303,9 +301,10 @@ v_VOID_t * vos_mem_malloc( v_SIZE_t size )
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
     v_VOID_t* pmem;
 #endif    
-   if (size > (1024*1024))
+   if (size > (1024*1024) || size == 0)
    {
-       VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, "%s: called with arg > 1024K; passed in %d !!!", __func__,size); 
+       VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+               "%s: called with invalid arg %u !!!", __func__, size);
        return NULL;
    }
    if (in_interrupt() || irqs_disabled() || in_atomic())
@@ -336,6 +335,31 @@ v_VOID_t vos_mem_free( v_VOID_t *ptr )
     kfree(ptr);
 }
 #endif
+
+v_VOID_t * vos_mem_vmalloc(v_SIZE_t size)
+{
+    if (size == 0 || size >= (1024*1024))
+    {
+        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                  "%s invalid size: %u", __func__, size);
+        return NULL;
+    }
+
+    return vmalloc(size);
+}
+
+v_VOID_t vos_mem_vfree(void *addr)
+{
+    if (addr == NULL)
+    {
+        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                  "%s NULL address passed to free", __func__);
+        return;
+    }
+
+    vfree(addr);
+    return;
+}
 
 v_VOID_t vos_mem_set( v_VOID_t *ptr, v_SIZE_t numBytes, v_BYTE_t value )
 {

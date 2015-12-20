@@ -247,7 +247,7 @@ static int slave_configure(struct scsi_device *sdev)
 			sdev->use_rpm_auto = 1;
 			sdev->autosuspend_delay = us->sdev_autosuspend_delay;
 		}
-		
+
 		/* A few buggy USB-ATA bridges don't understand FUA */
 		if (us->fflags & US_FL_BROKEN_FUA)
 			sdev->broken_fua = 1;

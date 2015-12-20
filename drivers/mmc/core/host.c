@@ -439,17 +439,18 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	int err;
 	struct mmc_host *host;
 
-	if (!idr_pre_get(&mmc_host_idr, GFP_KERNEL))
-		return NULL;
-
 	host = kzalloc(sizeof(struct mmc_host) + extra, GFP_KERNEL);
 	if (!host)
 		return NULL;
 
+	idr_preload(GFP_KERNEL);
 	spin_lock(&mmc_host_lock);
-	err = idr_get_new(&mmc_host_idr, host, &host->index);
+	err = idr_alloc(&mmc_host_idr, host, 0, 0, GFP_NOWAIT);
+	if (err >= 0)
+		host->index = err;
 	spin_unlock(&mmc_host_lock);
-	if (err)
+	idr_preload_end();
+	if (err < 0)
 		goto free;
 
 	dev_set_name(&host->class_dev, "mmc%d", host->index);
@@ -548,37 +549,6 @@ out:
 	return retval;
 }
 
-static ssize_t show_scale_down_in_low_wr_load(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct mmc_host *host = cls_dev_to_mmc_host(dev);
-
-	if (!host)
-		return -EINVAL;
-
-	return snprintf(buf, PAGE_SIZE, "%d\n",
-		host->clk_scaling.scale_down_in_low_wr_load);
-}
-
-static ssize_t store_scale_down_in_low_wr_load(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct mmc_host *host = cls_dev_to_mmc_host(dev);
-	unsigned long value;
-	int retval = -EINVAL;
-
-	if (!host)
-		goto out;
-
-	if (!host->card || kstrtoul(buf, 0, &value))
-		goto out;
-
-	host->clk_scaling.scale_down_in_low_wr_load = value;
-
-out:
-	return retval;
-}
-
 static ssize_t show_up_threshold(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -671,16 +641,12 @@ DEVICE_ATTR(up_threshold, S_IRUGO | S_IWUSR,
 		show_up_threshold, store_up_threshold);
 DEVICE_ATTR(down_threshold, S_IRUGO | S_IWUSR,
 		show_down_threshold, store_down_threshold);
-DEVICE_ATTR(scale_down_in_low_wr_load, S_IRUGO | S_IWUSR,
-		show_scale_down_in_low_wr_load,
-		store_scale_down_in_low_wr_load);
 
 static struct attribute *clk_scaling_attrs[] = {
 	&dev_attr_enable.attr,
 	&dev_attr_up_threshold.attr,
 	&dev_attr_down_threshold.attr,
 	&dev_attr_polling_interval.attr,
-	&dev_attr_scale_down_in_low_wr_load.attr,
 	NULL,
 };
 
@@ -787,7 +753,6 @@ int mmc_add_host(struct mmc_host *host)
 	host->clk_scaling.up_threshold = 35;
 	host->clk_scaling.down_threshold = 5;
 	host->clk_scaling.polling_delay_ms = 100;
-	host->clk_scaling.scale_down_in_low_wr_load = false;
 
 	err = sysfs_create_group(&host->class_dev.kobj, &clk_scaling_attr_grp);
 	if (err)

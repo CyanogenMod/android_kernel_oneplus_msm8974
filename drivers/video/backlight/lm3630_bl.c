@@ -50,6 +50,10 @@
 /* OPPO 2013-10-24 yxq Add end */
 #define INT_DEBOUNCE_MSEC	10
 
+#ifdef CONFIG_STATE_NOTIFIER
+#include <linux/state_notifier.h>
+#endif /*CONFIG_STATE_NOTIFIER*/
+
 static struct lm3630_chip_data *lm3630_pchip;
 
 struct lm3630_chip_data {
@@ -201,50 +205,18 @@ static int lm3630_intr_config(struct lm3630_chip_data *pchip)
 	int ret;
 	struct lm3630_chip_data *pchip = lm3630_pchip;
 	pr_debug("%s: bl=%d\n", __func__,bl_level);
+#ifdef CONFIG_MACH_OPPO
 
-
-#ifdef CONFIG_BACKLIGHT_EXT_CONTROL
+#ifdef CONFIG_STATE_NOTIFIER
 	// if display is switched off
-	if (bl_level == 0) 
-	{
-		// write status to external var for further usage
-		backlight_on = false;
-
-		// Add external function calls here...
-#ifdef CONFIG_DYNAMIC_FSYNC
-		// if dynamic fsync is defined call external suspend function
-		dyn_fsync_suspend();
-#endif
-
-#ifdef CONFIG_CPU_FREQ_GOV_ZZMOOVE
-		// if zzmoove governor is defined call external suspend function
-		zzmoove_suspend();
-#endif
-
-	}
+	if (!use_fb_notifier && bl_level == 0)
+		state_notifier_call_chain(STATE_NOTIFIER_SUSPEND, NULL);
 
 	// if display is switched on
-	if (bl_level != 0 && pre_brightness == 0) 
-	{
-		// write status to external var for further usage
-		backlight_on = true;
+	if (!use_fb_notifier && bl_level != 0 && pre_brightness == 0)
+		state_notifier_call_chain(STATE_NOTIFIER_ACTIVE, NULL);
+#endif /*CONFIG_STATE_NOTIFIER*/
 
-		// Add external function calls here...
-
-#ifdef CONFIG_DYNAMIC_FSYNC
-		// if dynamic fsync is defined call external resume function
-		dyn_fsync_resume();
-#endif
-
-#ifdef CONFIG_CPU_FREQ_GOV_ZZMOOVE
-		// if zzmoove governor is defined call external resume function
-		zzmoove_resume();
-#endif
-
-	}
-#endif
-
-#ifdef CONFIG_MACH_OPPO
 /* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/04/28  Add for add log for 14001 black screen */
 		if(pre_brightness == 0)
 			{pr_err("%s set brightness :  %d \n",__func__,bl_level);}

@@ -456,8 +456,8 @@ static int slim_register_controller(struct slim_controller *ctrl)
 	if (ret)
 		goto out_list;
 
-	dev_dbg(&ctrl->dev, "Bus [%s] registered:dev:%x\n", ctrl->name,
-							(u32)&ctrl->dev);
+	dev_dbg(&ctrl->dev, "Bus [%s] registered:dev:%p\n", ctrl->name,
+							&ctrl->dev);
 
 	if (ctrl->nports) {
 		ctrl->ports = kzalloc(ctrl->nports * sizeof(struct slim_port),
@@ -593,28 +593,16 @@ EXPORT_SYMBOL_GPL(slim_del_controller);
 int slim_add_numbered_controller(struct slim_controller *ctrl)
 {
 	int	id;
-	int	status;
-
-	if (ctrl->nr & ~MAX_ID_MASK)
-		return -EINVAL;
-
-retry:
-	if (idr_pre_get(&ctrl_idr, GFP_KERNEL) == 0)
-		return -ENOMEM;
 
 	mutex_lock(&slim_lock);
-	status = idr_get_new_above(&ctrl_idr, ctrl, ctrl->nr, &id);
-	if (status == 0 && id != ctrl->nr) {
-		status = -EAGAIN;
-		idr_remove(&ctrl_idr, id);
-	}
+	id = idr_alloc(&ctrl_idr, ctrl, ctrl->nr, ctrl->nr + 1, GFP_KERNEL);
 	mutex_unlock(&slim_lock);
-	if (status == -EAGAIN)
-		goto retry;
 
-	if (status == 0)
-		status = slim_register_controller(ctrl);
-	return status;
+	if (id < 0)
+		return id;
+
+	ctrl->nr = id;
+	return slim_register_controller(ctrl);
 }
 EXPORT_SYMBOL_GPL(slim_add_numbered_controller);
 
@@ -1050,7 +1038,7 @@ int slim_xfer_msg(struct slim_controller *ctrl, struct slim_device *sbdev,
 	int ret;
 	u16 sl, cur;
 	u16 ec;
-	u8 tid = 0, mlen = 6;
+	u8 tid, mlen = 6;
 
 	ret = slim_ele_access_sanity(msg, mc, rbuf, wbuf, len);
 	if (ret)

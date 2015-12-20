@@ -111,6 +111,10 @@ if COLDFIRE
 source "kernel/Kconfig.preempt"
 endif
 
+if !MMU || COLDFIRE
+source "kernel/time/Kconfig"
+endif
+
 source "mm/Kconfig"
 
 endmenu

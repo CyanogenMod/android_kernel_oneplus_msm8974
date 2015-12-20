@@ -1649,7 +1649,7 @@ int bnx2x_config_rss_pf(struct bnx2x *bp, u8 *ind_table, bool config_hash)
 		if (config_hash) {
 			/* RSS keys */
 			for (i = 0; i < sizeof(params.rss_key) / 4; i++)
-				params.rss_key[i] = prandom_u32();
+				params.rss_key[i] = random32();
 
 			__set_bit(BNX2X_RSS_SET_SRCH, &params.rss_flags);
 		}

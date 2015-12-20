@@ -63,6 +63,8 @@ source "kernel/Kconfig.freezer"
 
 menu "System Type and features"
 
+source "kernel/time/Kconfig"
+
 config SUBARCH_AVR32B
 	bool
 config MMU

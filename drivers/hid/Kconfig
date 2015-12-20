@@ -198,6 +198,14 @@ config HID_EZKEY
 	---help---
 	Support for Ezkey BTC 8193 keyboard.
 
+config HID_FIIO
+	tristate "FiiO USB DAC Amp"
+	depends on HID
+	---help---
+	FiiO USB DACs generate spurious events during plug.  Say Y here if
+	you are using a FiiO device and it is causing problems for your user
+	space.
+
 config HID_HOLTEK
 	tristate "Holtek On Line Grip based game controller support"
 	depends on USB_HID

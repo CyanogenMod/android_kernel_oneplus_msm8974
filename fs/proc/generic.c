@@ -15,6 +15,7 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/printk.h>
 #include <linux/mount.h>
 #include <linux/init.h>
 #include <linux/idr.h>
@@ -132,11 +133,8 @@ __proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 		}
 
 		if (start == NULL) {
-			if (n > PAGE_SIZE) {
-				printk(KERN_ERR
-				       "proc_file_read: Apparent buffer overflow!\n");
+			if (n > PAGE_SIZE)	/* Apparent buffer overflow */
 				n = PAGE_SIZE;
-			}
 			n -= *ppos;
 			if (n <= 0)
 				break;
@@ -144,26 +142,19 @@ __proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 				n = count;
 			start = page + *ppos;
 		} else if (start < page) {
-			if (n > PAGE_SIZE) {
-				printk(KERN_ERR
-				       "proc_file_read: Apparent buffer overflow!\n");
+			if (n > PAGE_SIZE)	/* Apparent buffer overflow */
 				n = PAGE_SIZE;
-			}
 			if (n > count) {
 				/*
 				 * Don't reduce n because doing so might
 				 * cut off part of a data block.
 				 */
-				printk(KERN_WARNING
-				       "proc_file_read: Read count exceeded\n");
+				pr_warn("proc_file_read: count exceeded\n");
 			}
 		} else /* start >= page */ {
 			unsigned long startoff = (unsigned long)(start - page);
-			if (n > (PAGE_SIZE - startoff)) {
-				printk(KERN_ERR
-				       "proc_file_read: Apparent buffer overflow!\n");
+			if (n > (PAGE_SIZE - startoff))	/* buffer overflow? */
 				n = PAGE_SIZE - startoff;
-			}
 			if (n > count)
 				n = count;
 		}
@@ -261,16 +252,9 @@ static int proc_notify_change(struct dentry *dentry, struct iattr *iattr)
 	if (error)
 		return error;
 
-	if ((iattr->ia_valid & ATTR_SIZE) &&
-	    iattr->ia_size != i_size_read(inode)) {
-		error = vmtruncate(inode, iattr->ia_size);
-		if (error)
-			return error;
-	}
-
 	setattr_copy(inode, iattr);
 	mark_inode_dirty(inode);
-	
+
 	de->uid = inode->i_uid;
 	de->gid = inode->i_gid;
 	de->mode = inode->i_mode;
@@ -350,37 +334,39 @@ static DEFINE_SPINLOCK(proc_inum_lock); /* protects the above */
  * Return an inode number between PROC_DYNAMIC_FIRST and
  * 0xffffffff, or zero on failure.
  */
-static unsigned int get_inode_number(void)
+int proc_alloc_inum(unsigned int *inum)
 {
 	unsigned int i;
 	int error;
 
 retry:
-	if (ida_pre_get(&proc_inum_ida, GFP_KERNEL) == 0)
-		return 0;
+	if (!ida_pre_get(&proc_inum_ida, GFP_KERNEL))
+		return -ENOMEM;
 
-	spin_lock(&proc_inum_lock);
+	spin_lock_irq(&proc_inum_lock);
 	error = ida_get_new(&proc_inum_ida, &i);
-	spin_unlock(&proc_inum_lock);
+	spin_unlock_irq(&proc_inum_lock);
 	if (error == -EAGAIN)
 		goto retry;
 	else if (error)
-		return 0;
+		return error;
 
 	if (i > UINT_MAX - PROC_DYNAMIC_FIRST) {
-		spin_lock(&proc_inum_lock);
+		spin_lock_irq(&proc_inum_lock);
 		ida_remove(&proc_inum_ida, i);
-		spin_unlock(&proc_inum_lock);
-		return 0;
+		spin_unlock_irq(&proc_inum_lock);
+		return -ENOSPC;
 	}
-	return PROC_DYNAMIC_FIRST + i;
+	*inum = PROC_DYNAMIC_FIRST + i;
+	return 0;
 }
 
-static void release_inode_number(unsigned int inum)
+void proc_free_inum(unsigned int inum)
 {
-	spin_lock(&proc_inum_lock);
+	unsigned long flags;
+	spin_lock_irqsave(&proc_inum_lock, flags);
 	ida_remove(&proc_inum_ida, inum - PROC_DYNAMIC_FIRST);
-	spin_unlock(&proc_inum_lock);
+	spin_unlock_irqrestore(&proc_inum_lock, flags);
 }
 
 static void *proc_follow_link(struct dentry *dentry, struct nameidata *nd)
@@ -554,13 +540,12 @@ static const struct inode_operations proc_dir_inode_operations = {
 
 static int proc_register(struct proc_dir_entry * dir, struct proc_dir_entry * dp)
 {
-	unsigned int i;
 	struct proc_dir_entry *tmp;
+	int ret;
 	
-	i = get_inode_number();
-	if (i == 0)
-		return -EAGAIN;
-	dp->low_ino = i;
+	ret = proc_alloc_inum(&dp->low_ino);
+	if (ret)
+		return ret;
 
 	if (S_ISDIR(dp->mode)) {
 		if (dp->proc_iops == NULL) {
@@ -582,7 +567,7 @@ static int proc_register(struct proc_dir_entry * dir, struct proc_dir_entry * dp
 
 	for (tmp = dir->subdir; tmp; tmp = tmp->next)
 		if (strcmp(tmp->name, dp->name) == 0) {
-			WARN(1, KERN_WARNING "proc_dir_entry '%s/%s' already registered\n",
+			WARN(1, "proc_dir_entry '%s/%s' already registered\n",
 				dir->name, dp->name);
 			break;
 		}
@@ -765,7 +750,7 @@ EXPORT_SYMBOL(proc_create_data);
 
 static void free_proc_entry(struct proc_dir_entry *de)
 {
-	release_inode_number(de->low_ino);
+	proc_free_inum(de->low_ino);
 
 	if (S_ISLNK(de->mode))
 		kfree(de->data);
@@ -844,9 +829,9 @@ void remove_proc_entry(const char *name, struct proc_dir_entry *parent)
 	if (S_ISDIR(de->mode))
 		parent->nlink--;
 	de->nlink = 0;
-	WARN(de->subdir, KERN_WARNING "%s: removing non-empty directory "
-			"'%s/%s', leaking at least '%s'\n", __func__,
-			de->parent->name, de->name, de->subdir->name);
+	WARN(de->subdir, "%s: removing non-empty directory "
+			 "'%s/%s', leaking at least '%s'\n", __func__,
+			 de->parent->name, de->name, de->subdir->name);
 	pde_put(de);
 }
 EXPORT_SYMBOL(remove_proc_entry);

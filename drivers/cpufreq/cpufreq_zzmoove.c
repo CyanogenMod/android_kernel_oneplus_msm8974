@@ -8425,13 +8425,11 @@ static void do_dbs_timer(struct work_struct *work)
 
 #ifdef ENABLE_SNAP_THERMAL_SUPPORT
 	if (dbs_tuners_ins.scaling_trip_temp > 0) {
-		if (!suspend_flag) {
+		if (!suspend_flag)
 			tmu_check_delay = DEF_TMU_CHECK_DELAY;
-		} else {
+		else
 			tmu_check_delay = DEF_TMU_CHECK_DELAY_SLEEP;
-			if (cpu == 0)								// ZZ: only start temp reading work if we are on core 0 to avoid re-scheduling on every gov reload during hotplugging
-				schedule_delayed_work(&work_tmu_check, msecs_to_jiffies(tmu_check_delay));
-		}
+		schedule_delayed_work(&work_tmu_check, msecs_to_jiffies(tmu_check_delay));
 	} else {
 		tt_reset();
 	}
@@ -8946,9 +8944,6 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		    if (!policy->cpu && dbs_tuners_ins.inputboost_cycles)
 			input_unregister_handler(&interactive_input_handler);
 #endif /* ENABLE_INPUTBOOST */
-#ifdef ENABLE_SNAP_THERMAL_SUPPORT
-		    cancel_delayed_work(&work_tmu_check);				// ZZ: cancel cpu temperature reading when leaving the governor
-#endif /* ENABLE_SNAP_THERMAL_SUPPORT */
 #if (defined(CONFIG_HAS_EARLYSUSPEND) || defined(CONFIG_POWERSUSPEND) && !defined(DISABLE_POWER_MANAGEMENT)) || defined(USE_LCD_NOTIFIER)
 		    dbs_tuners_ins.disable_sleep_mode = DEF_DISABLE_SLEEP_MODE;
 #endif /* (defined(CONFIG_HAS_EARLYSUSPEND)... */
@@ -8966,7 +8961,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		   &dbs_attr_group);
 #if defined(CONFIG_HAS_EARLYSUSPEND) && !defined(USE_LCD_NOTIFIER) && !defined(DISABLE_POWER_MANAGEMENT)
 		unregister_early_suspend(&_powersave_early_suspend);
-#elif defined(CONFIG_POWERSUSPEND) && !defined(USE_LCD_NOTIFIER) && !defined(DISABLE_POWER_MANAGEMENT) || defined(CONFIG_POWERSUSPEND) && defined(USE_LCD_NOTIFIER) && !defined(DISABLE_POWER_MANAGEMENT)
+#elif defined(CONFIG_POWERSUSPEND) && !defined(USE_LCD_NOTIFIER) && !defined(DISABLE_POWER_MANAGEMENT)
 		if (cpu == 0)
 		    unregister_power_suspend(&powersave_powersuspend);
 #endif /* defined(CONFIG_HAS_EARLYSUSPEND)... */
