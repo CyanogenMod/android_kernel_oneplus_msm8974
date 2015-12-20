@@ -70,6 +70,10 @@
 #define CURRENT_MODE_INIT AUTO_MODE;
 #endif
 
+#if defined(CONFIG_THUMB2_KERNEL) || defined(CONFIG_ARCH_MSM8974)
+#define SWP_OFF
+#endif
+
 static int current_mode = CURRENT_MODE_INIT;
 
 static int is_hw_lock_type;
@@ -146,16 +150,14 @@ static int __raw_remote_dek_spin_owner(raw_remote_spinlock_t *lock)
 }
 /* end dekkers implementation ----------------------------------------------- */
 
-#if (__LINUX_ARM_ARCH__ <= 5)
+#ifndef SWP_OFF
 /* swp implementation ------------------------------------------------------- */
 static void __raw_remote_swp_spin_lock(raw_remote_spinlock_t *lock)
 {
 	unsigned long tmp;
 
 	__asm__ __volatile__(
-"1:     ldrex   %0, [%1]; \n"
-"       cmp     %0, %2; \n"
-"       strexne %0, %2, [%1]; \n"
+"1:     swp     %0, %2, [%1]\n"
 "       teq     %0, #0\n"
 "       bne     1b"
 	: "=&r" (tmp)
@@ -170,9 +172,7 @@ static int __raw_remote_swp_spin_trylock(raw_remote_spinlock_t *lock)
 	unsigned long tmp;
 
 	__asm__ __volatile__(
-"      ldrex   %0, [%1]; \n"
-"       cmp     %0, %2; \n"
-"       strexne %0, %2, [%1]; \n"
+"       swp     %0, %2, [%1]\n"
 	: "=&r" (tmp)
 	: "r" (&lock->lock), "r" (1)
 	: "cc");
@@ -461,7 +461,7 @@ static void initialize_ops(void)
 		current_ops.owner = __raw_remote_dek_spin_owner;
 		is_hw_lock_type = 0;
 		break;
-#if (__LINUX_ARM_ARCH__ <= 5)
+#ifndef SWP_OFF
 	case SWP_MODE:
 		current_ops.lock = __raw_remote_swp_spin_lock;
 		current_ops.unlock = __raw_remote_swp_spin_unlock;

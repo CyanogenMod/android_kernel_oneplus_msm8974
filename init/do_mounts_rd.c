@@ -47,11 +47,7 @@ static int __init crd_load(int in_fd, int out_fd, decompress_fn deco);
  *	romfs
  *	cramfs
  *	squashfs
- * 	bzip2
- * 	lzma
- * 	xz
- * 	lzo
- * 	lz4
+ *	gzip
  */
 static int __init
 identify_ramdisk_image(int fd, int start_block, decompress_fn *decompressor)

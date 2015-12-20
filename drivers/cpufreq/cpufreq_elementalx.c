@@ -30,10 +30,10 @@
 static int orig_up_threshold = 90;
 static int g_count = 0;
 #define DEF_SAMPLING_RATE	(30000)
-#define DEF_FREQUENCY_DOWN_DIFFERENTIAL	(10)
+#define DEF_FREQUENCY_DOWN_DIFFERENTIAL	(20)
 #define DEF_FREQUENCY_UP_THRESHOLD	(90)
-#define DEF_SAMPLING_DOWN_FACTOR	(1)
-#define MAX_SAMPLING_DOWN_FACTOR	(100000)
+#define DEF_SAMPLING_DOWN_FACTOR	(4)
+#define MAX_SAMPLING_DOWN_FACTOR	(20)
 #define MICRO_FREQUENCY_DOWN_DIFFERENTIAL	(3)
 #define MICRO_FREQUENCY_UP_THRESHOLD	(95)
 #define MICRO_FREQUENCY_MIN_SAMPLE_RATE	(10000)
@@ -94,7 +94,7 @@ static unsigned long input_event_boost_expired = 0;
 #define TABLE_SIZE	5
 #define MAX(x,y) (x > y ? x : y)
 #define MIN(x,y) (x < y ? x : y)
-#define FREQ_NEED_BURST(x) (x < 600000 ? 1 : 0)
+#define FREQ_NEED_BURST(x) (x < 1000000 ? 1 : 0)
 static	struct cpufreq_frequency_table *tbl = NULL;
 static unsigned int *tblmap[TABLE_SIZE] __read_mostly;
 static unsigned int tbl_select[4];

@@ -1,0 +1,48 @@
+Up to version 0.5, nothing interesting. Small cosmetic issues resulting
+in exactly the same.
+
+Oct 15 2003: Version 0.6:
+Made the Makefile for 2.4 and 2.2 work properly, using the original Rules.make
+
+Apr 6 2004: Version 0.7:
+Added the "economic" device /dev/erandom, which seeds new files from its own
+RC4-like random numbers. Weaker randomness, no entropy used at all.
+
+Apr 18 2004: Version 0.8
+
+Created a patch version for application on the kernel source tree.
+
+Added interface for sysctl in the patch version.
+
+export-objs line added in makefile to allow the export of
+erandom_get_random_bytes
+
+The global random state (for erandom) is now seeded only at first read
+request, and not on module initialization, or in other words, as late
+as possible. This makes sense when the module is compiled into the kernel,
+and hence initialized before the boot startup scripts seeds the regular
+random generator, from which the initial seed is taken.
+
+Jan 6 2007: Version 1.0 : Fixes against 2.6.19
+Replaced deprecated MODULE_PARM with module_param for compilation of 2.6.0 kernels
+and up.
+
+Replaced kdev_t related and deprecated MINOR macro with iminor(inode) for 2.6.0
+and up.
+
+Also removed include of config.h for 2.6.0 and up
+
+Moved the symlink of Makefile from Makefile-2.4 to Makefile-2.6 (it's about time).
+
+Jul 28 2011: Version 1.1 : Sync with 2.6.37
+
+Removed any support for kernels prior to 2.6.
+
+Changed the init and release methods to behave correctly with udev, and
+added a udev rule to match frandom/erandom devices.
+
+Updated sysctl interface to match current API
+
+Updated INSTALL file to reflect the new installation.
+
+Removed sysctl interface (since there's no use for it anymore)

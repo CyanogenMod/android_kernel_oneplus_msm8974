@@ -544,6 +544,7 @@ asmlinkage void __init start_kernel(void)
 	idr_init_cache();
 	perf_event_init();
 	rcu_init();
+	tick_nohz_init();
 	radix_tree_init();
 	/* init some links before init_ISA_irqs() */
 	early_irq_init();
@@ -696,7 +697,7 @@ int __init_or_module do_one_initcall(initcall_t fn)
 
 	if (preempt_count() != count) {
 		strlcat(msgbuf, "preemption imbalance ", sizeof(msgbuf));
-		preempt_count_set(count);
+		preempt_count() = count;
 	}
 	if (irqs_disabled()) {
 		strlcat(msgbuf, "disabled interrupts ", sizeof(msgbuf));

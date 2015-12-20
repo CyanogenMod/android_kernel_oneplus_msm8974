@@ -421,7 +421,6 @@ struct mmc_host {
 		unsigned int	down_threshold;
 		ktime_t		start_busy;
 		bool		enable;
-		bool		scale_down_in_low_wr_load;
 		bool		initialized;
 		bool		in_progress;
 		/* freq. transitions are not allowed in invalid state */
@@ -430,7 +429,6 @@ struct mmc_host {
 		enum mmc_load	state;
 	} clk_scaling;
 	enum dev_state dev_status;
-	bool			wakeup_on_idle;
 	unsigned long		private[0] ____cacheline_aligned;
 };
 

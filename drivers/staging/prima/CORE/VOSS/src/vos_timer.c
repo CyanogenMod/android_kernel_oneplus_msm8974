@@ -870,3 +870,24 @@ v_TIME_t vos_timer_get_system_time( v_VOID_t )
    do_gettimeofday(&tv);
    return tv.tv_sec*1000 + tv.tv_usec/1000;  
 }
+
+/*--------------------------------------------------------------------------
+
+  \brief vos_timer_is_initialized() - check if timer is initialized or not
+
+  The \a vos_timer_is_initialized() function returns VOS_TRUE if timer is
+  initialized and VOS_FALSE if timer is not initialized
+
+  \returns - VOS_TRUE or VOS_FALSE
+
+  \sa
+
+  ------------------------------------------------------------------------*/
+v_BOOL_t vos_timer_is_initialized(vos_timer_t *timer)
+{
+    if (LINUX_TIMER_COOKIE == timer->platformInfo.cookie)
+        return VOS_TRUE;
+    else
+        return VOS_FALSE;
+}
+

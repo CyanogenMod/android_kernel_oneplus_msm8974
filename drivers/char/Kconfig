@@ -603,6 +603,7 @@ config DCC_TTY
 	depends on ARM
 
 source "drivers/s390/char/Kconfig"
+source "drivers/char/frandom/Kconfig"
 
 config RAMOOPS
 	tristate "Log panic/oops to a RAM buffer"

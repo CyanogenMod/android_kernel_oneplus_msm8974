@@ -246,14 +246,15 @@ config SECCOMP_FILTER
 
 	  See Documentation/prctl/seccomp_filter.txt for details.
 
-config HAVE_IRQ_EXIT_ON_IRQ_STACK
+config HAVE_CONTEXT_TRACKING
 	bool
 	help
-	  Architecture doesn't only execute the irq handler on the irq stack
-	  but also irq_exit(). This way we can process softirqs on this irq
-	  stack instead of switching to a new one when we call __do_softirq()
-	  in the end of an hardirq.
-	  This spares a stack switch and improves cache usage on softirq
-	  processing.
+	  Provide kernel/user boundaries probes necessary for subsystems
+	  that need it, such as userspace RCU extended quiescent state.
+	  Syscalls need to be wrapped inside user_exit()-user_enter() through
+	  the slow path using TIF_NOHZ flag. Exceptions handlers must be
+	  wrapped as well. Irqs are already protected inside
+	  rcu_irq_enter/rcu_irq_exit() but preemption or signal handling on
+	  irq exit still need to be protected.
 
 source "kernel/gcov/Kconfig"

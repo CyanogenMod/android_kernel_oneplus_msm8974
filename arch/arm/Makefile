@@ -23,6 +23,7 @@ KBUILD_CFLAGS	+=$(call cc-option,-marm,)
 
 # Never generate .eh_frame
 KBUILD_CFLAGS	+= $(call cc-option,-fno-dwarf2-cfi-asm)
+KBUILD_CFLAGS	+= -fno-pic
 
 # Do not use arch/arm/defconfig - it's always outdated.
 # Select a platform tht is kept up-to-date
@@ -40,10 +41,6 @@ endif
 ifeq ($(CONFIG_CC_STACKPROTECTOR),y)
 KBUILD_CFLAGS	+=-fstack-protector
 endif
-
-# ARM gcc developers unfortunately broke -fconserve-stack. It misaligns
-# variables on the stack
-KBUILD_CFLAGS += $(call cc-option,-fno-conserve-stack)
 
 ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
 KBUILD_CPPFLAGS	+= -mbig-endian

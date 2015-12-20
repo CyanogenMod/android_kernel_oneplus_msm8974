@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -320,6 +320,7 @@ struct qpnp_chg_irq {
 	int		irq;
 	unsigned long		disabled;
 	unsigned long		wake_enable;
+	bool			is_wake;
 };
 
 struct qpnp_chg_regulator {
@@ -647,6 +648,10 @@ qpnp_chg_enable_irq(struct qpnp_chg_irq *irq)
 		pr_debug("number = %d\n", irq->irq);
 		enable_irq(irq->irq);
 	}
+	if ((irq->is_wake) && (!__test_and_set_bit(0, &irq->wake_enable))) {
+		pr_debug("enable wake, number = %d\n", irq->irq);
+		enable_irq_wake(irq->irq);
+	}
 }
 
 static void
@@ -655,6 +660,10 @@ qpnp_chg_disable_irq(struct qpnp_chg_irq *irq)
 	if (!__test_and_set_bit(0, &irq->disabled)) {
 		pr_debug("number = %d\n", irq->irq);
 		disable_irq_nosync(irq->irq);
+	}
+	if ((irq->is_wake) && (__test_and_clear_bit(0, &irq->wake_enable))) {
+		pr_debug("disable wake, number = %d\n", irq->irq);
+		disable_irq_wake(irq->irq);
 	}
 }
 
@@ -665,6 +674,7 @@ qpnp_chg_irq_wake_enable(struct qpnp_chg_irq *irq)
 		pr_debug("number = %d\n", irq->irq);
 		enable_irq_wake(irq->irq);
 	}
+	irq->is_wake = true;
 }
 
 static void
@@ -674,6 +684,7 @@ qpnp_chg_irq_wake_disable(struct qpnp_chg_irq *irq)
 		pr_debug("number = %d\n", irq->irq);
 		disable_irq_wake(irq->irq);
 	}
+	irq->is_wake = false;
 }
 
 #define USB_OTG_EN_BIT	BIT(0)
@@ -3081,7 +3092,7 @@ get_prop_batt_temp(struct qpnp_chg_chip *chip)
 		pr_debug("Unable to read batt temperature rc=%d\n", rc);
 		return 0;
 	}
-	pr_debug("get_bat_temp %d, %lld\n",
+	pr_debug("get_bat_temp %d %lld\n",
 		results.adc_code, results.physical);
 
 	return (int)results.physical;
@@ -5079,8 +5090,8 @@ qpnp_chg_request_irqs(struct qpnp_chg_chip *chip)
 
 			qpnp_chg_irq_wake_enable(&chip->chg_trklchg);
 			qpnp_chg_irq_wake_enable(&chip->chg_failed);
-			qpnp_chg_disable_irq(&chip->chg_vbatdet_lo);
 			qpnp_chg_irq_wake_enable(&chip->chg_vbatdet_lo);
+			qpnp_chg_disable_irq(&chip->chg_vbatdet_lo);
 
 			break;
 		case SMBB_BAT_IF_SUBTYPE:

@@ -122,10 +122,10 @@ extern void get_avenrun(unsigned long *loads, unsigned long offset, int shift);
 
 #define FSHIFT		11		/* nr of bits of precision */
 #define FIXED_1		(1<<FSHIFT)	/* 1.0 as fixed-point */
-#define LOAD_FREQ	(5*HZ+1)	/* 5 sec intervals */
-#define EXP_1		1884		/* 1/exp(5sec/1min) as fixed-point */
-#define EXP_5		2014		/* 1/exp(5sec/5min) */
-#define EXP_15		2037		/* 1/exp(5sec/15min) */
+#define LOAD_FREQ	(4*HZ+61)	/* 5 sec intervals */
+#define EXP_1		1896		/* 1/exp(5sec/1min) as fixed-point */
+#define EXP_5		2017		/* 1/exp(5sec/5min) */
+#define EXP_15		2038		/* 1/exp(5sec/15min) */
 
 #define CALC_LOAD(load,exp,n) \
 	load *= exp; \
@@ -153,6 +153,8 @@ extern void calc_global_load(unsigned long ticks);
 extern void update_cpu_load_nohz(void);
 
 extern unsigned long get_parent_ip(unsigned long addr);
+
+extern void dump_cpu_task(int cpu);
 
 struct seq_file;
 struct cfs_rq;
@@ -278,7 +280,7 @@ extern void init_idle_bootup_task(struct task_struct *idle);
 
 extern int runqueue_is_locked(int cpu);
 
-#if defined(CONFIG_SMP) && defined(CONFIG_NO_HZ)
+#if defined(CONFIG_SMP) && defined(CONFIG_NO_HZ_COMMON)
 extern void select_nohz_load_balancer(int stop_tick);
 extern void set_cpu_sd_state_idle(void);
 extern int get_nohz_timer_target(void);
@@ -369,6 +371,7 @@ extern signed long schedule_timeout_killable(signed long timeout);
 extern signed long schedule_timeout_uninterruptible(signed long timeout);
 asmlinkage void schedule(void);
 extern void schedule_preempt_disabled(void);
+extern int mutex_spin_on_owner(struct mutex *lock, struct task_struct *owner);
 
 struct nsproxy;
 struct user_namespace;
@@ -672,7 +675,6 @@ struct signal_struct {
 	struct rw_semaphore group_rwsem;
 #endif
 
-	int oom_adj;		/* OOM kill score adjustment (bit shift) */
 	int oom_score_adj;	/* OOM kill score adjustment */
 	int oom_score_adj_min;	/* OOM kill score adjustment minimum value.
 				 * Only settable by CAP_SYS_RESOURCE. */
@@ -681,11 +683,6 @@ struct signal_struct {
 					 * credential calculations
 					 * (notably. ptrace) */
 };
-
-/* Context switch must be unlocked if interrupts are to be enabled */
-#ifdef __ARCH_WANT_INTERRUPTS_ON_CTXSW
-# define __ARCH_WANT_UNLOCKED_CTXSW
-#endif
 
 /*
  * Bits in flags field of signal_struct.
@@ -867,13 +864,60 @@ enum cpu_idle_type {
 #define SD_WAKE_AFFINE		0x0020	/* Wake task to waking CPU */
 #define SD_PREFER_LOCAL		0x0040  /* Prefer to keep tasks local to this domain */
 #define SD_SHARE_CPUPOWER	0x0080	/* Domain members share cpu power */
+#define SD_POWERSAVINGS_BALANCE	0x0100	/* Balance for power savings */
 #define SD_SHARE_PKG_RESOURCES	0x0200	/* Domain members share cpu pkg resources */
 #define SD_SERIALIZE		0x0400	/* Only a single load balancing instance */
 #define SD_ASYM_PACKING		0x0800  /* Place busy groups earlier in the domain */
 #define SD_PREFER_SIBLING	0x1000	/* Prefer to place tasks in a sibling domain */
 #define SD_OVERLAP		0x2000	/* sched_domains of this level overlap */
 
+enum powersavings_balance_level {
+	POWERSAVINGS_BALANCE_NONE = 0,  /* No power saving load balance */
+	POWERSAVINGS_BALANCE_BASIC,	/* Fill one thread/core/package
+					 * first for long running threads
+					 */
+	POWERSAVINGS_BALANCE_WAKEUP,	/* Also bias task wakeups to semi-idle
+					 * cpu package for power savings
+					 */
+	MAX_POWERSAVINGS_BALANCE_LEVELS
+};
+
+extern int sched_mc_power_savings, sched_smt_power_savings;
+
+static inline int sd_balance_for_mc_power(void)
+{
+	if (sched_smt_power_savings)
+		return SD_POWERSAVINGS_BALANCE;
+
+	if (!sched_mc_power_savings)
+		return SD_PREFER_SIBLING;
+
+	return 0;
+}
+
+static inline int sd_balance_for_package_power(void)
+{
+	if (sched_mc_power_savings | sched_smt_power_savings)
+		return SD_POWERSAVINGS_BALANCE;
+
+	return SD_PREFER_SIBLING;
+}
+
 extern int __weak arch_sd_sibiling_asym_packing(void);
+
+/*
+ * Optimise SD flags for power savings:
+ * SD_BALANCE_NEWIDLE helps aggressive task consolidation and power savings.
+ * Keep default SD flags if sched_{smt,mc}_power_saving=0
+ */
+
+static inline int sd_power_saving_flags(void)
+{
+	if (sched_mc_power_savings | sched_smt_power_savings)
+		return SD_BALANCE_NEWIDLE;
+
+	return 0;
+}
 
 struct sched_group_power {
 	atomic_t ref;
@@ -948,7 +992,6 @@ struct sched_domain {
 	unsigned int smt_gain;
 	int flags;			/* See SD_* */
 	int level;
-	int idle_buddy;			/* cpu assigned to select_idle_sibling() */
 
 	/* Runtime fields. */
 	unsigned long last_balance;	/* init to jiffies. units in jiffies */
@@ -1238,9 +1281,6 @@ struct task_struct {
 #ifdef CONFIG_SMP
 	struct llist_node wake_entry;
 	int on_cpu;
-	struct task_struct *last_wakee;
-	unsigned long wakee_flips;
-	unsigned long wakee_flip_decay_ts;
 #endif
 	int on_rq;
 
@@ -1291,9 +1331,6 @@ struct task_struct {
 #endif
 
 	struct list_head tasks;
-#ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
-	struct rb_node adj_node;
-#endif
 #ifdef CONFIG_SMP
 	struct plist_node pushable_tasks;
 #endif
@@ -1325,7 +1362,6 @@ struct task_struct {
 	/* IRQ handler threads */
 	unsigned irq_thread:1;
 #endif
-
 	unsigned long atomic_flags; /* Flags needing atomic access. */
 
 	pid_t pid;
@@ -1369,6 +1405,8 @@ struct task_struct {
 
 	cputime_t utime, stime, utimescaled, stimescaled;
 	cputime_t gtime;
+	unsigned long long cpu_power;
+
 #ifndef CONFIG_VIRT_CPU_ACCOUNTING
 	cputime_t prev_utime, prev_stime;
 #endif
@@ -1641,14 +1679,6 @@ static inline struct pid *task_tgid(struct task_struct *task)
 	return task->group_leader->pids[PIDTYPE_PID].pid;
 }
 
-#ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
-extern void add_2_adj_tree(struct task_struct *task);
-extern void delete_from_adj_tree(struct task_struct *task);
-#else
-static inline void add_2_adj_tree(struct task_struct *task) { }
-static inline void delete_from_adj_tree(struct task_struct *task) { }
-#endif
-
 /*
  * Without tasklist or rcu lock it is not safe to dereference
  * the result of task_pgrp/task_session even if task == current,
@@ -1846,18 +1876,6 @@ extern int task_free_unregister(struct notifier_block *n);
 #define used_math() tsk_used_math(current)
 
 /* Per-process atomic flags. */
-#define PFA_SPREAD_PAGE  1      /* Spread page cache over cpuset */
-#define PFA_SPREAD_SLAB  2      /* Spread some slab caches over cpuset */
-
-#define TASK_PFA_TEST(name, func)					\
-	static inline bool task_##func(struct task_struct *p)		\
-	{ return test_bit(PFA_##name, &p->atomic_flags); }
-#define TASK_PFA_SET(name, func)					\
-	static inline void task_set_##func(struct task_struct *p)	\
-	{ set_bit(PFA_##name, &p->atomic_flags); }
-#define TASK_PFA_CLEAR(name, func)					\
-	static inline void task_clear_##func(struct task_struct *p)	\
-	{ clear_bit(PFA_##name, &p->atomic_flags); }
 
 #define PFA_NO_NEW_PRIVS 0x00000001	/* May not gain new privileges. */
 
@@ -1870,6 +1888,19 @@ static inline void task_set_no_new_privs(struct task_struct *p)
 {
 	set_bit(PFA_NO_NEW_PRIVS, &p->atomic_flags);
 }
+
+#define PFA_SPREAD_PAGE  1      /* Spread page cache over cpuset */
+#define PFA_SPREAD_SLAB  2      /* Spread some slab caches over cpuset */
+
+#define TASK_PFA_TEST(name, func)					\
+	static inline bool task_##func(struct task_struct *p)		\
+	{ return test_bit(PFA_##name, &p->atomic_flags); }
+#define TASK_PFA_SET(name, func)					\
+	static inline void task_set_##func(struct task_struct *p)	\
+	{ set_bit(PFA_##name, &p->atomic_flags); }
+#define TASK_PFA_CLEAR(name, func)					\
+	static inline void task_clear_##func(struct task_struct *p)	\
+	{ clear_bit(PFA_##name, &p->atomic_flags); }
 
 /*
  * task->jobctl flags
@@ -1955,13 +1986,13 @@ static inline void set_wake_up_idle(bool enabled)
 		current->flags &= ~PF_WAKE_UP_IDLE;
 }
 
-#ifdef CONFIG_NO_HZ
+#ifdef CONFIG_NO_HZ_COMMON
 void calc_load_enter_idle(void);
 void calc_load_exit_idle(void);
 #else
 static inline void calc_load_enter_idle(void) { }
 static inline void calc_load_exit_idle(void) { }
-#endif /* CONFIG_NO_HZ */
+#endif /* CONFIG_NO_HZ_COMMON */
 
 #ifndef CONFIG_CPUMASK_OFFSTACK
 static inline int set_cpus_allowed(struct task_struct *p, cpumask_t new_mask)
@@ -2055,10 +2086,10 @@ extern void idle_task_exit(void);
 static inline void idle_task_exit(void) {}
 #endif
 
-#if defined(CONFIG_NO_HZ) && defined(CONFIG_SMP)
-extern void wake_up_idle_cpu(int cpu);
+#if defined(CONFIG_NO_HZ_COMMON) && defined(CONFIG_SMP)
+extern void wake_up_nohz_cpu(int cpu);
 #else
-static inline void wake_up_idle_cpu(int cpu) { }
+static inline void wake_up_nohz_cpu(int cpu) { }
 #endif
 
 extern unsigned int sysctl_sched_latency;
@@ -2103,6 +2134,12 @@ extern int sysctl_sched_rt_runtime;
 int sched_rt_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp,
 		loff_t *ppos);
+
+#ifdef CONFIG_NO_HZ_FULL
+extern bool sched_can_stop_tick(void);
+#else
+static inline bool sched_can_stop_tick(void) { return false; }
+#endif
 
 #ifdef CONFIG_SCHED_AUTOGROUP
 extern unsigned int sysctl_sched_autogroup_enabled;
@@ -2153,7 +2190,6 @@ extern int task_nice(const struct task_struct *p);
 extern int can_nice(const struct task_struct *p, const int nice);
 extern int task_curr(const struct task_struct *p);
 extern int idle_cpu(int cpu);
-extern int idle_cpu_relaxed(int cpu);
 extern int sched_setscheduler(struct task_struct *, int,
 			      const struct sched_param *);
 extern int sched_setscheduler_nocheck(struct task_struct *, int,

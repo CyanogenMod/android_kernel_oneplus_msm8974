@@ -104,7 +104,7 @@ static unsigned fpos_off(loff_t p)
 /*
  * When possible, we try to satisfy a readdir by peeking at the
  * dcache.  We make this work by carefully ordering dentries on
- * d_u.d_child when we initially get results back from the MDS, and
+ * d_child when we initially get results back from the MDS, and
  * falling back to a "normal" sync readdir if any dentries in the dir
  * are dropped.
  *
@@ -140,11 +140,11 @@ static int __dcache_readdir(struct file *filp,
 		p = parent->d_subdirs.prev;
 		dout(" initial p %p/%p\n", p->prev, p->next);
 	} else {
-		p = last->d_u.d_child.prev;
+		p = last->d_child.prev;
 	}
 
 more:
-	dentry = list_entry(p, struct dentry, d_u.d_child);
+	dentry = list_entry(p, struct dentry, d_child);
 	di = ceph_dentry(dentry);
 	while (1) {
 		dout(" p %p/%p %s d_subdirs %p/%p\n", p->prev, p->next,
@@ -166,7 +166,7 @@ more:
 		     !dentry->d_inode ? " null" : "");
 		spin_unlock(&dentry->d_lock);
 		p = p->prev;
-		dentry = list_entry(p, struct dentry, d_u.d_child);
+		dentry = list_entry(p, struct dentry, d_child);
 		di = ceph_dentry(dentry);
 	}
 
@@ -1028,12 +1028,12 @@ static int dir_lease_is_valid(struct inode *dir, struct dentry *dentry)
 /*
  * Check if cached dentry can be trusted.
  */
-static int ceph_d_revalidate(struct dentry *dentry, struct nameidata *nd)
+static int ceph_d_revalidate(struct dentry *dentry, unsigned int flags)
 {
 	int valid = 0;
 	struct inode *dir;
 
-	if (nd && nd->flags & LOOKUP_RCU)
+	if (flags & LOOKUP_RCU)
 		return -ECHILD;
 
 	dout("d_revalidate %p '%.*s' inode %p offset %lld\n", dentry,
@@ -1080,7 +1080,7 @@ static void ceph_d_release(struct dentry *dentry)
 }
 
 static int ceph_snapdir_d_revalidate(struct dentry *dentry,
-					  struct nameidata *nd)
+					  unsigned int flags)
 {
 	/*
 	 * Eventually, we'll want to revalidate snapped metadata

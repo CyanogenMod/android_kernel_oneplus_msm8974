@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -271,13 +271,17 @@ tSirRetStatus limSendSwitchChnlParams(tpAniSirGlobal pMac,
     msgQ.bodyptr = pChnlParams;
     msgQ.bodyval = 0;
 #if defined WLAN_FEATURE_VOWIFI  
-    PELOG3(limLog( pMac, LOG3,
-        FL( "Sending WDA_CHNL_SWITCH_REQ with SecondaryChnOffset - %d, ChannelNumber - %d, maxTxPower - %d"),
-        pChnlParams->secondaryChannelOffset, pChnlParams->channelNumber, pChnlParams->maxTxPower);)
+    limLog( pMac, LOG1,
+        FL( "Sending WDA_CHNL_SWITCH_REQ with SecondaryChnOffset - %d,"
+        " ChannelNumber - %d, maxTxPower - %d"),
+        pChnlParams->secondaryChannelOffset, pChnlParams->channelNumber,
+                                                pChnlParams->maxTxPower);
 #else
-    PELOG3(limLog( pMac, LOG3,
-        FL( "Sending WDA_CHNL_SWITCH_REQ with SecondaryChnOffset - %d, ChannelNumber - %d, LocalPowerConstraint - %d"),
-        pChnlParams->secondaryChannelOffset, pChnlParams->channelNumber, pChnlParams->localPowerConstraint);)
+    limLog( pMac, LOG1,
+        FL( "Sending WDA_CHNL_SWITCH_REQ with SecondaryChnOffset - %d, "
+        "ChannelNumber - %d, LocalPowerConstraint - %d"),
+        pChnlParams->secondaryChannelOffset, pChnlParams->channelNumber,
+                                        pChnlParams->localPowerConstraint);
 #endif
     MTRACE(macTraceMsgTx(pMac, peSessionId, msgQ.type));
     limLog(pMac,LOG1,"SessionId:%d WDA_CHNL_SWITCH_REQ for SSID:%s",peSessionId,
@@ -669,10 +673,13 @@ tSirRetStatus limSendHT40OBSSScanInd(tpAniSirGlobal pMac,
     {
         limLog(pMac, LOGE,
                    FL("could not retrieve Valid channel list"));
+        vos_mem_free(ht40OBSSScanInd);
+        return eSIR_FAILURE;
     }
     /* Extract 24G channel list */
     channel24GNum = 0;
-    for( count =0 ;count < validChannelNum ;count++)
+    for( count =0 ;count < validChannelNum &&
+                   (channel24GNum < SIR_ROAM_MAX_CHANNELS);count++)
     {
        if ((validChanList[count]> RF_CHAN_1) &&
            (validChanList[count] < RF_CHAN_14))
@@ -692,7 +699,10 @@ tSirRetStatus limSendHT40OBSSScanInd(tpAniSirGlobal pMac,
     msgQ.reserved = 0;
     msgQ.bodyptr = (void *)ht40OBSSScanInd;
     msgQ.bodyval = 0;
-    PELOGW(limLog(pMac, LOGW, FL("Sending WDA_HT40_OBSS_SCAN_IND to WDA"));)
+    limLog(pMac, LOG1, FL("Sending WDA_HT40_OBSS_SCAN_IND to WDA"
+           "Obss Scan trigger width = %d, delay factor = %d"),
+           ht40OBSSScanInd->BSSChannelWidthTriggerScanInterval,
+            ht40OBSSScanInd->BSSWidthChannelTransitionDelayFactor);
     MTRACE(macTraceMsgTx(pMac, psessionEntry->peSessionId, msgQ.type));
     retCode = wdaPostCtrlMsg(pMac, &msgQ);
     if (eSIR_SUCCESS != retCode)
@@ -724,7 +734,7 @@ tSirRetStatus limSendHT40OBSSStopScanInd(tpAniSirGlobal pMac,
     bssIdx = psessionEntry->bssIdx;
 
     VOS_TRACE (VOS_MODULE_ID_PE,VOS_TRACE_LEVEL_INFO,
-               " Sending STOP OBSS cmd, bssid %d staid %d \n",
+               " Sending STOP OBSS cmd, bssid %d staid %d ",
                psessionEntry->bssIdx, psessionEntry->staId);
 
     msgQ.type = WDA_HT40_OBSS_STOP_SCAN_IND;
@@ -915,107 +925,6 @@ tSirRetStatus limSendModeUpdate(tpAniSirGlobal pMac,
     return retCode;
 }
 
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-/** ---------------------------------------------------------
-\fn      limSendTdlsLinkEstablish
-\brief   LIM sends a message to HAL to set tdls direct link
-\param   tpAniSirGlobal  pMac
-\param   
-\return  None
-  -----------------------------------------------------------*/
-tSirRetStatus limSendTdlsLinkEstablish(tpAniSirGlobal pMac, tANI_U8 bIsPeerResponder, tANI_U8 linkIdenOffset, 
-                tANI_U8 ptiBufStatusOffset, tANI_U8 ptiFrameLen, tANI_U8 *ptiFrame, tANI_U8 *extCapability)
-{
-    tSirMsgQ msgQ;
-    tSirRetStatus retCode;
-    tpSirTdlsLinkEstablishInd pTdlsLinkEstablish = NULL;
-
-    // Allocate memory.
-    pTdlsLinkEstablish = vos_mem_malloc(sizeof(tSirTdlsLinkEstablishInd));
-    if ( NULL == pTdlsLinkEstablish )
-    {
-        limLog( pMac, LOGP,
-        FL( "Unable to allocate memory while sending Tdls Link Establish " ));
-
-        retCode = eSIR_SME_RESOURCES_UNAVAILABLE;
-        return retCode;
-    }
-
-    vos_mem_set((tANI_U8 *) pTdlsLinkEstablish, sizeof(tSirTdlsLinkEstablishInd), 0);
-
-    pTdlsLinkEstablish->bIsResponder = !!bIsPeerResponder; 
-    pTdlsLinkEstablish->linkIdenOffset = linkIdenOffset;
-    pTdlsLinkEstablish->ptiBufStatusOffset = ptiBufStatusOffset;
-    pTdlsLinkEstablish->ptiTemplateLen = ptiFrameLen;
-    /* Copy ptiFrame template */
-    vos_mem_copy(pTdlsLinkEstablish->ptiTemplateBuf, ptiFrame, ptiFrameLen);
-    /* Copy extended capabilities */
-    vos_mem_copy((tANI_U8 *) pTdlsLinkEstablish->extCapability,  extCapability, sizeof(pTdlsLinkEstablish->extCapability));
-
-    msgQ.type = SIR_HAL_TDLS_LINK_ESTABLISH;
-    msgQ.reserved = 0;
-    msgQ.bodyptr = pTdlsLinkEstablish;
-    msgQ.bodyval = 0;
-    
-    MTRACE(macTraceMsgTx(pMac, 0, msgQ.type));
-
-    retCode = (tANI_U32)wdaPostCtrlMsg(pMac, &msgQ);
-    if (retCode != eSIR_SUCCESS)
-    {
-        vos_mem_free(pTdlsLinkEstablish);
-        limLog(pMac, LOGP, FL("Posting tdls link establish %d failed, reason = %x "), retCode);
-    }
-
-    return retCode;
-}
-
-/** ---------------------------------------------------------
-\fn      limSendTdlsLinkTeardown
-\brief   LIM sends a message to HAL to indicate tdls direct link is teardowned
-\param   tpAniSirGlobal  pMac
-\param   
-\return  None
-  -----------------------------------------------------------*/
-tSirRetStatus limSendTdlsLinkTeardown(tpAniSirGlobal pMac, tANI_U16 staId)
-{
-    tSirMsgQ msgQ;
-    tSirRetStatus retCode;
-    tpSirTdlsLinkTeardownInd pTdlsLinkTeardown = NULL;
-
-    // Allocate memory.
-    pTdlsLinkTeardown = vos_mem_malloc(sizeof(tSirTdlsLinkTeardownInd));
-    if ( NULL == pTdlsLinkTeardown )
-    {
-        limLog( pMac, LOGP,
-        FL( "Unable to allocate memory while sending Tdls Link Teardown " ));
-
-        retCode = eSIR_SME_RESOURCES_UNAVAILABLE;
-        return retCode;
-    }
-
-    vos_mem_set((tANI_U8 *) pTdlsLinkTeardown, sizeof(tSirTdlsLinkTeardownInd), 0);
-
-    pTdlsLinkTeardown->staId = staId;
-
-    msgQ.type = SIR_HAL_TDLS_LINK_TEARDOWN;
-    msgQ.reserved = 0;
-    msgQ.bodyptr = pTdlsLinkTeardown;
-    msgQ.bodyval = 0;
-    
-    MTRACE(macTraceMsgTx(pMac, 0, msgQ.type));
-
-    retCode = (tANI_U32)wdaPostCtrlMsg(pMac, &msgQ);
-    if (retCode != eSIR_SUCCESS)
-    {
-        vos_mem_free(pTdlsLinkTeardown);
-        limLog(pMac, LOGP, FL("Posting tdls link teardown %d failed, reason = %x "), retCode);
-    }
-
-    return retCode;
-}
-
-#endif
-
 #ifdef WLAN_FEATURE_11W
 /** ---------------------------------------------------------
 \fn      limSendExcludeUnencryptInd
@@ -1050,8 +959,8 @@ tSirRetStatus limSendExcludeUnencryptInd(tpAniSirGlobal pMac,
     msgQ.reserved = 0;
     msgQ.bodyptr = pExcludeUnencryptParam;
     msgQ.bodyval = 0;
-    PELOG3(limLog(pMac, LOG3,
-                FL("Sending WDA_EXCLUDE_UNENCRYPTED_IND"));)
+    limLog(pMac, LOG1,
+                FL("Sending WDA_EXCLUDE_UNENCRYPTED_IND"));
     MTRACE(macTraceMsgTx(pMac, psessionEntry->peSessionId, msgQ.type));
     retCode = wdaPostCtrlMsg(pMac, &msgQ);
     if (eSIR_SUCCESS != retCode)

@@ -490,6 +490,7 @@ static bool elv_attempt_insert_merge(struct request_queue *q,
 				     struct request *rq)
 {
 	struct request *__rq;
+	bool ret;
 
 	if (blk_queue_nomerges(q))
 		return false;
@@ -503,14 +504,21 @@ static bool elv_attempt_insert_merge(struct request_queue *q,
 	if (blk_queue_noxmerges(q))
 		return false;
 
+	ret = false;
 	/*
 	 * See if our hash lookup can find a potential backmerge.
 	 */
-	__rq = elv_rqhash_find(q, blk_rq_pos(rq));
-	if (__rq && blk_attempt_req_merge(q, __rq, rq))
-		return true;
+	while (1) {
+		__rq = elv_rqhash_find(q, blk_rq_pos(rq));
+		if (!__rq || !blk_attempt_req_merge(q, __rq, rq))
+			break;
 
-	return false;
+		/* The merged request could be merged with others, try again */
+		ret = true;
+		rq = __rq;
+	}
+
+	return ret;
 }
 
 void elv_merged_request(struct request_queue *q, struct request *rq, int type)
@@ -904,8 +912,6 @@ int __elv_register_queue(struct request_queue *q, struct elevator_queue *e)
 		}
 		kobject_uevent(&e->kobj, KOBJ_ADD);
 		e->registered = 1;
-		if (e->type->ops.elevator_registered_fn)
-			e->type->ops.elevator_registered_fn(q);
 	}
 	return error;
 }

@@ -384,25 +384,15 @@ static int destroy_region(struct ocmem_region *region)
 
 static int attach_req(struct ocmem_region *region, struct ocmem_req *req)
 {
-	int ret, id;
+	int id;
 
-	while (1) {
-		if (idr_pre_get(&region->region_idr, GFP_KERNEL) == 0)
-			return -ENOMEM;
-
-		ret = idr_get_new_above(&region->region_idr, req, 1, &id);
-
-		if (ret != -EAGAIN)
-			break;
-	}
-
-	if (!ret) {
-		req->req_id = id;
-		pr_debug("ocmem: request %p(id:%d) attached to region %p\n",
-				req, id, region);
-		return 0;
-	}
-	return -EINVAL;
+	id = idr_alloc(&region->region_idr, req, 1, 0, GFP_KERNEL);
+	if (id < 0)
+		return id;
+	req->req_id = id;
+	pr_debug("ocmem: request %p(id:%d) attached to region %p\n",
+			req, id, region);
+	return 0;
 }
 
 static int detach_req(struct ocmem_region *region, struct ocmem_req *req)

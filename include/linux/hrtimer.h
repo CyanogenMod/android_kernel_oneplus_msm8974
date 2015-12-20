@@ -5,7 +5,6 @@
  *
  *   Copyright(C) 2005, Thomas Gleixner <tglx@linutronix.de>
  *   Copyright(C) 2005, Red Hat, Inc., Ingo Molnar
- *  Copyright (C) 2014, NVIDIA CORPORATION. All rights reserved.
  *
  *  data type definitions, declarations, prototypes
  *
@@ -24,7 +23,6 @@
 #include <linux/percpu.h>
 #include <linux/timer.h>
 #include <linux/timerqueue.h>
-#include <asm/relaxed.h>
 
 struct hrtimer_clock_base;
 struct hrtimer_cpu_base;
@@ -170,6 +168,7 @@ enum  hrtimer_base_type {
  * @clock_was_set:	Indicates that clock was set from irq context.
  * @expires_next:	absolute time of the next event which was scheduled
  *			via clock_set_next_event()
+ * @in_hrtirq:		hrtimer_interrupt() is currently executing
  * @hres_active:	State of high resolution mode
  * @hang_detected:	The last hrtimer interrupt detected a hang
  * @nr_events:		Total number of hrtimer interrupt events
@@ -184,6 +183,7 @@ struct hrtimer_cpu_base {
 	unsigned int			clock_was_set;
 #ifdef CONFIG_HIGH_RES_TIMERS
 	ktime_t				expires_next;
+	int				in_hrtirq;
 	int				hres_active;
 	int				hang_detected;
 	unsigned long			nr_events;
@@ -415,11 +415,6 @@ static inline int hrtimer_is_queued(struct hrtimer *timer)
 static inline int hrtimer_callback_running(struct hrtimer *timer)
 {
 	return timer->state & HRTIMER_STATE_CALLBACK;
-}
-
-static inline int hrtimer_callback_running_relaxed(struct hrtimer *timer)
-{
-	return cpu_relaxed_read_long(&timer->state) & HRTIMER_STATE_CALLBACK;
 }
 
 /* Forward a hrtimer so it expires after now: */

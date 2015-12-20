@@ -1332,7 +1332,7 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 		/* Default to the fs superblock SID. */
 		isec->sid = sbsec->sid;
 
-		if ((sbsec->flags & SE_SBGENFS) && !S_ISLNK(inode->i_mode)) {
+		if ((sbsec->flags & SE_SBPROC) && !S_ISLNK(inode->i_mode)) {
 			/* We must have a dentry to determine the label on
 			 * procfs inodes */
 			if (opt_dentry)
@@ -2642,9 +2642,9 @@ static int selinux_sb_statfs(struct dentry *dentry)
 	return superblock_has_perm(cred, dentry->d_sb, FILESYSTEM__GETATTR, &ad);
 }
 
-static int selinux_mount(char *dev_name,
+static int selinux_mount(const char *dev_name,
 			 struct path *path,
-			 char *type,
+			 const char *type,
 			 unsigned long flags,
 			 void *data)
 {
@@ -3152,12 +3152,14 @@ int ioctl_has_perm(const struct cred *cred, struct file *file,
 	u32 ssid = cred_sid(cred);
 	struct selinux_audit_data sad = {0,};
 	int rc;
+	u8 driver = cmd >> 8;
+	u8 xperm = cmd & 0xff;
 
 	COMMON_AUDIT_DATA_INIT(&ad, IOCTL_OP);
 	ad.u.op = &ioctl;
 	ad.u.op->cmd = cmd;
-	ad.u.op->path = file->f_path;
 	ad.selinux_audit_data = &sad;
+	ad.u.op->path = file->f_path;
 
 	if (ssid != fsec->sid) {
 		rc = avc_has_perm(ssid, fsec->sid,
@@ -3171,8 +3173,8 @@ int ioctl_has_perm(const struct cred *cred, struct file *file,
 	if (unlikely(IS_PRIVATE(inode)))
 		return 0;
 
-	rc = avc_has_operation(ssid, isec->sid, isec->sclass,
-			requested, cmd, &ad);
+	rc = avc_has_extended_perms(ssid, isec->sid, isec->sclass,
+			requested, driver, xperm, &ad);
 out:
 	return rc;
 }

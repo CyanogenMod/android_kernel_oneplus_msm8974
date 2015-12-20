@@ -40,6 +40,10 @@ struct rand_pool_info {
 	__u32	buf[0];
 };
 
+struct rnd_state {
+	__u32 s1, s2, s3;
+};
+
 /* Exported functions */
 
 #ifdef __KERNEL__
@@ -61,34 +65,10 @@ extern const struct file_operations random_fops, urandom_fops;
 unsigned int get_random_int(void);
 unsigned long randomize_range(unsigned long start, unsigned long end, unsigned long len);
 
-u32 prandom_u32(void);
-void prandom_bytes(void *buf, size_t nbytes);
-void prandom_seed(u32 seed);
-void prandom_reseed_late(void);
+u32 random32(void);
+void srandom32(u32 seed);
 
-struct rnd_state {
-        __u32 s1, s2, s3, s4;
-};
-
-u32 prandom_u32_state(struct rnd_state *state);
-void prandom_bytes_state(struct rnd_state *state, void *buf, size_t nbytes);
-
-/**
-* prandom_u32_max - returns a pseudo-random number in interval [0, ep_ro)
-* @ep_ro: right open interval endpoint
-*
-* Returns a pseudo-random number that is in interval [0, ep_ro). Note
-* that the result depends on PRNG being well distributed in [0, ~0U]
-* u32 space. Here we use maximally equidistributed combined Tausworthe
-* generator, that is, prandom_u32(). This is useful when requesting a
-* random index of an array containing ep_ro elements, for example.
-*
-* Returns: pseudo-random number in interval [0, ep_ro)
-*/
-static inline u32 prandom_u32_max(u32 ep_ro)
-{
-	return (u32)(((u64) prandom_u32() * ep_ro) >> 32);
-}
+u32 prandom32(struct rnd_state *);
 
 /*
  * Handle minimum values for seeds
@@ -99,18 +79,17 @@ static inline u32 __seed(u32 x, u32 m)
 }
 
 /**
- * prandom_seed_state - set seed for prandom_u32_state().
+ * prandom32_seed - set seed for prandom32().
  * @state: pointer to state structure to receive the seed.
  * @seed: arbitrary 64-bit value to use as a seed.
  */
-static inline void prandom_seed_state(struct rnd_state *state, u64 seed)
+static inline void prandom32_seed(struct rnd_state *state, u64 seed)
 {
 	u32 i = (seed >> 32) ^ (seed << 10) ^ seed;
 
-	state->s1 = __seed(i,   2U);
-	state->s2 = __seed(i,   8U);
-	state->s3 = __seed(i,  16U);
-	state->s4 = __seed(i, 128U);
+	state->s1 = __seed(i, 2);
+	state->s2 = __seed(i, 8);
+	state->s3 = __seed(i, 16);
 }
 
 #ifdef CONFIG_ARCH_RANDOM
@@ -129,5 +108,3 @@ static inline int arch_get_random_int(unsigned int *v)
 #endif /* __KERNEL___ */
 
 #endif /* _LINUX_RANDOM_H */
-
-void erandom_get_random_bytes(char *buf, size_t count);

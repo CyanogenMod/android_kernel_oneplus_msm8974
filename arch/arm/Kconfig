@@ -1,6 +1,7 @@
 config ARM
 	bool
 	default y
+	select ARCH_USE_BUILTIN_BSWAP
 	select HAVE_DMA_API_DEBUG
 	select HAVE_IDE if PCI || ISA || PCMCIA
 	select HAVE_DMA_CONTIGUOUS if (CPU_V6 || CPU_V6K || CPU_V7)
@@ -320,6 +321,7 @@ config ARM_USER_ACCESSIBLE_TIMER_BASE
 
 config ARCH_RANDOM
 	bool "SOC specific random number generation"
+	default y
 	help
 	 Allow the kernel to use an architecture specific implementation for
 	 random number generation
@@ -338,6 +340,30 @@ config MMU
 	help
 	  Select if you want MMU-based virtualised addressing space
 	  support by paged memory management. If unsure, say 'Y'.
+
+config ARCH_MMAP_RND_BITS_MIN
+	int
+	default 8
+
+config ARCH_MMAP_RND_BITS_MAX
+	int
+	default 14 if MMU && PAGE_OFFSET=0x40000000
+	default 15 if MMU && PAGE_OFFSET=0x80000000
+	default 16 if MMU
+	default 8
+
+config ARCH_MMAP_RND_BITS
+	int "Number of bits to use for ASLR of mmap base address" if EXPERT
+	range ARCH_MMAP_RND_BITS_MIN ARCH_MMAP_RND_BITS_MAX
+	default ARCH_MMAP_RND_BITS_MIN
+	help
+	  This value can be used to select the number of bits to use to
+	  determine the random offset to the base address of vma regions
+	  resulting from mmap allocations. This value will be bounded
+	  by the architecture's minimum and maximum supported values.
+
+	  This value can be changed after boot using the
+	  /proc/sys/kernel/mmap_rnd_bits tunable
 
 #
 # The "ARM system type" choice list is ordered alphabetically by option
@@ -1615,6 +1641,8 @@ endmenu
 
 menu "Kernel Features"
 
+source "kernel/time/Kconfig"
+
 config HAVE_SMP
 	bool
 	help
@@ -1674,6 +1702,7 @@ config ARM_CPU_TOPOLOGY
 config SCHED_MC
 	bool "Multi-core scheduler support"
 	depends on ARM_CPU_TOPOLOGY
+	default y
 	help
 	  Multi-core scheduler support improves the CPU scheduler's decision
 	  making when dealing with multi-core CPU chips at a cost of slightly
@@ -1682,6 +1711,7 @@ config SCHED_MC
 config SCHED_SMT
 	bool "SMT scheduler support"
 	depends on ARM_CPU_TOPOLOGY
+	default y
 	help
 	  Improves the CPU scheduler's decision making when dealing with
 	  MultiThreading at a cost of slightly increased overhead in some
@@ -2447,8 +2477,6 @@ config CPU_FREQ_S3C24XX_DEBUGFS
 endif
 
 source "drivers/cpuidle/Kconfig"
-
-source "drivers/cpuquiet/Kconfig"
 
 endmenu
 

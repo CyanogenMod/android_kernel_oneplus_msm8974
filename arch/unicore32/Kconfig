@@ -147,6 +147,8 @@ endmenu
 
 menu "Kernel Features"
 
+source "kernel/time/Kconfig"
+
 source "kernel/Kconfig.preempt"
 
 source "kernel/Kconfig.hz"

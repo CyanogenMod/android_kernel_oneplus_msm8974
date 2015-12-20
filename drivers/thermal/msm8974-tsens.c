@@ -25,7 +25,6 @@
 #include <linux/msm_tsens.h>
 #include <linux/err.h>
 #include <linux/of.h>
-#include <linux/sched.h>
 
 #include <mach/msm_iomap.h>
 

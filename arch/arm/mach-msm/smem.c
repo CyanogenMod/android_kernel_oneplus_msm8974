@@ -295,6 +295,7 @@ static void *__smem_get_entry(unsigned id, unsigned *size,
 	int use_spinlocks = spinlocks_initialized && use_rspinlock;
 	void *ret = 0;
 	unsigned long flags = 0;
+	int rc;
 
 	if (!skip_init_check && !smem_initialized_check())
 		return ret;
@@ -302,8 +303,12 @@ static void *__smem_get_entry(unsigned id, unsigned *size,
 	if (id >= SMEM_NUM_ITEMS)
 		return ret;
 
-	if (use_spinlocks)
-		remote_spin_lock_irqsave(&remote_spinlock, flags);
+	if (use_spinlocks) {
+		do {
+			rc = remote_spin_trylock_irqsave(&remote_spinlock,
+				flags);
+		} while (!rc);
+	}
 	/* toc is in device memory and cannot be speculatively accessed */
 	if (toc[id].allocated) {
 		phys_addr_t phys_base;
@@ -383,8 +388,12 @@ static void *__smem_get_entry_to_proc(unsigned id,
 			return NULL;
 		}
 	}
-	if (use_rspinlock)
-		remote_spin_lock_irqsave(&remote_spinlock, lflags);
+	if (use_rspinlock) {
+		do {
+			rc = remote_spin_trylock_irqsave(&remote_spinlock,
+				lflags);
+		} while (!rc);
+	}
 	if (hdr->identifier != SMEM_PART_HDR_IDENTIFIER) {
 		LOG_ERR(
 			"%s: SMEM corruption detected.  Partition %d to %d at %p\n",
@@ -756,7 +765,9 @@ void *smem_alloc2_to_proc(unsigned id, unsigned size_in, unsigned to_proc,
 	}
 
 	a_size_in = ALIGN(size_in, 8);
-	remote_spin_lock_irqsave(&remote_spinlock, lflags);
+	do {
+		rc = remote_spin_trylock_irqsave(&remote_spinlock, lflags);
+	} while (!rc);
 
 	ret = __smem_get_entry_to_proc(id, &size_out, to_proc, flags, true,
 									false);
@@ -1252,7 +1263,7 @@ static int msm_smem_probe(struct platform_device *pdev)
 		goto free_smem_areas;
 	}
 
-	ramdump_segments_tmp = kmalloc_array(num_smem_areas,
+	ramdump_segments_tmp = kcalloc(num_smem_areas,
 			sizeof(struct ramdump_segment), GFP_KERNEL);
 	if (!ramdump_segments_tmp) {
 		LOG_ERR("%s: ramdump segment kmalloc failed\n", __func__);

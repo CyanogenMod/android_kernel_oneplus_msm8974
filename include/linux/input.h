@@ -478,13 +478,13 @@ struct input_keymap_entry {
 #define KEY_MICMUTE		248	/* Mute / unmute the microphone */
 
 /* Oppo specific keycodes */
-#define KEY_GESTURE_V_UP	249
 #define KEY_GESTURE_CIRCLE	250
 #define KEY_GESTURE_SWIPE_DOWN	251
 #define KEY_GESTURE_V		252
 #define KEY_GESTURE_LTR		253
 #define KEY_GESTURE_GTR		254
 #define KEY_DOUBLE_TAP      255
+#define KEY_SWEEP_WAKE		116
 
 /* Code 255 is reserved for special needs of AT keyboard driver */
 

@@ -23,6 +23,8 @@
 #include "kgsl_cffdump.h"
 #include "kgsl_device.h"
 
+DEFINE_MUTEX(kernel_map_global_lock);
+
 /* An attribute for showing per-process memory statistics */
 struct kgsl_mem_entry_attribute {
 	struct attribute attr;
@@ -375,17 +377,44 @@ static int kgsl_page_alloc_vmflags(struct kgsl_memdesc *memdesc)
 	return VM_RESERVED | VM_DONTEXPAND | VM_DONTCOPY;
 }
 
+/*
+ * kgsl_page_alloc_unmap_kernel() - Unmap the memory in memdesc
+ *
+ * @memdesc: The memory descriptor which contains information about the memory
+ *
+ * Unmaps the memory mapped into kernel address space
+ */
+static void kgsl_page_alloc_unmap_kernel(struct kgsl_memdesc *memdesc)
+{
+	mutex_lock(&kernel_map_global_lock);
+	if (!memdesc->hostptr) {
+		BUG_ON(memdesc->hostptr_count);
+		goto done;
+	}
+	memdesc->hostptr_count--;
+	if (memdesc->hostptr_count)
+		goto done;
+	vunmap(memdesc->hostptr);
+
+	atomic_sub(memdesc->size, &kgsl_driver.stats.vmalloc);
+	memdesc->hostptr = NULL;
+done:
+	mutex_unlock(&kernel_map_global_lock);
+}
+
 static void kgsl_page_alloc_free(struct kgsl_memdesc *memdesc)
 {
 	int i = 0;
 	struct scatterlist *sg;
 	int sglen = memdesc->sglen;
 
+	atomic_sub(memdesc->size, &kgsl_driver.stats.page_alloc);
 
-	if (memdesc->hostptr) {
-		vunmap(memdesc->hostptr);
-	    atomic_sub(memdesc->size, &kgsl_driver.stats.page_alloc);
-	}
+	kgsl_page_alloc_unmap_kernel(memdesc);
+
+	/* we certainly do not expect the hostptr to still be mapped */
+	BUG_ON(memdesc->hostptr);
+
 	if (memdesc->sg)
 		for_each_sg(memdesc->sg, sg, sglen, i)
 			__free_pages(sg_page(sg), get_order(sg->length));
@@ -406,6 +435,9 @@ static int kgsl_contiguous_vmflags(struct kgsl_memdesc *memdesc)
  */
 static int kgsl_page_alloc_map_kernel(struct kgsl_memdesc *memdesc)
 {
+	int ret = 0;
+
+	mutex_lock(&kernel_map_global_lock);
 	if (!memdesc->hostptr) {
 		pgprot_t page_prot = pgprot_writecombine(PAGE_KERNEL);
 		struct page **pages = NULL;
@@ -419,7 +451,8 @@ static int kgsl_page_alloc_map_kernel(struct kgsl_memdesc *memdesc)
 		if (!pages) {
 			KGSL_CORE_ERR("vmalloc(%d) failed\n",
 				npages * sizeof(struct page *));
-			return -ENOMEM;
+			ret = -ENOMEM;
+			goto done;
 		}
 
 		for_each_sg(memdesc->sg, sg, sglen, i) {
@@ -437,12 +470,16 @@ static int kgsl_page_alloc_map_kernel(struct kgsl_memdesc *memdesc)
 			KGSL_STATS_ADD(memdesc->size,
 				&kgsl_driver.stats.vmalloc,
 				&kgsl_driver.stats.vmalloc_max);
+		else
+			ret = -ENOMEM;
 		vfree(pages);
 	}
-	if (!memdesc->hostptr)
-		return -ENOMEM;
+	if (memdesc->hostptr)
+		memdesc->hostptr_count++;
+done:
+	mutex_unlock(&kernel_map_global_lock);
 
-	return 0;
+	return ret;
 }
 
 static int kgsl_contiguous_vmfault(struct kgsl_memdesc *memdesc,
@@ -469,7 +506,8 @@ static int kgsl_contiguous_vmfault(struct kgsl_memdesc *memdesc,
 static void kgsl_cma_coherent_free(struct kgsl_memdesc *memdesc)
 {
 	if (memdesc->hostptr) {
-		atomic_sub(memdesc->size, &kgsl_driver.stats.vmalloc);
+		atomic_sub(memdesc->size,
+				&kgsl_driver.stats.coherent);
 		dma_free_coherent(memdesc->dev, memdesc->size,
 				memdesc->hostptr, memdesc->physaddr);
 	}
@@ -480,7 +518,8 @@ struct kgsl_memdesc_ops kgsl_page_alloc_ops = {
 	.free = kgsl_page_alloc_free,
 	.vmflags = kgsl_page_alloc_vmflags,
 	.vmfault = kgsl_page_alloc_vmfault,
-	.map_kernel_mem = kgsl_page_alloc_map_kernel,
+	.map_kernel = kgsl_page_alloc_map_kernel,
+	.unmap_kernel = kgsl_page_alloc_unmap_kernel,
 };
 EXPORT_SYMBOL(kgsl_page_alloc_ops);
 
@@ -491,8 +530,7 @@ static struct kgsl_memdesc_ops kgsl_cma_ops = {
 	.vmfault = kgsl_contiguous_vmfault,
 };
 
-int kgsl_cache_range_op(struct kgsl_memdesc *memdesc, size_t offset,
-			size_t size, unsigned int op)
+void kgsl_cache_range_op(struct kgsl_memdesc *memdesc, int op)
 {
 	/*
 	 * If the buffer is mapped in the kernel operate on that address
@@ -502,16 +540,7 @@ int kgsl_cache_range_op(struct kgsl_memdesc *memdesc, size_t offset,
 	void *addr = (memdesc->hostptr) ?
 		memdesc->hostptr : (void *) memdesc->useraddr;
 
-	/* Check that offset+length does not exceed memdesc->size */
-	if ((offset + size) > memdesc->size)
-		return -ERANGE;
-
-	addr = addr + offset;
-
-	/*
-	 * The dmac_xxx_range functions handle addresses and sizes that
-	 * are not aligned to the cacheline size correctly.
-	 */
+	int size = memdesc->size;
 
 	if (addr !=  NULL) {
 		switch (op) {
@@ -527,8 +556,6 @@ int kgsl_cache_range_op(struct kgsl_memdesc *memdesc, size_t offset,
 		}
 	}
 	outer_cache_range_op_sg(memdesc->sg, memdesc->sglen, op);
-
-	return 0;
 }
 EXPORT_SYMBOL(kgsl_cache_range_op);
 
@@ -758,6 +785,8 @@ kgsl_sharedmem_readl(const struct kgsl_memdesc *memdesc,
 	WARN_ON(offsetbytes + sizeof(uint32_t) > memdesc->size);
 	if (offsetbytes + sizeof(uint32_t) > memdesc->size)
 		return -ERANGE;
+
+	rmb();
 	src = (uint32_t *)(memdesc->hostptr + offsetbytes);
 	*dst = *src;
 	return 0;
@@ -784,6 +813,9 @@ kgsl_sharedmem_writel(struct kgsl_device *device,
 		src, sizeof(uint32_t));
 	dst = (uint32_t *)(memdesc->hostptr + offsetbytes);
 	*dst = src;
+
+	wmb();
+
 	return 0;
 }
 EXPORT_SYMBOL(kgsl_sharedmem_writel);

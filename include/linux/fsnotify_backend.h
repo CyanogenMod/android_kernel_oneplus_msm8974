@@ -154,7 +154,6 @@ struct fsnotify_group {
 		struct inotify_group_private_data {
 			spinlock_t	idr_lock;
 			struct idr      idr;
-			u32             last_wd;
 			struct fasync_struct    *fa;    /* async notification */
 			struct user_struct      *user;
 		} inotify_data;

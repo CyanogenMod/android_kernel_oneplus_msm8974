@@ -829,7 +829,7 @@ static int qh_schedule(struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
 	int		status;
 	unsigned	uframe;
-	__hc32		c_mask = 0;
+	__hc32		c_mask;
 	unsigned	frame;		/* 0..(qh->period - 1), or NO_FRAME */
 	struct ehci_qh_hw	*hw = qh->hw;
 

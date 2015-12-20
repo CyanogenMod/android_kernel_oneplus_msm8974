@@ -1873,14 +1873,35 @@ config MSM_CPU_FREQ_SET_MIN_MAX
 config MSM_CPU_FREQ_MAX
 	int "Max CPU Frequency"
 	depends on MSM_CPU_FREQ_SET_MIN_MAX
-	default 300000
+	default 384000
 
 config MSM_CPU_FREQ_MIN
 	int "Min CPU Frequency"
 	depends on MSM_CPU_FREQ_SET_MIN_MAX
-	default 2457600
+	default 245760
 
 endif # CPU_FREQ_MSM
+
+config ZEN_DECISION
+	bool "Zen Decision MPDecision Replacement"
+	depends on SMP && FB
+	default y
+	help
+	  MPDecision is a userspace service that does several functions
+	  related to CPU Frequency and CPU Hotplugging. Some of these are:
+	  - Remove cores when screen goes off
+	  - Enable cores when screen goes on
+	  - Raise CPU_MIN_FREQ to a fixed value for a few seconds on input
+  
+	  Zen Decision allows some of the MPDecison functions to be delegated
+	  to the kernel. Right now these are
+	  - Remove cores when screen goes off (after a configurable amount of time)
+	  - Enable cores when screen comes on (immediately)
+
+	  Zen Decision assumes the input boost function of MPDecision should be
+	  delegated to somewhere else in the kernel (Such as in CPU-BOOST)
+
+	  Enable this if you'd like the ability to disable MPDecision.
 
 config CPU_VOLTAGE_TABLE
 	bool "Enable CPU Voltage Table via sysfs for adjustements"
@@ -3032,14 +3053,6 @@ config WALL_CLK_SYSFS
 	 Support the wallclk directory in sysfs filesystem to enable the
 	 wall clock simulation and read the current SFN.
 
-config BRICKED_HOTPLUG
-	bool "Enable kernel based mpdecision"
-	depends on MSM_RUN_QUEUE_STATS
-	default y
-	help
-	  This enables kernel based multi core control.
-	  (up/down hotplug based on load)
-
 config KRAIT_REGULATOR
 	bool "Support Kraits powered via ganged regulators in the pmic"
 	help
@@ -3095,36 +3108,24 @@ config INTELLI_HOTPLUG
 
 config ALUCARD_HOTPLUG
 	bool "Enable alucard-hotplug cpu hotplug driver"
-	default n
+	default y
 	help
 	  Generic Alucard-hotplug cpu hotplug driver for ARM SOCs
 
-config ZEN_DECISION
-	bool "Zen Decision: MSM Userspace Handler"
-	depends on SMP && FB
+config BRICKED_HOTPLUG
+	bool "Enable kernel based mpdecision"
+	depends on MSM_RUN_QUEUE_STATS
 	default y
 	help
-	  MSM/Qcomm devices have multiple userspace applications that handle
-	  CPU hotplugging and frequency operations.
-
-	  ZenDecision is a partial resolution to handling behavior caused by
-	  disabling some of these services.
-
-	  For example, If MPDecision is disabled and MSM-Thermal_Engine is 
-	  enabled in the userspace. Situations where CPUs go offline but never
-	  come back online occur.
-  
-	  ZenDecision ensures all CPUs are online when they are supposed to be by:
-	  - Enable all CPUs when screen comes on after zen_wake_delay
-	  - Ignore all CPU_UP operations when battery level is <= 15% to respect
-	    the decision made by MSMThermal (which disables cores at <= 15% battery)
-
-	  Thresholds and driver enable/disable for above values can be found in:
-	  /sys/kernel/zen_decision
-
-	  ZenDecision is not a direct replacement for any of the MSM userspace
-	  services.
-
-	  If unsure, say N.
+	  This enables kernel based multi core control.
+	  (up/down hotplug based on load)
 
 endif
+
+config KERNEL_TEXT_MPU_PROT
+        bool "Enable xpu protection of kernel r/o sections"
+        help
+          Enables xpu protection of kernel code and read-only data
+          sections early in boot. Read access is permitted to
+          all masters; Write access is only permited to the
+          secure world.

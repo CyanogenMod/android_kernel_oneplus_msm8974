@@ -165,23 +165,14 @@ struct iommu_group *iommu_group_alloc(void)
 	BLOCKING_INIT_NOTIFIER_HEAD(&group->notifier);
 
 	mutex_lock(&iommu_group_mutex);
-
-again:
-	if (unlikely(0 == idr_pre_get(&iommu_group_idr, GFP_KERNEL))) {
-		kfree(group);
-		mutex_unlock(&iommu_group_mutex);
-		return ERR_PTR(-ENOMEM);
-	}
-
-	ret = idr_get_new_above(&iommu_group_idr, group, 1, &group->id);
-	if (ret == -EAGAIN)
-		goto again;
+	ret = idr_alloc(&iommu_group_idr, group, 1, 0, GFP_KERNEL);
 	mutex_unlock(&iommu_group_mutex);
 
-	if (ret == -ENOSPC) {
+	if (ret < 0) {
 		kfree(group);
 		return ERR_PTR(ret);
 	}
+	group->id = ret;
 
 	ret = kobject_init_and_add(&group->kobj, &iommu_group_ktype,
 				   NULL, "%d", group->id);

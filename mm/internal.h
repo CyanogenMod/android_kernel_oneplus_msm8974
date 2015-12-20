@@ -368,3 +368,5 @@ extern u32 hwpoison_filter_enable;
 
 unsigned long reclaim_clean_pages_from_list(struct zone *zone,
 					    struct list_head *page_list);
+
+extern void set_pageblock_order(void);

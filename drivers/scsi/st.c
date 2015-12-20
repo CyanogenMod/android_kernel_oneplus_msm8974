@@ -4001,7 +4001,7 @@ static int st_probe(struct device *dev)
 	struct st_modedef *STm;
 	struct st_partstat *STps;
 	struct st_buffer *buffer;
-	int i, j, mode, dev_num, error;
+	int i, error;
 	char *stp;
 
 	if (SDp->type != TYPE_TAPE)
@@ -4144,38 +4144,24 @@ static int st_probe(struct device *dev)
 	    tpnt->blksize_changed = 0;
 	mutex_init(&tpnt->lock);
 
-	st_nr_dev++;
-	write_unlock(&st_dev_arr_lock);
-
-	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-		STm = &(tpnt->modes[mode]);
-		for (j=0; j < 2; j++) {
-			cdev = cdev_alloc();
-			if (!cdev) {
-				printk(KERN_ERR
-				       "st%d: out of memory. Device not attached.\n",
-				       dev_num);
-				goto out_free_tape;
-			}
-			cdev->owner = THIS_MODULE;
-			cdev->ops = &st_fops;
-
-			error = cdev_add(cdev,
-					 MKDEV(SCSI_TAPE_MAJOR, TAPE_MINOR(dev_num, mode, j)),
-					 1);
-			if (error) {
-				printk(KERN_ERR "st%d: Can't add %s-rewind mode %d\n",
-				       dev_num, j ? "non" : "auto", mode);
-				printk(KERN_ERR "st%d: Device not attached.\n", dev_num);
-				goto out_free_tape;
-			}
-			STm->cdevs[j] = cdev;
-
-		}
-		error = do_create_class_files(tpnt, dev_num, mode);
-		if (error)
-			goto out_free_tape;
+	idr_preload(GFP_KERNEL);
+	spin_lock(&st_index_lock);
+	error = idr_alloc(&st_index_idr, tpnt, 0, ST_MAX_TAPES + 1, GFP_NOWAIT);
+	spin_unlock(&st_index_lock);
+	idr_preload_end();
+	if (error < 0) {
+		pr_warn("st: idr allocation failed: %d\n", error);
+		goto out_put_disk;
 	}
+	tpnt->index = error;
+	sprintf(disk->disk_name, "st%d", tpnt->index);
+
+	dev_set_drvdata(dev, tpnt);
+
+
+	error = create_cdevs(tpnt);
+	if (error)
+		goto out_remove_devs;
 	scsi_autopm_put_device(SDp);
 
 	sdev_printk(KERN_NOTICE, SDp,
@@ -4186,28 +4172,11 @@ static int st_probe(struct device *dev)
 
 	return 0;
 
-out_free_tape:
-	for (mode=0; mode < ST_NBR_MODES; mode++) {
-		STm = &(tpnt->modes[mode]);
-		sysfs_remove_link(&tpnt->device->sdev_gendev.kobj,
-				  "tape");
-		for (j=0; j < 2; j++) {
-			if (STm->cdevs[j]) {
-				if (cdev == STm->cdevs[j])
-					cdev = NULL;
-					device_destroy(st_sysfs_class,
-						       MKDEV(SCSI_TAPE_MAJOR,
-							     TAPE_MINOR(i, mode, j)));
-				cdev_del(STm->cdevs[j]);
-			}
-		}
-	}
-	if (cdev)
-		cdev_del(cdev);
-	write_lock(&st_dev_arr_lock);
-	scsi_tapes[dev_num] = NULL;
-	st_nr_dev--;
-	write_unlock(&st_dev_arr_lock);
+out_remove_devs:
+	remove_cdevs(tpnt);
+	spin_lock(&st_index_lock);
+	idr_remove(&st_index_idr, tpnt->index);
+	spin_unlock(&st_index_lock);
 out_put_disk:
 	put_disk(disk);
 	kfree(tpnt);

@@ -160,13 +160,31 @@ static int mdss_fb_notify_update(struct msm_fb_data_type *mfd,
 	if (notify > NOTIFY_UPDATE_POWER_OFF)
 		return -EINVAL;
 
-	if (mfd->update.is_suspend) {
+	if (notify == NOTIFY_UPDATE_INIT) {
+		mutex_lock(&mfd->update.lock);
+		mfd->update.init_done = true;
+		mutex_unlock(&mfd->update.lock);
+		ret = 1;
+	} else if (notify == NOTIFY_UPDATE_DEINIT) {
+		mutex_lock(&mfd->update.lock);
+		mfd->update.init_done = false;
+		mutex_unlock(&mfd->update.lock);
+		complete(&mfd->update.comp);
+		complete(&mfd->no_update.comp);
+		ret = 1;
+	} else if (mfd->update.is_suspend) {
 		to_user = NOTIFY_TYPE_SUSPEND;
 		mfd->update.is_suspend = 0;
 		ret = 1;
 	} else if (notify == NOTIFY_UPDATE_START) {
-		INIT_COMPLETION(mfd->update.comp);
 		mutex_lock(&mfd->update.lock);
+		if (mfd->update.init_done)
+			INIT_COMPLETION(mfd->update.comp);
+		else {
+			mutex_unlock(&mfd->update.lock);
+			pr_err("notify update start called without init\n");
+			return -EINVAL;
+		}
 		mfd->update.ref_count++;
 		mutex_unlock(&mfd->update.lock);
 		ret = wait_for_completion_interruptible_timeout(
@@ -180,7 +198,15 @@ static int mdss_fb_notify_update(struct msm_fb_data_type *mfd,
 			ret = 1;
 		}
 	} else if (notify == NOTIFY_UPDATE_STOP) {
-		INIT_COMPLETION(mfd->no_update.comp);
+		mutex_lock(&mfd->update.lock);
+		if (mfd->update.init_done)
+			INIT_COMPLETION(mfd->no_update.comp);
+		else {
+			mutex_unlock(&mfd->update.lock);
+			pr_err("notify update stop called without init\n");
+			return -EINVAL;
+		}
+		mutex_unlock(&mfd->update.lock);
 		mutex_lock(&mfd->no_update.lock);
 		mfd->no_update.ref_count++;
 		mutex_unlock(&mfd->no_update.lock);
@@ -985,11 +1011,12 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 	int ret = -EINVAL;
 	bool is_bl_changed = (bkl_lvl != mfd->bl_level);
 
-	if ((((mdss_fb_is_power_off(mfd) && mfd->dcm_state != DCM_ENTER)
-		|| !mfd->bl_updated) && !IS_CALIB_MODE_BL(mfd)) ||
-		mfd->panel_info->cont_splash_enabled) {
+	if (((mdss_fb_is_power_off(mfd) && mfd->dcm_state != DCM_ENTER)
+		|| !mfd->bl_updated) && !IS_CALIB_MODE_BL(mfd)) {
 		mfd->unset_bl_level = bkl_lvl;
 		return;
+	} else if (mdss_fb_is_power_on(mfd) && mfd->panel_info->panel_dead) {
+		mfd->unset_bl_level = mfd->bl_level;
 	} else {
 		mfd->unset_bl_level = 0;
 	}
@@ -1040,26 +1067,25 @@ void mdss_fb_update_backlight(struct msm_fb_data_type *mfd)
 	int ret = 0;
 	u32 temp;
 
-	if (mfd->unset_bl_level) {
-		mutex_lock(&mfd->bl_lock);
-		if (!mfd->bl_updated) {
-			pdata = dev_get_platdata(&mfd->pdev->dev);
-			if ((pdata) && (pdata->set_backlight)) {
-				mfd->bl_level = mfd->unset_bl_level;
-				temp = mfd->bl_level;
-				if (mfd->mdp.ad_attenuate_bl) {
-					ret = (*mfd->mdp.ad_attenuate_bl)(temp,
-									&temp, mfd);
-					if (ret)
-						pr_err("Failed to attenuate BL\n");
-				}
-				pdata->set_backlight(pdata, temp);
-				mfd->bl_level_scaled = mfd->unset_bl_level;
-				mfd->bl_updated = 1;
+	mutex_lock(&mfd->bl_lock);
+	if (mfd->unset_bl_level && !mfd->bl_updated) {
+		pdata = dev_get_platdata(&mfd->pdev->dev);
+		if ((pdata) && (pdata->set_backlight)) {
+			mfd->bl_level = mfd->unset_bl_level;
+			temp = mfd->bl_level;
+			if (mfd->mdp.ad_attenuate_bl) {
+				ret = (*mfd->mdp.ad_attenuate_bl)(temp,
+					&temp, mfd);
+			   if (ret)
+					pr_err("Failed to attenuate BL\n");
 			}
+
+			pdata->set_backlight(pdata, temp);
+			mfd->bl_level_scaled = mfd->unset_bl_level;
+			mfd->bl_updated = 1;
 		}
-		mutex_unlock(&mfd->bl_lock);
 	}
+	mutex_unlock(&mfd->bl_lock);
 }
 
 static int mdss_fb_start_disp_thread(struct msm_fb_data_type *mfd)
@@ -1912,6 +1938,7 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 	mfd->no_update.timer.data = (unsigned long)mfd;
 	mfd->update.ref_count = 0;
 	mfd->no_update.ref_count = 0;
+	mfd->update.init_done = false;
 	init_completion(&mfd->update.comp);
 	init_completion(&mfd->no_update.comp);
 	init_completion(&mfd->power_off_comp);
@@ -2656,14 +2683,9 @@ static int __mdss_fb_display_thread(void *data)
 				mfd->index);
 
 	while (1) {
-		ret = wait_event_interruptible(mfd->commit_wait_q,
+		wait_event(mfd->commit_wait_q,
 				(atomic_read(&mfd->commits_pending) ||
 				 kthread_should_stop()));
-
-		if (ret) {
-			pr_info("%s: interrupted", __func__);
-			continue;
-		}
 
 		if (kthread_should_stop())
 			break;
@@ -2673,8 +2695,8 @@ static int __mdss_fb_display_thread(void *data)
 		wake_up_all(&mfd->idle_wait_q);
 	}
 
+	mdss_fb_release_kickoff(mfd);
 	atomic_set(&mfd->commits_pending, 0);
-	atomic_set(&mfd->kickoff_pending, 0);
 	wake_up_all(&mfd->idle_wait_q);
 
 	return ret;

@@ -15,14 +15,18 @@
 #include <linux/hrtimer.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/notifier.h>
 #include <linux/smp.h>
-#include <linux/device.h>
 
 #include "tick-internal.h"
 
 /* The registered clock event devices */
 static LIST_HEAD(clockevent_devices);
 static LIST_HEAD(clockevents_released);
+
+/* Notification for clock events */
+static RAW_NOTIFIER_HEAD(clockevents_chain);
+
 /* Protection for the above */
 static DEFINE_RAW_SPINLOCK(clockevents_lock);
 
@@ -265,6 +269,30 @@ int clockevents_program_event(struct clock_event_device *dev, ktime_t expires,
 	return (rc && force) ? clockevents_program_min_delta(dev) : rc;
 }
 
+/**
+ * clockevents_register_notifier - register a clock events change listener
+ */
+int clockevents_register_notifier(struct notifier_block *nb)
+{
+	unsigned long flags;
+	int ret;
+
+	raw_spin_lock_irqsave(&clockevents_lock, flags);
+	ret = raw_notifier_chain_register(&clockevents_chain, nb);
+	raw_spin_unlock_irqrestore(&clockevents_lock, flags);
+
+	return ret;
+}
+
+/*
+ * Notify about a clock event change. Called with clockevents_lock
+ * held.
+ */
+static void clockevents_do_notify(unsigned long reason, void *dev)
+{
+	raw_notifier_call_chain(&clockevents_chain, reason, dev);
+}
+
 /*
  * Called after a notify add to make devices available which were
  * released from the notifier call.
@@ -278,7 +306,7 @@ static void clockevents_notify_released(void)
 				 struct clock_event_device, list);
 		list_del(&dev->list);
 		list_add(&dev->list, &clockevent_devices);
-		tick_check_new_device(dev);
+		clockevents_do_notify(CLOCK_EVT_NOTIFY_ADD, dev);
 	}
 }
 
@@ -299,14 +327,15 @@ void clockevents_register_device(struct clock_event_device *dev)
 	raw_spin_lock_irqsave(&clockevents_lock, flags);
 
 	list_add(&dev->list, &clockevent_devices);
-	tick_check_new_device(dev);
+	clockevents_do_notify(CLOCK_EVT_NOTIFY_ADD, dev);
 	clockevents_notify_released();
 
 	raw_spin_unlock_irqrestore(&clockevents_lock, flags);
 }
 EXPORT_SYMBOL_GPL(clockevents_register_device);
 
-void clockevents_config(struct clock_event_device *dev, u32 freq)
+static void clockevents_config(struct clock_event_device *dev,
+			       u32 freq)
 {
 	u64 sec;
 
@@ -348,20 +377,6 @@ void clockevents_config_and_register(struct clock_event_device *dev,
 	clockevents_config(dev, freq);
 	clockevents_register_device(dev);
 }
-EXPORT_SYMBOL_GPL(clockevents_config_and_register);
-
-int __clockevents_update_freq(struct clock_event_device *dev, u32 freq)
-{
-	clockevents_config(dev, freq);
-
-	if (dev->mode == CLOCK_EVT_MODE_ONESHOT)
-		return clockevents_program_event(dev, dev->next_event, false);
-
-	if (dev->mode == CLOCK_EVT_MODE_PERIODIC)
-		dev->set_mode(CLOCK_EVT_MODE_PERIODIC, dev);
-
-	return 0;
-}
 
 /**
  * clockevents_update_freq - Update frequency and reprogram a clock event device.
@@ -370,22 +385,17 @@ int __clockevents_update_freq(struct clock_event_device *dev, u32 freq)
  *
  * Reconfigure and reprogram a clock event device in oneshot
  * mode. Must be called on the cpu for which the device delivers per
- * cpu timer events. If called for the broadcast device the core takes
- * care of serialization.
- *
- * Returns 0 on success, -ETIME when the event is in the past.
+ * cpu timer events with interrupts disabled!  Returns 0 on success,
+ * -ETIME when the event is in the past.
  */
 int clockevents_update_freq(struct clock_event_device *dev, u32 freq)
 {
-	unsigned long flags;
-	int ret;
+	clockevents_config(dev, freq);
 
-	local_irq_save(flags);
-	ret = tick_broadcast_update_freq(dev, freq);
-	if (ret == -ENODEV)
-		ret = __clockevents_update_freq(dev, freq);
-	local_irq_restore(flags);
-	return ret;
+	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
+		return 0;
+
+	return clockevents_program_event(dev, dev->next_event, false);
 }
 
 /*
@@ -413,7 +423,6 @@ void clockevents_exchange_device(struct clock_event_device *old,
 	 * released list and do a notify add later.
 	 */
 	if (old) {
-		module_put(old->owner);
 		clockevents_set_mode(old, CLOCK_EVT_MODE_UNUSED);
 		list_del(&old->list);
 		list_add(&old->list, &clockevents_released);
@@ -426,72 +435,21 @@ void clockevents_exchange_device(struct clock_event_device *old,
 	local_irq_restore(flags);
 }
 
-/**
- * clockevents_suspend - suspend clock devices
- */
-void clockevents_suspend(void)
-{
-	struct clock_event_device *dev;
-
-	list_for_each_entry_reverse(dev, &clockevent_devices, list)
-		if (dev->suspend)
-			dev->suspend(dev);
-}
-
-/**
- * clockevents_resume - resume clock devices
- */
-void clockevents_resume(void)
-{
-	struct clock_event_device *dev;
-
-	list_for_each_entry(dev, &clockevent_devices, list)
-		if (dev->resume)
-			dev->resume(dev);
-}
-
 #ifdef CONFIG_GENERIC_CLOCKEVENTS
 /**
  * clockevents_notify - notification about relevant events
- * Returns 0 on success, any other value on error
  */
-int clockevents_notify(unsigned long reason, void *arg)
+void clockevents_notify(unsigned long reason, void *arg)
 {
 	struct clock_event_device *dev, *tmp;
 	unsigned long flags;
-	int cpu, ret = 0;
+	int cpu;
 
 	raw_spin_lock_irqsave(&clockevents_lock, flags);
+	clockevents_do_notify(reason, arg);
 
 	switch (reason) {
-	case CLOCK_EVT_NOTIFY_BROADCAST_ON:
-	case CLOCK_EVT_NOTIFY_BROADCAST_OFF:
-	case CLOCK_EVT_NOTIFY_BROADCAST_FORCE:
-		tick_broadcast_on_off(reason, arg);
-		break;
-
-	case CLOCK_EVT_NOTIFY_BROADCAST_ENTER:
-	case CLOCK_EVT_NOTIFY_BROADCAST_EXIT:
-		ret = tick_broadcast_oneshot_control(reason);
-		break;
-
-	case CLOCK_EVT_NOTIFY_CPU_DYING:
-		tick_handover_do_timer(arg);
-		break;
-
-	case CLOCK_EVT_NOTIFY_SUSPEND:
-		tick_suspend();
-		tick_suspend_broadcast();
-		break;
-
-	case CLOCK_EVT_NOTIFY_RESUME:
-		tick_resume();
-		break;
-
 	case CLOCK_EVT_NOTIFY_CPU_DEAD:
-		tick_shutdown_broadcast_oneshot(arg);
-		tick_shutdown_broadcast(arg);
-		tick_shutdown(arg);
 		/*
 		 * Unregister the clock event devices which were
 		 * released from the users in the notify chain.
@@ -515,92 +473,6 @@ int clockevents_notify(unsigned long reason, void *arg)
 		break;
 	}
 	raw_spin_unlock_irqrestore(&clockevents_lock, flags);
-	return ret;
 }
 EXPORT_SYMBOL_GPL(clockevents_notify);
-
-#ifdef CONFIG_SYSFS
-struct bus_type clockevents_subsys = {
-	.name		= "clockevents",
-	.dev_name       = "clockevent",
-};
-
-static DEFINE_PER_CPU(struct device, tick_percpu_dev);
-static struct tick_device *tick_get_tick_dev(struct device *dev);
-
-static ssize_t sysfs_show_current_tick_dev(struct device *dev,
-					   struct device_attribute *attr,
-					   char *buf)
-{
-	struct tick_device *td;
-	ssize_t count = 0;
-
-	raw_spin_lock_irq(&clockevents_lock);
-	td = tick_get_tick_dev(dev);
-	if (td && td->evtdev)
-		count = snprintf(buf, PAGE_SIZE, "%s\n", td->evtdev->name);
-	raw_spin_unlock_irq(&clockevents_lock);
-	return count;
-}
-static DEVICE_ATTR(current_device, 0444, sysfs_show_current_tick_dev, NULL);
-
-#ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-static struct device tick_bc_dev = {
-	.init_name	= "broadcast",
-	.id		= 0,
-	.bus		= &clockevents_subsys,
-};
-
-static struct tick_device *tick_get_tick_dev(struct device *dev)
-{
-	return dev == &tick_bc_dev ? tick_get_broadcast_device() :
-		&per_cpu(tick_cpu_device, dev->id);
-}
-
-static __init int tick_broadcast_init_sysfs(void)
-{
-	int err = device_register(&tick_bc_dev);
-
-	if (!err)
-		err = device_create_file(&tick_bc_dev, &dev_attr_current_device);
-	return err;
-}
-#else
-static struct tick_device *tick_get_tick_dev(struct device *dev)
-{
-	return &per_cpu(tick_cpu_device, dev->id);
-}
-static inline int tick_broadcast_init_sysfs(void) { return 0; }
 #endif
-
-static int __init tick_init_sysfs(void)
-{
-	int cpu;
-
-	for_each_possible_cpu(cpu) {
-		struct device *dev = &per_cpu(tick_percpu_dev, cpu);
-		int err;
-
-		dev->id = cpu;
-		dev->bus = &clockevents_subsys;
-		err = device_register(dev);
-		if (!err)
-			err = device_create_file(dev, &dev_attr_current_device);
-		if (err)
-			return err;
-	}
-	return tick_broadcast_init_sysfs();
-}
-
-static int __init clockevents_init_sysfs(void)
-{
-	int err = subsys_system_register(&clockevents_subsys, NULL);
-
-	if (!err)
-		err = tick_init_sysfs();
-	return err;
-}
-device_initcall(clockevents_init_sysfs);
-#endif /* SYSFS */
-
-#endif /* GENERIC_CLOCK_EVENTS */

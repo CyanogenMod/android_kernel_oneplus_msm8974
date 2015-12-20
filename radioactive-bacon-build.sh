@@ -15,13 +15,13 @@ DTBIMAGE="dtb"
 DEFCONFIG="radioactive_defconfig"
 
 # Kernel Details
-BASE_AK_VER="RADIOACTIVE"
-VER="RADIOACTIVE_V2.43"
+BASE_RADIOACTIVE_VER="RADIOACTIVE_REBORN"
+VER="_V1.01"
 RADIOACTIVE_VER="$BASE_RADIOACTIVE_VER$VER"
 
 # Vars
 export LOCALVERSION=~`echo $RADIOACTIVE_VER`
-export CROSS_COMPILE=${HOME}/Android/toolchains/uber5.2/bin/arm-eabi-
+export CROSS_COMPILE=${HOME}/Android/toolchains/uber4.9/bin/arm-eabi-
 export ARCH=arm
 export SUBARCH=arm
 export KBUILD_BUILD_USER=R.Cuenca
@@ -33,10 +33,11 @@ REPACK_DIR="${HOME}/Android/AK-OnePone-AnyKernel2"
 PATCH_DIR="${HOME}/Android/AK-OnePone-AnyKernel2/patch"
 MODULES_DIR="${HOME}/Android/AK-OnePone-AnyKernel2/modules"
 ZIP_MOVE="${HOME}/Android/releases"
-ZIMAGE_DIR="${HOME}/Radioactive-kernelpruebas2/arch/arm/boot"
+ZIMAGE_DIR="${HOME}/Android/AK-OnePone-AnyKernel2"
 
 # Functions
 function clean_all {
+                ccache -c -C
 		rm -rf $MODULES_DIR/*
 		cd $REPACK_DIR
 		rm -rf $KERNEL
@@ -66,8 +67,8 @@ function make_dtb {
 
 function make_zip {
 		cd $REPACK_DIR
-		zip -r9 `echo $AK_VER`.zip *
-		mv  `echo $AK_VER`.zip $ZIP_MOVE
+		zip -r9 `echo $RADIOACTIVE_VER`.zip *
+		mv  `echo $RADIOACTIVE_VER`.zip $ZIP_MOVE
 		cd $KERNEL_DIR
 }
 
@@ -88,7 +89,7 @@ echo "---------------"
 echo "Kernel Version:"
 echo "---------------"
 
-echo -e "${red}"; echo -e "${blink_red}"; echo "$AK_VER"; echo -e "${restore}";
+echo -e "${red}"; echo -e "${blink_red}"; echo "$RADIOACTIVE_VER"; echo -e "${restore}";
 
 echo -e "${green}"
 echo "-----------------"

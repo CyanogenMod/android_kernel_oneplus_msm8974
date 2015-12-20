@@ -72,7 +72,7 @@ const struct inode_operations ncp_dir_inode_operations =
 /*
  * Dentry operations routines
  */
-static int ncp_lookup_validate(struct dentry *, struct nameidata *);
+static int ncp_lookup_validate(struct dentry *, unsigned int);
 static int ncp_hash_dentry(const struct dentry *, const struct inode *,
 		struct qstr *);
 static int ncp_compare_dentry(const struct dentry *, const struct inode *,
@@ -290,7 +290,7 @@ leave_me:;
 
 
 static int
-ncp_lookup_validate(struct dentry *dentry, struct nameidata *nd)
+ncp_lookup_validate(struct dentry *dentry, unsigned int flags)
 {
 	struct ncp_server *server;
 	struct dentry *parent;
@@ -302,7 +302,7 @@ ncp_lookup_validate(struct dentry *dentry, struct nameidata *nd)
 	if (dentry == dentry->d_sb->s_root)
 		return 1;
 
-	if (nd->flags & LOOKUP_RCU)
+	if (flags & LOOKUP_RCU)
 		return -ECHILD;
 
 	parent = dget_parent(dentry);
@@ -391,7 +391,7 @@ ncp_dget_fpos(struct dentry *dentry, struct dentry *parent, unsigned long fpos)
 	spin_lock(&parent->d_lock);
 	next = parent->d_subdirs.next;
 	while (next != &parent->d_subdirs) {
-		dent = list_entry(next, struct dentry, d_u.d_child);
+		dent = list_entry(next, struct dentry, d_child);
 		if ((unsigned long)dent->d_fsdata == fpos) {
 			if (dent->d_inode)
 				dget(dent);
