@@ -5,7 +5,6 @@ piggy.gzip
 piggy.lzo
 piggy.lzma
 piggy.xzkern
-piggy.lz4
 vmlinux
 vmlinux.lds
 
