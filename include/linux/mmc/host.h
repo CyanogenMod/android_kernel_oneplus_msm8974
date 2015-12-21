@@ -86,6 +86,7 @@ struct mmc_ios {
 /* states to represent load on the host */
 enum mmc_load {
 	MMC_LOAD_HIGH,
+	MMC_LOAD_INIT,
 	MMC_LOAD_LOW,
 };
 
