@@ -303,6 +303,8 @@ asmlinkage void do_softirq(void)
  */
 void irq_enter(void)
 {
+	int cpu = smp_processor_id();
+
 	rcu_irq_enter();
 	if (is_idle_task(current) && !in_interrupt()) {
 		/*
@@ -310,7 +312,7 @@ void irq_enter(void)
 		 * here, as softirq will be serviced on return from interrupt.
 		 */
 		local_bh_disable();
-		tick_check_idle();
+		tick_check_idle(cpu);
 		_local_bh_enable();
 	}
 
@@ -320,31 +322,17 @@ void irq_enter(void)
 static inline void invoke_softirq(void)
 {
 	if (!force_irqthreads) {
-		/*
-		 * We can safely execute softirq on the current stack if
-		 * it is the irq stack, because it should be near empty
-		 * at this stage. But we have no way to know if the arch
-		 * calls irq_exit() on the irq stack. So call softirq
-		 * in its own stack to prevent from any overrun on top
-		 * of a potentially deep task stack.
-		 */
+#ifdef __ARCH_IRQ_EXIT_IRQS_DISABLED
+		__do_softirq();
+#else
 		do_softirq();
-	} else {
-		wakeup_softirqd();
-	}
-}
-
-static inline void tick_irq_exit(void)
-{
-#ifdef CONFIG_NO_HZ_COMMON
-	int cpu = smp_processor_id();
-
-	/* Make sure that timer wheel updates are propagated */
-	if ((idle_cpu(cpu) && !need_resched()) || tick_nohz_full_cpu(cpu)) {
-		if (!in_interrupt())
-			tick_nohz_irq_exit();
-	}
 #endif
+	} else {
+		__local_bh_disable((unsigned long)__builtin_return_address(0),
+				SOFTIRQ_OFFSET);
+		wakeup_softirqd();
+		__local_bh_enable(SOFTIRQ_OFFSET);
+	}
 }
 
 /*
@@ -354,12 +342,17 @@ void irq_exit(void)
 {
 	account_system_vtime(current);
 	trace_hardirq_exit();
-	sub_preempt_count(HARDIRQ_OFFSET);
+	sub_preempt_count(IRQ_EXIT_OFFSET);
 	if (!in_interrupt() && local_softirq_pending())
 		invoke_softirq();
 
-	tick_irq_exit();
+#ifdef CONFIG_NO_HZ
+	/* Make sure that timer wheel updates are propagated */
+	if (idle_cpu(smp_processor_id()) && !in_interrupt() && !need_resched())
+		tick_nohz_irq_exit();
+#endif
 	rcu_irq_exit();
+	sched_preempt_enable_no_resched();
 }
 
 /*
@@ -628,7 +621,8 @@ static void remote_softirq_receive(void *data)
 	unsigned long flags;
 	int softirq;
 
-	softirq = *(int *)cp->info;
+	softirq = cp->priv;
+
 	local_irq_save(flags);
 	__local_trigger(cp, softirq);
 	local_irq_restore(flags);
@@ -638,8 +632,9 @@ static int __try_remote_softirq(struct call_single_data *cp, int cpu, int softir
 {
 	if (cpu_online(cpu)) {
 		cp->func = remote_softirq_receive;
-		cp->info = &softirq;
+		cp->info = cp;
 		cp->flags = 0;
+		cp->priv = softirq;
 
 		__smp_call_function_single(cpu, cp, 0);
 		return 0;

@@ -514,7 +514,7 @@ void release_open_intent(struct nameidata *nd)
 
 static inline int d_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
-	return dentry->d_op->d_revalidate(dentry, nd ? nd->flags : 0);
+	return dentry->d_op->d_revalidate(dentry, nd);
 }
 
 /**

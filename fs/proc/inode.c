@@ -13,7 +13,6 @@
 #include <linux/stat.h>
 #include <linux/completion.h>
 #include <linux/poll.h>
-#include <linux/printk.h>
 #include <linux/file.h>
 #include <linux/limits.h>
 #include <linux/init.h>

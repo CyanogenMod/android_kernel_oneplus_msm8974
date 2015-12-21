@@ -439,18 +439,17 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	int err;
 	struct mmc_host *host;
 
+	if (!idr_pre_get(&mmc_host_idr, GFP_KERNEL))
+		return NULL;
+
 	host = kzalloc(sizeof(struct mmc_host) + extra, GFP_KERNEL);
 	if (!host)
 		return NULL;
 
-	idr_preload(GFP_KERNEL);
 	spin_lock(&mmc_host_lock);
-	err = idr_alloc(&mmc_host_idr, host, 0, 0, GFP_NOWAIT);
-	if (err >= 0)
-		host->index = err;
+	err = idr_get_new(&mmc_host_idr, host, &host->index);
 	spin_unlock(&mmc_host_lock);
-	idr_preload_end();
-	if (err < 0)
+	if (err)
 		goto free;
 
 	dev_set_name(&host->class_dev, "mmc%d", host->index);

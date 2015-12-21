@@ -180,10 +180,10 @@ static bool oom_unkillable_task(struct task_struct *p,
  * predictable as possible.  The goal is to return the highest value for the
  * task consuming the most memory to avoid subsequent oom failures.
  */
-unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
-			  const nodemask_t *nodemask, unsigned long totalpages)
+unsigned int oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
+		      const nodemask_t *nodemask, unsigned long totalpages)
 {
-	unsigned long points;
+	long points;
 
 	if (oom_unkillable_task(p, memcg, nodemask))
 		return 0;
@@ -198,11 +198,21 @@ unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
 	}
 
 	/*
+	 * The memory controller may have a limit of 0 bytes, so avoid a divide
+	 * by zero, if necessary.
+	 */
+	if (!totalpages)
+		totalpages = 1;
+
+	/*
 	 * The baseline for the badness score is the proportion of RAM that each
 	 * task's rss, pagetable and swap space use.
 	 */
-	points = get_mm_rss(p->mm) + p->mm->nr_ptes +
-		 get_mm_counter(p->mm, MM_SWAPENTS);
+	points = get_mm_rss(p->mm) + p->mm->nr_ptes;
+	points += get_mm_counter(p->mm, MM_SWAPENTS);
+
+	points *= 1000;
+	points /= totalpages;
 	task_unlock(p);
 
 	/*
@@ -210,20 +220,23 @@ unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *memcg,
 	 * implementation used by LSMs.
 	 */
 	if (has_capability_noaudit(p, CAP_SYS_ADMIN))
-		points -= 30 * totalpages / 1000;
+		points -= 30;
 
 	/*
 	 * /proc/pid/oom_score_adj ranges from -1000 to +1000 such that it may
 	 * either completely disable oom killing or always prefer a certain
 	 * task.
 	 */
-	points += p->signal->oom_score_adj * totalpages / 1000;
+	points += p->signal->oom_score_adj;
 
 	/*
-	 * Never return 0 for an eligible task regardless of the root bonus and
-	 * oom_score_adj (oom_score_adj can't be OOM_SCORE_ADJ_MIN here).
+	 * Never return 0 for an eligible task that may be killed since it's
+	 * possible that no single user task uses more than 0.1% of memory and
+	 * no single admin tasks uses more than 3.0%.
 	 */
-	return points ? points : 1;
+	if (points <= 0)
+		return 1;
+	return (points < 1000) ? points : 1000;
 }
 
 /*
@@ -301,7 +314,7 @@ static struct task_struct *select_bad_process(unsigned int *ppoints,
 {
 	struct task_struct *g, *p;
 	struct task_struct *chosen = NULL;
-	unsigned long chosen_points = 0;
+	*ppoints = 0;
 
 	do_each_thread(g, p) {
 		unsigned int points;
@@ -341,7 +354,7 @@ static struct task_struct *select_bad_process(unsigned int *ppoints,
 			 */
 			if (p == current) {
 				chosen = p;
-				chosen_points = ULONG_MAX;
+				*ppoints = 1000;
 			} else if (!force_kill) {
 				/*
 				 * If this task is not being ptraced on exit,
@@ -354,13 +367,12 @@ static struct task_struct *select_bad_process(unsigned int *ppoints,
 		}
 
 		points = oom_badness(p, memcg, nodemask, totalpages);
-		if (points > chosen_points) {
+		if (points > *ppoints) {
 			chosen = p;
-			chosen_points = points;
+			*ppoints = points;
 		}
 	} while_each_thread(g, p);
 
-	*ppoints = chosen_points * 1000 / totalpages;
 	return chosen;
 }
 
@@ -400,7 +412,7 @@ void dump_tasks(const struct mem_cgroup *memcg, const nodemask_t *nodemask)
 		pr_info("[%5d] %5d %5d %8lu %8lu %3u     %3d         %5d %s\n",
 			task->pid, task_uid(task), task->tgid,
 			task->mm->total_vm, get_mm_rss(task->mm),
-			task_cpu(task), task->signal->oom_score_adj,
+			task_cpu(task), task->signal->oom_adj,
 			task->signal->oom_score_adj, task->comm);
 		task_unlock(task);
 	}
@@ -411,8 +423,8 @@ static void dump_header(struct task_struct *p, gfp_t gfp_mask, int order,
 {
 	task_lock(current);
 	pr_warning("%s invoked oom-killer: gfp_mask=0x%x, order=%d, "
-		"oom_score_adj=%d\n",
-		current->comm, gfp_mask, order,
+		"oom_adj=%d, oom_score_adj=%d\n",
+		current->comm, gfp_mask, order, current->signal->oom_adj,
 		current->signal->oom_score_adj);
 	cpuset_print_task_mems_allowed(current);
 	task_unlock(current);
@@ -577,7 +589,7 @@ void mem_cgroup_out_of_memory(struct mem_cgroup *memcg, gfp_t gfp_mask,
 	}
 
 	check_panic_on_oom(CONSTRAINT_MEMCG, gfp_mask, order, NULL);
-	limit = mem_cgroup_get_limit(memcg) >> PAGE_SHIFT ? : 1;
+	limit = mem_cgroup_get_limit(memcg) >> PAGE_SHIFT;
 	read_lock(&tasklist_lock);
 	p = select_bad_process(&points, limit, memcg, NULL, false);
 	if (p && PTR_ERR(p) != -1UL)

@@ -17,6 +17,8 @@
 #include <linux/proc_fs.h>
 #include <linux/reboot.h>
 
+#define BITS_PER_PAGE		(PAGE_SIZE*8)
+
 struct pid_cache {
 	int nr_ids;
 	char name[16];

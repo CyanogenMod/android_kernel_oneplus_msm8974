@@ -79,7 +79,7 @@ long long os_nsecs(void)
 	return timeval_to_ns(&tv);
 }
 
-#ifdef UML_CONFIG_NO_HZ_COMMON
+#ifdef UML_CONFIG_NO_HZ
 static int after_sleep_interval(struct timespec *ts)
 {
 	return 0;

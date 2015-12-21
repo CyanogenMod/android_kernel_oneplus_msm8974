@@ -1844,7 +1844,6 @@ static int _adreno_start(struct adreno_device *adreno_dev)
 	if (status)
 		goto error_rb_stop;
 
-
 	/* Start the dispatcher */
 	adreno_dispatcher_start(device);
 
@@ -2714,39 +2713,6 @@ bool adreno_isidle(struct kgsl_device *device)
 		return adreno_hw_isidle(device);
 
 	return false;
-}
-
-/**
- * adreno_spin_idle() - Spin wait for the GPU to idle
- * @device: Pointer to the KGSL device
- *
- * Spin the CPU waiting for the RBBM status to return idle
- */
-int adreno_spin_idle(struct kgsl_device *device)
-{
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
-	unsigned long wait = jiffies + msecs_to_jiffies(ADRENO_IDLE_TIMEOUT);
-
-	kgsl_cffdump_regpoll(device,
-		adreno_getreg(adreno_dev, ADRENO_REG_RBBM_STATUS) << 2,
-		0x00000000, 0x80000000);
-
-	while (time_before(jiffies, wait)) {
-		/*
-		 * If we fault, stop waiting and return an error. The dispatcher
-		 * will clean up the fault from the work queue, but we need to
-		 * make sure we don't block it by waiting for an idle that
-		 * will never come.
-		 */
-
-		if (adreno_gpu_fault(adreno_dev) != 0)
-			return -EDEADLK;
-
-		if (adreno_isidle(device))
-			return 0;
-	}
-
-	return -ETIMEDOUT;
 }
 
 /**

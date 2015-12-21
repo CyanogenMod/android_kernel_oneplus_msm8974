@@ -49,13 +49,14 @@ void ocfs2_dentry_attach_gen(struct dentry *dentry)
 }
 
 
-static int ocfs2_dentry_revalidate(struct dentry *dentry, unsigned int flags)
+static int ocfs2_dentry_revalidate(struct dentry *dentry,
+				   struct nameidata *nd)
 {
 	struct inode *inode;
 	int ret = 0;    /* if all else fails, just return false */
 	struct ocfs2_super *osb;
 
-	if (flags & LOOKUP_RCU)
+	if (nd && nd->flags & LOOKUP_RCU)
 		return -ECHILD;
 
 	inode = dentry->d_inode;

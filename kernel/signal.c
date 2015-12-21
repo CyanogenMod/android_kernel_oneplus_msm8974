@@ -1662,18 +1662,19 @@ bool do_notify_parent(struct task_struct *tsk, int sig)
 	info.si_signo = sig;
 	info.si_errno = 0;
 	/*
-	 * We are under tasklist_lock here so our parent is tied to
-	 * us and cannot change.
+	 * we are under tasklist_lock here so our parent is tied to
+	 * us and cannot exit and release its namespace.
 	 *
-	 * task_active_pid_ns will always return the same pid namespace
-	 * until a task passes through release_task.
+	 * the only it can is to switch its nsproxy with sys_unshare,
+	 * bu uncharing pid namespaces is not allowed, so we'll always
+	 * see relevant namespace
 	 *
 	 * write_lock() currently calls preempt_disable() which is the
 	 * same as rcu_read_lock(), but according to Oleg, this is not
 	 * correct to rely on this
 	 */
 	rcu_read_lock();
-	info.si_pid = task_pid_nr_ns(tsk, task_active_pid_ns(tsk->parent));
+	info.si_pid = task_pid_nr_ns(tsk, tsk->parent->nsproxy->pid_ns);
 	info.si_uid = map_cred_ns(__task_cred(tsk),
 			task_cred_xxx(tsk->parent, user_ns));
 	rcu_read_unlock();

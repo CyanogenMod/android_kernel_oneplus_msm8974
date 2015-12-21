@@ -18,7 +18,7 @@ extern unsigned int nf_iterate(struct list_head *head,
 				unsigned int hook,
 				const struct net_device *indev,
 				const struct net_device *outdev,
-				struct nf_hook_ops **elemp,
+				struct list_head **i,
 				int (*okfn)(struct sk_buff *),
 				int hook_thresh);
 

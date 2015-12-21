@@ -658,9 +658,9 @@ lookup_out:
 }
 
 static int
-cifs_d_revalidate(struct dentry *direntry, unsigned int flags)
+cifs_d_revalidate(struct dentry *direntry, struct nameidata *nd)
 {
-	if (flags & LOOKUP_RCU)
+	if (nd && (nd->flags & LOOKUP_RCU))
 		return -ECHILD;
 
 	if (direntry->d_inode) {
@@ -689,7 +689,7 @@ cifs_d_revalidate(struct dentry *direntry, unsigned int flags)
 	 * This may be nfsd (or something), anyway, we can't see the
 	 * intent of this. So, since this can be for creation, drop it.
 	 */
-	if (!flags)
+	if (!nd)
 		return 0;
 
 	/*
@@ -697,7 +697,7 @@ cifs_d_revalidate(struct dentry *direntry, unsigned int flags)
 	 * case sensitive name which is specified by user if this is
 	 * for creation.
 	 */
-	if (flags & (LOOKUP_CREATE | LOOKUP_RENAME_TARGET))
+	if (nd->flags & (LOOKUP_CREATE | LOOKUP_RENAME_TARGET))
 		return 0;
 
 	if (time_after(jiffies, direntry->d_time + HZ) || !lookupCacheEnabled)

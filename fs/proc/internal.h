@@ -9,12 +9,10 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-#include <linux/sched.h>
 #include <linux/proc_fs.h>
 struct  ctl_table_header;
 
 extern struct proc_dir_entry proc_root;
-extern void proc_self_init(void);
 #ifdef CONFIG_PROC_SYSCTL
 extern int proc_sys_init(void);
 extern void sysctl_head_put(struct ctl_table_header *head);
@@ -68,7 +66,6 @@ extern const struct file_operations proc_clear_refs_operations;
 extern const struct file_operations proc_pagemap_operations;
 extern const struct file_operations proc_net_operations;
 extern const struct inode_operations proc_net_inode_operations;
-extern const struct inode_operations proc_pid_link_inode_operations;
 
 struct proc_maps_private {
 	struct pid *pid;
@@ -94,48 +91,6 @@ static inline int proc_fd(struct inode *inode)
 {
 	return PROC_I(inode)->fd;
 }
-
-static inline int task_dumpable(struct task_struct *task)
-{
-	int dumpable = 0;
-	struct mm_struct *mm;
-
-	task_lock(task);
-	mm = task->mm;
-	if (mm)
-		dumpable = get_dumpable(mm);
-	task_unlock(task);
-	if(dumpable == 1)
-		return 1;
-	return 0;
-}
-
-static inline unsigned name_to_int(struct dentry *dentry)
-{
-	const char *name = dentry->d_name.name;
-	int len = dentry->d_name.len;
-	unsigned n = 0;
-
-	if (len > 1 && *name == '0')
-		goto out;
-	while (len-- > 0) {
-		unsigned c = *name++ - '0';
-		if (c > 9)
-			goto out;
-		if (n >= (~0U-9)/10)
-			goto out;
-		n *= 10;
-		n += c;
-	}
-	return n;
-out:
-	return ~0U;
-}
-
-/*
- * base.c
- */
-extern int pid_delete_dentry(const struct dentry *);
 
 struct dentry *proc_lookup_de(struct proc_dir_entry *de, struct inode *ino,
 		struct dentry *dentry);
@@ -188,7 +143,7 @@ typedef struct dentry *instantiate_t(struct inode *, struct dentry *,
 int proc_fill_cache(struct file *filp, void *dirent, filldir_t filldir,
 	const char *name, int len,
 	instantiate_t instantiate, struct task_struct *task, const void *ptr);
-int pid_revalidate(struct dentry *dentry, unsigned int flags);
+int pid_revalidate(struct dentry *dentry, struct nameidata *nd);
 struct inode *proc_pid_make_inode(struct super_block * sb, struct task_struct *task);
 extern const struct dentry_operations pid_dentry_operations;
 int pid_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat);

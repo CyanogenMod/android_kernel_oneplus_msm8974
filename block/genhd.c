@@ -408,7 +408,7 @@ static int blk_mangle_minor(int minor)
 int blk_alloc_devt(struct hd_struct *part, dev_t *devt)
 {
 	struct gendisk *disk = part_to_disk(part);
-	int idx;
+	int idx, rc;
 
 	/* in consecutive minor range? */
 	if (part->partno < disk->minors) {
@@ -417,11 +417,20 @@ int blk_alloc_devt(struct hd_struct *part, dev_t *devt)
 	}
 
 	/* allocate ext devt */
-	spin_lock(&ext_devt_lock);
-	idx = idr_alloc(&ext_devt_idr, part, 0, NR_EXT_DEVT, GFP_KERNEL);
-	spin_unlock(&ext_devt_lock);
-	if (idx < 0)
-		return idx == -ENOSPC ? -EBUSY : idx;
+	do {
+		if (!idr_pre_get(&ext_devt_idr, GFP_KERNEL))
+			return -ENOMEM;
+		spin_lock_bh(&ext_devt_lock);
+		rc = idr_get_new(&ext_devt_idr, part, &idx);
+		if (!rc && idx >= NR_EXT_DEVT) {
+			idr_remove(&ext_devt_idr, idx);
+			rc = -EBUSY;
+		}
+		spin_unlock_bh(&ext_devt_lock);
+	} while (rc == -EAGAIN);
+
+	if (rc)
+		return rc;
 
 	*devt = MKDEV(BLOCK_EXT_MAJOR, blk_mangle_minor(idx));
 	return 0;

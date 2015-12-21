@@ -66,21 +66,37 @@ EXPORT_SYMBOL_GPL(spmi_busnum_to_ctrl);
 int spmi_add_controller(struct spmi_controller *ctrl)
 {
 	int	id;
+	int	status;
 
 	if (!ctrl)
 		return -EINVAL;
 
 	pr_debug("adding controller for bus %d (0x%p)\n", ctrl->nr, ctrl);
 
+	if (ctrl->nr & ~MAX_ID_MASK) {
+		pr_err("invalid bus identifier %d\n", ctrl->nr);
+		return -EINVAL;
+	}
+
+retry:
+	if (idr_pre_get(&ctrl_idr, GFP_KERNEL) == 0) {
+		pr_err("no free memory for idr\n");
+		return -ENOMEM;
+	}
+
 	mutex_lock(&board_lock);
-	id = idr_alloc(&ctrl_idr, ctrl, ctrl->nr, ctrl->nr + 1, GFP_KERNEL);
+	status = idr_get_new_above(&ctrl_idr, ctrl, ctrl->nr, &id);
+	if (status == 0 && id != ctrl->nr) {
+		status = -EBUSY;
+		idr_remove(&ctrl_idr, id);
+	}
 	mutex_unlock(&board_lock);
+	if (status == -EAGAIN)
+		goto retry;
 
-	if (id < 0)
-		return id;
-
-	ctrl->nr = id;
-	return spmi_register_controller(ctrl);
+	if (status == 0)
+		status = spmi_register_controller(ctrl);
+	return status;
 }
 EXPORT_SYMBOL_GPL(spmi_add_controller);
 

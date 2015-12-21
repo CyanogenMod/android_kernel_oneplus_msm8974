@@ -15,7 +15,6 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/printk.h>
 #include <linux/mount.h>
 #include <linux/init.h>
 #include <linux/idr.h>
@@ -133,8 +132,11 @@ __proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 		}
 
 		if (start == NULL) {
-			if (n > PAGE_SIZE)	/* Apparent buffer overflow */
+			if (n > PAGE_SIZE) {
+				printk(KERN_ERR
+				       "proc_file_read: Apparent buffer overflow!\n");
 				n = PAGE_SIZE;
+			}
 			n -= *ppos;
 			if (n <= 0)
 				break;
@@ -142,19 +144,26 @@ __proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 				n = count;
 			start = page + *ppos;
 		} else if (start < page) {
-			if (n > PAGE_SIZE)	/* Apparent buffer overflow */
+			if (n > PAGE_SIZE) {
+				printk(KERN_ERR
+				       "proc_file_read: Apparent buffer overflow!\n");
 				n = PAGE_SIZE;
+			}
 			if (n > count) {
 				/*
 				 * Don't reduce n because doing so might
 				 * cut off part of a data block.
 				 */
-				pr_warn("proc_file_read: count exceeded\n");
+				printk(KERN_WARNING
+				       "proc_file_read: Read count exceeded\n");
 			}
 		} else /* start >= page */ {
 			unsigned long startoff = (unsigned long)(start - page);
-			if (n > (PAGE_SIZE - startoff))	/* buffer overflow? */
+			if (n > (PAGE_SIZE - startoff)) {
+				printk(KERN_ERR
+				       "proc_file_read: Apparent buffer overflow!\n");
 				n = PAGE_SIZE - startoff;
+			}
 			if (n > count)
 				n = count;
 		}
@@ -252,9 +261,16 @@ static int proc_notify_change(struct dentry *dentry, struct iattr *iattr)
 	if (error)
 		return error;
 
+	if ((iattr->ia_valid & ATTR_SIZE) &&
+	    iattr->ia_size != i_size_read(inode)) {
+		error = vmtruncate(inode, iattr->ia_size);
+		if (error)
+			return error;
+	}
+
 	setattr_copy(inode, iattr);
 	mark_inode_dirty(inode);
-
+	
 	de->uid = inode->i_uid;
 	de->gid = inode->i_gid;
 	de->mode = inode->i_mode;
@@ -567,7 +583,7 @@ static int proc_register(struct proc_dir_entry * dir, struct proc_dir_entry * dp
 
 	for (tmp = dir->subdir; tmp; tmp = tmp->next)
 		if (strcmp(tmp->name, dp->name) == 0) {
-			WARN(1, "proc_dir_entry '%s/%s' already registered\n",
+			WARN(1, KERN_WARNING "proc_dir_entry '%s/%s' already registered\n",
 				dir->name, dp->name);
 			break;
 		}
@@ -829,9 +845,9 @@ void remove_proc_entry(const char *name, struct proc_dir_entry *parent)
 	if (S_ISDIR(de->mode))
 		parent->nlink--;
 	de->nlink = 0;
-	WARN(de->subdir, "%s: removing non-empty directory "
-			 "'%s/%s', leaking at least '%s'\n", __func__,
-			 de->parent->name, de->name, de->subdir->name);
+	WARN(de->subdir, KERN_WARNING "%s: removing non-empty directory "
+			"'%s/%s', leaking at least '%s'\n", __func__,
+			de->parent->name, de->name, de->subdir->name);
 	pde_put(de);
 }
 EXPORT_SYMBOL(remove_proc_entry);

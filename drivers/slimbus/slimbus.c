@@ -593,16 +593,28 @@ EXPORT_SYMBOL_GPL(slim_del_controller);
 int slim_add_numbered_controller(struct slim_controller *ctrl)
 {
 	int	id;
+	int	status;
+
+	if (ctrl->nr & ~MAX_ID_MASK)
+		return -EINVAL;
+
+retry:
+	if (idr_pre_get(&ctrl_idr, GFP_KERNEL) == 0)
+		return -ENOMEM;
 
 	mutex_lock(&slim_lock);
-	id = idr_alloc(&ctrl_idr, ctrl, ctrl->nr, ctrl->nr + 1, GFP_KERNEL);
+	status = idr_get_new_above(&ctrl_idr, ctrl, ctrl->nr, &id);
+	if (status == 0 && id != ctrl->nr) {
+		status = -EAGAIN;
+		idr_remove(&ctrl_idr, id);
+	}
 	mutex_unlock(&slim_lock);
+	if (status == -EAGAIN)
+		goto retry;
 
-	if (id < 0)
-		return id;
-
-	ctrl->nr = id;
-	return slim_register_controller(ctrl);
+	if (status == 0)
+		status = slim_register_controller(ctrl);
+	return status;
 }
 EXPORT_SYMBOL_GPL(slim_add_numbered_controller);
 

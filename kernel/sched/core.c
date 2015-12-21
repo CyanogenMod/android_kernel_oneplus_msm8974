@@ -5,8 +5,6 @@
  *
  *  Copyright (C) 1991-2002  Linus Torvalds
  *
- * Copyright (c) 2014, NVIDIA CORPORATION. All rights reserved.
- * 
  *  1996-12-23  Modified by Dave Grothe to fix bugs in semaphores and
  *		make semaphores SMP safe
  *  1998-11-19	Implemented schedule_timeout() and related stuff
@@ -75,13 +73,11 @@
 #include <linux/slab.h>
 #include <linux/init_task.h>
 #include <linux/binfmts.h>
-#include <linux/context_tracking.h>
 
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
 #include <asm/irq_regs.h>
 #include <asm/mutex.h>
-#include <asm/relaxed.h>
 #ifdef CONFIG_PARAVIRT
 #include <asm/paravirt.h>
 #endif
@@ -559,7 +555,7 @@ void resched_cpu(int cpu)
 	raw_spin_unlock_irqrestore(&rq->lock, flags);
 }
 
-#ifdef CONFIG_NO_HZ_COMMON
+#ifdef CONFIG_NO_HZ
 /*
  * In the semi idle case, use the nearest busy cpu for migrating timers
  * from an idle cpu.  This is good for power-savings.
@@ -597,7 +593,7 @@ unlock:
  * account when the CPU goes back to idle and evaluates the timer
  * wheel for the next timer event.
  */
-static void wake_up_idle_cpu(int cpu)
+void wake_up_idle_cpu(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
 
@@ -627,24 +623,6 @@ static void wake_up_idle_cpu(int cpu)
 		smp_send_reschedule(cpu);
 }
 
-static bool wake_up_full_nohz_cpu(int cpu)
-{
-	if (tick_nohz_full_cpu(cpu)) {
-		if (cpu != smp_processor_id() ||
-		    tick_nohz_tick_stopped())
-			smp_send_reschedule(cpu);
-		return true;
-	}
-
-	return false;
-}
-
-void wake_up_nohz_cpu(int cpu)
-{
-	if (!wake_up_full_nohz_cpu(cpu))
-		wake_up_idle_cpu(cpu);
-}
-
 static inline bool got_nohz_idle_kick(void)
 {
 	int cpu = smp_processor_id();
@@ -663,32 +641,14 @@ static inline bool got_nohz_idle_kick(void)
 	return false;
 }
 
-#else /* CONFIG_NO_HZ_COMMON */
+#else /* CONFIG_NO_HZ */
 
 static inline bool got_nohz_idle_kick(void)
 {
 	return false;
 }
 
-#endif /* CONFIG_NO_HZ_COMMON */
-
-#ifdef CONFIG_NO_HZ_FULL
-bool sched_can_stop_tick(void)
-{
-       struct rq *rq;
-
-       rq = this_rq();
-
-       /* Make sure rq->nr_running update is visible after the IPI */
-       smp_rmb();
-
-       /* More than one running task need preemption */
-       if (rq->nr_running > 1)
-               return false;
-
-       return true;
-}
-#endif /* CONFIG_NO_HZ_FULL */
+#endif /* CONFIG_NO_HZ */
 
 void sched_avg_update(struct rq *rq)
 {
@@ -1236,10 +1196,9 @@ unsigned long wait_task_inactive(struct task_struct *p, long match_state)
 		 * is actually now running somewhere else!
 		 */
 		while (task_running(rq, p)) {
-			if (match_state && unlikely(cpu_relaxed_read_long
-			    (&(p->state)) != match_state))
+			if (match_state && unlikely(p->state != match_state))
 				return 0;
-			cpu_read_relax();
+			cpu_relax();
 		}
 
 		/*
@@ -1565,8 +1524,7 @@ static void sched_ttwu_pending(void)
 
 void scheduler_ipi(void)
 {
-	if (llist_empty(&this_rq()->wake_list) && !got_nohz_idle_kick()
-	    && !tick_nohz_full_cpu(smp_processor_id()))
+	if (llist_empty(&this_rq()->wake_list) && !got_nohz_idle_kick())
 		return;
 
 	/*
@@ -1583,7 +1541,6 @@ void scheduler_ipi(void)
 	 * somewhat pessimize the simple resched case.
 	 */
 	irq_enter();
-	tick_nohz_full_check();
 	sched_ttwu_pending();
 
 	/*
@@ -1670,21 +1627,8 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	 * If the owning (remote) cpu is still in the middle of schedule() with
 	 * this task as prev, wait until its done referencing the task.
 	 */
-	while (p->on_cpu) {
-#ifdef __ARCH_WANT_INTERRUPTS_ON_CTXSW
-		/*
-		 * In case the architecture enables interrupts in
-		 * context_switch(), we cannot busy wait, since that
-		 * would lead to deadlocks when an interrupt hits and
-		 * tries to wake up @prev. So bail and do a complete
-		 * remote wakeup.
-		 */
-		if (ttwu_activate_remote(p, wake_flags))
-			goto stat;
-#else
-		cpu_read_relax();
-#endif
-	}
+	while (p->on_cpu)
+		cpu_relax();
 	/*
 	 * Pairs with the smp_wmb() in finish_lock_switch().
 	 */
@@ -2057,8 +2001,6 @@ static void finish_task_switch(struct rq *rq, struct task_struct *prev)
 		kprobe_flush_task(prev);
 		put_task_struct(prev);
 	}
-
-	tick_nohz_task_switch(current);
 }
 
 #ifdef CONFIG_SMP
@@ -2164,7 +2106,6 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	spin_release(&rq->lock.dep_map, 1, _THIS_IP_);
 #endif
 
-	context_tracking_task_switch(prev, next);
 	/* Here we just switch the register state and the stack. */
 	switch_to(prev, next, prev);
 
@@ -2395,7 +2336,7 @@ calc_load(unsigned long load, unsigned long exp, unsigned long active)
 	return load >> FSHIFT;
 }
 
-#ifdef CONFIG_NO_HZ_COMMON
+#ifdef CONFIG_NO_HZ
 /*
  * Handle NO_HZ for the global load-average.
  *
@@ -2621,12 +2562,12 @@ static void calc_global_nohz(void)
 	smp_wmb();
 	calc_load_idx++;
 }
-#else /* !CONFIG_NO_HZ_COMMON */
+#else /* !CONFIG_NO_HZ */
 
 static inline long calc_load_fold_idle(void) { return 0; }
 static inline void calc_global_nohz(void) { }
 
-#endif /* CONFIG_NO_HZ_COMMON */
+#endif /* CONFIG_NO_HZ */
 
 /*
  * calc_load - update the avenrun load estimates 10 ticks after the
@@ -2786,7 +2727,7 @@ static void __update_cpu_load(struct rq *this_rq, unsigned long this_load,
 	sched_avg_update(this_rq);
 }
 
-#ifdef CONFIG_NO_HZ_COMMON
+#ifdef CONFIG_NO_HZ
 /*
  * There is no sane way to deal with nohz on smp when using jiffies because the
  * cpu doing the jiffies update might drift wrt the cpu doing the jiffy reading
@@ -2846,7 +2787,7 @@ void update_cpu_load_nohz(void)
 	}
 	raw_spin_unlock(&this_rq->lock);
 }
-#endif /* CONFIG_NO_HZ_COMMON */
+#endif /* CONFIG_NO_HZ */
 
 /*
  * Called from scheduler_tick()
@@ -2983,6 +2924,7 @@ static inline void task_group_account_field(struct task_struct *p, int index,
 	rcu_read_unlock();
 #endif
 }
+
 
 /*
  * Account user cpu time to a process.
@@ -3618,21 +3560,6 @@ asmlinkage void __sched schedule(void)
 }
 EXPORT_SYMBOL(schedule);
 
-#ifdef CONFIG_CONTEXT_TRACKING
-asmlinkage void __sched schedule_user(void)
-{
-	/*
-	 * If we come here after a random call to set_need_resched(),
-	 * or we have been woken up remotely but the IPI has not yet arrived,
-	 * we haven't yet exited the RCU idle mode. Do it here manually until
-	 * we find a better solution.
-	 */
-	user_exit();
-	schedule();
-	user_enter();
-}
-#endif
-
 /**
  * schedule_preempt_disabled - called with preemption disabled
  *
@@ -3730,12 +3657,9 @@ EXPORT_SYMBOL(preempt_schedule);
 asmlinkage void __sched preempt_schedule_irq(void)
 {
 	struct thread_info *ti = current_thread_info();
-	enum ctx_state prev_state;
 
 	/* Catch callers which need to be fixed */
 	BUG_ON(ti->preempt_count || !irqs_disabled());
-
-	prev_state = exception_enter();
 
 	do {
 		add_preempt_count(PREEMPT_ACTIVE);
@@ -3750,8 +3674,6 @@ asmlinkage void __sched preempt_schedule_irq(void)
 		 */
 		barrier();
 	} while (need_resched());
-
-	exception_exit(prev_state);
 }
 
 #endif /* CONFIG_PREEMPT */
@@ -4383,24 +4305,6 @@ int idle_cpu(int cpu)
 #endif
 
 	return 1;
-}
-
-int idle_cpu_relaxed(int cpu)
-{
-      struct rq *rq = cpu_rq(cpu);
-
-      if (cpu_relaxed_read_long(&rq->curr) != rq->idle)
-             return 0;
-
-      if (cpu_relaxed_read_long(&rq->nr_running))
-             return 0;
-
-#ifdef CONFIG_SMP
-      if (!llist_empty_relaxed(&rq->wake_list))
-             return 0;
-#endif
-
-             return 1;
 }
 
 /**
@@ -7265,7 +7169,7 @@ static int cpuset_cpu_active(struct notifier_block *nfb, unsigned long action,
 
 	case CPU_ONLINE:
 	case CPU_DOWN_FAILED:
-		cpuset_update_active_cpus(true);
+		cpuset_update_active_cpus();
 		break;
 	default:
 		return NOTIFY_DONE;
@@ -7278,7 +7182,7 @@ static int cpuset_cpu_inactive(struct notifier_block *nfb, unsigned long action,
 {
 	switch (action) {
 	case CPU_DOWN_PREPARE:
-		cpuset_update_active_cpus(false);
+		cpuset_update_active_cpus();
 		break;
 	case CPU_DOWN_PREPARE_FROZEN:
 		num_cpus_frozen++;
@@ -7470,7 +7374,7 @@ void __init sched_init(void)
 		INIT_LIST_HEAD(&rq->cfs_tasks);
 
 		rq_attach_root(rq, &def_root_domain);
-#ifdef CONFIG_NO_HZ_COMMON
+#ifdef CONFIG_NO_HZ
 		rq->nohz_flags = 0;
 #endif
 #endif
@@ -8744,9 +8648,3 @@ struct cgroup_subsys cpuacct_subsys = {
 	.subsys_id = cpuacct_subsys_id,
 };
 #endif	/* CONFIG_CGROUP_CPUACCT */
-
-void dump_cpu_task(int cpu)
-{
-	pr_info("Task dump for CPU %d:\n", cpu);
-	sched_show_task(cpu_curr(cpu));
-}

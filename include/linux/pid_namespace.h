@@ -13,9 +13,7 @@ struct pidmap {
        void *page;
 };
 
-#define BITS_PER_PAGE		(PAGE_SIZE * 8)
-#define BITS_PER_PAGE_MASK	(BITS_PER_PAGE-1)
-#define PIDMAP_ENTRIES		((PID_MAX_LIMIT+BITS_PER_PAGE-1)/BITS_PER_PAGE)
+#define PIDMAP_ENTRIES         ((PID_MAX_LIMIT + 8*PAGE_SIZE - 1)/PAGE_SIZE/8)
 
 struct bsd_acct_struct;
 

@@ -46,10 +46,6 @@
 
 #define PDEV_NAME_LEN 20
 
-static bool uicc_card_present;
-module_param(uicc_card_present, bool, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(uicc_card_present, "UICC card inserted");
-
 struct msm_hcd {
 	struct ehci_hcd				ehci;
 	spinlock_t				wakeup_lock;
@@ -300,11 +296,6 @@ static int msm_ehci_config_vddcx(struct msm_hcd *mhcd, int high)
 static void msm_ehci_vbus_power(struct msm_hcd *mhcd, bool on)
 {
 	int ret;
-	const struct msm_usb_host_platform_data *pdata;
-
-	pdata = mhcd->dev->platform_data;
-	if (pdata && pdata->is_uicc)
-		return;
 
 	if (!mhcd->vbus) {
 		pr_err("vbus is NULL.");
@@ -361,10 +352,6 @@ static int msm_ehci_init_vbus(struct msm_hcd *mhcd, int init)
 	int ret = 0;
 
 	pdata = mhcd->dev->platform_data;
-
-	/* For uicc card connection, external vbus is not required */
-	if (pdata && pdata->is_uicc)
-		return 0;
 
 	if (!init) {
 		if (pdata && pdata->dock_connect_irq)
@@ -708,8 +695,6 @@ static int msm_ehci_suspend(struct msm_hcd *mhcd)
 	unsigned long timeout;
 	int ret;
 	u32 portsc;
-	const struct msm_usb_host_platform_data *pdata;
-	u32 func_ctrl;
 
 	if (atomic_read(&mhcd->in_lpm)) {
 		dev_dbg(mhcd->dev, "%s called in lpm\n", __func__);
@@ -726,14 +711,6 @@ static int msm_ehci_suspend(struct msm_hcd *mhcd)
 		return -EBUSY;
 	}
 
-	pdata = mhcd->dev->platform_data;
-	if (pdata && pdata->is_uicc) {
-		/* put the controller in non-driving mode */
-		func_ctrl = msm_ulpi_read(mhcd, ULPI_FUNC_CTRL);
-		func_ctrl &= ~ULPI_FUNC_CTRL_OPMODE_MASK;
-		func_ctrl |= ULPI_FUNC_CTRL_OPMODE_NONDRIVING;
-		msm_ulpi_write(mhcd, func_ctrl, ULPI_FUNC_CTRL);
-	}
 	/* If port is enabled wait 5ms for PHCD to come up. Reset PHY
 	 * and link if it fails to do so.
 	 * If port is not enabled set the PHCD bit and poll for it to
@@ -838,8 +815,6 @@ static int msm_ehci_resume(struct msm_hcd *mhcd)
 	unsigned temp;
 	int ret;
 	unsigned long flags;
-	u32 func_ctrl;
-	const struct msm_usb_host_platform_data *pdata;
 
 	if (!atomic_read(&mhcd->in_lpm)) {
 		dev_dbg(mhcd->dev, "%s called in !in_lpm\n", __func__);
@@ -909,14 +884,6 @@ static int msm_ehci_resume(struct msm_hcd *mhcd)
 	}
 
 skip_phy_resume:
-	pdata = mhcd->dev->platform_data;
-	if (pdata && pdata->is_uicc) {
-		/* put the controller in normal mode */
-		func_ctrl = msm_ulpi_read(mhcd, ULPI_FUNC_CTRL);
-		func_ctrl &= ~ULPI_FUNC_CTRL_OPMODE_MASK;
-		func_ctrl |= ULPI_FUNC_CTRL_OPMODE_NORMAL;
-		msm_ulpi_write(mhcd, func_ctrl, ULPI_FUNC_CTRL);
-	}
 
 	usb_hcd_resume_root_hub(hcd);
 	atomic_set(&mhcd->in_lpm, 0);
@@ -1371,8 +1338,6 @@ struct msm_usb_host_platform_data *ehci_msm2_dt_to_pdata(
 	pdata->resume_gpio = of_get_named_gpio(node, "qcom,resume-gpio", 0);
 	if (pdata->resume_gpio < 0)
 		pdata->resume_gpio = 0;
-	pdata->is_uicc = of_property_read_bool(node,
-					"qcom,usb2-enable-uicc");
 
 	return pdata;
 }
@@ -1388,14 +1353,6 @@ static int __devinit ehci_msm2_probe(struct platform_device *pdev)
 	int ret;
 
 	dev_dbg(&pdev->dev, "ehci_msm2 probe\n");
-
-	/*
-	 * Fail probe in case of uicc till userspace activates driver through
-	 * sysfs entry.
-	 */
-	if (!uicc_card_present && pdev->dev.of_node && of_property_read_bool(
-				pdev->dev.of_node, "qcom,usb2-enable-uicc"))
-		return -ENODEV;
 
 	if (pdev->dev.of_node) {
 		dev_dbg(&pdev->dev, "device tree enabled\n");

@@ -154,8 +154,6 @@ extern void update_cpu_load_nohz(void);
 
 extern unsigned long get_parent_ip(unsigned long addr);
 
-extern void dump_cpu_task(int cpu);
-
 struct seq_file;
 struct cfs_rq;
 struct task_group;
@@ -280,7 +278,7 @@ extern void init_idle_bootup_task(struct task_struct *idle);
 
 extern int runqueue_is_locked(int cpu);
 
-#if defined(CONFIG_SMP) && defined(CONFIG_NO_HZ_COMMON)
+#if defined(CONFIG_SMP) && defined(CONFIG_NO_HZ)
 extern void select_nohz_load_balancer(int stop_tick);
 extern void set_cpu_sd_state_idle(void);
 extern int get_nohz_timer_target(void);
@@ -675,6 +673,7 @@ struct signal_struct {
 	struct rw_semaphore group_rwsem;
 #endif
 
+	int oom_adj;		/* OOM kill score adjustment (bit shift) */
 	int oom_score_adj;	/* OOM kill score adjustment */
 	int oom_score_adj_min;	/* OOM kill score adjustment minimum value.
 				 * Only settable by CAP_SYS_RESOURCE. */
@@ -1986,13 +1985,13 @@ static inline void set_wake_up_idle(bool enabled)
 		current->flags &= ~PF_WAKE_UP_IDLE;
 }
 
-#ifdef CONFIG_NO_HZ_COMMON
+#ifdef CONFIG_NO_HZ
 void calc_load_enter_idle(void);
 void calc_load_exit_idle(void);
 #else
 static inline void calc_load_enter_idle(void) { }
 static inline void calc_load_exit_idle(void) { }
-#endif /* CONFIG_NO_HZ_COMMON */
+#endif /* CONFIG_NO_HZ */
 
 #ifndef CONFIG_CPUMASK_OFFSTACK
 static inline int set_cpus_allowed(struct task_struct *p, cpumask_t new_mask)
@@ -2086,10 +2085,10 @@ extern void idle_task_exit(void);
 static inline void idle_task_exit(void) {}
 #endif
 
-#if defined(CONFIG_NO_HZ_COMMON) && defined(CONFIG_SMP)
-extern void wake_up_nohz_cpu(int cpu);
+#if defined(CONFIG_NO_HZ) && defined(CONFIG_SMP)
+extern void wake_up_idle_cpu(int cpu);
 #else
-static inline void wake_up_nohz_cpu(int cpu) { }
+static inline void wake_up_idle_cpu(int cpu) { }
 #endif
 
 extern unsigned int sysctl_sched_latency;
@@ -2134,12 +2133,6 @@ extern int sysctl_sched_rt_runtime;
 int sched_rt_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp,
 		loff_t *ppos);
-
-#ifdef CONFIG_NO_HZ_FULL
-extern bool sched_can_stop_tick(void);
-#else
-static inline bool sched_can_stop_tick(void) { return false; }
-#endif
 
 #ifdef CONFIG_SCHED_AUTOGROUP
 extern unsigned int sysctl_sched_autogroup_enabled;
@@ -2190,7 +2183,6 @@ extern int task_nice(const struct task_struct *p);
 extern int can_nice(const struct task_struct *p, const int nice);
 extern int task_curr(const struct task_struct *p);
 extern int idle_cpu(int cpu);
-extern int idle_cpu_relaxed(int cpu);
 extern int sched_setscheduler(struct task_struct *, int,
 			      const struct sched_param *);
 extern int sched_setscheduler_nocheck(struct task_struct *, int,

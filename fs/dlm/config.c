@@ -160,7 +160,7 @@ static ssize_t cluster_set(struct dlm_cluster *cl, unsigned int *cl_field,
 	unsigned int x;
 
 	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
+		return -EACCES;
 
 	x = simple_strtoul(buf, NULL, 0);
 

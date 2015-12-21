@@ -410,10 +410,10 @@ int tick_resume_broadcast_oneshot(struct clock_event_device *bc)
  * Called from irq_enter() when idle was interrupted to reenable the
  * per cpu device.
  */
-void tick_check_oneshot_broadcast_this_cpu(void)
+void tick_check_oneshot_broadcast(int cpu)
 {
-	if (cpumask_test_cpu(smp_processor_id(), to_cpumask(tick_broadcast_oneshot_mask))) {
-		struct tick_device *td = &__get_cpu_var(tick_cpu_device);
+	if (cpumask_test_cpu(cpu, to_cpumask(tick_broadcast_oneshot_mask))) {
+		struct tick_device *td = &per_cpu(tick_cpu_device, cpu);
 
 		clockevents_set_mode(td->evtdev, CLOCK_EVT_MODE_ONESHOT);
 	}
@@ -559,8 +559,7 @@ void tick_broadcast_setup_oneshot(struct clock_event_device *bc)
 		bc->event_handler = tick_handle_oneshot_broadcast;
 
 		/* Take the do_timer update */
-		if (!tick_nohz_full_cpu(cpu))
-			tick_do_timer_cpu = cpu;
+		tick_do_timer_cpu = cpu;
 
 		/*
 		 * We must be careful here. There might be other CPUs

@@ -25,7 +25,7 @@
 /**
  * gfs2_drevalidate - Check directory lookup consistency
  * @dentry: the mapping to check
- * @flags: lookup flags
+ * @nd:
  *
  * Check to make sure the lookup necessary to arrive at this inode from its
  * parent is still good.
@@ -33,7 +33,7 @@
  * Returns: 1 if the dentry is ok, 0 if it isn't
  */
 
-static int gfs2_drevalidate(struct dentry *dentry, unsigned int flags)
+static int gfs2_drevalidate(struct dentry *dentry, struct nameidata *nd)
 {
 	struct dentry *parent;
 	struct gfs2_sbd *sdp;
@@ -44,7 +44,7 @@ static int gfs2_drevalidate(struct dentry *dentry, unsigned int flags)
 	int error;
 	int had_lock = 0;
 
-	if (flags & LOOKUP_RCU)
+	if (nd && nd->flags & LOOKUP_RCU)
 		return -ECHILD;
 
 	parent = dget_parent(dentry);

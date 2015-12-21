@@ -15,7 +15,6 @@
 #include <linux/export.h>
 #include <linux/slab.h>
 #include <linux/highmem.h>
-#include <linux/printk.h>
 #include <linux/bootmem.h>
 #include <linux/init.h>
 #include <linux/crash_dump.h>
@@ -554,7 +553,8 @@ static int __init parse_crash_elf64_headers(void)
 		ehdr.e_ehsize != sizeof(Elf64_Ehdr) ||
 		ehdr.e_phentsize != sizeof(Elf64_Phdr) ||
 		ehdr.e_phnum == 0) {
-		pr_warn("Warning: Core image elf header is not sane\n");
+		printk(KERN_WARNING "Warning: Core image elf header is not"
+					"sane\n");
 		return -EINVAL;
 	}
 
@@ -609,7 +609,8 @@ static int __init parse_crash_elf32_headers(void)
 		ehdr.e_ehsize != sizeof(Elf32_Ehdr) ||
 		ehdr.e_phentsize != sizeof(Elf32_Phdr) ||
 		ehdr.e_phnum == 0) {
-		pr_warn("Warning: Core image elf header is not sane\n");
+		printk(KERN_WARNING "Warning: Core image elf header is not"
+					"sane\n");
 		return -EINVAL;
 	}
 
@@ -652,7 +653,8 @@ static int __init parse_crash_elf_headers(void)
 	if (rc < 0)
 		return rc;
 	if (memcmp(e_ident, ELFMAG, SELFMAG) != 0) {
-		pr_warn("Warning: Core image elf header not found\n");
+		printk(KERN_WARNING "Warning: Core image elf header"
+					" not found\n");
 		return -EINVAL;
 	}
 
@@ -671,7 +673,8 @@ static int __init parse_crash_elf_headers(void)
 		/* Determine vmcore size. */
 		vmcore_size = get_vmcore_size_elf32(elfcorebuf);
 	} else {
-		pr_warn("Warning: Core image elf header is not sane\n");
+		printk(KERN_WARNING "Warning: Core image elf header is not"
+					" sane\n");
 		return -EINVAL;
 	}
 	return 0;
@@ -687,7 +690,7 @@ static int __init vmcore_init(void)
 		return rc;
 	rc = parse_crash_elf_headers();
 	if (rc) {
-		pr_warn("Kdump: vmcore not initialized\n");
+		printk(KERN_WARNING "Kdump: vmcore not initialized\n");
 		return rc;
 	}
 

@@ -534,16 +534,10 @@ void dwc3_set_notifier(void (*notify)(struct dwc3 *, unsigned))
 }
 EXPORT_SYMBOL(dwc3_set_notifier);
 
-int dwc3_notify_event(struct dwc3 *dwc, unsigned event)
+void dwc3_notify_event(struct dwc3 *dwc, unsigned event)
 {
-	int ret = 0;
-
 	if (dwc->notify_event)
 		dwc->notify_event(dwc, event);
-	else
-		ret = -ENODEV;
-
-	return ret;
 }
 EXPORT_SYMBOL(dwc3_notify_event);
 
@@ -741,6 +735,9 @@ err1:
 static int __devexit dwc3_remove(struct platform_device *pdev)
 {
 	struct dwc3	*dwc = platform_get_drvdata(pdev);
+	struct resource	*res;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
 	dwc3_debugfs_exit(dwc);
 
@@ -763,7 +760,6 @@ static int __devexit dwc3_remove(struct platform_device *pdev)
 
 	dwc3_core_exit(dwc);
 
-	pm_runtime_put(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 
 	return 0;

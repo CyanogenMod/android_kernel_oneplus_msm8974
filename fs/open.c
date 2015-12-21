@@ -848,7 +848,7 @@ static inline int build_open_flags(int flags, umode_t mode, struct open_flags *o
 		op->mode = 0;
 
 	/* Must never be set by userspace */
-	flags &= ~FMODE_NONOTIFY & ~O_CLOEXEC;
+	flags &= ~FMODE_NONOTIFY;
 
 	/*
 	 * O_SYNC is implemented as __O_SYNC|O_DSYNC.  As many places only

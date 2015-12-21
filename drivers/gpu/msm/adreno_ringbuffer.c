@@ -427,7 +427,7 @@ int _ringbuffer_start_common(struct adreno_ringbuffer *rb)
 		return status;
 
 	/* idle device to validate ME INIT */
-	status = adreno_spin_idle(device);
+	status = adreno_idle(device);
 
 	if (status == 0)
 		rb->flags |= KGSL_FLAGS_STARTED;

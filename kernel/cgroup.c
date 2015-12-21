@@ -4940,7 +4940,7 @@ EXPORT_SYMBOL_GPL(free_css_id);
 static struct css_id *get_new_cssid(struct cgroup_subsys *ss, int depth)
 {
 	struct css_id *newid;
-	int ret, size;
+	int myid, error, size;
 
 	BUG_ON(!ss->use_id);
 
@@ -4948,24 +4948,35 @@ static struct css_id *get_new_cssid(struct cgroup_subsys *ss, int depth)
 	newid = kzalloc(size, GFP_KERNEL);
 	if (!newid)
 		return ERR_PTR(-ENOMEM);
-
-	idr_preload(GFP_KERNEL);
+	/* get id */
+	if (unlikely(!idr_pre_get(&ss->idr, GFP_KERNEL))) {
+		error = -ENOMEM;
+		goto err_out;
+	}
 	spin_lock(&ss->id_lock);
 	/* Don't use 0. allocates an ID of 1-65535 */
-	ret = idr_alloc(&ss->idr, newid, 1, CSS_ID_MAX + 1, GFP_NOWAIT);
+	error = idr_get_new_above(&ss->idr, newid, 1, &myid);
 	spin_unlock(&ss->id_lock);
-	idr_preload_end();
 
 	/* Returns error when there are no free spaces for new ID.*/
-	if (ret < 0)
+	if (error) {
+		error = -ENOSPC;
 		goto err_out;
+	}
+	if (myid > CSS_ID_MAX)
+		goto remove_idr;
 
-	newid->id = ret;
+	newid->id = myid;
 	newid->depth = depth;
 	return newid;
+remove_idr:
+	error = -ENOSPC;
+	spin_lock(&ss->id_lock);
+	idr_remove(&ss->idr, myid);
+	spin_unlock(&ss->id_lock);
 err_out:
 	kfree(newid);
-	return ERR_PTR(ret);
+	return ERR_PTR(error);
 
 }
 

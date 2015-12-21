@@ -161,7 +161,6 @@ struct wcd9xxx_ocp_setting {
 #define  WCD9XXX_VDDD_CDC_A_CUR_MAX       5000
 
 #define WCD9XXX_VDD_SPKDRV_NAME "cdc-vdd-spkdrv"
-#define WCD9XXX_VDD_SPKDRV2_NAME "cdc-vdd-spkdrv-2"
 #define WCD9XXX_VDD_HPMIC_SWITCH "cdc-vdd-hpmic-switch"
 #define WCD9XXX_VDD_MICBIAS_NAME "cdc-vdd-mic-bias"
 

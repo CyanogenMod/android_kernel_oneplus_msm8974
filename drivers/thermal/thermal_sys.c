@@ -408,19 +408,25 @@ int sensor_init(struct thermal_zone_device *tz)
 	return 0;
 }
 
-
 static int get_idr(struct idr *idr, struct mutex *lock, int *id)
 {
-	int ret;
+	int err;
+
+again:
+	if (unlikely(idr_pre_get(idr, GFP_KERNEL) == 0))
+		return -ENOMEM;
 
 	if (lock)
 		mutex_lock(lock);
-	ret = idr_alloc(idr, NULL, 0, 0, GFP_KERNEL);
+	err = idr_get_new(idr, NULL, id);
 	if (lock)
 		mutex_unlock(lock);
-	if (unlikely(ret < 0))
-		return ret;
-	*id = ret;
+	if (unlikely(err == -EAGAIN))
+		goto again;
+	else if (unlikely(err))
+		return err;
+
+	*id = *id & MAX_ID_MASK;
 	return 0;
 }
 

@@ -126,7 +126,7 @@ unsigned int nf_iterate(struct list_head *head,
 			unsigned int hook,
 			const struct net_device *indev,
 			const struct net_device *outdev,
-			struct nf_hook_ops **elemp,
+			struct list_head **i,
 			int (*okfn)(struct sk_buff *),
 			int hook_thresh)
 {
@@ -136,20 +136,22 @@ unsigned int nf_iterate(struct list_head *head,
 	 * The caller must not block between calls to this
 	 * function because of risk of continuing from deleted element.
 	 */
-	list_for_each_entry_continue_rcu((*elemp), head, list) {
-		if (hook_thresh > (*elemp)->priority)
+	list_for_each_continue_rcu(*i, head) {
+		struct nf_hook_ops *elem = (struct nf_hook_ops *)*i;
+
+		if (hook_thresh > elem->priority)
 			continue;
 
 		/* Optimization: we don't need to hold module
 		   reference here, since function can't sleep. --RR */
 repeat:
-		verdict = (*elemp)->hook(hook, skb, indev, outdev, okfn);
+		verdict = elem->hook(hook, skb, indev, outdev, okfn);
 		if (verdict != NF_ACCEPT) {
 #ifdef CONFIG_NETFILTER_DEBUG
 			if (unlikely((verdict & NF_VERDICT_MASK)
 							> NF_MAX_VERDICT)) {
 				NFDEBUG("Evil return from %p(%u).\n",
-					(*elemp)->hook, hook);
+					elem->hook, hook);
 				continue;
 			}
 #endif
@@ -170,14 +172,14 @@ int nf_hook_slow(u_int8_t pf, unsigned int hook, struct sk_buff *skb,
 		 int (*okfn)(struct sk_buff *),
 		 int hook_thresh)
 {
-	struct nf_hook_ops *elem;
+	struct list_head *elem;
 	unsigned int verdict;
 	int ret = 0;
 
 	/* We may already have this, but read-locks nest anyway */
 	rcu_read_lock();
 
-	elem = list_entry_rcu(&nf_hooks[pf][hook], struct nf_hook_ops, list);
+	elem = &nf_hooks[pf][hook];
 next_hook:
 	verdict = nf_iterate(&nf_hooks[pf][hook], skb, hook, indev,
 			     outdev, &elem, okfn, hook_thresh);
@@ -189,8 +191,8 @@ next_hook:
 		if (ret == 0)
 			ret = -EPERM;
 	} else if ((verdict & NF_VERDICT_MASK) == NF_QUEUE) {
-		int err = nf_queue(skb, &elem->list, pf, hook, indev, outdev,
-					okfn, verdict >> NF_VERDICT_QBITS);
+		int err = nf_queue(skb, elem, pf, hook, indev, outdev, okfn,
+						verdict >> NF_VERDICT_QBITS);
 		if (err < 0) {
 			if (err == -ECANCELED)
 				goto next_hook;
