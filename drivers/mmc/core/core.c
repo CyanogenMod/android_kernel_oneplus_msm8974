@@ -3037,6 +3037,8 @@ out:
 void mmc_disable_clk_scaling(struct mmc_host *host)
 {
 	cancel_delayed_work_sync(&host->clk_scaling.work);
+	if (host->ops->notify_load)
+		host->ops->notify_load(host, MMC_LOAD_LOW);
 	host->clk_scaling.enable = false;
 }
 EXPORT_SYMBOL_GPL(mmc_disable_clk_scaling);
@@ -3068,8 +3070,8 @@ void mmc_init_clk_scaling(struct mmc_host *host)
 	INIT_DELAYED_WORK(&host->clk_scaling.work, mmc_clk_scale_work);
 	host->clk_scaling.curr_freq = mmc_get_max_frequency(host);
 	if (host->ops->notify_load)
-		host->ops->notify_load(host, MMC_LOAD_HIGH);
-	host->clk_scaling.state = MMC_LOAD_HIGH;
+		host->ops->notify_load(host, MMC_LOAD_INIT);
+	host->clk_scaling.state = MMC_LOAD_INIT;
 	mmc_reset_clk_scale_stats(host);
 	host->clk_scaling.enable = true;
 	host->clk_scaling.initialized = true;
@@ -3086,6 +3088,8 @@ EXPORT_SYMBOL_GPL(mmc_init_clk_scaling);
 void mmc_exit_clk_scaling(struct mmc_host *host)
 {
 	cancel_delayed_work_sync(&host->clk_scaling.work);
+	if (host->ops->notify_load)
+		host->ops->notify_load(host, MMC_LOAD_LOW);
 	memset(&host->clk_scaling, 0, sizeof(host->clk_scaling));
 }
 EXPORT_SYMBOL_GPL(mmc_exit_clk_scaling);
@@ -3639,6 +3643,7 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 	switch (mode) {
 	case PM_HIBERNATION_PREPARE:
 	case PM_SUSPEND_PREPARE:
+	case PM_RESTORE_PREPARE:
 		if (host->card && mmc_card_mmc(host->card)) {
 			mmc_claim_host(host);
 			err = mmc_stop_bkops(host->card);
@@ -3649,7 +3654,6 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 				return err;
 			}
 		}
-	case PM_RESTORE_PREPARE:
 
 		spin_lock_irqsave(&host->lock, flags);
 		if (mmc_bus_needs_resume(host)) {

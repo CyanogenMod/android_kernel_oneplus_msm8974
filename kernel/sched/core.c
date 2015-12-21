@@ -297,6 +297,60 @@ int sysctl_sched_rt_runtime = 950000;
 
 
 /*
+ * __task_rq_lock - lock the rq @p resides on.
+ */
+static inline struct rq *__task_rq_lock(struct task_struct *p)
+	__acquires(rq->lock)
+{
+	struct rq *rq;
+
+	lockdep_assert_held(&p->pi_lock);
+
+	for (;;) {
+		rq = task_rq(p);
+		raw_spin_lock(&rq->lock);
+		if (likely(rq == task_rq(p)))
+			return rq;
+		raw_spin_unlock(&rq->lock);
+	}
+}
+
+/*
+ * task_rq_lock - lock p->pi_lock and lock the rq @p resides on.
+ */
+static struct rq *task_rq_lock(struct task_struct *p, unsigned long *flags)
+	__acquires(p->pi_lock)
+	__acquires(rq->lock)
+{
+	struct rq *rq;
+
+	for (;;) {
+		raw_spin_lock_irqsave(&p->pi_lock, *flags);
+		rq = task_rq(p);
+		raw_spin_lock(&rq->lock);
+		if (likely(rq == task_rq(p)))
+			return rq;
+		raw_spin_unlock(&rq->lock);
+		raw_spin_unlock_irqrestore(&p->pi_lock, *flags);
+	}
+}
+
+static void __task_rq_unlock(struct rq *rq)
+	__releases(rq->lock)
+{
+	raw_spin_unlock(&rq->lock);
+}
+
+static inline void
+task_rq_unlock(struct rq *rq, struct task_struct *p, unsigned long *flags)
+	__releases(rq->lock)
+	__releases(p->pi_lock)
+{
+	raw_spin_unlock(&rq->lock);
+	raw_spin_unlock_irqrestore(&p->pi_lock, *flags);
+}
+
+/*
  * this_rq_lock - lock this runqueue and disable interrupts.
  */
 static struct rq *this_rq_lock(void)
@@ -1550,7 +1604,13 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	int cpu, src_cpu, success = 0;
 	int notify = 0;
 
-	smp_wmb();
+	/*
+	 * If we are going to wake up a thread waiting for CONDITION we
+	 * need to ensure that CONDITION=1 done by the caller can not be
+	 * reordered with p->state check below. This pairs with mb() in
+	 * set_current_state() the waiting thread does.
+	 */
+	smp_mb__before_spinlock();
 	raw_spin_lock_irqsave(&p->pi_lock, flags);
 	src_cpu = cpu = task_cpu(p);
 
@@ -3413,6 +3473,12 @@ need_resched:
 	if (sched_feat(HRTICK))
 		hrtick_clear(rq);
 
+	/*
+	 * Make sure that signal_pending_state()->signal_pending() below
+	 * can't be reordered with __set_current_state(TASK_INTERRUPTIBLE)
+	 * done by the caller to avoid the race with signal_wake_up().
+	 */
+	smp_mb__before_spinlock();
 	raw_spin_lock_irq(&rq->lock);
 
 	switch_count = &prev->nivcsw;
@@ -4616,6 +4682,10 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 	get_task_struct(p);
 	rcu_read_unlock();
 
+	if (p->flags & PF_NO_SETAFFINITY) {
+		retval = -EINVAL;
+		goto out_put_task;
+	}
 	if (!alloc_cpumask_var(&cpus_allowed, GFP_KERNEL)) {
 		retval = -ENOMEM;
 		goto out_put_task;
@@ -5240,11 +5310,6 @@ int set_cpus_allowed_ptr(struct task_struct *p, const struct cpumask *new_mask)
 		goto out;
 
 	if (!cpumask_intersects(new_mask, cpu_active_mask)) {
-		ret = -EINVAL;
-		goto out;
-	}
-
-	if (unlikely((p->flags & PF_THREAD_BOUND) && p != current)) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -8088,8 +8153,7 @@ static int tg_set_cfs_bandwidth(struct task_group *tg, u64 period, u64 quota)
 	/* restart the period timer (if active) to handle new period expiry */
 	if (runtime_enabled && cfs_b->timer_active) {
 		/* force a reprogram */
-		cfs_b->timer_active = 0;
-		__start_cfs_bandwidth(cfs_b);
+		__start_cfs_bandwidth(cfs_b, true);
 	}
 	raw_spin_unlock_irq(&cfs_b->lock);
 

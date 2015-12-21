@@ -320,6 +320,7 @@ struct qpnp_chg_irq {
 	int		irq;
 	unsigned long		disabled;
 	unsigned long		wake_enable;
+	bool			is_wake;
 };
 
 struct qpnp_chg_regulator {
@@ -647,6 +648,10 @@ qpnp_chg_enable_irq(struct qpnp_chg_irq *irq)
 		pr_debug("number = %d\n", irq->irq);
 		enable_irq(irq->irq);
 	}
+	if ((irq->is_wake) && (!__test_and_set_bit(0, &irq->wake_enable))) {
+		pr_debug("enable wake, number = %d\n", irq->irq);
+		enable_irq_wake(irq->irq);
+	}
 }
 
 static void
@@ -655,6 +660,10 @@ qpnp_chg_disable_irq(struct qpnp_chg_irq *irq)
 	if (!__test_and_set_bit(0, &irq->disabled)) {
 		pr_debug("number = %d\n", irq->irq);
 		disable_irq_nosync(irq->irq);
+	}
+	if ((irq->is_wake) && (__test_and_clear_bit(0, &irq->wake_enable))) {
+		pr_debug("disable wake, number = %d\n", irq->irq);
+		disable_irq_wake(irq->irq);
 	}
 }
 
@@ -665,6 +674,7 @@ qpnp_chg_irq_wake_enable(struct qpnp_chg_irq *irq)
 		pr_debug("number = %d\n", irq->irq);
 		enable_irq_wake(irq->irq);
 	}
+	irq->is_wake = true;
 }
 
 static void
@@ -674,6 +684,7 @@ qpnp_chg_irq_wake_disable(struct qpnp_chg_irq *irq)
 		pr_debug("number = %d\n", irq->irq);
 		disable_irq_wake(irq->irq);
 	}
+	irq->is_wake = false;
 }
 
 #define USB_OTG_EN_BIT	BIT(0)
@@ -1085,14 +1096,14 @@ qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 }
 #endif /* CONFIG_BQ24196_CHARGER */
 
-#define QPNP_CHG_VINMIN_MIN_MV		4000
+#define QPNP_CHG_VINMIN_MIN_MV		4200
 #define QPNP_CHG_VINMIN_HIGH_MIN_MV	5600
 #define QPNP_CHG_VINMIN_HIGH_MIN_VAL	0x2B
 #define QPNP_CHG_VINMIN_MAX_MV		9600
 #define QPNP_CHG_VINMIN_STEP_MV		50
 #define QPNP_CHG_VINMIN_STEP_HIGH_MV	200
 #define QPNP_CHG_VINMIN_MASK		0x3F
-#define QPNP_CHG_VINMIN_MIN_VAL	        0x0C
+#define QPNP_CHG_VINMIN_MIN_VAL	0x10
 #ifdef CONFIG_BQ24196_CHARGER
 static int
 qpnp_chg_vinmin_set(struct qpnp_chg_chip *chip, int voltage)
@@ -1110,8 +1121,8 @@ qpnp_chg_vinmin_set(struct qpnp_chg_chip *chip, int voltage)
 {
 	u8 temp;
 
-	if ((voltage < QPNP_CHG_VINMIN_MIN_MV)
-			|| (voltage > QPNP_CHG_VINMIN_MAX_MV)) {
+	if (voltage < QPNP_CHG_VINMIN_MIN_MV
+			|| voltage > QPNP_CHG_VINMIN_MAX_MV) {
 		pr_err("bad mV=%d asked to set\n", voltage);
 		return -EINVAL;
 	}
@@ -5079,8 +5090,8 @@ qpnp_chg_request_irqs(struct qpnp_chg_chip *chip)
 
 			qpnp_chg_irq_wake_enable(&chip->chg_trklchg);
 			qpnp_chg_irq_wake_enable(&chip->chg_failed);
-			qpnp_chg_disable_irq(&chip->chg_vbatdet_lo);
 			qpnp_chg_irq_wake_enable(&chip->chg_vbatdet_lo);
+			qpnp_chg_disable_irq(&chip->chg_vbatdet_lo);
 
 			break;
 		case SMBB_BAT_IF_SUBTYPE:

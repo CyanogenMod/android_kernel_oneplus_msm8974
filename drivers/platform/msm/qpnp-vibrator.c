@@ -231,12 +231,12 @@ static void qpnp_vib_enable(struct timed_output_dev *dev, int value)
 					 timed_dev);
 	unsigned long flags;
 
-retry:
 	spin_lock_irqsave(&vib->lock, flags);
-	if (hrtimer_try_to_cancel(&vib->vib_timer) < 0) {
+	while (unlikely(hrtimer_active(&vib->vib_timer)) &&
+			hrtimer_try_to_cancel(&vib->vib_timer) < 0) {
 		spin_unlock_irqrestore(&vib->lock, flags);
 		cpu_relax();
-		goto retry;
+		spin_lock_irqsave(&vib->lock, flags);
 	}
 
 	if (value == 0)
