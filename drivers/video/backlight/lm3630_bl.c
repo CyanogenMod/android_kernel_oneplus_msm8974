@@ -212,26 +212,11 @@ static int lm3630_intr_config(struct lm3630_chip_data *pchip)
 	if (!use_fb_notifier && bl_level == 0)
 		state_notifier_call_chain(STATE_NOTIFIER_SUSPEND, NULL);
 
-		// Add external function calls here...
-#ifdef CONFIG_DYNAMIC_FSYNC
-		// if dynamic fsync is defined call external suspend function
-		dyn_fsync_suspend();
-#endif
-	}
 	// if display is switched on
 	if (!use_fb_notifier && bl_level != 0 && pre_brightness == 0)
 		state_notifier_call_chain(STATE_NOTIFIER_ACTIVE, NULL);
 #endif /*CONFIG_STATE_NOTIFIER*/
 
-		// Add external function calls here...
-#ifdef CONFIG_DYNAMIC_FSYNC
-		// if dynamic fsync is defined call external resume function
-		dyn_fsync_resume();
-#endif		
-	}
-#endif
-
-#ifdef CONFIG_MACH_OPPO
 /* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/04/28  Add for add log for 14001 black screen */
 		if(pre_brightness == 0)
 			{pr_err("%s set brightness :  %d \n",__func__,bl_level);}
