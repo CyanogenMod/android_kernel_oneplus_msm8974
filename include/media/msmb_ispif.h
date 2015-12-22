@@ -1,3 +1,7 @@
+#ifdef CONFIG_OPPO_CAMERA_50
+#include <media/msmb_ispif_oppo_50.h>
+#else
+
 #ifndef MSM_CAM_ISPIF_H
 #define MSM_CAM_ISPIF_H
 
@@ -122,3 +126,5 @@ struct ispif_cfg_data {
 	_IOWR('V', BASE_VIDIOC_PRIVATE, struct ispif_cfg_data)
 
 #endif /* MSM_CAM_ISPIF_H */
+
+#endif

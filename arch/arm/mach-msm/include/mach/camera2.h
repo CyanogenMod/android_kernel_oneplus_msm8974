@@ -13,6 +13,8 @@
 
 #ifdef CONFIG_OPPO_CAMERA
 #include <mach/camera2-oppo.h>
+#elif defined(CONFIG_OPPO_CAMERA_50)
+#include <mach/camera2_oppo_50.h>
 #else
 
 #ifndef __CAMERA2_H__
@@ -157,4 +159,5 @@ struct msm_eeprom_board_info {
 };
 
 #endif
+
 #endif

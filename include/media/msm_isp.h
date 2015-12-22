@@ -1,3 +1,7 @@
+#ifdef CONFIG_OPPO_CAMERA_50
+#include <media/msm_isp_oppo_50.h>
+#else
+
 #ifndef __MSM_ISP_H__
 #define __MSM_ISP_H__
 
@@ -342,3 +346,4 @@ struct msm_frame_info {
 
 #endif /*__MSM_ISP_H__*/
 
+#endif

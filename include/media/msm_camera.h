@@ -10,8 +10,11 @@
  * GNU General Public License for more details.
  *
  */
+
 #ifdef CONFIG_OPPO_CAMERA
 #include <media/msm_camera_oppo.h>
+#elif defined(CONFIG_OPPO_CAMERA_50)
+#include <media/msm_camera_oppo_50.h>
 #else
 
 #ifndef __LINUX_MSM_CAMERA_H
@@ -2286,4 +2289,5 @@ struct msm_ver_num_info {
 	(handle |= (0x1 << 7) | (data & 0x7F))
 
 #endif /* __LINUX_MSM_CAMERA_H */
+
 #endif
