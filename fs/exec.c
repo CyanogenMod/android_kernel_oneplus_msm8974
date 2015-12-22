@@ -1312,7 +1312,7 @@ static void bprm_fill_uid(struct linux_binprm *bprm)
 
 /* 
  * Fill the binprm structure from the inode.
-/*
+ * 
  * Fill the binprm structure from the inode.
  * Check permissions, then read the first 128 (BINPRM_BUF_SIZE) bytes
  *

@@ -422,6 +422,11 @@ extern int keventd_up(void);
 
 int execute_in_process_context(work_func_t fn, struct execute_work *);
 
+extern bool mod_delayed_work_on(int cpu, struct workqueue_struct *wq,
+			struct delayed_work *dwork, unsigned long delay);
+extern bool mod_delayed_work(struct workqueue_struct *wq,
+			struct delayed_work *dwork, unsigned long delay);
+
 extern bool flush_work(struct work_struct *work);
 extern bool flush_work_sync(struct work_struct *work);
 extern bool cancel_work_sync(struct work_struct *work);
