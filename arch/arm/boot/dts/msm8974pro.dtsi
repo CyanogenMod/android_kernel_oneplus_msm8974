@@ -1799,7 +1799,13 @@
 		/* Nominal / Turbo */
 		<26 512 0 4912000>, <89 604 0 9248000>,
 		/* Turbo / Turbo */
+		<26 512 0 7464000>, <89 604 0 9248000>,
+		/* Aux Turbo / low Turbo */
+		<26 512 0 8528000>, <89 604 0 9248000>,
+		/* Aux Nominal / Turbo */
 		<26 512 0 7464000>, <89 604 0 9248000>;
+		/* Aux Turbo / Turbo */
+		<26 512 0 8528000>, <89 604 0 10192000>;
 
        qcom,gpu-pwrlevels {
                #address-cells = <1>;
@@ -1809,36 +1815,50 @@
 
                qcom,gpu-pwrlevel@0 {
                        reg = <0>;
-                       qcom,gpu-freq = <578000000>;
-                       qcom,bus-freq = <13>;
+                       qcom,gpu-freq = <657500000>;
+                       qcom,bus-freq = <16>;
                };
 
                qcom,gpu-pwrlevel@1 {
                        reg = <1>;
-                       qcom,gpu-freq = <462400000>;
-                       qcom,bus-freq = <10>;
+                       qcom,gpu-freq = <578000000>;
+                       qcom,bus-freq = <13>;
                };
 
                qcom,gpu-pwrlevel@2 {
                        reg = <2>;
-                       qcom,gpu-freq = <389000000>;
-                       qcom,bus-freq = <7>;
+                       qcom,gpu-freq = <462400000>;
+                       qcom,bus-freq = <10>;
                };
 
                qcom,gpu-pwrlevel@3 {
                        reg = <3>;
-                       qcom,gpu-freq = <330000000>;
-                       qcom,bus-freq = <4>;
+                       qcom,gpu-freq = <389000000>;
+                       qcom,bus-freq = <7>;
                };
 
                qcom,gpu-pwrlevel@4 {
                        reg = <4>;
-                       qcom,gpu-freq = <200000000>;
-                       qcom,bus-freq = <1>;
+                       qcom,gpu-freq = <330000000>;
+                       qcom,bus-freq = <4>;
                };
 
                qcom,gpu-pwrlevel@5 {
                        reg = <5>;
+                       qcom,gpu-freq = <200000000>;
+                       qcom,bus-freq = <1>;
+               };
+
+               qcom,gpu-pwrlevel@6 {
+                       reg = <6>;
+                       qcom,gpu-freq = <27000000>;
+                       qcom,bus-freq = <0>;
+               };
+
+			   /* this dummy power level 7 is implemented to make
+				  the system use power level 6; it is never actively used */
+               qcom,gpu-pwrlevel@7 {
+                       reg = <7>;
                        qcom,gpu-freq = <27000000>;
                        qcom,bus-freq = <0>;
                };
