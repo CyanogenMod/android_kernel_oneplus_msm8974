@@ -548,6 +548,7 @@ static int kgsl_pwrctrl_gpu_available_frequencies_show(
 					struct device_attribute *attr,
 					char *buf)
 {
+        unsigned long freq;
 	struct kgsl_device *device = kgsl_device_from_dev(dev);
 	struct kgsl_pwrctrl *pwr;
 	int index, num_chars = 0;
@@ -555,11 +556,13 @@ static int kgsl_pwrctrl_gpu_available_frequencies_show(
 	if (device == NULL)
 		return 0;
 	pwr = &device->pwrctrl;
-	for (index = 0; index < pwr->num_pwrlevels - 1; index++)
-		num_chars += snprintf(buf + num_chars, PAGE_SIZE, "%d ",
-		pwr->pwrlevels[index].gpu_freq);
-	buf[num_chars++] = '\n';
-	return num_chars;
+	
+ 	if (device->state == KGSL_STATE_SLUMBER)
+ 		freq = pwr->pwrlevels[pwr->num_pwrlevels - 1].gpu_freq;
+ 	else
+ 		freq = kgsl_pwrctrl_active_freq(pwr);
+ 
+ 	return snprintf(buf, PAGE_SIZE, "%lu\n", freq);  
 }
 
 static int kgsl_pwrctrl_reset_count_show(struct device *dev,
