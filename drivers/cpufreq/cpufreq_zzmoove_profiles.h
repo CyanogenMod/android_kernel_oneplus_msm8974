@@ -44,7 +44,7 @@
  */
 
 // NOTE: profile values in this version are mainly for Snapdragon devices!
-static char profiles_file_version[20] = "0.3 beta8 SNAP";
+static char profiles_file_version[20] = "develop-24.09.15";
 #define PROFILE_TABLE_END ~1
 #define END_OF_PROFILES "end"
 #define PROFILE_MAX_FREQ (2457600)	// ZZ: max possible freq in system table for freq adaption (possible OC frequencies inclusive)
@@ -301,7 +301,7 @@ struct zzmoove_profile zzmoove_profiles[] = {
 		1,		// block_up_multiplier_hotplug5 (1=disable hotplug up block cycles for 3rd core, 2 to 25x)
 		1,		// block_up_multiplier_hotplug6 (1=disable hotplug up block cycles for 4th core, 2 to 25x)
 		1,		// block_up_multiplier_hotplug7 (1=disable hotplug up block cycles for 4th core, 2 to 25x)
-		2,		// hotplug_block_down_cycles (0=disable, any value above 0)
+		20,		// hotplug_block_down_cycles (0=disable, any value above 0)
 		1,		// block_down_multiplier_hotplug1 (1=disable hotplug down block cycles for 2nd core, 2 to 25x)
 		1,		// block_down_multiplier_hotplug2 (1=disable hotplug down block cycles for 3rd core, 2 to 25x)
 		1,		// block_down_multiplier_hotplug3 (1=disable hotplug down block cycles for 4th core, 2 to 25x)
@@ -476,7 +476,7 @@ struct zzmoove_profile zzmoove_profiles[] = {
 		1,		// block_up_multiplier_hotplug5
 		1,		// block_up_multiplier_hotplug6
 		1,		// block_up_multiplier_hotplug7
-		2,		// hotplug_block_down_cycles
+		20,		// hotplug_block_down_cycles
 		1,		// block_down_multiplier_hotplug1
 		1,		// block_down_multiplier_hotplug2
 		1,		// block_down_multiplier_hotplug3
@@ -651,7 +651,7 @@ struct zzmoove_profile zzmoove_profiles[] = {
 		1,		// block_up_multiplier_hotplug5
 		1,		// block_up_multiplier_hotplug6
 		1,		// block_up_multiplier_hotplug7
-		2,		// hotplug_block_down_cycles
+		20,		// hotplug_block_down_cycles
 		1,		// block_down_multiplier_hotplug1
 		1,		// block_down_multiplier_hotplug2
 		1,		// block_down_multiplier_hotplug3
@@ -826,7 +826,7 @@ struct zzmoove_profile zzmoove_profiles[] = {
 		1,		// block_up_multiplier_hotplug5
 		1,		// block_up_multiplier_hotplug6
 		1,		// block_up_multiplier_hotplug7
-		2,		// hotplug_block_down_cycles
+		20,		// hotplug_block_down_cycles
 		1,		// block_down_multiplier_hotplug1
 		1,		// block_down_multiplier_hotplug2
 		1,		// block_down_multiplier_hotplug3
@@ -1001,7 +1001,7 @@ struct zzmoove_profile zzmoove_profiles[] = {
 		1,		// block_up_multiplier_hotplug5
 		1,		// block_up_multiplier_hotplug6
 		1,		// block_up_multiplier_hotplug7
-		2,		// hotplug_block_down_cycles
+		20,		// hotplug_block_down_cycles
 		1,		// block_down_multiplier_hotplug1
 		1,		// block_down_multiplier_hotplug2
 		1,		// block_down_multiplier_hotplug3
@@ -1177,7 +1177,7 @@ struct zzmoove_profile zzmoove_profiles[] = {
 		1,		// block_up_multiplier_hotplug5
 		1,		// block_up_multiplier_hotplug6
 		1,		// block_up_multiplier_hotplug7
-		2,		// hotplug_block_down_cycles
+		20,		// hotplug_block_down_cycles
 		1,		// block_down_multiplier_hotplug1
 		1,		// block_down_multiplier_hotplug2
 		1,		// block_down_multiplier_hotplug3
@@ -1352,7 +1352,7 @@ struct zzmoove_profile zzmoove_profiles[] = {
 		1,		// block_up_multiplier_hotplug5
 		1,		// block_up_multiplier_hotplug6
 		1,		// block_up_multiplier_hotplug7
-		2,		// hotplug_block_down_cycles
+		20,		// hotplug_block_down_cycles
 		1,		// block_down_multiplier_hotplug1
 		1,		// block_down_multiplier_hotplug2
 		1,		// block_down_multiplier_hotplug3
@@ -1527,7 +1527,7 @@ struct zzmoove_profile zzmoove_profiles[] = {
 		1,		// block_up_multiplier_hotplug5
 		1,		// block_up_multiplier_hotplug6
 		1,		// block_up_multiplier_hotplug7
-		2,		// hotplug_block_down_cycles
+		20,		// hotplug_block_down_cycles
 		1,		// block_down_multiplier_hotplug1
 		1,		// block_down_multiplier_hotplug2
 		1,		// block_down_multiplier_hotplug3
@@ -1702,7 +1702,7 @@ struct zzmoove_profile zzmoove_profiles[] = {
 		1,		// block_up_multiplier_hotplug5
 		1,		// block_up_multiplier_hotplug6
 		1,		// block_up_multiplier_hotplug7
-		2,		// hotplug_block_down_cycles
+		20,		// hotplug_block_down_cycles
 		1,		// block_down_multiplier_hotplug1
 		1,		// block_down_multiplier_hotplug2
 		1,		// block_down_multiplier_hotplug3
@@ -1877,7 +1877,7 @@ struct zzmoove_profile zzmoove_profiles[] = {
 		1,		// block_up_multiplier_hotplug5
 		1,		// block_up_multiplier_hotplug6
 		1,		// block_up_multiplier_hotplug7
-		2,		// hotplug_block_down_cycles
+		20,		// hotplug_block_down_cycles
 		1,		// block_down_multiplier_hotplug1
 		1,		// block_down_multiplier_hotplug2
 		1,		// block_down_multiplier_hotplug3
@@ -2054,7 +2054,7 @@ struct zzmoove_profile zzmoove_profiles[] = {
 		1,		// block_up_multiplier_hotplug5
 		1,		// block_up_multiplier_hotplug6
 		1,		// block_up_multiplier_hotplug7
-		2,		// hotplug_block_down_cycles
+		20,		// hotplug_block_down_cycles
 		1,		// block_down_multiplier_hotplug1
 		1,		// block_down_multiplier_hotplug2
 		1,		// block_down_multiplier_hotplug3
