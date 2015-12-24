@@ -19,6 +19,7 @@ struct rq_data {
 	unsigned long rq_poll_total_jiffies;
 	unsigned long def_timer_last_jiffy;
 	unsigned int hotplug_disabled;
+	unsigned int hotplug_enabled;
 	int64_t def_start_time;
 	struct attribute_group *attr_group;
 	struct kobject *kobj;

@@ -116,7 +116,7 @@ enum {
 	HPUPDATE_IN_PROGRESS = 2, /* we are in the process of hotplugging */
 };
 
-static int msm_mpd_enabled = 1;
+static int msm_mpd_enabled = 0;
 module_param_named(enabled, msm_mpd_enabled, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 static struct dentry *debugfs_base;

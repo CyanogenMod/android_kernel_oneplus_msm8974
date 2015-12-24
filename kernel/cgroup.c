@@ -52,7 +52,7 @@
 #include <linux/module.h>
 #include <linux/delayacct.h>
 #include <linux/cgroupstats.h>
-#include <linux/hash.h>
+#include <linux/hashtable.h>
 #include <linux/namei.h>
 #include <linux/pid_namespace.h>
 #include <linux/idr.h>
@@ -356,22 +356,18 @@ static int css_set_count;
  * account cgroups in empty hierarchies.
  */
 #define CSS_SET_HASH_BITS	7
-#define CSS_SET_TABLE_SIZE	(1 << CSS_SET_HASH_BITS)
-static struct hlist_head css_set_table[CSS_SET_TABLE_SIZE];
+static DEFINE_HASHTABLE(css_set_table, CSS_SET_HASH_BITS);
 
-static struct hlist_head *css_set_hash(struct cgroup_subsys_state *css[])
+static unsigned long css_set_hash(struct cgroup_subsys_state *css[])
 {
 	int i;
-	int index;
-	unsigned long tmp = 0UL;
+	unsigned long key = 0UL;
 
 	for (i = 0; i < CGROUP_SUBSYS_COUNT; i++)
-		tmp += (unsigned long)css[i];
-	tmp = (tmp >> 16) ^ tmp;
+		key += (unsigned long)css[i];
+	key = (key >> 16) ^ key;
 
-	index = hash_long(tmp, CSS_SET_HASH_BITS);
-
-	return &css_set_table[index];
+	return key;
 }
 
 static void free_css_set_work(struct work_struct *work)
@@ -442,7 +438,7 @@ static void put_css_set(struct css_set *cg)
 		return;
 	}
 
-	hlist_del(&cg->hlist);
+	hash_del(&cg->hlist);
 	css_set_count--;
 
 	write_unlock(&css_set_lock);
@@ -541,9 +537,9 @@ static struct css_set *find_existing_css_set(
 {
 	int i;
 	struct cgroupfs_root *root = cgrp->root;
-	struct hlist_head *hhead;
 	struct hlist_node *node;
 	struct css_set *cg;
+	unsigned long key;
 
 	/*
 	 * Build the set of subsystem state objects that we want to see in the
@@ -563,8 +559,8 @@ static struct css_set *find_existing_css_set(
 		}
 	}
 
-	hhead = css_set_hash(template);
-	hlist_for_each_entry(cg, node, hhead, hlist) {
+	key = css_set_hash(template);
+	hash_for_each_possible(css_set_table, cg, node, hlist, key) {
 		if (!compare_css_sets(cg, oldcg, cgrp, template))
 			continue;
 
@@ -648,8 +644,8 @@ static struct css_set *find_css_set(
 
 	struct list_head tmp_cg_links;
 
-	struct hlist_head *hhead;
 	struct cg_cgroup_link *link;
+	unsigned long key;
 
 	/* First see if we already have a cgroup group that matches
 	 * the desired set */
@@ -695,8 +691,8 @@ static struct css_set *find_css_set(
 	css_set_count++;
 
 	/* Add this cgroup group to the hash table */
-	hhead = css_set_hash(res->subsys);
-	hlist_add_head(&res->hlist, hhead);
+	key = css_set_hash(res->subsys);
+	hash_add(css_set_table, &res->hlist, key);
 
 	write_unlock(&css_set_lock);
 
@@ -1546,6 +1542,8 @@ static struct dentry *cgroup_mount(struct file_system_type *fs_type,
 		struct cgroupfs_root *existing_root;
 		const struct cred *cred;
 		int i;
+		struct hlist_node *node;
+		struct css_set *cg;
 
 		BUG_ON(sb->s_root != NULL);
 
@@ -1599,14 +1597,8 @@ static struct dentry *cgroup_mount(struct file_system_type *fs_type,
 		/* Link the top cgroup in this hierarchy into all
 		 * the css_set objects */
 		write_lock(&css_set_lock);
-		for (i = 0; i < CSS_SET_TABLE_SIZE; i++) {
-			struct hlist_head *hhead = &css_set_table[i];
-			struct hlist_node *node;
-			struct css_set *cg;
-
-			hlist_for_each_entry(cg, node, hhead, hlist)
-				link_css_set(&tmp_cg_links, cg, root_cgrp);
-		}
+		hash_for_each(css_set_table, i, node, cg, hlist)
+			link_css_set(&tmp_cg_links, cg, root_cgrp);
 		write_unlock(&css_set_lock);
 
 		free_cg_links(&tmp_cg_links);
@@ -4164,6 +4156,9 @@ int __init_or_module cgroup_load_subsys(struct cgroup_subsys *ss)
 {
 	int i;
 	struct cgroup_subsys_state *css;
+	struct hlist_node *node, *tmp;
+	struct css_set *cg;
+	unsigned long key;
 
 	/* check name and function validity */
 	if (ss->name == NULL || strlen(ss->name) > MAX_CGROUP_TYPE_NAMELEN ||
@@ -4247,23 +4242,17 @@ int __init_or_module cgroup_load_subsys(struct cgroup_subsys *ss)
 	 * this is all done under the css_set_lock.
 	 */
 	write_lock(&css_set_lock);
-	for (i = 0; i < CSS_SET_TABLE_SIZE; i++) {
-		struct css_set *cg;
-		struct hlist_node *node, *tmp;
-		struct hlist_head *bucket = &css_set_table[i], *new_bucket;
-
-		hlist_for_each_entry_safe(cg, node, tmp, bucket, hlist) {
-			/* skip entries that we already rehashed */
-			if (cg->subsys[ss->subsys_id])
-				continue;
-			/* remove existing entry */
-			hlist_del(&cg->hlist);
-			/* set new value */
-			cg->subsys[ss->subsys_id] = css;
-			/* recompute hash and restore entry */
-			new_bucket = css_set_hash(cg->subsys);
-			hlist_add_head(&cg->hlist, new_bucket);
-		}
+	hash_for_each_safe(css_set_table, i, node, tmp, cg, hlist) {
+		/* skip entries that we already rehashed */
+		if (cg->subsys[ss->subsys_id])
+			continue;
+		/* remove existing entry */
+		hash_del(&cg->hlist);
+		/* set new value */
+		cg->subsys[ss->subsys_id] = css;
+		/* recompute hash and restore entry */
+		key = css_set_hash(cg->subsys);
+		hash_add(css_set_table, node, key);
 	}
 	write_unlock(&css_set_lock);
 
@@ -4288,7 +4277,6 @@ EXPORT_SYMBOL_GPL(cgroup_load_subsys);
 void cgroup_unload_subsys(struct cgroup_subsys *ss)
 {
 	struct cg_cgroup_link *link;
-	struct hlist_head *hhead;
 
 	BUG_ON(ss->module == NULL);
 
@@ -4314,12 +4302,13 @@ void cgroup_unload_subsys(struct cgroup_subsys *ss)
 	write_lock(&css_set_lock);
 	list_for_each_entry(link, &dummytop->css_sets, cgrp_link_list) {
 		struct css_set *cg = link->cg;
+		unsigned long key;
 
-		hlist_del(&cg->hlist);
+		hash_del(&cg->hlist);
 		BUG_ON(!cg->subsys[ss->subsys_id]);
 		cg->subsys[ss->subsys_id] = NULL;
-		hhead = css_set_hash(cg->subsys);
-		hlist_add_head(&cg->hlist, hhead);
+		key = css_set_hash(cg->subsys);
+		hash_add(css_set_table, &cg->hlist, key);
 	}
 	write_unlock(&css_set_lock);
 
@@ -4361,9 +4350,6 @@ int __init cgroup_init_early(void)
 	list_add(&init_css_set_link.cg_link_list,
 		 &init_css_set.cg_links);
 
-	for (i = 0; i < CSS_SET_TABLE_SIZE; i++)
-		INIT_HLIST_HEAD(&css_set_table[i]);
-
 	/* at bootup time, we don't worry about modular subsystems */
 	for (i = 0; i < CGROUP_BUILTIN_SUBSYS_COUNT; i++) {
 		struct cgroup_subsys *ss = subsys[i];
@@ -4394,7 +4380,7 @@ int __init cgroup_init(void)
 {
 	int err;
 	int i;
-	struct hlist_head *hhead;
+	unsigned long key;
 
 	err = bdi_init(&cgroup_backing_dev_info);
 	if (err)
@@ -4410,8 +4396,8 @@ int __init cgroup_init(void)
 	}
 
 	/* Add init_css_set to the hash table */
-	hhead = css_set_hash(init_css_set.subsys);
-	hlist_add_head(&init_css_set.hlist, hhead);
+	key = css_set_hash(init_css_set.subsys);
+	hash_add(css_set_table, &init_css_set.hlist, key);
 	BUG_ON(!init_root_id(&rootnode));
 
 	cgroup_kobj = kobject_create_and_add("cgroup", fs_kobj);

@@ -960,14 +960,14 @@ static void _iface_stat_set_active(struct iface_stat *entry,
 		IF_DEBUG("qtaguid: %s(%s): "
 			 "enable tracking. rfcnt=%d\n", __func__,
 			 entry->ifname,
-			 percpu_read(*net_dev->pcpu_refcnt));
+			 __this_cpu_read(*net_dev->pcpu_refcnt));
 	} else {
 		entry->active = false;
 		entry->net_dev = NULL;
 		IF_DEBUG("qtaguid: %s(%s): "
 			 "disable tracking. rfcnt=%d\n", __func__,
 			 entry->ifname,
-			 percpu_read(*net_dev->pcpu_refcnt));
+			 __this_cpu_read(*net_dev->pcpu_refcnt));
 
 	}
 }

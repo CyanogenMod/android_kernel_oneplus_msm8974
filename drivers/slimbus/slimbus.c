@@ -456,8 +456,8 @@ static int slim_register_controller(struct slim_controller *ctrl)
 	if (ret)
 		goto out_list;
 
-	dev_dbg(&ctrl->dev, "Bus [%s] registered:dev:%x\n", ctrl->name,
-							(u32)&ctrl->dev);
+	dev_dbg(&ctrl->dev, "Bus [%s] registered:dev:%p\n", ctrl->name,
+							&ctrl->dev);
 
 	if (ctrl->nports) {
 		ctrl->ports = kzalloc(ctrl->nports * sizeof(struct slim_port),
