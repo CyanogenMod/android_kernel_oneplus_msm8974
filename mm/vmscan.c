@@ -2113,7 +2113,6 @@ static inline bool should_continue_reclaim(struct zone *zone,
 {
 	unsigned long pages_for_compaction;
 	unsigned long inactive_lru_pages;
-	struct lruvec *lruvec;
 
 	/* If not in reclaim/compaction mode, stop */
 	if (!in_reclaim_compaction(sc))
@@ -2146,10 +2145,9 @@ static inline bool should_continue_reclaim(struct zone *zone,
 	 * If we have not reclaimed enough pages for compaction and the
 	 * inactive lists are large enough, continue reclaiming
 	 */
-	lruvec = mem_cgroup_zone_lruvec(mz->zone, mz->mem_cgroup);
 	pages_for_compaction = (2UL << sc->order);
 	inactive_lru_pages = zone_page_state(zone, NR_INACTIVE_FILE);
-	if (nr_swap_pages > 0)
+	if (get_nr_swap_pages() > 0)
 		inactive_lru_pages += zone_page_state(zone, NR_INACTIVE_ANON);
 	if (sc->nr_reclaimed < pages_for_compaction &&
 			inactive_lru_pages > pages_for_compaction)
@@ -2652,7 +2650,7 @@ static bool pgdat_balanced(pg_data_t *pgdat, int order, int classzone_idx)
 		 * DEF_PRIORITY. Effectively, it considers them balanced so
 		 * they must be considered balanced here as well!
 		 */
-		if (zone->all_unreclaimable) {
+		if (!zone_reclaimable(zone)) {
 			balanced_pages += zone->present_pages;
 			continue;
 		}
