@@ -2826,7 +2826,7 @@ static bool kswapd_shrink_zone(struct zone *zone,
 	 * watermark or 1% of the zone, whichever is smaller.
 	 */
 	balance_gap = min(low_wmark_pages(zone),
-		(zone->managed_pages + KSWAPD_ZONE_BALANCE_GAP_RATIO-1) /
+		(zone->present_pages + KSWAPD_ZONE_BALANCE_GAP_RATIO-1) /
 		KSWAPD_ZONE_BALANCE_GAP_RATIO);
 
 	/*
@@ -3014,7 +3014,6 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
 							order, sc.gfp_mask,
 							&nr_soft_scanned);
 			sc.nr_reclaimed += nr_soft_reclaimed;
-			total_scanned += nr_soft_scanned;
 
 			/*
 			 * There should be no need to raise the scanning
