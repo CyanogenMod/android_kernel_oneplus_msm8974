@@ -501,6 +501,7 @@ typedef struct
    vos_event_t          ftmStopDoneEvent;
 
    tWDA_AddSelfStaDebugParams wdaAddSelfStaParams;
+   wpt_uint8  mgmtTxfailureCnt;
 
 } tWDA_CbContext ; 
 

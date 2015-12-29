@@ -5475,6 +5475,35 @@ __limProcessSmeSpoofMacAddrRequest(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf)
 }
 
 /**
+ * lim_register_mgmt_frame_ind_cb() - Save the Management frame
+ * indication callback in PE.
+ * @pMac: Mac pointer
+ * @pMsgBuf: Msg pointer containing the callback
+ *
+ * This function is used save the Management frame
+ * indication callback in PE.
+ *
+ * Return: None
+ */
+static void lim_register_mgmt_frame_ind_cb(tpAniSirGlobal pMac,
+                                                 tANI_U32 *msg_buf)
+{
+  struct sir_sme_mgmt_frame_cb_req *sme_req =
+             (struct sir_sme_mgmt_frame_cb_req *)msg_buf;
+
+  if (NULL == msg_buf)
+  {
+      limLog(pMac, LOGE, FL("msg_buf is null"));
+      return;
+  }
+  if (sme_req->callback)
+      pMac->mgmt_frame_ind_cb =
+             (sir_mgmt_frame_ind_callback)sme_req->callback;
+  else
+      limLog(pMac, LOGE, FL("sme_req->callback is null"));
+}
+
+/**
  * limProcessSmeReqMessages()
  *
  *FUNCTION:
@@ -5807,7 +5836,9 @@ limProcessSmeReqMessages(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
         case eWNI_SME_MAC_SPOOF_ADDR_IND:
             __limProcessSmeSpoofMacAddrRequest(pMac,  pMsgBuf);
             break ;
-
+        case eWNI_SME_REGISTER_MGMT_FRAME_CB:
+            lim_register_mgmt_frame_ind_cb(pMac, pMsgBuf);
+            break;
         default:
             vos_mem_free((v_VOID_t*)pMsg->bodyptr);
             pMsg->bodyptr = NULL;

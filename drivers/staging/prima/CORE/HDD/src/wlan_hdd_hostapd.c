@@ -1179,13 +1179,6 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             vos_mem_free(pSapEvent->sapevt.sapAssocStaListEvent.pAssocStas);// Release caller allocated memory here
             pSapEvent->sapevt.sapAssocStaListEvent.pAssocStas = NULL;
             return VOS_STATUS_SUCCESS;
-        case eSAP_INDICATE_MGMT_FRAME:
-           hdd_indicateMgmtFrame( pHostapdAdapter, 
-                                 pSapEvent->sapevt.sapManagementFrameInfo.nFrameLength,
-                                 pSapEvent->sapevt.sapManagementFrameInfo.pbFrames,
-                                 pSapEvent->sapevt.sapManagementFrameInfo.frameType, 
-                                 pSapEvent->sapevt.sapManagementFrameInfo.rxChan, 0);
-           return VOS_STATUS_SUCCESS;
         case eSAP_REMAIN_CHAN_READY:
            hdd_remainChanReadyHandler( pHostapdAdapter );
            return VOS_STATUS_SUCCESS;
