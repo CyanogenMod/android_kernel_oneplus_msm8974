@@ -63,5 +63,5 @@ void wlan_deinit_log_completion(void);
 
 void wlan_logging_set_log_level(void);
 
-
+bool wlan_is_logger_thread(int threadId);
 #endif /* WLAN_LOGGING_SOCK_SVC_H */

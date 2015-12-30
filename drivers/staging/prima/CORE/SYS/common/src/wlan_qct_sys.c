@@ -382,9 +382,10 @@ VOS_STATUS sysMcProcessMsg( v_CONTEXT_t pVosContext, vos_msg_t *pMsg )
          // function that is in the message.
          case SYS_MSG_ID_MC_THR_PROBE:
          {
-            VOS_TRACE(VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_ERROR,
-                       " Received SYS_MSG_ID_MC_THR_PROBE message msgType = %d [0x%08x]",
-                       pMsg->type, pMsg->type);
+#ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
+             if(pMsg->callback)
+                ((sysThreadProbeCback)pMsg->callback)(current->pid);
+#endif
             break;
          }
 
@@ -405,7 +406,6 @@ VOS_STATUS sysMcProcessMsg( v_CONTEXT_t pVosContext, vos_msg_t *pMsg )
              WLANFTM_McProcessMsg((v_VOID_t *)pMsg->bodyptr);
              break;
          }
-
          default:
          {
             VOS_TRACE( VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_ERROR,
@@ -471,13 +471,10 @@ VOS_STATUS sysTxProcessMsg( v_CONTEXT_t pVosContext, vos_msg_t *pMsg )
          // function that is in the message.
          case SYS_MSG_ID_TX_THR_PROBE:
          {
-           /* Handling for this message is not needed now so adding 
-            * debug print and VOS_ASSERT*/
-            VOS_TRACE( VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_ERROR,
-                       " Received SYS_MSG_ID_TX_THR_PROBE message msgType= %d [0x%08x]",
-                       pMsg->type, pMsg->type );
-            VOS_ASSERT(0);
-
+#ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
+            if(pMsg->callback)
+               ((sysThreadProbeCback)pMsg->callback)(current->pid);
+#endif
             break;
          }
 
@@ -547,6 +544,15 @@ VOS_STATUS sysRxProcessMsg( v_CONTEXT_t pVosContext, vos_msg_t *pMsg )
             {
                timerCB(pMsg->bodyptr);
             }
+            break;
+         }
+
+         case SYS_MSG_ID_RX_THR_PROBE:
+         {
+#ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
+            if(pMsg->callback)
+                ((sysThreadProbeCback)pMsg->callback)(current->pid);
+#endif
             break;
          }
 

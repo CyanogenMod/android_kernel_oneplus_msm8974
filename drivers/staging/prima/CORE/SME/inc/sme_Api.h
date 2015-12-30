@@ -2156,6 +2156,9 @@ eHalStatus sme_SetKeepAlive (tHalHandle hHal, tANI_U8 sessionId,
 -------------------------------------------------------------------------------*/
 eHalStatus sme_GetOperationChannel(tHalHandle hHal, tANI_U32 *pChannel, tANI_U8 sessionId);
 
+eHalStatus sme_register_mgmt_frame_ind_callback(tHalHandle hHal,
+      sir_mgmt_frame_ind_callback callback);
+
 /* ---------------------------------------------------------------------------
 
     \fn sme_RegisterMgtFrame

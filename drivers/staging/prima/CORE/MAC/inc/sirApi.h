@@ -3676,8 +3676,7 @@ typedef struct sSirSmeCoexInd
 
 typedef struct sSirSmeMgmtFrameInd
 {
-    tANI_U16        mesgType;
-    tANI_U16        mesgLen;
+    tANI_U16        frameLen;
     tANI_U32        rxChan;
     tANI_U8        sessionId;
     tANI_U8         frameType;
@@ -4701,6 +4700,23 @@ typedef void (*pGetBcnMissRateCB)( tANI_S32 bcnMissRate,
                                    VOS_STATUS status, void *data);
 typedef void (*tSirFWStatsCallback)(VOS_STATUS status,
                     tSirFwStatsResult *fwStatsRsp, void *pContext);
+typedef void (*sir_mgmt_frame_ind_callback)(tSirSmeMgmtFrameInd *frame_ind);
+
+
+/**
+ * struct sir_sme_mgmt_frame_cb_req - Register a
+ * management frame callback req
+ * @message_type: message id
+ * @length: msg length
+ * @callback: callback for management frame indication
+ */
+struct sir_sme_mgmt_frame_cb_req
+{
+  tANI_U16 message_type;
+  tANI_U16 length;
+  sir_mgmt_frame_ind_callback callback;
+};
+
 typedef PACKED_PRE struct PACKED_POST
 {
    tANI_U32   msgLen;

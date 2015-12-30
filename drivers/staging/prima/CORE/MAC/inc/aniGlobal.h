@@ -1067,6 +1067,7 @@ typedef struct sAniSirGlobal
     tANI_BOOLEAN miracastVendorConfig;
     v_BOOL_t fActiveScanOnDFSChannels;
     tAuthAckStatus  authAckStatus;
+    sir_mgmt_frame_ind_callback mgmt_frame_ind_cb;
 } tAniSirGlobal;
 
 #ifdef FEATURE_WLAN_TDLS

@@ -42,6 +42,7 @@
 #include "vos_memory.h"
 #include <linux/ratelimit.h>
 #include <asm/arch_timer.h>
+#include <vos_utils.h>
 
 #define LOGGING_TRACE(level, args...) \
 		VOS_TRACE(VOS_MODULE_ID_SVC, level, ## args)
@@ -729,15 +730,17 @@ static int wlan_logging_thread(void *Arg)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0))
 	daemonize("wlan_logging_thread");
 #endif
-
 	while (!gwlan_logging.exit) {
 		ret_wait_status = wait_event_interruptible(
 		  gwlan_logging.wait_queue,
 		  (test_bit(HOST_LOG_POST_MASK, &gwlan_logging.event_flag) ||
 		   gwlan_logging.exit ||
-		   test_bit(LOGGER_MGMT_DATA_PKT_POST_MASK,&gwlan_logging.event_flag) ||
-		   test_bit(LOGGER_FW_LOG_PKT_POST_MASK, &gwlan_logging.event_flag) ||
-		   test_bit(LOGGER_FATAL_EVENT_POST_MASK, &gwlan_logging.event_flag)));
+		   test_bit(LOGGER_MGMT_DATA_PKT_POST_MASK,
+						&gwlan_logging.event_flag) ||
+		   test_bit(LOGGER_FW_LOG_PKT_POST_MASK,
+						&gwlan_logging.event_flag) ||
+		   test_bit(LOGGER_FATAL_EVENT_POST_MASK,
+						&gwlan_logging.event_flag)));
 
 		if (ret_wait_status == -ERESTARTSYS) {
 			pr_err("%s: wait_event return -ERESTARTSYS", __func__);
@@ -1206,7 +1209,6 @@ int wlan_queue_logpkt_for_app(vos_pkt_t *pPacket, uint32 pkt_type)
 	return status;
 }
 
-
 void wlan_process_done_indication(uint8 type, uint32 reason_code)
 {
     if ((type == WLAN_QXDM_LOGGING) && (wlan_is_log_report_in_progress() == TRUE))
@@ -1217,4 +1219,20 @@ void wlan_process_done_indication(uint8 type, uint32 reason_code)
     }
 }
 
+/**
+ * wlan_is_logger_thread()- Check if threadid is
+ * of logger thread
+ *
+ * @threadId: passed threadid
+ *
+ * This function is called to check if threadid is
+ * of logger thread.
+ *
+ * Return: true if threadid is of logger thread.
+ */
+bool wlan_is_logger_thread(int threadId)
+{
+	return ((gwlan_logging.thread) &&
+		(threadId == gwlan_logging.thread->pid));
+}
 #endif /* WLAN_LOGGING_SOCK_SVC_ENABLE */

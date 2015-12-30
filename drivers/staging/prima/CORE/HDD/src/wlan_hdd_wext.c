@@ -7061,20 +7061,8 @@ static int __iw_setnone_getnone(struct net_device *dev,
             tpAniSirGlobal pMac = WLAN_HDD_GET_HAL_CTX(pAdapter);
             v_U32_t roamId = 0;
             tCsrRoamModifyProfileFields modProfileFields;
-            hdd_station_ctx_t *pHddStaCtx =
-                       WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
-            /* Reassoc to same AP, only supported for Open Security*/
-            if ((pHddStaCtx->conn_info.ucEncryptionType ||
-                  pHddStaCtx->conn_info.mcEncryptionType))
-            {
-                 hddLog(LOGE,
-                  FL("Reassoc to same AP, only supported for Open Security"));
-                 return -ENOTSUPP;
-            }
-            sme_GetModifyProfileFields(pMac,
-                      pAdapter->sessionId, &modProfileFields);
-            sme_RoamReassoc(pMac, pAdapter->sessionId,
-                              NULL, modProfileFields, &roamId, 1);
+            sme_GetModifyProfileFields(pMac, pAdapter->sessionId, &modProfileFields);
+            sme_RoamReassoc(pMac, pAdapter->sessionId, NULL, modProfileFields, &roamId, 1);
             return 0;
         }
 
@@ -7310,6 +7298,12 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
     {
         case WE_LOG_DUMP_CMD:
             {
+                if (apps_args[0] == 26) {
+                    if (!pHddCtx->cfg_ini->crash_inject_enabled) {
+                        hddLog(LOGE, "Crash Inject ini disabled, Ignore Crash Inject");
+                        return 0;
+                    }
+                }
                 hddLog(LOG1, "%s: LOG_DUMP %d arg1 %d arg2 %d arg3 %d arg4 %d",
                         __func__, apps_args[0], apps_args[1], apps_args[2],
                         apps_args[3], apps_args[4]);
@@ -7323,6 +7317,13 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
         case WE_P2P_NOA_CMD:
             {
                 p2p_app_setP2pPs_t p2pNoA;
+
+                if (pAdapter->device_mode != WLAN_HDD_P2P_GO) {
+                    hddLog(LOGE,
+                        FL("Setting NoA is not allowed in Device mode:%d"),
+                        pAdapter->device_mode);
+                    return -EINVAL;
+                }
 
                 p2pNoA.opp_ps = apps_args[0];
                 p2pNoA.ctWindow = apps_args[1];

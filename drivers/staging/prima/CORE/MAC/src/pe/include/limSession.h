@@ -359,6 +359,7 @@ typedef struct sPESession           // Added to Support BT-AMP
     tANI_U8  isKeyInstalled;
     tANI_BOOLEAN is11Gonly;
     tANI_BOOLEAN is_ext_caps_present;
+    tANI_BOOLEAN addBssfailed;
 }tPESession, *tpPESession;
 
 #define LIM_MAX_ACTIVE_SESSIONS 4

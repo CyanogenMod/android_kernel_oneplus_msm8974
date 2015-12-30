@@ -2277,7 +2277,9 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                         __limProcessQosMapConfigureFrame(pMac, (tANI_U8 *) pRxPacketInfo,psessionEntry);
                     break;
                     default:
-                        PELOGE(limLog(pMac, LOGE, FL("Qos action %d not handled"), pActionHdr->actionID);)
+                        limLog(pMac, LOG1,
+                         FL("Qos action %d not handled"),
+                         pActionHdr->actionID);
                         break;
                 }
                 break ;
@@ -2319,7 +2321,9 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                     }
                     break;
                 default:
-                    PELOGE(limLog(pMac, LOGE, FL("Spectrum mgmt action id %d not handled"), pActionHdr->actionID);)
+                    limLog(pMac, LOG1,
+                      FL("Spectrum mgmt action id %d not handled"),
+                      pActionHdr->actionID);
                     break;
             }
             break;
@@ -2350,7 +2354,8 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                     break;
 
                 default:
-                    PELOGE(limLog(pMac, LOGE, FL("WME action %d not handled"), pActionHdr->actionID);)
+                    limLog(pMac, LOG1, FL("WME action %d not handled"),
+                                                  pActionHdr->actionID);
                     break;
             }
             break;
@@ -2387,7 +2392,9 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
             __limProcessSMPowerSaveUpdate(pMac, (tANI_U8 *) pRxPacketInfo,psessionEntry);
             break;
         default:
-            PELOGE(limLog(pMac, LOGE, FL("Action ID %d not handled in HT Action category"), pActionHdr->actionID);)
+            limLog(pMac, LOG1,
+                   FL("Action ID %d not handled in HT Action category"),
+                   pActionHdr->actionID);
             break;
         }
         break;
@@ -2439,7 +2446,8 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
                     __limProcessNeighborReport( pMac, (tANI_U8*) pRxPacketInfo, psessionEntry );
                     break;
                 default:
-                    PELOGE( limLog( pMac, LOGE, FL("Action ID %d not handled in RRM"), pActionHdr->actionID);)
+                    limLog( pMac, LOG1, FL("Action ID %d not handled in RRM"),
+                         pActionHdr->actionID);
                     break;
 
             }
@@ -2447,7 +2455,8 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
         else
         {
             // Else we will just ignore the RRM messages.
-            PELOGE( limLog( pMac, LOGE, FL("RRM Action frame ignored as RRM is disabled in cfg"));)
+            limLog( pMac, LOG1,
+              FL("RRM Action frame ignored as RRM is disabled in cfg"));
         }
         break;
 #endif
@@ -2477,13 +2486,14 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
               }
               else
               {
-                 limLog( pMac, LOGE, FL("Dropping the vendor specific action frame because of( "
-                                        "WES Mode not enabled (WESMODE = %d) or OUI mismatch (%02x %02x %02x) or "
-                                        "not received with SelfSta Mac address) system role = %d"),
-                                        IS_WES_MODE_ENABLED(pMac),
-                                        pVendorSpecific->Oui[0], pVendorSpecific->Oui[1],
-                                        pVendorSpecific->Oui[2],
-                                        psessionEntry->limSystemRole );
+                 limLog( pMac, LOG1,
+                      FL("Dropping the vendor specific action frame because of( "
+                      "WES Mode not enabled (WESMODE = %d) or OUI mismatch (%02x %02x %02x) or "
+                      "not received with SelfSta Mac address) system role = %d"),
+                      IS_WES_MODE_ENABLED(pMac),
+                      pVendorSpecific->Oui[0], pVendorSpecific->Oui[1],
+                      pVendorSpecific->Oui[2],
+                      psessionEntry->limSystemRole );
               }
            }
            break;
@@ -2506,8 +2516,10 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
               }
               else
               {
-                 limLog( pMac, LOGE, FL("Unhandled public action frame (Vendor specific). OUI %x %x %x %x"),
-                      pPubAction->Oui[0], pPubAction->Oui[1], pPubAction->Oui[2], pPubAction->Oui[3] );
+                 limLog( pMac, LOG1,
+                    FL("Unhandled public action frame (Vendor specific). OUI %x %x %x %x"),
+                      pPubAction->Oui[0], pPubAction->Oui[1],
+                      pPubAction->Oui[2], pPubAction->Oui[3] );
               }
            }
             break;
@@ -2542,7 +2554,8 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
 #endif
 
         default:
-            PELOGE(limLog(pMac, LOGE, FL("Unhandled public action frame -- %x "), pActionHdr->actionID);)
+            limLog(pMac, LOG1, FL("Unhandled public action frame -- %x "),
+                             pActionHdr->actionID);
             break;
         }
         break;
@@ -2589,7 +2602,8 @@ limProcessActionFrame(tpAniSirGlobal pMac, tANI_U8 *pRxPacketInfo,tpPESession ps
     }
 #endif
     default:
-       PELOGE(limLog(pMac, LOGE, FL("Action category %d not handled"), pActionHdr->category);)
+       limLog(pMac, LOG1,
+         FL("Action category %d not handled"), pActionHdr->category);
        break;
     }
 }
@@ -2639,19 +2653,24 @@ limProcessActionFrameNoSession(tpAniSirGlobal pMac, tANI_U8 *pBd)
                 }
                 else
                 {
-                  limLog( pMac, LOGE, FL("Unhandled public action frame (Vendor specific). OUI %x %x %x %x"),
-                      pActionHdr->Oui[0], pActionHdr->Oui[1], pActionHdr->Oui[2], pActionHdr->Oui[3] );
+                  limLog( pMac, LOG1,
+                     FL("Unhandled public action frame (Vendor specific). OUI %x %x %x %x"),
+                      pActionHdr->Oui[0], pActionHdr->Oui[1],
+                      pActionHdr->Oui[2], pActionHdr->Oui[3]);
                 }
               }
                break;
             default:
-               PELOGE(limLog(pMac, LOGE, FL("Unhandled public action frame -- %x "), pActionHdr->actionID);)
+               limLog(pMac, LOG1,
+                FL("Unhandled public action frame -- %x "), pActionHdr->actionID);
                   break;
          }
          break;
       default:
-         PELOGE(limLog(pMac, LOG1, FL("Unhandled action frame without session -- %x "), pActionHdr->category);)
-            break;
+         limLog(pMac, LOG1,
+          FL("Unhandled action frame without session -- %x "),
+                                    pActionHdr->category);
+         break;
 
    }
 }

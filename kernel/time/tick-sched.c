@@ -19,6 +19,7 @@
 #include <linux/percpu.h>
 #include <linux/profile.h>
 #include <linux/sched.h>
+#include <linux/timer.h>
 #include <linux/module.h>
 #include <linux/rq_stats.h>
 
@@ -291,6 +292,11 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 
 	now = tick_nohz_start_idle(cpu, ts);
 
+#ifdef CONFIG_SMP
+	if (check_pending_deferrable_timers(cpu))
+		raise_softirq_irqoff(TIMER_SOFTIRQ);
+#endif
+
 	/*
 	 * If this cpu is offline and it is the one which updates
 	 * jiffies, then give up the assignment and let it be taken by
@@ -348,7 +354,7 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 	 * Do not stop the tick, if we are only one off
 	 * or if the cpu is required for rcu
 	 */
-	if (!ts->tick_stopped && delta_jiffies <= 1)
+	if (!ts->tick_stopped && delta_jiffies == 1)
 		goto out;
 
 	/* Schedule the tick, if we are at least one jiffie off */

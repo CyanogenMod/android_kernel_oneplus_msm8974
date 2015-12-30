@@ -436,4 +436,5 @@ bool vos_is_wakelock_enabled(void);
 v_BOOL_t vos_isUnloadInProgress(void);
 v_BOOL_t vos_isLoadUnloadInProgress(void);
 
+void vos_probe_threads(void);
 #endif // if !defined __VOS_NVITEM_H
