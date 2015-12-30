@@ -745,7 +745,6 @@ void limSendSmeMgmtFrameInd(
                     tANI_U8 *pRxPacketInfo, tpPESession psessionEntry,
                     tANI_S8 rxRssi)
 {
-    tSirMsgQ              mmhMsg;
     tpSirSmeMgmtFrameInd  pSirSmeMgmtFrame = NULL;
     tANI_U16              length;
     tANI_U8               frameType;
@@ -770,8 +769,7 @@ void limSendSmeMgmtFrameInd(
     }
     vos_mem_set((void*)pSirSmeMgmtFrame, length, 0);
 
-    pSirSmeMgmtFrame->mesgType = eWNI_SME_MGMT_FRM_IND;
-    pSirSmeMgmtFrame->mesgLen = length;
+    pSirSmeMgmtFrame->frameLen = frameLen;
     pSirSmeMgmtFrame->sessionId = sessionId;
     pSirSmeMgmtFrame->frameType = frameType;
     pSirSmeMgmtFrame->rxRssi = rxRssi;
@@ -831,11 +829,14 @@ void limSendSmeMgmtFrameInd(
     vos_mem_zero(pSirSmeMgmtFrame->frameBuf, frameLen);
     vos_mem_copy(pSirSmeMgmtFrame->frameBuf, frame, frameLen);
 
-    mmhMsg.type = eWNI_SME_MGMT_FRM_IND;
-    mmhMsg.bodyptr = pSirSmeMgmtFrame;
-    mmhMsg.bodyval = 0;
-
-    limSysProcessMmhMsgApi(pMac, &mmhMsg, ePROT);
+    if (pMac->mgmt_frame_ind_cb)
+       pMac->mgmt_frame_ind_cb(pSirSmeMgmtFrame);
+    else
+    {
+       limLog(pMac, LOGW,
+               FL("Management indication callback not registered!!"));
+    }
+    vos_mem_free(pSirSmeMgmtFrame);
     return;
 } /*** end limSendSmeListenRsp() ***/
 
