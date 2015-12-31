@@ -82,6 +82,7 @@ struct msm_cpp_timer_t cpp_timer;
 
 static int msm_cpp_buffer_ops(struct cpp_device *cpp_dev,
 	uint32_t buff_mgr_ops, struct msm_buf_mngr_info *buff_mgr_info);
+
 #if CONFIG_MSM_CPP_DBG
 #define CPP_DBG(fmt, args...) pr_err(fmt, ##args)
 #else
@@ -807,10 +808,8 @@ static void cpp_release_hardware(struct cpp_device *cpp_dev)
 	if (cpp_dev->state != CPP_STATE_BOOT) {
 		rc = msm_cpp_buffer_ops(cpp_dev,
 			VIDIOC_MSM_BUF_MNGR_DEINIT, NULL);
-		if (rc < 0) {
-			pr_err("error in buf mngr deinit\n");
-			rc = -EINVAL;
-		}
+		if (rc < 0)
+			pr_err("error in buf mngr deinit rc=%d\n", rc);
 		free_irq(cpp_dev->irq->start, cpp_dev);
 		tasklet_kill(&cpp_dev->cpp_tasklet);
 		atomic_set(&cpp_dev->irq_cnt, 0);
@@ -1346,7 +1345,7 @@ static int msm_cpp_cfg(struct cpp_device *cpp_dev,
 		&buff_mgr_info);
 	if (rc < 0) {
 		rc = -EAGAIN;
-		pr_err("error getting buffer rc:%d,at %d\n", rc, __LINE__);
+		pr_debug("error getting buffer rc:%d\n", rc);
 		goto ERROR2;
 	}
 	new_frame->output_buffer_info[0].index = buff_mgr_info.index;
@@ -1377,7 +1376,7 @@ static int msm_cpp_cfg(struct cpp_device *cpp_dev,
 			&dup_buff_mgr_info);
 		if (rc < 0) {
 			rc = -EAGAIN;
-			pr_err("error getting buffer rc:%d, at %d\n", rc, __LINE__);
+			pr_debug("error getting buffer rc:%d\n", rc);
 			goto ERROR3;
 		}
 		new_frame->output_buffer_info[1].index =
@@ -1669,8 +1668,10 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 			msm_cpp_clear_timer(cpp_dev);
 			msm_cpp_clean_queue(cpp_dev);
 		}
-		cpp_dev->stream_cnt++;
-		pr_debug("stream_cnt:%d\n", cpp_dev->stream_cnt);
+		if (cmd != VIDIOC_MSM_CPP_APPEND_STREAM_BUFF_INFO) {
+			cpp_dev->stream_cnt++;
+			pr_debug("stream_cnt:%d\n", cpp_dev->stream_cnt);
+		}
 		break;
 	}
 	case VIDIOC_MSM_CPP_DEQUEUE_STREAM_BUFF_INFO: {
@@ -1765,6 +1766,12 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 
 		if (ioctl_ptr->ioctl_ptr == NULL) {
 			pr_err("ioctl_ptr->ioctl_ptr is NULL\n");
+			mutex_unlock(&cpp_dev->mutex);
+			return -EINVAL;
+		}
+
+		if (ioctl_ptr->len > sizeof(clock_rate)) {
+			pr_err("Not valid ioctl_ptr->len\n");
 			mutex_unlock(&cpp_dev->mutex);
 			return -EINVAL;
 		}
@@ -2069,6 +2076,12 @@ static int __devinit cpp_probe(struct platform_device *pdev)
 	cpp_dev->timer_wq = create_workqueue("msm_cpp_workqueue");
 	cpp_dev->work = kmalloc(sizeof(struct msm_cpp_work_t),
 		GFP_KERNEL);
+	if (!cpp_dev->work) {
+		pr_err("cpp_dev->work is NULL\n");
+		rc = -ENOMEM;
+		goto ERROR3;
+	}
+
 	INIT_WORK((struct work_struct *)cpp_dev->work, msm_cpp_do_timeout_work);
 	cpp_dev->cpp_open_cnt = 0;
 	cpp_dev->is_firmware_loaded = 0;
