@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -268,6 +268,8 @@ static int msm_vfe40_init_hardware(struct vfe_device *vfe_dev)
 			goto fs_failed;
 		}
 	}
+	else
+		goto fs_failed;
 
 	rc = msm_cam_clk_enable(&vfe_dev->pdev->dev, msm_vfe40_clk_info,
 		vfe_dev->vfe_clk, ARRAY_SIZE(msm_vfe40_clk_info), 1);
@@ -375,14 +377,15 @@ static void msm_vfe40_process_camif_irq(struct vfe_device *vfe_dev,
 	uint32_t irq_status0, uint32_t irq_status1,
 	struct msm_isp_timestamp *ts)
 {
+
 	if (!(irq_status0 & 0xF))
 		return;
 
 	if (irq_status0 & (1 << 0)) {
 		ISP_DBG("%s: SOF IRQ\n", __func__);
 		if (vfe_dev->axi_data.src_info[VFE_PIX_0].raw_stream_count > 0
-			&& vfe_dev->axi_data.src_info[VFE_PIX_0].
-			pix_stream_count == 0) {
+				&& vfe_dev->axi_data.src_info[VFE_PIX_0].
+				pix_stream_count == 0) {
 			msm_isp_sof_notify(vfe_dev, VFE_PIX_0, ts);
 			if (vfe_dev->axi_data.stream_update)
 				msm_isp_axi_stream_update(vfe_dev);
@@ -466,22 +469,22 @@ static void msm_vfe40_process_error_status(struct vfe_device *vfe_dev)
 {
 	uint32_t error_status1 = vfe_dev->error_info.error_mask1;
 	if (error_status1 & (1 << 0))
-		pr_err("%s: camif error status: 0x%x\n",
+		pr_err_ratelimited("%s: camif error status: 0x%x\n",
 			__func__, vfe_dev->error_info.camif_status);
 	if (error_status1 & (1 << 1))
-		pr_err("%s: stats bhist overwrite\n", __func__);
+		pr_err_ratelimited("%s: stats bhist overwrite\n", __func__);
 	if (error_status1 & (1 << 2))
-		pr_err("%s: stats cs overwrite\n", __func__);
+		pr_err_ratelimited("%s: stats cs overwrite\n", __func__);
 	if (error_status1 & (1 << 3))
-		pr_err("%s: stats ihist overwrite\n", __func__);
+		pr_err_ratelimited("%s: stats ihist overwrite\n", __func__);
 	if (error_status1 & (1 << 4))
-		pr_err("%s: realign buf y overflow\n", __func__);
+		pr_err_ratelimited("%s: realign buf y overflow\n", __func__);
 	if (error_status1 & (1 << 5))
-		pr_err("%s: realign buf cb overflow\n", __func__);
+		pr_err_ratelimited("%s: realign buf cb overflow\n", __func__);
 	if (error_status1 & (1 << 6))
-		pr_err("%s: realign buf cr overflow\n", __func__);
+		pr_err_ratelimited("%s: realign buf cr overflow\n", __func__);
 	if (error_status1 & (1 << 7)) {
-		pr_err("%s: violation\n", __func__);
+		pr_err_ratelimited("%s: violation\n", __func__);
 		msm_vfe40_process_violation_status(vfe_dev);
 	}
 	if (error_status1 & (1 << 9)) {
@@ -941,10 +944,8 @@ static void msm_vfe40_update_camif_state(struct vfe_device *vfe_dev,
 		msm_camera_io_w_mb(0x0, vfe_dev->vfe_base + 0x2F4);
 		vfe_dev->axi_data.src_info[VFE_PIX_0].active = 0;
 	} else if (update_state == DISABLE_CAMIF_IMMEDIATELY) {
-		vfe_dev->ignore_error = 1;
 		msm_camera_io_w_mb(0x6, vfe_dev->vfe_base + 0x2F4);
 		vfe_dev->axi_data.src_info[VFE_PIX_0].active = 0;
-		vfe_dev->ignore_error = 0;
 	}
 }
 
@@ -1193,16 +1194,15 @@ static long msm_vfe40_axi_halt(struct vfe_device *vfe_dev,
 	if (blocking) {
 		/* Halt AXI Bus Bridge */
 		msm_camera_io_w_mb(0x1, vfe_dev->vfe_base + 0x2C0);
-		atomic_set(&vfe_dev->error_info.overflow_state, NO_OVERFLOW);
 		while (axi_busy_flag) {
 			if (msm_camera_io_r(
 				vfe_dev->vfe_base + 0x2E4) & 0x1)
 				axi_busy_flag = false;
 		}
 	}
-        else {
-	        msm_camera_io_w_mb(0x1, vfe_dev->vfe_base + 0x2C0);
-        }
+	else {
+		msm_camera_io_w_mb(0x1, vfe_dev->vfe_base + 0x2C0);
+	}
 	return rc;
 }
 

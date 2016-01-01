@@ -27,6 +27,10 @@ DEFINE_MSM_MUTEX(msm_actuator_mutex);
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 #endif
 
+
+static int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl);
+static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl);
+
 static struct msm_actuator msm_vcm_actuator_table;
 static struct msm_actuator msm_piezo_actuator_table;
 
@@ -359,7 +363,7 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 	for (; data_size > 0; data_size--)
 		max_code_size *= 2;
 
-	if ((a_ctrl->actuator_state == ACTUATOR_POWER_UP) &&
+	if ((a_ctrl->actuator_state == ACT_OPS_ACTIVE) &&
 		(a_ctrl->step_position_table != NULL))
 		kfree(a_ctrl->step_position_table);
 
@@ -423,6 +427,31 @@ static int32_t msm_actuator_set_default_focus(
 	return rc;
 }
 
+static int32_t msm_actuator_vreg_control(struct msm_actuator_ctrl_t *a_ctrl,
+							int config)
+{
+	int rc = 0, i, cnt;
+	struct msm_actuator_vreg *vreg_cfg;
+
+	vreg_cfg = &a_ctrl->vreg_cfg;
+	cnt = vreg_cfg->num_vreg;
+	if (!cnt)
+		return 0;
+
+	if (cnt >= MSM_ACTUATOT_MAX_VREGS) {
+		pr_err("%s failed %d cnt %d\n", __func__, __LINE__, cnt);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < cnt; i++) {
+		rc = msm_camera_config_single_vreg(&(a_ctrl->pdev->dev),
+			&vreg_cfg->cam_vreg[i],
+			(struct regulator **)&vreg_cfg->data[i],
+			config);
+	}
+	return rc;
+}
+
 static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
 {
 	int32_t rc = 0;
@@ -430,7 +459,7 @@ static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
     uint8_t buf[2];
 
 	CDBG("Enter\n");
-	if (a_ctrl->actuator_state != ACTUATOR_POWER_DOWN) {
+	if (a_ctrl->actuator_state != ACT_DISABLE_STATE) {
 		if (a_ctrl->vcm_enable) {
 			rc = gpio_direction_output(a_ctrl->vcm_pwd, 0);
 			if (!rc)
@@ -444,7 +473,12 @@ static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
 			kfree(a_ctrl->i2c_reg_tbl);
 		a_ctrl->i2c_reg_tbl = NULL;
 		a_ctrl->i2c_tbl_index = 0;
-		a_ctrl->actuator_state = ACTUATOR_POWER_DOWN;
+		a_ctrl->actuator_state = ACT_OPS_INACTIVE;
+	}
+	rc = msm_actuator_vreg_control(a_ctrl, 0);
+	if (rc < 0) {
+		pr_err("%s failed %d\n", __func__, __LINE__);
+		return rc;
 	}
 
 	code = a_ctrl->current_lens_pos;
@@ -477,7 +511,7 @@ static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
 	kfree(a_ctrl->i2c_reg_tbl);
 	a_ctrl->i2c_reg_tbl = NULL;
 	a_ctrl->i2c_tbl_index = 0;
-	a_ctrl->actuator_state = ACTUATOR_POWER_DOWN;
+	a_ctrl->actuator_state = ACT_OPS_INACTIVE;
 
 	CDBG("Exit\n");
 	return rc;
@@ -587,7 +621,7 @@ static int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 		return -EFAULT;
 	}
 
-	if ((a_ctrl->actuator_state == ACTUATOR_POWER_UP) &&
+	if ((a_ctrl->actuator_state == ACT_OPS_ACTIVE) &&
 		(a_ctrl->i2c_reg_tbl != NULL))
 		kfree(a_ctrl->i2c_reg_tbl);
 
@@ -650,7 +684,7 @@ static int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 
 	a_ctrl->curr_step_pos = 0;
 	a_ctrl->curr_region_index = 0;
-	a_ctrl->actuator_state = ACTUATOR_POWER_UP;
+	a_ctrl->actuator_state = ACT_OPS_ACTIVE;
 	CDBG("Exit\n");
 
 	return rc;
@@ -698,11 +732,12 @@ static int32_t msm_actuator_config(struct msm_actuator_ctrl_t *a_ctrl,
 			pr_err("actuator_set_position failed %d\n", rc);
 		break;
 
-	case CFG_ACTUATOR_POWERDOWN:
-		rc = msm_actuator_power_down(a_ctrl);
+	case CFG_ACTUATOR_POWERUP:
+		rc = msm_actuator_power_up(a_ctrl);
 		if (rc < 0)
-			pr_err("msm_actuator_power_down failed %d\n", rc);
+			pr_err("Failed actuator power up%d\n", rc);
 		break;
+
 	default:
 		break;
 	}
@@ -767,6 +802,7 @@ static int msm_actuator_open(struct v4l2_subdev *sd,
 		if (rc < 0)
 			pr_err("cci_init failed\n");
 	}
+	a_ctrl->actuator_state = ACT_OPS_ACTIVE;
 	CDBG("Exit\n");
 	return rc;
 }
@@ -780,7 +816,9 @@ static int msm_actuator_close(struct v4l2_subdev *sd,
 		pr_err("failed\n");
 		return -EINVAL;
 	}
-	if (a_ctrl->act_device_type == MSM_CAMERA_PLATFORM_DEVICE) {
+	mutex_lock(a_ctrl->actuator_mutex);
+	if (a_ctrl->act_device_type == MSM_CAMERA_PLATFORM_DEVICE &&
+		a_ctrl->actuator_state != ACT_DISABLE_STATE) {
 		rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_util(
 			&a_ctrl->i2c_client, MSM_CCI_RELEASE);
 		if (rc < 0)
@@ -788,7 +826,8 @@ static int msm_actuator_close(struct v4l2_subdev *sd,
 	}
 	kfree(a_ctrl->i2c_reg_tbl);
 	a_ctrl->i2c_reg_tbl = NULL;
-
+	a_ctrl->actuator_state = ACT_DISABLE_STATE;
+	mutex_unlock(a_ctrl->actuator_mutex);
 	CDBG("Exit\n");
 	return rc;
 }
@@ -801,6 +840,7 @@ static const struct v4l2_subdev_internal_ops msm_actuator_internal_ops = {
 static long msm_actuator_subdev_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg)
 {
+	int rc;
 	struct msm_actuator_ctrl_t *a_ctrl = v4l2_get_subdevdata(sd);
 	void __user *argp = (void __user *)arg;
 	CDBG("Enter\n");
@@ -811,8 +851,12 @@ static long msm_actuator_subdev_ioctl(struct v4l2_subdev *sd,
 	case VIDIOC_MSM_ACTUATOR_CFG:
 		return msm_actuator_config(a_ctrl, argp);
 	case MSM_SD_SHUTDOWN:
-		msm_actuator_close(sd, NULL);
-		return 0;
+		rc = msm_actuator_power_down(a_ctrl);
+		if (rc < 0) {
+			pr_err("%s:%d Actuator Power down failed\n",
+				__func__, __LINE__);
+		}
+		return msm_actuator_close(sd, NULL);
 	default:
 		return -ENOIOCTLCMD;
 	}
@@ -825,6 +869,13 @@ static int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl)
 
 	CDBG("vcm info: %x %x\n", a_ctrl->vcm_pwd,
 		a_ctrl->vcm_enable);
+
+	rc = msm_actuator_vreg_control(a_ctrl, 1);
+	if (rc < 0) {
+		pr_err("%s failed %d\n", __func__, __LINE__);
+		return rc;
+	}
+
 	if (a_ctrl->vcm_enable) {
 		rc = gpio_request(a_ctrl->vcm_pwd, "msm_actuator");
 		if (!rc) {
@@ -832,28 +883,14 @@ static int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl)
 			gpio_direction_output(a_ctrl->vcm_pwd, 1);
 		}
 	}
-	CDBG("Exit\n");
-	return rc;
-}
+	a_ctrl->actuator_state = ACT_ENABLE_STATE;
 
-static int32_t msm_actuator_power(struct v4l2_subdev *sd, int on)
-{
-	int rc = 0;
-	struct msm_actuator_ctrl_t *a_ctrl = v4l2_get_subdevdata(sd);
-	CDBG("Enter\n");
-	mutex_lock(a_ctrl->actuator_mutex);
-	if (on)
-		rc = msm_actuator_power_up(a_ctrl);
-	else
-		rc = msm_actuator_power_down(a_ctrl);
-	mutex_unlock(a_ctrl->actuator_mutex);
 	CDBG("Exit\n");
 	return rc;
 }
 
 static struct v4l2_subdev_core_ops msm_actuator_subdev_core_ops = {
 	.ioctl = msm_actuator_subdev_ioctl,
-	.s_power = msm_actuator_power,
 };
 
 static struct v4l2_subdev_ops msm_actuator_subdev_ops = {
@@ -928,7 +965,7 @@ static int32_t msm_actuator_i2c_probe(struct i2c_client *client,
 	act_ctrl_t->msm_sd.sd.entity.group_id = MSM_CAMERA_SUBDEV_ACTUATOR;
 	act_ctrl_t->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x2;
 	msm_sd_register(&act_ctrl_t->msm_sd);
-	act_ctrl_t->actuator_state = ACTUATOR_POWER_DOWN;
+	act_ctrl_t->actuator_state = ACT_DISABLE_STATE;
 	pr_info("msm_actuator_i2c_probe: succeeded\n");
 	CDBG("Exit\n");
 
@@ -941,6 +978,7 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	int32_t rc = 0;
 	struct msm_camera_cci_client *cci_client = NULL;
 	struct msm_actuator_ctrl_t *msm_actuator_t = NULL;
+	struct msm_actuator_vreg *vreg_cfg;
 	CDBG("Enter\n");
 
 	if (!pdev->dev.of_node) {
@@ -972,6 +1010,18 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 		return rc;
 	}
 
+	if (of_find_property((&pdev->dev)->of_node,
+			"qcom,cam-vreg-name", NULL)) {
+		vreg_cfg = &msm_actuator_t->vreg_cfg;
+		rc = msm_camera_get_dt_vreg_data((&pdev->dev)->of_node,
+			&vreg_cfg->cam_vreg, &vreg_cfg->num_vreg);
+		if (rc < 0) {
+			kfree(msm_actuator_t);
+			pr_err("failed rc %d\n", rc);
+			return rc;
+		}
+	}
+
 	msm_actuator_t->act_v4l2_subdev_ops = &msm_actuator_subdev_ops;
 	msm_actuator_t->actuator_mutex = &msm_actuator_mutex;
 	msm_actuator_t->cam_name = pdev->id;
@@ -984,6 +1034,7 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	msm_actuator_t->i2c_client.cci_client = kzalloc(sizeof(
 		struct msm_camera_cci_client), GFP_KERNEL);
 	if (!msm_actuator_t->i2c_client.cci_client) {
+		kfree(msm_actuator_t->vreg_cfg.cam_vreg);
 		kfree(msm_actuator_t);
 		pr_err("failed no memory\n");
 		return -ENOMEM;
@@ -1004,7 +1055,8 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	msm_actuator_t->msm_sd.sd.entity.group_id = MSM_CAMERA_SUBDEV_ACTUATOR;
 	msm_actuator_t->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x2;
 	msm_sd_register(&msm_actuator_t->msm_sd);
-	msm_actuator_t->actuator_state = ACTUATOR_POWER_DOWN;
+	msm_actuator_t->actuator_state = ACT_DISABLE_STATE;
+
 	CDBG("Exit\n");
 	return rc;
 }
