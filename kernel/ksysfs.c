@@ -208,7 +208,7 @@ static struct attribute_group kernel_attr_group = {
 };
 
 static unsigned int Lgentle_fair_sleepers = 0;
-static unsigned int Larch_power = 1;
+static unsigned int Larch_power = 0;
 
 extern void relay_gfs(unsigned int gfs);
 extern void relay_ap(unsigned int ap);
