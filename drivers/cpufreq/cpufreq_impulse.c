@@ -366,6 +366,7 @@ static u64 update_load(int cpu)
 	return now;
 }
 
+#define MAX_LOCAL_LOAD 100
 static void cpufreq_impulse_timer(unsigned long data)
 {
 	u64 now;
@@ -417,7 +418,8 @@ static void cpufreq_impulse_timer(unsigned long data)
 	if (boosted)
 		new_freq = max(new_freq, this_hispeed_freq);
 
-	if (pcpu->policy->cur >= this_hispeed_freq &&
+	if (cpu_load <= MAX_LOCAL_LOAD &&
+	    pcpu->policy->cur >= this_hispeed_freq &&
 	    new_freq > pcpu->policy->cur &&
 	    now - pcpu->hispeed_validate_time <
 	    freq_to_above_hispeed_delay(pcpu->policy->cur)) {
