@@ -122,7 +122,7 @@ static struct msm_gpiomux_config mdm_configs[] __initdata = {
 	},
 };
 
-static struct gpiomux_setting gpio_uart_config __initdata = {
+static struct gpiomux_setting gpio_uart_config = {
 	.func = GPIOMUX_FUNC_2,
 	.drv = GPIOMUX_DRV_16MA,
 	.pull = GPIOMUX_PULL_NONE,

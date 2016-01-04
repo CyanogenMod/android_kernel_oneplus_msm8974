@@ -374,12 +374,18 @@ LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include \
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
-KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
+KBUILD_CFLAGS   := -Wall -DNDEBUG -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
-		   -Wno-array-bounds \
-		   -fno-delete-null-pointer-checks
+                   -Wno-unused-variable \
+                   -Wno-discarded-qualifiers \
+                   -Wno-maybe-uninitialized \
+		   -fno-delete-null-pointer-checks \
+		   -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4 -marm \
+		   -ffast-math -fsingle-precision-constant \
+		   -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr \
+		   -std=gnu89
 
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=

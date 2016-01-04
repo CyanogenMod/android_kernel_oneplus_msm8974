@@ -171,7 +171,7 @@ static struct msm_dmov_conf dmov_conf[] = {
 		.lock = __SPIN_LOCK_UNLOCKED(dmov_lock),
 		.clk_ctl = CLK_DIS,
 		.work = __DELAYED_WORK_INITIALIZER(dmov_conf[0].work,
-				msm_dmov_clock_work),
+				msm_dmov_clock_work, 0),
 	}, {
 		.crci_conf = adm1_crci_conf,
 		.chan_conf = adm1_chan_conf,
@@ -179,7 +179,7 @@ static struct msm_dmov_conf dmov_conf[] = {
 		.lock = __SPIN_LOCK_UNLOCKED(dmov_lock),
 		.clk_ctl = CLK_DIS,
 		.work = __DELAYED_WORK_INITIALIZER(dmov_conf[1].work,
-				msm_dmov_clock_work),
+				msm_dmov_clock_work, 0),
 	}
 };
 #else
@@ -191,7 +191,7 @@ static struct msm_dmov_conf dmov_conf[] = {
 		.lock = __SPIN_LOCK_UNLOCKED(dmov_lock),
 		.clk_ctl = CLK_DIS,
 		.work = __DELAYED_WORK_INITIALIZER(dmov_conf[0].work,
-				msm_dmov_clock_work),
+				msm_dmov_clock_work, 0),
 	}
 };
 #endif

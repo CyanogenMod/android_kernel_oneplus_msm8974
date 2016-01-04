@@ -63,7 +63,7 @@ static struct hotplug_tuners {
 	.hotplug_enable = 1,
 #else
 	.hotplug_sampling_rate = 50,
-	.hotplug_enable = 1,
+	.hotplug_enable = 0,
 #endif
 	.min_cpus_online = 1,
 	.maxcoreslimit = NR_CPUS,
@@ -330,7 +330,7 @@ static void hotplug_start(void)
 		delay -= jiffies % delay;
 	}
 
-	INIT_DELAYED_WORK_DEFERRABLE(&alucard_hotplug_work, hotplug_work_fn);
+	INIT_DEFERRABLE_WORK(&alucard_hotplug_work, hotplug_work_fn);
 	queue_delayed_work_on(BOOT_CPU, alucard_hp_wq,
 				&alucard_hotplug_work,
 				delay);

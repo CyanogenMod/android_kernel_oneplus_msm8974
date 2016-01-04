@@ -603,7 +603,7 @@ static int cpufreq_governor_nightmare(struct cpufreq_policy *policy,
 			delay -= jiffies % delay;
 		}
 
-		INIT_DELAYED_WORK_DEFERRABLE(&this_nightmare_cpuinfo->work, do_nightmare_timer);
+		INIT_DEFERRABLE_WORK(&this_nightmare_cpuinfo->work, do_nightmare_timer);
 		queue_delayed_work_on(cpu,
 			nightmare_wq, &this_nightmare_cpuinfo->work, delay);
 

@@ -5,7 +5,6 @@
  *
  *   Copyright(C) 2005, Thomas Gleixner <tglx@linutronix.de>
  *   Copyright(C) 2005, Red Hat, Inc., Ingo Molnar
- *  Copyright (C) 2014, NVIDIA CORPORATION. All rights reserved.
  *
  *  data type definitions, declarations, prototypes
  *
@@ -24,7 +23,6 @@
 #include <linux/percpu.h>
 #include <linux/timer.h>
 #include <linux/timerqueue.h>
-#include <asm/relaxed.h>
 
 struct hrtimer_clock_base;
 struct hrtimer_cpu_base;
@@ -417,11 +415,6 @@ static inline int hrtimer_is_queued(struct hrtimer *timer)
 static inline int hrtimer_callback_running(struct hrtimer *timer)
 {
 	return timer->state & HRTIMER_STATE_CALLBACK;
-}
-
-static inline int hrtimer_callback_running_relaxed(struct hrtimer *timer)
-{
-	return cpu_relaxed_read_long(&timer->state) & HRTIMER_STATE_CALLBACK;
 }
 
 /* Forward a hrtimer so it expires after now: */

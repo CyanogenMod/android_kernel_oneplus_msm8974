@@ -762,7 +762,6 @@ const char * const vmstat_text[] = {
 	"kswapd_inodesteal",
 	"kswapd_low_wmark_hit_quickly",
 	"kswapd_high_wmark_hit_quickly",
-	"kswapd_skip_congestion_wait",
 	"pageoutrun",
 	"allocstall",
 
@@ -1168,7 +1167,7 @@ static void __cpuinit start_cpu_timer(int cpu)
 {
 	struct delayed_work *work = &per_cpu(vmstat_work, cpu);
 
-	INIT_DELAYED_WORK_DEFERRABLE(work, vmstat_update);
+	INIT_DEFERRABLE_WORK(work, vmstat_update);
 	schedule_delayed_work_on(cpu, work, __round_jiffies_relative(HZ, cpu));
 }
 

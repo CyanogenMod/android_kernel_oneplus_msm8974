@@ -411,7 +411,7 @@ static inline unsigned int get_timer_delay(void) {
 static inline void dbs_timer_init(struct smartmax_info_s *this_smartmax) {
 	int delay = get_timer_delay();
 
-	INIT_DELAYED_WORK_DEFERRABLE(&this_smartmax->work, do_dbs_timer);
+	INIT_DEFERRABLE_WORK(&this_smartmax->work, do_dbs_timer);
 	schedule_delayed_work_on(this_smartmax->cpu, &this_smartmax->work, delay);
 }
 
