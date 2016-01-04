@@ -211,9 +211,9 @@
 #ifdef CONFIG_SMP
 #if __LINUX_ARM_ARCH__ >= 7
 	.ifeqs "\mode","arm"
-	ALT_SMP(dmb	ish)
+	ALT_SMP(dmb)
 	.else
-	ALT_SMP(W(dmb)	ish)
+	ALT_SMP(W(dmb))
 	.endif
 #elif __LINUX_ARM_ARCH__ == 6
 	ALT_SMP(mcr	p15, 0, r0, c7, c10, 5)	@ dmb

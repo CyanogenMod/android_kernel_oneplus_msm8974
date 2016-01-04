@@ -678,6 +678,7 @@
 			qcom,cdc-slim-ifd = "taiko-slim-ifd";
 			qcom,cdc-slim-ifd-elemental-addr = [00 00 A0 00 17 02];
 			qcom,cdc-dmic-sample-rate = <4800000>;
+			qcom,cdc-mad-dmic-rate = <4800000>;
 		};
 	};
 
@@ -1484,7 +1485,8 @@
 			< 3509 /* 460 MHz */ >,
 			< 4684 /* 614 MHz */ >,
 			< 6103 /* 800 MHz */ >,
-			< 7102 /* 931 MHz */ >;
+			< 7102 /* 931 MHz */ >,
+                        < 7674 /* 1006 MHz */ >;
 	};
 
 	qcom,kraitbw-l2pm {

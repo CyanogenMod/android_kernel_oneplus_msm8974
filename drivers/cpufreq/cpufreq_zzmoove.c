@@ -8463,7 +8463,7 @@ static inline void dbs_timer_init(struct cpu_dbs_info_s *dbs_info)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)
 	INIT_DEFERRABLE_WORK(&dbs_info->work, do_dbs_timer);
 #else
-	INIT_DELAYED_WORK_DEFERRABLE(&dbs_info->work, do_dbs_timer);
+	INIT_DEFERRABLE_WORK(&dbs_info->work, do_dbs_timer);
 #endif /* LINUX_VERSION_CODE... */
 	queue_delayed_work_on(dbs_info->cpu, dbs_wq, &dbs_info->work, delay);
 }
