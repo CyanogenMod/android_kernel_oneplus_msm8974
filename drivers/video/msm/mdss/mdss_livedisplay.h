@@ -16,7 +16,6 @@
 
 #include <linux/of.h>
 #include <linux/sysfs.h>
-#include <linux/workqueue.h>
 
 #include "mdss_dsi.h"
 #include "mdss_fb.h"
@@ -56,15 +55,9 @@ struct mdss_livedisplay_ctx {
 	unsigned int caps;
 
 	uint32_t r, g, b;
-
 	struct msm_fb_data_type *mfd;
 
 	struct mutex lock;
-	struct work_struct update_work;
-	struct workqueue_struct *wq;
-
-	uint32_t updated;
-	uint8_t *cmd_buf;
 };
 
 enum {
@@ -89,15 +82,14 @@ enum {
 	MODE_AUTO_CONTRAST	= 0x04,
 	MODE_COLOR_ENHANCE	= 0x08,
 	MODE_PRESET		= 0x10,
-	MODE_RGB		= 0x20,
 	MODE_UPDATE_ALL		= 0xFF,
 };
 
-void mdss_livedisplay_update(struct mdss_livedisplay_ctx *mlc, uint32_t updated);
+int mdss_livedisplay_update(struct mdss_dsi_ctrl_pdata *ctrl_pdata, int types);
 int mdss_livedisplay_parse_dt(struct device_node *np, struct mdss_panel_info *pinfo);
 int mdss_livedisplay_create_sysfs(struct msm_fb_data_type *mfd);
 
-static inline bool is_cabc_cmd(uint32_t value)
+static inline bool is_cabc_cmd(unsigned int value)
 {
     return (value & MODE_CABC) || (value & MODE_SRE) || (value & MODE_AUTO_CONTRAST);
 }
