@@ -860,7 +860,6 @@ int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 
 	req->id = pipe->ndx;
 
-cursor_done:
 	req->vert_deci = pipe->vert_deci;
 
 	pipe->req_data = *req;
