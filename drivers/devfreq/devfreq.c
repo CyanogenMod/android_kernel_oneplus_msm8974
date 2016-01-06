@@ -100,10 +100,9 @@ static void devfreq_set_freq_limits(struct devfreq *devfreq)
 int devfreq_get_freq_level(struct devfreq *devfreq, unsigned long freq)
 {
 	int lev;
-	unsigned int *freq_table = devfreq->profile->freq_table;
 
-	for (lev = 0; lev < sizeof(freq_table); lev++)
-		if (freq == freq_table[lev])
+	for (lev = 0; lev < devfreq->profile->max_state; lev++)
+		if (freq == devfreq->profile->freq_table[lev])
 			return lev;
 
 	return -EINVAL;
@@ -121,10 +120,6 @@ static int devfreq_update_status(struct devfreq *devfreq, unsigned long freq)
 	unsigned long cur_time;
 
 	cur_time = jiffies;
-	if (devfreq->state == KGSL_STATE_SLUMBER) {
-		devfreq->last_stat_updated = cur_time;
-		return 0;
-	}
 
 	prev_lev = devfreq_get_freq_level(devfreq, devfreq->previous_freq);
 	if (prev_lev < 0) {
@@ -820,15 +815,9 @@ static ssize_t show_freq(struct device *dev,
 {
 	unsigned long freq;
 	struct devfreq *devfreq = to_devfreq(dev);
-	struct devfreq_dev_profile *profile = devfreq->profile;
 
-	if (devfreq->state == KGSL_STATE_SLUMBER)
-		return sprintf(buf, "%u\n",
-			       profile->
-			       freq_table[sizeof(profile->freq_table)]);
-
-	if (profile->get_cur_freq &&
-		!profile->get_cur_freq(devfreq->dev.parent, &freq))
+	if (devfreq->profile->get_cur_freq &&
+		!devfreq->profile->get_cur_freq(devfreq->dev.parent, &freq))
 			return sprintf(buf, "%lu\n", freq);
 
 	return sprintf(buf, "%lu\n", devfreq->previous_freq);
@@ -976,7 +965,6 @@ static ssize_t show_trans_table(struct device *dev, struct device_attribute *att
 				char *buf)
 {
 	struct devfreq *devfreq = to_devfreq(dev);
-	struct devfreq_dev_profile *profile = devfreq->profile;
 	ssize_t len;
 	int i, j, err;
 	unsigned int max_state = devfreq->profile->max_state;
@@ -989,17 +977,19 @@ static ssize_t show_trans_table(struct device *dev, struct device_attribute *att
 	len += sprintf(buf + len, "         :");
 	for (i = 0; i < max_state; i++)
 		len += sprintf(buf + len, "%8u",
-				profile->freq_table[i]);
+				devfreq->profile->freq_table[i]);
 
 	len += sprintf(buf + len, "   time(ms)\n");
 
 	for (i = 0; i < max_state; i++) {
-		if (profile->freq_table[i] == devfreq->previous_freq
-		    && devfreq->state != KGSL_STATE_SLUMBER)
+		if (devfreq->profile->freq_table[i]
+					== devfreq->previous_freq) {
 			len += sprintf(buf + len, "*");
-		else
+		} else {
 			len += sprintf(buf + len, " ");
-		len += sprintf(buf + len, "%8u:", profile->freq_table[i]);
+		}
+		len += sprintf(buf + len, "%8u:",
+				devfreq->profile->freq_table[i]);
 		for (j = 0; j < max_state; j++)
 			len += sprintf(buf + len, "%8u",
 				devfreq->trans_table[(i * max_state) + j]);
