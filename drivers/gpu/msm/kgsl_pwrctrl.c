@@ -1468,12 +1468,9 @@ EXPORT_SYMBOL(kgsl_pwrctrl_disable);
 
 void kgsl_pwrctrl_set_state(struct kgsl_device *device, unsigned int state)
 {
-	struct kgsl_pwrscale *pwrscale = &device->pwrscale;
-
 	trace_kgsl_pwr_set_state(device, state);
 	device->state = state;
 	device->requested_state = KGSL_STATE_NONE;
-	pwrscale->devfreq->state = state;
 }
 EXPORT_SYMBOL(kgsl_pwrctrl_set_state);
 
