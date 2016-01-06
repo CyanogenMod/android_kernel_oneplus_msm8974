@@ -43,6 +43,7 @@
 #include <linux/idr.h>
 #include <linux/bug.h>
 #include <linux/jhash.h>
+#include <linux/moduleparam.h>
 #include <linux/hashtable.h>
 #include <linux/rculist.h>
 
