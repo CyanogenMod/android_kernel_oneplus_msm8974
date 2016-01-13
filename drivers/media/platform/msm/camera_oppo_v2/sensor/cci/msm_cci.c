@@ -17,6 +17,7 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
+#include <linux/wakelock.h>
 #include <media/msm_isp.h>
 #include "msm_sd.h"
 #include "msm_cci.h"
@@ -27,9 +28,9 @@
 #define CCI_I2C_QUEUE_0_SIZE 64
 #define CCI_I2C_QUEUE_1_SIZE 16
 #define CYCLES_PER_MICRO_SEC 4915
-#define CCI_MAX_DELAY 100000
+#define CCI_MAX_DELAY 10000
 
-#define CCI_TIMEOUT msecs_to_jiffies(500)
+#define CCI_TIMEOUT msecs_to_jiffies(100)
 
 /* TODO move this somewhere else */
 #define MSM_CCI_DRV_NAME "msm_cci"
@@ -48,6 +49,11 @@
 #define CCI_I2C_MAX_WRITE 8192
 
 static struct v4l2_subdev *g_cci_subdev;
+
+#ifdef CONFIG_MACH_OPPO
+/*hufeng 2014-11-05 add to aviod ref_count chaos if cci_init and cci_release concurrency happened*/
+static struct mutex ref_count_lock;
+#endif
 
 static void msm_cci_set_clk_param(struct cci_device *cci_dev)
 {
@@ -490,13 +496,24 @@ static int32_t msm_cci_i2c_read_bytes(struct v4l2_subdev *sd,
 		pr_err("%s:%d cci_dev NULL\n", __func__, __LINE__);
 		return -EINVAL;
 	}
+	if (cci_dev->cci_state != CCI_STATE_ENABLED) {
+		pr_err("%s invalid cci state %d\n",
+			__func__, cci_dev->cci_state);
+		return -EINVAL;
+	}
 
 	if (c_ctrl->cci_info->cci_i2c_master > MASTER_MAX
 			|| c_ctrl->cci_info->cci_i2c_master < 0) {
 		pr_err("%s:%d Invalid I2C master addr\n", __func__, __LINE__);
 		return -EINVAL;
 	}
-
+#ifdef CONFIG_MACH_OPPO
+/*hufeng 2014-11-05 add to avoid cci read or write if cci_dev is already released*/
+	if (cci_dev->cci_state == CCI_STATE_DISABLED){
+		pr_err("%s:%d cci state is DISABLED!\n", __func__, __LINE__);
+		return -EINVAL;
+	}
+#endif
 	master = c_ctrl->cci_info->cci_i2c_master;
 	read_cfg = &c_ctrl->cfg.cci_i2c_read_cfg;
 	if ((!read_cfg->num_byte) || (read_cfg->num_byte > CCI_I2C_MAX_READ)) {
@@ -536,17 +553,19 @@ static int32_t msm_cci_i2c_write(struct v4l2_subdev *sd,
 	uint32_t val;
 	enum cci_i2c_master_t master;
 	enum cci_i2c_queue_t queue = QUEUE_0;
-	struct msm_camera_i2c_reg_setting *i2c_msg =
-		&c_ctrl->cfg.cci_i2c_write_cfg;
-	uint16_t cmd_size = i2c_msg->size;
-	struct msm_camera_i2c_reg_array *i2c_cmd = i2c_msg->reg_setting;
-	uint16_t i = 0;
 	cci_dev = v4l2_get_subdevdata(sd);
 	if (c_ctrl->cci_info->cci_i2c_master > MASTER_MAX
 			|| c_ctrl->cci_info->cci_i2c_master < 0) {
 		pr_err("%s:%d Invalid I2C master addr\n", __func__, __LINE__);
 		return -EINVAL;
 	}
+
+	if (cci_dev->cci_state != CCI_STATE_ENABLED) {
+		pr_err("%s invalid cci state %d\n",
+			__func__, cci_dev->cci_state);
+		return -EINVAL;
+	}
+
 	master = c_ctrl->cci_info->cci_i2c_master;
 	CDBG("%s master %d, queue %d\n", __func__, master, queue);
 	CDBG("%s set param sid 0x%x retries %d id_map %d\n", __func__,
@@ -630,11 +649,6 @@ static int32_t msm_cci_i2c_write(struct v4l2_subdev *sd,
 	if (rc <= 0) {
 		pr_err("%s: wait_for_completion_timeout %d\n",
 			 __func__, __LINE__);
-		for(i = 0; i < cmd_size; i++){
-			pr_err("%s: addr 0x%x data 0x%x, delay: %d",__func__,i2c_cmd->reg_addr,
-				i2c_cmd->reg_data,i2c_cmd->delay);
-			i2c_cmd++;
-		}
 		if (rc == 0)
 			rc = -ETIMEDOUT;
 		msm_cci_flush_queue(cci_dev, master);
@@ -653,7 +667,11 @@ ERROR:
 static int msm_cci_subdev_g_chip_ident(struct v4l2_subdev *sd,
 			struct v4l2_dbg_chip_ident *chip)
 {
-	BUG_ON(!chip);
+	if (!chip) {
+		pr_err("%s:%d: NULL pointer supplied for chip ident\n",
+			 __func__, __LINE__);
+		return -EINVAL;
+	}
 	chip->ident = V4L2_IDENT_CCI;
 	chip->revision = 0;
 	return 0;
@@ -805,27 +823,63 @@ static int32_t msm_cci_release(struct v4l2_subdev *sd)
 static int32_t msm_cci_config(struct v4l2_subdev *sd,
 	struct msm_camera_cci_ctrl *cci_ctrl)
 {
-	int32_t rc = 0;
+	int32_t rc = 0, retry = 5;
 	CDBG("%s line %d cmd %d\n", __func__, __LINE__,
 		cci_ctrl->cmd);
-	switch (cci_ctrl->cmd) {
-	case MSM_CCI_INIT:
+	while (retry--) {
+		switch (cci_ctrl->cmd) {
+		case MSM_CCI_INIT:
+#ifdef CONFIG_MACH_OPPO
+/*hufeng 2014-11-05 add to aviod ref_count chaos if cci_init and cci_release concurrency happened*/
+			mutex_lock(&ref_count_lock);
 		rc = msm_cci_init(sd, cci_ctrl);
+			mutex_unlock(&ref_count_lock);
+#else
+			rc = msm_cci_init(sd, cci_ctrl);
+#endif
 		break;
 	case MSM_CCI_RELEASE:
+#ifdef CONFIG_MACH_OPPO
+/*hufeng 2014-11-05 add to aviod ref_count chaos if cci_init and cci_release concurrency happened*/
+			mutex_lock(&ref_count_lock);
 		rc = msm_cci_release(sd);
+			mutex_unlock(&ref_count_lock);
+#else
+			rc = msm_cci_release(sd);
+#endif
 		break;
 	case MSM_CCI_I2C_READ:
+#ifdef CONFIG_MACH_OPPO
+/*hufeng 2014-11-05 add to aviod ref_count chaos if cci_init and cci_release concurrency happened*/
+			mutex_lock(&ref_count_lock);
 		rc = msm_cci_i2c_read_bytes(sd, cci_ctrl);
+			mutex_unlock(&ref_count_lock);
+#else
+			rc = msm_cci_i2c_read_bytes(sd, cci_ctrl);
+#endif
 		break;
 	case MSM_CCI_I2C_WRITE:
 	case MSM_CCI_I2C_WRITE_SEQ:
-		rc = msm_cci_i2c_write(sd, cci_ctrl);
+#ifdef CONFIG_MACH_OPPO
+/*hufeng 2014-11-05 add to aviod ref_count chaos if cci_init and cci_release concurrency happened*/
+			mutex_lock(&ref_count_lock);
+			rc = msm_cci_i2c_write(sd, cci_ctrl);
+			mutex_unlock(&ref_count_lock);
+#else
+			rc = msm_cci_i2c_write(sd, cci_ctrl);
+#endif
 		break;
 	case MSM_CCI_GPIO_WRITE:
 		break;
 	default:
 		rc = -ENOIOCTLCMD;
+		}
+		if (rc >= 0) {
+			break;
+		} else {
+			pr_err("%s failed, retry is %d\n", __func__, retry);
+			usleep_range(10*1000, 20*1000);
+		}
 	}
 	CDBG("%s line %d rc %d\n", __func__, __LINE__, rc);
 	cci_ctrl->status = rc;
@@ -1131,7 +1185,7 @@ static int __devinit msm_cci_probe(struct platform_device *pdev)
 {
 	struct cci_device *new_cci_dev;
 	int rc = 0;
-	pr_err("%s: pdev %p device id = %d\n", __func__, pdev, pdev->id);
+	CDBG("%s: pdev %p device id = %d\n", __func__, pdev, pdev->id);
 	new_cci_dev = kzalloc(sizeof(struct cci_device), GFP_KERNEL);
 	if (!new_cci_dev) {
 		CDBG("%s: no enough memory\n", __func__);
@@ -1206,6 +1260,10 @@ static int __devinit msm_cci_probe(struct platform_device *pdev)
 	wake_lock_init(&new_cci_dev->cci_wakelock,WAKE_LOCK_SUSPEND,"msm_cci_wakelock");
 #endif
 /*Added by Jinshui.Liu@Camera 20140221 end*/
+#ifdef CONFIG_MACH_OPPO
+/*hufeng 2014-11-05 add to aviod ref_count chaos if cci_init and cci_release concurrency happened*/
+	mutex_init(&ref_count_lock);
+#endif
 	return 0;
 
 cci_release_mem:

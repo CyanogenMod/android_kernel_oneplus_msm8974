@@ -284,14 +284,16 @@ int sps_bam_enable(struct sps_bam *dev)
 			if (dev->props.options & SPS_BAM_RES_CONFIRM) {
 				result = request_irq(dev->props.irq,
 					(irq_handler_t) bam_isr,
-					IRQF_TRIGGER_RISING, "sps", dev);
+					IRQF_TRIGGER_RISING | IRQF_NO_SUSPEND,
+					"sps", dev);
 				SPS_DBG(
 					"sps:BAM %pa uses edge for IRQ# %d\n",
 					BAM_ID(dev), dev->props.irq);
 			} else {
 				result = request_irq(dev->props.irq,
 					(irq_handler_t) bam_isr,
-					IRQF_TRIGGER_HIGH, "sps", dev);
+					IRQF_TRIGGER_HIGH | IRQF_NO_SUSPEND,
+					"sps", dev);
 				SPS_DBG(
 					"sps:BAM %pa uses level for IRQ# %d\n",
 					BAM_ID(dev), dev->props.irq);

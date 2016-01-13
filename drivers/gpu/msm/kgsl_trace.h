@@ -38,18 +38,18 @@ TRACE_EVENT(kgsl_issueibcmds,
 	TP_PROTO(struct kgsl_device *device,
 			int drawctxt_id,
 			struct kgsl_cmdbatch *cmdbatch,
+			unsigned int numibs,
 			int timestamp,
 			int flags,
 			int result,
 			unsigned int type),
 
-	TP_ARGS(device, drawctxt_id, cmdbatch, timestamp, flags,
-		result, type),
+	TP_ARGS(device, drawctxt_id, cmdbatch, numibs, timestamp,
+		flags, result, type),
 
 	TP_STRUCT__entry(
 		__string(device_name, device->name)
 		__field(unsigned int, drawctxt_id)
-		__field(unsigned int, ibdesc_addr)
 		__field(unsigned int, numibs)
 		__field(unsigned int, timestamp)
 		__field(unsigned int, flags)
@@ -60,8 +60,7 @@ TRACE_EVENT(kgsl_issueibcmds,
 	TP_fast_assign(
 		__assign_str(device_name, device->name);
 		__entry->drawctxt_id = drawctxt_id;
-		__entry->ibdesc_addr = cmdbatch->ibdesc[0].gpuaddr;
-		__entry->numibs = cmdbatch->ibcount;
+		__entry->numibs = numibs;
 		__entry->timestamp = timestamp;
 		__entry->flags = flags;
 		__entry->result = result;
@@ -69,18 +68,20 @@ TRACE_EVENT(kgsl_issueibcmds,
 	),
 
 	TP_printk(
-		"d_name=%s ctx=%u ib=0x%u numibs=%u ts=%u "
+		"d_name=%s ctx=%u ib=0x0 numibs=%u ts=%u "
 		"flags=0x%x(%s) result=%d type=%s",
 		__get_str(device_name),
 		__entry->drawctxt_id,
-		__entry->ibdesc_addr,
 		__entry->numibs,
 		__entry->timestamp,
 		__entry->flags,
 		__entry->flags ? __print_flags(__entry->flags, "|",
-			{ KGSL_CONTEXT_SAVE_GMEM, "SAVE_GMEM" },
-			{ KGSL_CONTEXT_SUBMIT_IB_LIST, "IB_LIST" },
-			{ KGSL_CONTEXT_CTX_SWITCH, "CTX_SWITCH" })
+			{ KGSL_CMDBATCH_SUBMIT_IB_LIST, "IB_LIST" },
+			{ KGSL_CMDBATCH_CTX_SWITCH, "CTX_SWITCH" },
+			{ KGSL_CMDBATCH_SYNC, "SYNC" },
+			{ KGSL_CMDBATCH_END_OF_FRAME, "EOF" },
+			{ KGSL_CMDBATCH_PWR_CONSTRAINT, "PWR_CONSTRAINT" },
+			{ KGSL_CMDBATCH_MEMLIST, "MEMLIST" })
 			: "None",
 		__entry->result,
 		__print_symbolic(__entry->drawctxt_type,
@@ -483,41 +484,35 @@ TRACE_EVENT(kgsl_mem_free,
 
 TRACE_EVENT(kgsl_mem_sync_cache,
 
-	TP_PROTO(struct kgsl_mem_entry *mem_entry, size_t offset,
-		size_t length, unsigned int op),
+	TP_PROTO(struct kgsl_mem_entry *mem_entry, unsigned int op),
 
-	TP_ARGS(mem_entry, offset, length, op),
+	TP_ARGS(mem_entry, op),
 
 	TP_STRUCT__entry(
 		__field(unsigned int, gpuaddr)
+		__field(unsigned int, size)
 		__array(char, usage, 16)
 		__field(unsigned int, tgid)
 		__field(unsigned int, id)
 		__field(unsigned int, op)
-		__field(size_t, offset)
-		__field(size_t, length)
 	),
 
 	TP_fast_assign(
 		__entry->gpuaddr = mem_entry->memdesc.gpuaddr;
-		kgsl_get_memory_usage(__entry->usage, sizeof(__entry->usage),
-				     mem_entry->memdesc.flags);
+		__entry->size = mem_entry->memdesc.size;
 		__entry->tgid = mem_entry->priv->pid;
 		__entry->id = mem_entry->id;
+		kgsl_get_memory_usage(__entry->usage, sizeof(__entry->usage),
+				     mem_entry->memdesc.flags);
 		__entry->op = op;
-		__entry->offset = offset;
-		__entry->length = (length == 0) ?
-				mem_entry->memdesc.size : length;
 	),
 
 	TP_printk(
-		"gpuaddr=0x%08x size=%zu tgid=%u"
-		" usage=%s id=%u op=%c%c offset=%zu",
-		__entry->gpuaddr,  __entry->length,
-		__entry->tgid, __entry->usage, __entry->id,
+		"gpuaddr=0x%08x size=%u tgid=%u usage=%s id=%u op=%c%c",
+		__entry->gpuaddr, __entry->size, __entry->tgid, __entry->usage,
+		__entry->id,
 		(__entry->op & KGSL_GPUMEM_CACHE_CLEAN) ? 'c' : '.',
-		(__entry->op & KGSL_GPUMEM_CACHE_INV) ? 'i' : '.',
-		__entry->offset
+		(__entry->op & KGSL_GPUMEM_CACHE_INV) ? 'i' : '.'
 	)
 );
 
@@ -631,9 +626,12 @@ TRACE_EVENT(kgsl_context_create,
 		__get_str(device_name), __entry->id, __entry->flags,
 		__entry->flags ? __print_flags(__entry->flags, "|",
 			{ KGSL_CONTEXT_NO_GMEM_ALLOC , "NO_GMEM_ALLOC" },
+			{ KGSL_CONTEXT_CTX_SWITCH, "CTX_SWITCH" },
 			{ KGSL_CONTEXT_PREAMBLE, "PREAMBLE" },
-			{ KGSL_CONTEXT_TRASH_STATE, "TRASH_STATE" },
-			{ KGSL_CONTEXT_PER_CONTEXT_TS, "PER_CONTEXT_TS" })
+			{ KGSL_CONTEXT_PER_CONTEXT_TS, "PER_CONTEXT_TS" },
+			{ KGSL_CONTEXT_USER_GENERATED_TS, "USER_GENERATED_TS" },
+			{ KGSL_CONTEXT_NO_FAULT_TOLERANCE, "NO_GFT" },
+			{ KGSL_CONTEXT_PWR_CONSTRAINT, "PWR_CONSTRAINT" })
 			: "None"
 	)
 );
@@ -679,66 +677,6 @@ TRACE_EVENT(kgsl_context_destroy,
 	TP_printk(
 		"d_name=%s ctx=%u",
 		__get_str(device_name), __entry->id
-	)
-);
-
-TRACE_EVENT(kgsl_user_pwrlevel_constraint,
-
-	TP_PROTO(struct kgsl_device *device, unsigned int id, unsigned int type,
-		unsigned int sub_type),
-
-	TP_ARGS(device, id, type, sub_type),
-
-	TP_STRUCT__entry(
-		__string(device_name, device->name)
-		__field(unsigned int, id)
-		__field(unsigned int, type)
-		__field(unsigned int, sub_type)
-	),
-
-	TP_fast_assign(
-		__assign_str(device_name, device->name);
-		__entry->id = id;
-		__entry->type = type;
-		__entry->sub_type = sub_type;
-	),
-
-	TP_printk(
-		"d_name=%s ctx=%u constraint_type=%s constraint_subtype=%s",
-		__get_str(device_name), __entry->id,
-		__print_symbolic(__entry->type, KGSL_CONSTRAINT_TYPES),
-		__print_symbolic(__entry->sub_type,
-		KGSL_CONSTRAINT_PWRLEVEL_SUBTYPES)
-	)
-);
-
-TRACE_EVENT(kgsl_constraint,
-
-	TP_PROTO(struct kgsl_device *device, unsigned int type,
-		unsigned int value, unsigned int on),
-
-	TP_ARGS(device, type, value, on),
-
-	TP_STRUCT__entry(
-		__string(device_name, device->name)
-		__field(unsigned int, type)
-		__field(unsigned int, value)
-		__field(unsigned int, on)
-	),
-
-	TP_fast_assign(
-		__assign_str(device_name, device->name);
-		__entry->type = type;
-		__entry->value = value;
-		__entry->on = on;
-	),
-
-	TP_printk(
-		"d_name=%s constraint_type=%s constraint_value=%u status=%s",
-		__get_str(device_name),
-		__print_symbolic(__entry->type, KGSL_CONSTRAINT_TYPES),
-		__entry->value,
-		__entry->on ? "ON" : "OFF"
 	)
 );
 

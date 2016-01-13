@@ -318,13 +318,18 @@ fail:
 static void *f2fs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	struct page *page;
+	char *link;
 
 	page = page_follow_link_light(dentry, nd);
 	if (IS_ERR(page))
 		return page;
 
+	link = nd_get_link(nd);
+	if (IS_ERR(link))
+		return link;
+
 	/* this is broken symlink case */
-	if (*nd_get_link(nd) == 0) {
+	if (*link == 0) {
 		kunmap(page);
 		page_cache_release(page);
 		return ERR_PTR(-ENOENT);
@@ -416,11 +421,14 @@ err_out:
 	 * If the symlink path is stored into inline_data, there is no
 	 * performance regression.
 	 */
-	if (!err)
+	if (!err) {
 		filemap_write_and_wait_range(inode->i_mapping, 0, p_len - 1);
 
-	if (IS_DIRSYNC(dir))
-		f2fs_sync_fs(sbi->sb, 1);
+		if (IS_DIRSYNC(dir))
+			f2fs_sync_fs(sbi->sb, 1);
+	} else {
+		f2fs_unlink(dir, dentry);
+	}
 
 	kfree(sd);
 	f2fs_fname_crypto_free_buffer(&disk_link);
@@ -678,8 +686,13 @@ static void *f2fs_encrypted_follow_link(struct dentry *dentry,
 
 	/* Symlink is encrypted */
 	sd = (struct f2fs_encrypted_symlink_data *)caddr;
-	cstr.name = sd->encrypted_path;
 	cstr.len = le16_to_cpu(sd->len);
+	cstr.name = kmalloc(cstr.len, GFP_NOFS);
+	if (!cstr.name) {
+		res = -ENOMEM;
+		goto errout;
+	}
+	memcpy(cstr.name, sd->encrypted_path, cstr.len);
 
 	/* this is broken symlink case */
 	if (cstr.name[0] == 0 && cstr.len == 0) {
@@ -701,6 +714,8 @@ static void *f2fs_encrypted_follow_link(struct dentry *dentry,
 	if (res < 0)
 		goto errout;
 
+	kfree(cstr.name);
+
 	paddr = pstr.name;
 
 	/* Null-terminate the name */
@@ -711,6 +726,7 @@ static void *f2fs_encrypted_follow_link(struct dentry *dentry,
 	page_cache_release(cpage);
 	return NULL;
 errout:
+	kfree(cstr.name);
 	f2fs_fname_crypto_free_buffer(&pstr);
 	kunmap(cpage);
 	page_cache_release(cpage);

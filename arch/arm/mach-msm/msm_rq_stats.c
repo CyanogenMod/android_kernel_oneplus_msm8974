@@ -74,7 +74,7 @@ static int update_average_load(unsigned int freq, unsigned int cpu)
 	idle_time = (unsigned int) (cur_idle_time - pcpu->prev_cpu_idle);
 	pcpu->prev_cpu_idle = cur_idle_time;
 
-	if (unlikely(!wall_time || wall_time < idle_time))
+	if (unlikely(wall_time <= 0 || wall_time < idle_time))
 		return 0;
 
 	cur_load = 100 * (wall_time - idle_time) / wall_time;
@@ -132,7 +132,7 @@ static int cpufreq_transition_handler(struct notifier_block *nb,
 		for_each_cpu(j, this_cpu->related_cpus) {
 			struct cpu_load_data *pcpu = &per_cpu(cpuload, j);
 			mutex_lock(&pcpu->cpu_load_mutex);
-			update_average_load(freqs->old, freqs->cpu);
+			update_average_load(freqs->old, j);
 			pcpu->cur_freq = freqs->new;
 			mutex_unlock(&pcpu->cpu_load_mutex);
 		}
@@ -203,12 +203,6 @@ static struct kobj_attribute hotplug_disabled_attr = __ATTR_RO(hotplug_disable);
 
 static void def_work_fn(struct work_struct *work)
 {
-	int64_t diff;
-
-	diff = ktime_to_ns(ktime_get()) - rq_info.def_start_time;
-	do_div(diff, 1000 * 1000);
-	rq_info.def_interval = (unsigned int) diff;
-
 	/* Notify polling threads on change of value */
 	sysfs_notify(rq_info.kobj, NULL, "def_timer_ms");
 }
@@ -271,7 +265,14 @@ static struct kobj_attribute run_queue_poll_ms_attr =
 static ssize_t show_def_timer_ms(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	return snprintf(buf, MAX_LONG_SIZE, "%u\n", rq_info.def_interval);
+	int64_t diff;
+	unsigned int udiff;
+
+	diff = ktime_to_ns(ktime_get()) - rq_info.def_start_time;
+	do_div(diff, 1000 * 1000);
+	udiff = (unsigned int) diff;
+
+	return snprintf(buf, MAX_LONG_SIZE, "%u\n", udiff);
 }
 
 static ssize_t store_def_timer_ms(struct kobject *kobj,
@@ -366,7 +367,7 @@ static int __init msm_rq_stats_init(void)
 		cpufreq_get_policy(&cpu_policy, i);
 		pcpu->policy_max = cpu_policy.max;
 		if (cpu_online(i))
-			pcpu->cur_freq = cpu_policy.cur;
+			pcpu->cur_freq = cpufreq_quick_get(i);
 		cpumask_copy(pcpu->related_cpus, cpu_policy.cpus);
 	}
 	freq_transition.notifier_call = cpufreq_transition_handler;

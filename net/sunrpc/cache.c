@@ -911,7 +911,7 @@ static unsigned int cache_poll(struct file *filp, poll_table *wait,
 	poll_wait(filp, &queue_wait, wait);
 
 	/* alway allow write */
-	mask = POLL_OUT | POLLWRNORM;
+	mask = POLLOUT | POLLWRNORM;
 
 	if (!rp)
 		return mask;
@@ -1632,7 +1632,7 @@ static int create_cache_proc_entries(struct cache_detail *cd, struct net *net)
 
 void __init cache_initialize(void)
 {
-	INIT_DELAYED_WORK_DEFERRABLE(&cache_cleaner, do_cache_clean);
+	INIT_DEFERRABLE_WORK(&cache_cleaner, do_cache_clean);
 }
 
 int cache_register_net(struct cache_detail *cd, struct net *net)

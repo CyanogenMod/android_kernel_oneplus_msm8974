@@ -1520,8 +1520,25 @@ static noinline void split_pmd(pmd_t *pmd, unsigned long addr,
 				const struct mem_type *type)
 {
 	pte_t *pte, *start_pte;
+	pmd_t *base_pmd;
 
-	start_pte = early_alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
+	base_pmd = pmd_offset(
+			pud_offset(pgd_offset(&init_mm, addr), addr), addr);
+
+	if (pmd_none(*base_pmd) || pmd_bad(*base_pmd)) {
+		start_pte = early_alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
+#ifndef CONFIG_ARM_LPAE
+		/*
+		 * Following is needed when new pte is allocated for pmd[1]
+		 * cases, which may happen when base (start) address falls
+		 * under pmd[1].
+		 */
+		if (addr & SECTION_SIZE)
+			start_pte += pte_index(addr);
+#endif
+	} else {
+		start_pte = pte_offset_kernel(base_pmd, addr);
+	}
 
 	pte = start_pte;
 
@@ -1552,9 +1569,11 @@ static void __init remap_pages(void)
 		pmd_t *pmd = NULL;
 		unsigned long next;
 		unsigned long pfn = __phys_to_pfn(phys_start);
-		bool fixup = false;
+		bool fixup = false, end_fixup = false;
 		unsigned long saved_start = addr;
 
+		if (phys_start > arm_lowmem_limit)
+			break;
 		if (phys_end > arm_lowmem_limit)
 			end = (unsigned long)__va(arm_lowmem_limit);
 		if (phys_start >= phys_end)
@@ -1570,8 +1589,10 @@ static void __init remap_pages(void)
 			pmd++;
 		}
 
-		if (end & SECTION_SIZE)
+		if (end & SECTION_SIZE) {
+			end_fixup = true;
 			pmd_empty_section_gap(end);
+		}
 #endif
 
 		do {
@@ -1594,6 +1615,10 @@ static void __init remap_pages(void)
 			 */
 			pmd = pmd_off_k(saved_start);
 			pmd[0] = pmd[1] & ~1;
+		}
+		if (end_fixup) {
+			pmd = pmd_off_k(end);
+			pmd[1] = pmd[0] & ~1;
 		}
 	}
 }

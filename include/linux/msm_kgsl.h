@@ -11,24 +11,38 @@
 #define KGSL_VERSION_MAJOR        3
 #define KGSL_VERSION_MINOR        14
 
-/*context flags */
+/*
+ * We have traditionally mixed context and issueibcmds / command batch flags
+ * together into a big flag stew. This worked fine until we started adding a
+ * lot more command batch flags and we started running out of bits. Turns out
+ * we have a bit of room in the context type / priority mask that we could use
+ * for command batches, but that means we need to split out the flags into two
+ * coherent sets.
+ *
+ * If any future definitions are for both context and cmdbatch add both defines
+ * and link the cmdbatch to the context define as we do below. Otherwise feel
+ * free to add exclusive bits to either set.
+ */
+
+/* --- context flags --- */
 #define KGSL_CONTEXT_SAVE_GMEM		0x00000001
 #define KGSL_CONTEXT_NO_GMEM_ALLOC	0x00000002
+/* This is a cmdbatch exclusive flag - use the CMDBATCH equivalent instead */
 #define KGSL_CONTEXT_SUBMIT_IB_LIST	0x00000004
 #define KGSL_CONTEXT_CTX_SWITCH		0x00000008
 #define KGSL_CONTEXT_PREAMBLE		0x00000010
 #define KGSL_CONTEXT_TRASH_STATE	0x00000020
 #define KGSL_CONTEXT_PER_CONTEXT_TS	0x00000040
 #define KGSL_CONTEXT_USER_GENERATED_TS	0x00000080
+/* This is a cmdbatch exclusive flag - use the CMDBATCH equivalent instead */
 #define KGSL_CONTEXT_END_OF_FRAME	0x00000100
-
 #define KGSL_CONTEXT_NO_FAULT_TOLERANCE 0x00000200
+/* This is a cmdbatch exclusive flag - use the CMDBATCH equivalent instead */
 #define KGSL_CONTEXT_SYNC               0x00000400
 #define KGSL_CONTEXT_PWR_CONSTRAINT     0x00000800
 /* bits [12:15] are reserved for future use */
 #define KGSL_CONTEXT_TYPE_MASK          0x01F00000
 #define KGSL_CONTEXT_TYPE_SHIFT         20
-
 #define KGSL_CONTEXT_TYPE_ANY		0
 #define KGSL_CONTEXT_TYPE_GL		1
 #define KGSL_CONTEXT_TYPE_CL		2
@@ -37,6 +51,27 @@
 #define KGSL_CONTEXT_TYPE_UNKNOWN	0x1E
 
 #define KGSL_CONTEXT_INVALID 0xffffffff
+
+/*
+ * --- command batch flags ---
+ * The bits that are linked to a KGSL_CONTEXT equivalent are either legacy
+ * definitions or bits that are valid for both contexts and cmdbatches.  To be
+ * safe the other 8 bits that are still available in the context field should be
+ * omitted here in case we need to share - the other bits are available for
+ * cmdbatch only flags as needed
+ */
+#define KGSL_CMDBATCH_MEMLIST	0x00000001
+#define KGSL_CMDBATCH_MARKER	0x00000002
+#define KGSL_CMDBATCH_SUBMIT_IB_LIST	KGSL_CONTEXT_SUBMIT_IB_LIST /* 0x004 */
+#define KGSL_CMDBATCH_CTX_SWITCH	KGSL_CONTEXT_CTX_SWITCH     /* 0x008 */
+#define KGSL_CMDBATCH_END_OF_FRAME	KGSL_CONTEXT_END_OF_FRAME   /* 0x100 */
+#define KGSL_CMDBATCH_SYNC		KGSL_CONTEXT_SYNC           /* 0x400 */
+#define KGSL_CMDBATCH_PWR_CONSTRAINT	KGSL_CONTEXT_PWR_CONSTRAINT /* 0x800 */
+
+/*
+ * Reserve bits [16:19] and bits [28:31] for possible bits shared between
+ * contexts and command batches.  Update this comment as new flags are added.
+ */
 
 /* --- Memory allocation flags --- */
 
@@ -662,9 +697,6 @@ struct kgsl_gpumem_get_info {
  * @gpuaddr: GPU address of the buffer to sync.
  * @id: id of the buffer to sync. Either gpuaddr or id is sufficient.
  * @op: a mask of KGSL_GPUMEM_CACHE_* values
- * @offset: offset into the buffer
- * @length: number of bytes starting from offset to perform
- * the cache operation on
  *
  * Sync the L2 cache for memory headed to and from the GPU - this replaces
  * KGSL_SHAREDMEM_FLUSH_CACHE since it can handle cache management for both
@@ -675,8 +707,8 @@ struct kgsl_gpumem_sync_cache {
 	unsigned int gpuaddr;
 	unsigned int id;
 	unsigned int op;
-	size_t offset;
-	size_t length;
+/* private: reserved for future use*/
+	unsigned int __pad[2]; /* For future binary compatibility */
 };
 
 #define KGSL_GPUMEM_CACHE_CLEAN (1 << 0)
@@ -687,9 +719,6 @@ struct kgsl_gpumem_sync_cache {
 
 #define KGSL_GPUMEM_CACHE_FLUSH \
 	(KGSL_GPUMEM_CACHE_CLEAN | KGSL_GPUMEM_CACHE_INV)
-
-/* Flag to ensure backwards compatibility of kgsl_gpumem_sync_cache struct */
-#define KGSL_GPUMEM_CACHE_RANGE (1 << 31U)
 
 #define IOCTL_KGSL_GPUMEM_SYNC_CACHE \
 	_IOW(KGSL_IOC_TYPE, 0x37, struct kgsl_gpumem_sync_cache)
@@ -859,6 +888,9 @@ struct kgsl_cmd_syncpoint {
 	unsigned int size;
 };
 
+/* Flag to indicate that the cmdlist may contain memlists */
+#define KGSL_IBDESC_MEMLIST 0x1
+
 /**
  * struct kgsl_submit_commands - Argument to IOCTL_KGSL_SUBMIT_COMMANDS
  * @context_id: KGSL context ID that owns the commands
@@ -874,7 +906,8 @@ struct kgsl_cmd_syncpoint {
  * similar to kgsl_issueibcmds expect that it doesn't support the legacy way to
  * submit IB lists and it adds sync points to block the IB until the
  * dependencies are satisified.  This entry point is the new and preferred way
- * to submit commands to the GPU.
+ * to submit commands to the GPU. The memory list can be used to specify all
+ * memory that is referrenced in the current set of commands.
  */
 
 struct kgsl_submit_commands {

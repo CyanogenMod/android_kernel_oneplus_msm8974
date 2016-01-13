@@ -112,6 +112,8 @@
 #define MDSS_MDP_HW_REV_200    MDSS_MDP_REV(2, 0, 0) /* 8092 v1.0 */
 
 enum {
+	NOTIFY_UPDATE_INIT,
+	NOTIFY_UPDATE_DEINIT,
 	NOTIFY_UPDATE_START,
 	NOTIFY_UPDATE_STOP,
 	NOTIFY_UPDATE_POWER_OFF,
@@ -632,12 +634,14 @@ struct mdp_overlay {
 	uint32_t flags;
 	uint32_t pipe_type;
 	uint32_t id;
+	uint8_t priority;
 	uint32_t user_data[6];
 	uint32_t bg_color;
 	uint8_t horz_deci;
 	uint8_t vert_deci;
 	struct mdp_overlay_pp_params overlay_pp_cfg;
 	struct mdp_scale_data scale;
+	uint8_t color_space;
 };
 
 struct msmfb_overlay_3d {

@@ -187,6 +187,8 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 			pm_get_active_wakeup_sources(suspend_abort,
 				MAX_SUSPEND_ABORT_LEN);
 			log_suspend_abort_reason(suspend_abort);
+			if (*wakeup)
+				error = -EBUSY;
 		}
 		syscore_resume();
 	}

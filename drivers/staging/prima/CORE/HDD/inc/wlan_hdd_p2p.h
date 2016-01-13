@@ -32,11 +32,10 @@
 \file         wlan_hdd_p2p.h
 
 \brief       Linux HDD P2P include file
-               Copyright 2008 (c) Qualcomm, Incorporated.
-               All Rights Reserved.
-               Qualcomm Confidential and Proprietary.
 
 ==========================================================================*/
+#include <linux/netdevice.h>
+#include <linux/inetdevice.h>
 #define ACTION_FRAME_TX_TIMEOUT 2000
 #define WAIT_CANCEL_REM_CHAN    1000
 #define WAIT_REM_CHAN_READY     1000
@@ -57,6 +56,8 @@
 #ifdef WLAN_FEATURE_11W
 #define WLAN_HDD_SET_WEP_FRM_FC(__fc__)     ( (__fc__) = ((__fc__) | 0x40))
 #endif //WLAN_FEATURE_11W
+
+#define HDD_P2P_MAX_ROC_DURATION            1000
 
 enum hdd_rx_flags {
     HDD_RX_FLAG_DECRYPTED        = 1 << 0,
@@ -128,11 +129,10 @@ int hdd_setP2pPs( struct net_device *dev, void *msgData );
 int hdd_setP2pOpps( struct net_device *dev, tANI_U8 *command );
 int hdd_setP2pNoa( struct net_device *dev, tANI_U8 *command );
 
-void hdd_indicateMgmtFrame( hdd_adapter_t *pAdapter,
+void __hdd_indicate_mgmt_frame(hdd_adapter_t *pAdapter,
                             tANI_U32 nFrameLength, tANI_U8* pbFrames,
                             tANI_U8 frameType,
                             tANI_U32 rxChan, tANI_S8 rxRssi);
-
 void hdd_remainChanReadyHandler( hdd_adapter_t *pAdapter );
 void hdd_sendActionCnf( hdd_adapter_t *pAdapter, tANI_BOOLEAN actionSendSuccess );
 int wlan_hdd_check_remain_on_channel(hdd_adapter_t *pAdapter);
@@ -194,5 +194,5 @@ int wlan_hdd_del_virtual_intf( struct wiphy *wiphy, struct wireless_dev *wdev );
 #else
 int wlan_hdd_del_virtual_intf( struct wiphy *wiphy, struct net_device *dev );
 #endif
-
+void hdd_p2p_roc_work_queue(struct work_struct *work);
 #endif // __P2P_H

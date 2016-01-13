@@ -47,7 +47,7 @@ static void *alloc_fdmem(size_t size)
 	 * vmalloc() if the allocation size will be considered "large" by the VM.
 	 */
 	if (size <= (PAGE_SIZE << PAGE_ALLOC_COSTLY_ORDER)) {
-		void *data = kmalloc(size, GFP_KERNEL|__GFP_NOWARN);
+		void *data = kmalloc(size, GFP_KERNEL|__GFP_NOWARN|__GFP_NORETRY);
 		if (data != NULL)
 			return data;
 	}
@@ -421,7 +421,7 @@ struct files_struct init_files = {
 		.close_on_exec	= init_files.close_on_exec_init,
 		.open_fds	= init_files.open_fds_init,
 	},
-	.file_lock	= __SPIN_LOCK_UNLOCKED(init_task.file_lock),
+	.file_lock	= __SPIN_LOCK_UNLOCKED(init_files.file_lock),
 };
 
 /*

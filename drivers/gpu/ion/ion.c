@@ -352,7 +352,7 @@ static struct ion_handle *ion_handle_create(struct ion_client *client,
 	if (!handle)
 		return ERR_PTR(-ENOMEM);
 	kref_init(&handle->ref);
-	rb_init_node(&handle->node);
+	RB_CLEAR_NODE(&handle->node);
 	handle->client = client;
 	ion_buffer_get(buffer);
 	ion_buffer_add_to_handle(buffer);
@@ -446,22 +446,16 @@ static bool ion_handle_validate(struct ion_client *client,
 
 static int ion_handle_add(struct ion_client *client, struct ion_handle *handle)
 {
-	int rc;
+	int id;
 	struct rb_node **p = &client->handles.rb_node;
 	struct rb_node *parent = NULL;
 	struct ion_handle *entry;
 
-	do {
-		int id;
-		rc = idr_pre_get(&client->idr, GFP_KERNEL);
-		if (!rc)
-			return -ENOMEM;
-		rc = idr_get_new_above(&client->idr, handle, 1, &id);
-		handle->id = id;
-	} while (rc == -EAGAIN);
+	id = idr_alloc(&client->idr, handle, 1, 0, GFP_KERNEL);
+	if (id < 0)
+		return id;
 
-	if (rc < 0)
-		return rc;
+	handle->id = id;
 
 	while (*p) {
 		parent = *p;
@@ -888,7 +882,6 @@ void ion_client_destroy(struct ion_client *client)
 		ion_handle_destroy(&handle->ref);
 	}
 
-	idr_remove_all(&client->idr);
 	idr_destroy(&client->idr);
 
 	down_write(&dev->lock);
@@ -1346,13 +1339,13 @@ struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd)
 		mutex_unlock(&client->lock);
 		goto end;
 	}
-	mutex_unlock(&client->lock);
 
 	handle = ion_handle_create(client, buffer);
-	if (IS_ERR_OR_NULL(handle))
+	if (IS_ERR_OR_NULL(handle)) {
+		mutex_unlock(&client->lock);
 		goto end;
+	}
 
-	mutex_lock(&client->lock);
 	ret = ion_handle_add(client, handle);
 	mutex_unlock(&client->lock);
 	if (ret) {

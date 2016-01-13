@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -178,6 +178,7 @@ static int snapshot_os(struct kgsl_device *device,
 	header->power_level = pwr->active_pwrlevel;
 	header->power_interval_timeout = pwr->interval_timeout;
 	header->grpclk = kgsl_get_clkrate(pwr->grp_clks[0]);
+	header->busclk = kgsl_get_clkrate(pwr->ebi1_clk);
 
 	/* Save the last active context */
 	kgsl_sharedmem_readl(&device->memstore, &header->current_context,
@@ -303,6 +304,8 @@ static void kgsl_snapshot_put_object(struct kgsl_device *device,
 	list_del(&obj->node);
 
 	obj->entry->memdesc.priv &= ~KGSL_MEMDESC_FROZEN;
+
+	kgsl_memdesc_unmap(&obj->entry->memdesc);
 	kgsl_mem_entry_put(obj->entry);
 
 	kfree(obj);
@@ -417,7 +420,7 @@ int kgsl_snapshot_get_object(struct kgsl_device *device, phys_addr_t ptbase,
 
 	if (obj == NULL) {
 		KGSL_DRV_ERR(device, "Unable to allocate memory\n");
-		goto err_put;
+		goto err_unmap;
 	}
 
 	obj->type = type;
@@ -443,6 +446,9 @@ int kgsl_snapshot_get_object(struct kgsl_device *device, phys_addr_t ptbase,
 	entry->memdesc.priv |= KGSL_MEMDESC_FROZEN;
 
 	return ret;
+
+err_unmap:
+	kgsl_memdesc_unmap(&entry->memdesc);
 err_put:
 	kgsl_mem_entry_put(entry);
 	return ret;

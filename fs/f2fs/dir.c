@@ -258,7 +258,7 @@ struct f2fs_dir_entry *f2fs_parent_dir(struct inode *dir, struct page **p)
 	if (f2fs_has_inline_dentry(dir))
 		return f2fs_parent_inline_dir(dir, p);
 
-	page = get_lock_data_page(dir, 0);
+	page = get_lock_data_page(dir, 0, false);
 	if (IS_ERR(page))
 		return NULL;
 
@@ -740,7 +740,7 @@ bool f2fs_empty_dir(struct inode *dir)
 		return f2fs_empty_inline_dir(dir);
 
 	for (bidx = 0; bidx < nblock; bidx++) {
-		dentry_page = get_lock_data_page(dir, bidx);
+		dentry_page = get_lock_data_page(dir, bidx, false);
 		if (IS_ERR(dentry_page)) {
 			if (PTR_ERR(dentry_page) == -ENOENT)
 				continue;
@@ -788,7 +788,6 @@ bool f2fs_fill_dentries(struct file *file, void *dirent, filldir_t filldir,
 		if (types && de->file_type < F2FS_FT_MAX)
 			d_type = types[de->file_type];
 
-		/* encrypted case */
 		de_name.name = d->filename[bit_pos];
 		de_name.len = le16_to_cpu(de->name_len);
 
@@ -796,12 +795,20 @@ bool f2fs_fill_dentries(struct file *file, void *dirent, filldir_t filldir,
 			int save_len = fstr->len;
 			int ret;
 
+			de_name.name = kmalloc(de_name.len, GFP_NOFS);
+			if (!de_name.name)
+				return false;
+
+			memcpy(de_name.name, d->filename[bit_pos], de_name.len);
+
 			ret = f2fs_fname_disk_to_usr(d->inode, &de->hash_code,
 							&de_name, fstr);
-			de_name = *fstr;
-			fstr->len = save_len;
+			kfree(de_name.name);
 			if (ret < 0)
 				return true;
+
+			de_name = *fstr;
+			fstr->len = save_len;
 		}
 
 		over = filldir(dirent, de_name.name, de_name.len,
@@ -856,7 +863,7 @@ static int f2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 				min(npages - n, (pgoff_t)MAX_DIR_RA_PAGES));
 
 	for (; n < npages; n++) {
-		dentry_page = get_lock_data_page(inode, n);
+		dentry_page = get_lock_data_page(inode, n, false);
 		if (IS_ERR(dentry_page))
 			continue;
 

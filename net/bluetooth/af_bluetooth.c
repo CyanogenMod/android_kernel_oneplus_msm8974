@@ -349,8 +349,6 @@ int bt_sock_stream_recvmsg(struct kiocb *iocb, struct socket *sock,
 	if (flags & MSG_OOB)
 		return -EOPNOTSUPP;
 
-	msg->msg_namelen = 0;
-
 	BT_DBG("sk %p size %zu", sk, size);
 
 	lock_sock(sk);

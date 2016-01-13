@@ -426,24 +426,20 @@ static void show_data(unsigned long addr, int nbytes, const char *name)
 			 * vmalloc addresses may point to
 			 * memory-mapped peripherals
 			 */
-			if (is_vmalloc_addr(p) ||
+			if (!virt_addr_valid(p) ||
 			    probe_kernel_address(p, data)) {
 				printk(" ********");
 			} else {
-				printk(" %08x", data);
+				printk(KERN_CONT " %08x", data);
 			}
 			++p;
 		}
-		printk("\n");
+		printk(KERN_CONT "\n");
 	}
 }
 
 static void show_extra_register_data(struct pt_regs *regs, int nbytes)
 {
-	mm_segment_t fs;
-
-	fs = get_fs();
-	set_fs(KERNEL_DS);
 	show_data(regs->ARM_pc - nbytes, nbytes * 2, "PC");
 	show_data(regs->ARM_lr - nbytes, nbytes * 2, "LR");
 	show_data(regs->ARM_sp - nbytes, nbytes * 2, "SP");
@@ -460,7 +456,6 @@ static void show_extra_register_data(struct pt_regs *regs, int nbytes)
 	show_data(regs->ARM_r8 - nbytes, nbytes * 2, "R8");
 	show_data(regs->ARM_r9 - nbytes, nbytes * 2, "R9");
 	show_data(regs->ARM_r10 - nbytes, nbytes * 2, "R10");
-	set_fs(fs);
 }
 
 void __show_regs(struct pt_regs *regs)
@@ -522,8 +517,8 @@ void __show_regs(struct pt_regs *regs)
 		printk("Control: %08x%s\n", ctrl, buf);
 	}
 #endif
-
-	show_extra_register_data(regs, 128);
+	if (get_fs() == get_ds())
+		show_extra_register_data(regs, 128);
 }
 
 void show_regs(struct pt_regs * regs)
@@ -676,6 +671,7 @@ EXPORT_SYMBOL(kernel_thread);
 unsigned long get_wchan(struct task_struct *p)
 {
 	struct stackframe frame;
+	unsigned long stack_page;
 	int count = 0;
 	if (!p || p == current || p->state == TASK_RUNNING)
 		return 0;
@@ -684,9 +680,11 @@ unsigned long get_wchan(struct task_struct *p)
 	frame.sp = thread_saved_sp(p);
 	frame.lr = 0;			/* recovered from the stack */
 	frame.pc = thread_saved_pc(p);
+	stack_page = (unsigned long)task_stack_page(p);
 	do {
-		int ret = unwind_frame(&frame);
-		if (ret < 0)
+		if (frame.sp < stack_page ||
+		    frame.sp >= stack_page + THREAD_SIZE ||
+		    unwind_frame(&frame) < 0)
 			return 0;
 		if (!in_sched_functions(frame.pc))
 			return frame.pc;
@@ -707,15 +705,16 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
  * atomic helpers. Insert it into the gate_vma so that it is visible
  * through ptrace and /proc/<pid>/mem.
  */
-static struct vm_area_struct gate_vma;
+static struct vm_area_struct gate_vma = {
+	.vm_start	= 0xffff0000,
+	.vm_end		= 0xffff0000 + PAGE_SIZE,
+	.vm_flags	= VM_READ | VM_EXEC | VM_MAYREAD | VM_MAYEXEC,
+	.vm_mm		= &init_mm,
+};
 
 static int __init gate_vma_init(void)
 {
-	gate_vma.vm_start	= 0xffff0000;
-	gate_vma.vm_end		= 0xffff0000 + PAGE_SIZE;
-	gate_vma.vm_page_prot	= PAGE_READONLY_EXEC;
-	gate_vma.vm_flags	= VM_READ | VM_EXEC |
-				  VM_MAYREAD | VM_MAYEXEC;
+	gate_vma.vm_page_prot = PAGE_READONLY_EXEC;
 	return 0;
 }
 arch_initcall(gate_vma_init);

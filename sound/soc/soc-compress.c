@@ -186,11 +186,11 @@ static void close_delayed_work(struct work_struct *work)
 	dev_dbg(rtd->dev, "ASoC: pop wq checking: %s status: %s waiting: %s\n",
 		 codec_dai->driver->playback.stream_name,
 		 codec_dai->playback_active ? "active" : "inactive",
-		     codec_dai->pop_wait ? "yes" : "no");
+		     rtd->pop_wait ? "yes" : "no");
 
 	/* are we waiting on this codec DAI stream */
-	if (codec_dai->pop_wait == 1) {
-	  codec_dai->pop_wait = 0;
+	if (rtd->pop_wait == 1) {
+	  rtd->pop_wait = 0;
 		snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_PLAYBACK,
 					  SND_SOC_DAPM_STREAM_STOP);
 	}
@@ -242,7 +242,7 @@ static int soc_compr_free(struct snd_compr_stream *cstream)
 					codec_dai->driver->playback.stream_name,
 					SND_SOC_DAPM_STREAM_STOP);
 		} else {
-			codec_dai->pop_wait = 1;
+			rtd->pop_wait = 1;
 			schedule_delayed_work(&rtd->delayed_work,
 				msecs_to_jiffies(rtd->pmdown_time));
 		}
@@ -457,7 +457,7 @@ static int soc_compr_set_params(struct snd_compr_stream *cstream,
 				SND_SOC_DAPM_STREAM_START);
 
 	/* cancel any delayed stream shutdown that is pending */
-	codec_dai->pop_wait = 0;
+	rtd->pop_wait = 0;
 	mutex_unlock(&rtd->pcm_mutex);
 
 	cancel_delayed_work_sync(&rtd->delayed_work);
@@ -715,6 +715,22 @@ static int soc_compr_copy(struct snd_compr_stream *cstream,
 	return ret;
 }
 
+static int sst_compr_set_next_track_param(struct snd_compr_stream *cstream,
+				union snd_codec_options *codec_options)
+{
+	struct snd_soc_pcm_runtime *rtd = cstream->private_data;
+	struct snd_soc_platform *platform = rtd->platform;
+	int ret = 0;
+
+	if (platform->driver->compr_ops &&
+			platform->driver->compr_ops->set_next_track_param)
+		ret = platform->driver->compr_ops->set_next_track_param(cstream,
+								codec_options);
+
+	return ret;
+}
+
+
 static int sst_compr_set_metadata(struct snd_compr_stream *cstream,
 				struct snd_compr_metadata *metadata)
 {
@@ -742,32 +758,34 @@ static int sst_compr_get_metadata(struct snd_compr_stream *cstream,
 }
 /* ASoC Compress operations */
 static struct snd_compr_ops soc_compr_ops = {
-	.open		= soc_compr_open,
-	.free		= soc_compr_free,
-	.set_params	= soc_compr_set_params,
-	.set_metadata   = sst_compr_set_metadata,
-	.get_metadata	= sst_compr_get_metadata,
-	.get_params	= soc_compr_get_params,
-	.trigger	= soc_compr_trigger,
-	.pointer	= soc_compr_pointer,
-	.ack		= soc_compr_ack,
-	.get_caps	= soc_compr_get_caps,
-	.get_codec_caps = soc_compr_get_codec_caps
+	.open			= soc_compr_open,
+	.free			= soc_compr_free,
+	.set_params		= soc_compr_set_params,
+	.set_metadata		= sst_compr_set_metadata,
+	.set_next_track_param	= sst_compr_set_next_track_param,
+	.get_metadata		= sst_compr_get_metadata,
+	.get_params		= soc_compr_get_params,
+	.trigger		= soc_compr_trigger,
+	.pointer		= soc_compr_pointer,
+	.ack			= soc_compr_ack,
+	.get_caps		= soc_compr_get_caps,
+	.get_codec_caps		= soc_compr_get_codec_caps
 };
 
 /* ASoC Dynamic Compress operations */
 static struct snd_compr_ops soc_compr_dyn_ops = {
-	.open		= soc_compr_open_fe,
-	.free		= soc_compr_free_fe,
-	.set_params	= soc_compr_set_params_fe,
-	.get_params	= soc_compr_get_params,
-	.set_metadata   = sst_compr_set_metadata,
-	.get_metadata	= sst_compr_get_metadata,
-	.trigger	= soc_compr_trigger_fe,
-	.pointer	= soc_compr_pointer,
-	.ack		= soc_compr_ack,
-	.get_caps	= soc_compr_get_caps,
-	.get_codec_caps = soc_compr_get_codec_caps
+	.open			= soc_compr_open_fe,
+	.free			= soc_compr_free_fe,
+	.set_params		= soc_compr_set_params_fe,
+	.get_params		= soc_compr_get_params,
+	.set_metadata		= sst_compr_set_metadata,
+	.set_next_track_param	= sst_compr_set_next_track_param,
+	.get_metadata		= sst_compr_get_metadata,
+	.trigger		= soc_compr_trigger_fe,
+	.pointer		= soc_compr_pointer,
+	.ack			= soc_compr_ack,
+	.get_caps		= soc_compr_get_caps,
+	.get_codec_caps		= soc_compr_get_codec_caps
 };
 
 /* create a new compress */

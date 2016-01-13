@@ -412,11 +412,11 @@ static void close_delayed_work(struct work_struct *work)
 	pr_debug("pop wq checking: %s status: %s waiting: %s\n",
 		 codec_dai->driver->playback.stream_name,
 		 codec_dai->playback_active ? "active" : "inactive",
-		 codec_dai->pop_wait ? "yes" : "no");
+		 rtd->pop_wait ? "yes" : "no");
 
 	/* are we waiting on this codec DAI stream */
-	if (codec_dai->pop_wait == 1) {
-		codec_dai->pop_wait = 0;
+	if (rtd->pop_wait == 1) {
+		rtd->pop_wait = 0;
 		snd_soc_dapm_stream_event(rtd,
 			codec_dai->driver->playback.stream_name,
 			SND_SOC_DAPM_STREAM_STOP);
@@ -486,16 +486,15 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 	cpu_dai->runtime = NULL;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		if (codec->ignore_pmdown_time ||
-		    rtd->dai_link->ignore_pmdown_time ||
-		    !rtd->pmdown_time) {
+		if (!rtd->pmdown_time || codec->ignore_pmdown_time ||
+		    rtd->dai_link->ignore_pmdown_time) {
 			/* powered down playback stream now */
 			snd_soc_dapm_stream_event(rtd,
 				codec_dai->driver->playback.stream_name,
 				SND_SOC_DAPM_STREAM_STOP);
 		} else {
 			/* start delayed pop wq here for playback streams */
-			codec_dai->pop_wait = 1;
+			rtd->pop_wait = 1;
 			schedule_delayed_work(&rtd->delayed_work,
 				msecs_to_jiffies(rtd->pmdown_time));
 		}
@@ -570,8 +569,8 @@ static int soc_pcm_prepare(struct snd_pcm_substream *substream)
 
 	/* cancel any delayed stream shutdown that is pending */
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
-	    codec_dai->pop_wait) {
-		codec_dai->pop_wait = 0;
+	    rtd->pop_wait) {
+		rtd->pop_wait = 0;
 		cancel_delayed_work(&rtd->delayed_work);
 	}
 
@@ -610,6 +609,17 @@ static int soc_pcm_hw_params(struct snd_pcm_substream *substream,
 	int ret = 0;
 
 	mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
+
+	/* perform any hw_params fixups */
+	if ((rtd->dai_link->no_host_mode == SND_SOC_DAI_LINK_NO_HOST) &&
+				rtd->dai_link->be_hw_params_fixup) {
+		ret = rtd->dai_link->be_hw_params_fixup(rtd,
+				params);
+		if (ret < 0) {
+			dev_err(rtd->card->dev, "ASoC: fixup failed for %s\n",
+			rtd->dai_link->name);
+		}
+	}
 
 	if (rtd->dai_link->ops && rtd->dai_link->ops->hw_params) {
 		ret = rtd->dai_link->ops->hw_params(substream, params);
@@ -2650,10 +2660,8 @@ int soc_dpcm_fe_dai_open(struct snd_pcm_substream *fe_substream)
 	fe->dpcm[stream].runtime = fe_substream->runtime;
 
 	if (dpcm_path_get(fe, stream, &list) <= 0) {
-		dev_warn(fe->dev, "asoc: %s no valid %s route from source to sink\n",
+		dev_warn(fe->dev, "asoc: %s no valid %s route\n",
 			fe->dai_link->name, stream ? "capture" : "playback");
-		mutex_unlock(&fe->card->dpcm_mutex);
-		return -EINVAL;
 	}
 
 	/* calculate valid and active FE <-> BE dpcm_paramss */

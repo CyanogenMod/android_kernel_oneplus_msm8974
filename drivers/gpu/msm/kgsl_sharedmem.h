@@ -56,9 +56,7 @@ int kgsl_sharedmem_set(struct kgsl_device *device,
 			unsigned int offsetbytes, unsigned int value,
 			unsigned int sizebytes);
 
-int kgsl_cache_range_op(struct kgsl_memdesc *memdesc,
-			size_t offset, size_t size,
-			unsigned int op);
+void kgsl_cache_range_op(struct kgsl_memdesc *memdesc, int op);
 
 int kgsl_process_init_sysfs(struct kgsl_device *device,
 		struct kgsl_process_private *private);

@@ -563,8 +563,8 @@ static unsigned int __startup_pirq(unsigned int irq)
 	pirq_query_unmask(irq);
 
 	evtchn_to_irq[evtchn] = irq;
-	bind_evtchn_to_cpu(evtchn, 0);
 	info->evtchn = evtchn;
+	bind_evtchn_to_cpu(evtchn, 0);
 
 out:
 	unmask_evtchn(evtchn);
@@ -906,7 +906,7 @@ static int find_virq(unsigned int virq, unsigned int cpu)
 	return rc;
 }
 
-int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
+int bind_virq_to_irq(unsigned int virq, unsigned int cpu, bool percpu)
 {
 	struct evtchn_bind_virq bind_virq;
 	int evtchn, irq, ret;
@@ -920,8 +920,12 @@ int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 		if (irq == -1)
 			goto out;
 
-		irq_set_chip_and_handler_name(irq, &xen_percpu_chip,
-					      handle_percpu_irq, "virq");
+		if (percpu)
+			irq_set_chip_and_handler_name(irq, &xen_percpu_chip,
+						      handle_percpu_irq, "virq");
+		else
+			irq_set_chip_and_handler_name(irq, &xen_dynamic_chip,
+						      handle_edge_irq, "virq");
 
 		bind_virq.virq = virq;
 		bind_virq.vcpu = cpu;
@@ -1042,7 +1046,7 @@ int bind_virq_to_irqhandler(unsigned int virq, unsigned int cpu,
 {
 	int irq, retval;
 
-	irq = bind_virq_to_irq(virq, cpu);
+	irq = bind_virq_to_irq(virq, cpu, irqflags & IRQF_PERCPU);
 	if (irq < 0)
 		return irq;
 	retval = request_irq(irq, handler, irqflags, devname, dev_id);
@@ -1422,8 +1426,10 @@ void rebind_evtchn_irq(int evtchn, int irq)
 /* Rebind an evtchn so that it gets delivered to a specific cpu */
 static int rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 {
+	struct shared_info *s = HYPERVISOR_shared_info;
 	struct evtchn_bind_vcpu bind_vcpu;
 	int evtchn = evtchn_from_irq(irq);
+	int masked;
 
 	if (!VALID_EVTCHN(evtchn))
 		return -1;
@@ -1440,12 +1446,21 @@ static int rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 	bind_vcpu.vcpu = tcpu;
 
 	/*
+	 * Mask the event while changing the VCPU binding to prevent
+	 * it being delivered on an unexpected VCPU.
+	 */
+	masked = sync_test_and_set_bit(evtchn, s->evtchn_mask);
+
+	/*
 	 * If this fails, it usually just indicates that we're dealing with a
 	 * virq or IPI channel, which don't actually need to be rebound. Ignore
 	 * it, but don't do the xenlinux-level rebind in that case.
 	 */
 	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_vcpu, &bind_vcpu) >= 0)
 		bind_evtchn_to_cpu(evtchn, tcpu);
+
+	if (!masked)
+		unmask_evtchn(evtchn);
 
 	return 0;
 }
