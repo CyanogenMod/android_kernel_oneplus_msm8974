@@ -46,6 +46,7 @@
 #include <linux/sw_sync.h>
 #include <linux/file.h>
 #include <linux/kthread.h>
+#include <linux/freezer.h>
 
 #include <mach/board.h>
 #include <mach/memory.h>
@@ -2691,7 +2692,8 @@ static int __mdss_fb_display_thread(void *data)
 				mfd->index);
 
 	while (1) {
-		wait_event(mfd->commit_wait_q,
+		while (!kthread_should_stop() && !atomic_read(&mfd->commits_pending))
+			wait_event_freezable(mfd->commit_wait_q,
 				(atomic_read(&mfd->commits_pending) ||
 				 kthread_should_stop()));
 
