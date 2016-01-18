@@ -1,25 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
- */
-/*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -40,7 +20,15 @@
  */
 
 /*
- * Airgo Networks, Inc proprietary. All rights reserved.
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
+ */
+
+
+
+
+/*
  * This file wniApi.h contains message definitions exported by
  * Sirius software modules.
  * NOTE: See projects/sirius/include/sirApi.h for structure
@@ -106,11 +94,10 @@
 #define AGN1223AR_02      8
 #define AGN_EEP_PRODUCT_ID_MAX   8
 
-
-
+#define SIR_SME_MODULE_ID 0x16
 
 /// Start of Sirius/Host message types
-#define WNI_HOST_MSG_START             0x1400
+#define WNI_HOST_MSG_START             0x1500
 
 enum eWniMsgTypes
 {
@@ -238,7 +225,6 @@ enum eWniMsgTypes
     eWNI_SME_REMAIN_ON_CHANNEL_REQ,
     eWNI_SME_REMAIN_ON_CHN_IND,
     eWNI_SME_REMAIN_ON_CHN_RSP,
-    eWNI_SME_MGMT_FRM_IND,
     eWNI_SME_REMAIN_ON_CHN_RDY_IND,
     eWNI_SME_SEND_ACTION_FRAME_IND,
     eWNI_SME_ACTION_FRAME_SEND_CNF,
@@ -247,6 +233,7 @@ enum eWniMsgTypes
     eWNI_SME_CLEAR_DFS_CHANNEL_LIST,
     eWNI_SME_PRE_CHANNEL_SWITCH_FULL_POWER,
     eWNI_SME_GET_SNR_REQ,
+    eWNI_SME_LOST_LINK_PARAMS_IND,
     //General Power Save Messages
     eWNI_PMC_MSG_TYPES_BEGIN,
     eWNI_PMC_PWR_SAVE_CFG,
@@ -307,8 +294,8 @@ enum eWniMsgTypes
     eWNI_SME_FT_AGGR_QOS_RSP,
 #endif
 
-#if defined FEATURE_WLAN_CCX
-    eWNI_SME_CCX_ADJACENT_AP_REPORT,
+#if defined FEATURE_WLAN_ESE
+    eWNI_SME_ESE_ADJACENT_AP_REPORT,
 #endif
 
     eWNI_SME_REGISTER_MGMT_FRAME_REQ,
@@ -346,31 +333,17 @@ enum eWniMsgTypes
     eWNI_SME_TDLS_DEL_STA_IND,
     eWNI_SME_TDLS_DEL_ALL_PEER_IND,
     eWNI_SME_MGMT_FRM_TX_COMPLETION_IND,
-#ifdef FEATURE_WLAN_TDLS_OXYGEN_DISAPPEAR_AP
-    eWNI_SME_TDLS_AP_DISAPPEAR_IND,
-#endif
     eWNI_SME_TDLS_LINK_ESTABLISH_REQ,
     eWNI_SME_TDLS_LINK_ESTABLISH_RSP,
+// tdlsoffchan
+    eWNI_SME_TDLS_CHANNEL_SWITCH_REQ,
+    eWNI_SME_TDLS_CHANNEL_SWITCH_RSP,
 #endif
     //NOTE: If you are planning to add more mesages, please make sure that 
     //SIR_LIM_ITC_MSG_TYPES_BEGIN is moved appropriately. It is set as
     //SIR_LIM_MSG_TYPES_BEGIN+0xB0 = 12B0 (which means max of 176 messages and
     //eWNI_SME_TDLS_DEL_STA_RSP = 175.
     //Should fix above issue to enable TDLS_INTERNAL
-#ifdef FEATURE_WLAN_TDLS_INTERNAL
-#error ERROR_TDLS_INTERNAL
-    eWNI_SME_TDLS_DISCOVERY_START_REQ,    
-    eWNI_SME_TDLS_DISCOVERY_START_RSP,    
-    eWNI_SME_TDLS_DISCOVERY_START_IND,    
-    eWNI_SME_TDLS_LINK_START_REQ,    
-    eWNI_SME_TDLS_LINK_START_RSP,    
-    eWNI_SME_TDLS_LINK_START_IND,    
-    eWNI_SME_TDLS_TEARDOWN_REQ,    
-    eWNI_SME_TDLS_TEARDOWN_RSP,    
-    eWNI_SME_TDLS_TEARDOWN_IND,    
-    eWNI_SME_ADD_TDLS_PEER_IND,    
-    eWNI_SME_DELETE_TDLS_PEER_IND,    
-#endif
     eWNI_SME_SET_BCN_FILTER_REQ,
     eWNI_SME_RESET_AP_CAPS_CHANGED,
 #ifdef WLAN_FEATURE_11W
@@ -383,17 +356,33 @@ enum eWniMsgTypes
     eWNI_SME_HANDOFF_REQ,/*upper layer requested handoff to driver in STA mode*/
     eWNI_SME_ROAM_SCAN_OFFLOAD_RSP,/*Fwd the LFR scan offload rsp from FW to SME*/
 #ifdef FEATURE_WLAN_LPHB
-    eWNI_SME_LPHB_WAIT_TIMEOUT_IND,
+    eWNI_SME_LPHB_IND,
 #endif /* FEATURE_WLAN_LPHB */
 
     eWNI_SME_GET_TSM_STATS_REQ,
     eWNI_SME_GET_TSM_STATS_RSP,
     eWNI_SME_TSM_IE_IND,
 
+#ifdef FEATURE_WLAN_CH_AVOID
+   eWNI_SME_CH_AVOID_IND,
+#endif /* FEATURE_WLAN_CH_AVOID */
+    eWNI_SME_HT40_OBSS_SCAN_IND, /* START and UPDATE OBSS SCAN Indication*/
+    eWNI_SME_HT40_STOP_OBSS_SCAN_IND, /* STOP OBSS SCAN indication */
+#ifdef WLAN_FEATURE_AP_HT40_24G
+    eWNI_SME_SET_HT_2040_MODE, /* HT 20/40 indication in SAP case for 2.4GHz*/
+    eWNI_SME_2040_COEX_IND, /* HT20/40 Coex indication in SAP case for 2.4GHz*/
+#endif
+    eWNI_SME_MAC_SPOOF_ADDR_IND,
+    eWNI_SME_ENCRYPT_MSG_RSP,
+    eWNI_SME_UPDATE_MAX_RATE_IND,
+    eWNI_SME_NAN_EVENT,
+    eWNI_SME_SET_TDLS_2040_BSSCOEX_REQ,
+    eWNI_SME_DEL_ALL_TDLS_PEERS,
+    eWNI_SME_REGISTER_MGMT_FRAME_CB,
     eWNI_SME_MSG_TYPES_END
 };
 
-#define WNI_CFG_MSG_TYPES_BEGIN        0x1100
+#define WNI_CFG_MSG_TYPES_BEGIN        0x1200
 
 /*---------------------------------------------------------------------*/
 /* CFG Module Definitions                                              */
@@ -429,9 +418,9 @@ enum eWniMsgTypes
 
 /*---------------------------------------------------------------------*/
 /* CFG to HDD message paramter indices                                 */
-/*                                                                     */
+
 /*   The followings are word indices starting from the message body    */
-/*                                                                     */
+
 /*   WNI_CFG_xxxx_xxxx_xxxx:         index of parameter                */
 /*                                                                     */
 /*   WNI_CFG_xxxx_xxxx_NUM:          number of parameters in message   */

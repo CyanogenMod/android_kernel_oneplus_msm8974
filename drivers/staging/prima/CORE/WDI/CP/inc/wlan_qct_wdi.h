@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18,26 +18,15 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
+
+
+
 
 #ifndef WLAN_QCT_WDI_H
 #define WLAN_QCT_WDI_H
@@ -53,9 +42,6 @@ DESCRIPTION
   module.
   
       
-  Copyright (c) 2010-2011 QUALCOMM Incorporated.
-  All Rights Reserved.
-  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 
 
@@ -138,7 +124,7 @@ of NV fragment is nt possbile.The next multiple of 1Kb is 3K */
 #define TOTALFRAGMENTS(x) (((x % FRAGMENT_SIZE) == 0) ? (x / FRAGMENT_SIZE):((x / FRAGMENT_SIZE) + 1))
 
 /* Beacon Filter Length*/
-#define WDI_BEACON_FILTER_LEN 70
+#define WDI_BEACON_FILTER_LEN 90
 
 /* Coex Indication data size - should match WLAN_COEX_IND_DATA_SIZE */
 #define WDI_COEX_IND_DATA_SIZE (4)
@@ -165,6 +151,10 @@ of NV fragment is nt possbile.The next multiple of 1Kb is 3K */
 /* Periodic Tx pattern offload feature */
 #define PERIODIC_TX_PTRN_MAX_SIZE 1536
 #define MAXNUM_PERIODIC_TX_PTRNS 6
+#define WDI_DISA_MAX_PAYLOAD_SIZE                1600
+#define MAX_NUM_OF_BUFFER 3
+#define VALID_FW_LOG_TYPES      2
+#define MAX_LOG_BUFFER_LENGTH      128 * 1024
 
 /*============================================================================
  *     GENERIC STRUCTURES 
@@ -397,8 +387,8 @@ typedef enum
   /* TDLS_Indication */
   WDI_TDLS_IND,
 
-  /* LPHB Timeout Indication from FW to umac */
-  WDI_LPHB_WAIT_TIMEOUT_IND,
+  /* LPHB Indication from FW to umac */
+  WDI_LPHB_IND,
 
   /* IBSS Peer Inactivity Indication */
   WDI_IBSS_PEER_INACTIVITY_IND,
@@ -411,6 +401,24 @@ typedef enum
   WDI_BATCH_SCAN_RESULT_IND,
 #endif
 
+#ifdef FEATURE_WLAN_CH_AVOID
+  WDI_CH_AVOID_IND,
+#endif /* FEATURE_WLAN_CH_AVOID */
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+  WDI_LL_STATS_RESULTS_IND,
+#endif
+#ifdef WLAN_FEATURE_EXTSCAN
+  WDI_EXTSCAN_PROGRESS_IND,
+  WDI_EXTSCAN_SCAN_AVAILABLE_IND,
+  WDI_EXTSCAN_SCAN_RESULT_IND,
+  WDI_EXTSCAN_GET_CAPABILITIES_IND,
+  WDI_EXTSCAN_BSSID_HOTLIST_RESULT_IND,
+  WDI_EXTSCAN_SIGN_RSSI_RESULT_IND,
+#endif
+  /*Delete BA Ind*/
+  WDI_DEL_BA_IND,
+  WDI_NAN_EVENT_IND,
+  WDI_LOST_LINK_PARAMS_IND,
   WDI_MAX_IND
 }WDI_LowLevelIndEnumType;
 
@@ -611,6 +619,13 @@ typedef struct
 } WDI_WakeReasonIndType;
 #endif // WLAN_WAKEUP_EVENTS
 
+typedef struct
+{
+    wpt_uint16 event_data_len;
+    wpt_uint8* event_data;
+} WDI_NanEventType;
+
+
 /*---------------------------------------------------------------------------
  WDI_MissedBeaconIndType
 -----------------------------------------------------------------------------*/
@@ -721,6 +736,19 @@ typedef struct
 #endif
 
 
+typedef struct
+{
+  wpt_uint8  bssIdx;
+  wpt_uint8  rssi;
+  wpt_uint8  selfMacAddr[WDI_MAC_ADDR_LEN];
+  wpt_uint32 linkFlCnt;
+  wpt_uint32 linkFlTx;
+  wpt_uint32 lastDataRate;
+  wpt_uint32 rsvd1;
+  wpt_uint32 rsvd2;
+
+}WDI_LostLinkParamsIndType;
+
 /*---------------------------------------------------------------------------
  WDI_IbssPeerInactivityIndType
 -----------------------------------------------------------------------------*/
@@ -731,6 +759,144 @@ typedef struct
    wpt_macAddr staMacAddr;
 }WDI_IbssPeerInactivityIndType;
 
+/*---------------------------------------------------------------------------
+ WDI_TxRateFlags
+-----------------------------------------------------------------------------*/
+typedef enum
+{
+   WDI_TX_RATE_LEGACY = 0x1,    /* Legacy rates */
+   WDI_TX_RATE_HT20   = 0x2,    /* HT20 rates */
+   WDI_TX_RATE_HT40   = 0x4,    /* HT40 rates */
+   WDI_TX_RATE_SGI    = 0x8,    /* Rate with Short guard interval */
+   WDI_TX_RATE_LGI    = 0x10,   /* Rate with Long guard interval */
+   WDI_TX_RATE_VHT20  = 0x20,   /* VHT 20 rates */
+   WDI_TX_RATE_VHT40  = 0x40,   /* VHT 20 rates */
+   WDI_TX_RATE_VHT80  = 0x80,   /* VHT 20 rates */
+   WDI_TX_RATE_VIRT   = 0x100,  /* Virtual Rate */
+} WDI_TxRateFlags;
+
+/*---------------------------------------------------------------------------
+ WDI_RateUpdateIndParams
+-----------------------------------------------------------------------------*/
+typedef struct
+{
+    /* 0 implies RA, positive value implies fixed rate, -1 implies ignore this
+     * param ucastDataRate can be used to control RA behavior of unicast data to
+     */
+    wpt_int32 ucastDataRate;
+
+    /* TX flag to differentiate between HT20, HT40 etc */
+    WDI_TxRateFlags ucastDataRateTxFlag;
+
+    /* BSSID - Optional. 00-00-00-00-00-00 implies apply to all BCAST STAs */
+    wpt_macAddr bssid;
+
+    /*
+     * 0 implies MCAST RA, positive value implies fixed rate,
+     * -1 implies ignore this param
+     */
+    wpt_int32 reliableMcastDataRate; //unit Mbpsx10
+
+    /* TX flag to differentiate between HT20, HT40 etc */
+    WDI_TxRateFlags reliableMcastDataRateTxFlag;
+
+    /*
+     * MCAST(or BCAST) fixed data rate in 2.4 GHz, unit Mbpsx10,
+     * 0 implies ignore
+     */
+    wpt_uint32 mcastDataRate24GHz;
+
+    /* TX flag to differentiate between HT20, HT40 etc */
+    WDI_TxRateFlags mcastDataRate24GHzTxFlag;
+
+    /*
+     * MCAST(or BCAST) fixed data rate in 5 GHz,
+     * unit Mbpsx10, 0 implies ignore
+     */
+    wpt_uint32 mcastDataRate5GHz;
+
+    /* TX flag to differentiate between HT20, HT40 etc */
+    WDI_TxRateFlags mcastDataRate5GHzTxFlag;
+
+    /*
+     * Request status callback offered by UMAC - it is called if the current
+     * req has returned PENDING as status; it delivers the status of sending
+     * the message over the BUS
+     */
+    WDI_ReqStatusCb   wdiReqStatusCB;
+
+    /*
+     * The user data passed in by UMAC, it will be sent back when the above
+     * function pointer will be called
+     */
+    void   *pUserData;
+
+} WDI_RateUpdateIndParams;
+
+typedef struct
+{
+   wpt_uint32 ubsp_enter_cnt;
+   wpt_uint32 ubsp_jump_ddr_cnt;
+}ubspFwStats;
+
+typedef struct
+{
+   wpt_uint32 type;
+   /*data*/
+   union{
+      ubspFwStats ubspStats;
+   }wdiFwStatsData;
+}  WDI_FWStatsResults;
+
+#ifdef FEATURE_WLAN_CH_AVOID
+#define WDI_CH_AVOID_MAX_RANGE   15
+
+typedef struct
+{
+   wpt_uint32 startFreq;
+   wpt_uint32 endFreq;
+} WDI_ChAvoidFreqType;
+
+typedef struct
+{
+   wpt_uint32          avoidRangeCount;
+   WDI_ChAvoidFreqType avoidFreqRange[WDI_CH_AVOID_MAX_RANGE];
+} WDI_ChAvoidIndType;
+#endif /* FEATURE_WLAN_CH_AVOID */
+
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+typedef struct
+{
+    void *pLinkLayerStatsResults;
+    wpt_macAddr  macAddr;
+}  WDI_LinkLayerStatsResults;
+
+#endif
+
+typedef struct
+{
+    /*STA Index*/
+    wpt_uint16    staIdx;
+
+    /*Peer MAC*/
+    wpt_macAddr   peerMacAddr;
+
+    // TID for which a BA session timeout is being triggered
+    wpt_uint8 baTID;
+       // DELBA direction
+       // 1 - Originator
+       // 0 - Recipient
+    wpt_uint8 baDirection;
+    wpt_uint32 reasonCode;
+    /*MAC ADDR of STA*/
+    wpt_macAddr  bssId;   // TO SUPPORT BT-AMP
+}  WDI_DeleteBAIndType;
+
+typedef struct
+{
+    wpt_uint32 tx_complete_status;
+    wpt_uint32 tx_bd_token;
+}  WDI_TxBDStatus;
 /*---------------------------------------------------------------------------
   WDI_LowLevelIndType
     Inidcation type and information about the indication being carried
@@ -796,6 +962,24 @@ typedef struct
     void *pBatchScanResult;
 #endif
 
+#ifdef FEATURE_WLAN_CH_AVOID
+    WDI_ChAvoidIndType          wdiChAvoidInd;
+#endif /* FEATURE_WLAN_CH_AVOID */
+
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+    /*Link Layer Statistics from FW*/
+    WDI_LinkLayerStatsResults   wdiLinkLayerStatsResults;
+#endif
+#ifdef WLAN_FEATURE_EXTSCAN
+    /*EXTSCAN Results from FW*/
+    void *pEXTScanIndData;
+#endif
+    WDI_DeleteBAIndType         wdiDeleteBAInd;
+
+    WDI_NanEventType wdiNanEvent;
+
+    WDI_TxBDStatus              wdiTxBdInd;
+    WDI_LostLinkParamsIndType   wdiLostLinkParamsInd;
   }  wdiIndicationData;
 }WDI_LowLevelIndType;
 
@@ -1250,6 +1434,65 @@ typedef struct
 
 }WDI_JoinReqInfoType;
 
+typedef enum
+{
+    eWDI_CHANNEL_SWITCH_SOURCE_SCAN,
+    eWDI_CHANNEL_SWITCH_SOURCE_LISTEN,
+    eWDI_CHANNEL_SWITCH_SOURCE_MCC,
+    eWDI_CHANNEL_SWITCH_SOURCE_CSA,
+    eWDI_CHANNEL_SWITCH_SOURCE_MAX = 0x7FFFFFFF
+} WDI_ChanSwitchSource;
+
+/*---------------------------------------------------------------------------
+  WDI_SwitchChReqInfoType_V1
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  /*Indicates the channel to switch to.*/
+  wpt_uint8         ucChannel;
+
+  /*Local power constraint*/
+  wpt_uint8         ucLocalPowerConstraint;
+
+  /*Secondary channel offset */
+  WDI_HTSecondaryChannelOffset  wdiSecondaryChannelOffset;
+
+#ifdef WLAN_FEATURE_VOWIFI
+  wpt_int8      cMaxTxPower;
+  /*Self STA Mac address*/
+  wpt_macAddr   macSelfStaMacAddr;
+#endif
+  /* VO Wifi comment: BSSID is needed to identify which session
+     issued this request. As the request has power constraints, this
+     should be applied only to that session
+  */
+  /* V IMP: Keep bssId field at the end of this msg. It is used to
+     maintain backward compatibility by way of ignoring if using new
+     host/old FW or old host/new FW since it is at the end of this struct
+   */
+  wpt_macAddr   macBSSId;
+  /* Source of Channel Switch */
+  WDI_ChanSwitchSource channelSwitchSrc;
+}WDI_SwitchChReqInfoType_V1;
+
+/*--------------------------------------------------------------------
+  WDI_SwitchChReqParamsType_V1
+----------------------------------------------------------------------*/
+typedef struct
+{
+  /*Channel Info*/
+  WDI_SwitchChReqInfoType_V1  wdiChInfo;
+
+  /*Request status callback offered by UMAC - it is called if the current
+    req has returned PENDING as status; it delivers the status of sending
+    the message over the BUS */
+  WDI_ReqStatusCb   wdiReqStatusCB;
+
+  /*The user data passed in by UMAC, it will be sent back when the above
+    function pointer will be called */
+  void*             pUserData;
+}WDI_SwitchChReqParamsType_V1;
+
 /*---------------------------------------------------------------------------
   WDI_JoinReqParamsType
 ---------------------------------------------------------------------------*/
@@ -1527,6 +1770,7 @@ typedef struct
   wpt_uint8                 ucVhtCapableSta;
   wpt_uint8                 ucVhtTxChannelWidthSet;
   wpt_uint8                 ucVhtTxBFEnabled;
+  wpt_uint8                 vhtTxMUBformeeCapable;
 #endif
 
   wpt_uint8                 ucHtLdpcEnabled;
@@ -2428,6 +2672,54 @@ typedef struct
 }WDI_AddBASessionRspParamsType;
 
 /*---------------------------------------------------------------------------
+  WDI_SpoofMacAddrRspParamType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  /* wdi status */
+  wpt_uint32   wdiStatus;
+
+  /* Reserved Field */
+  wpt_uint32    reserved;
+
+}WDI_SpoofMacAddrRspParamType;
+/*---------------------------------------------------------------------------
+  WDI_GetFrameLogRspParamType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  /* wdi status */
+  wpt_uint32   wdiStatus;
+}WDI_GetFrameLogRspParamType;
+/*---------------------------------------------------------------------------
+  WDI_FWLoggingInitRspParamType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  //FW mail box address
+  wpt_uint64 logMailBoxAddr;
+  wpt_uint32 status;
+  //Logging mail box version
+  wpt_uint8 logMailBoxVer;
+  //Qshrink is enabled
+  wpt_boolean logCompressEnabled;
+  //Reserved for future purpose
+  wpt_uint32 reserved0;
+  wpt_uint32 reserved1;
+  wpt_uint32 reserved2;
+}WDI_FWLoggingInitRspParamType;
+
+
+/*---------------------------------------------------------------------------
+  WDI_FatalEventLogsRspParamType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  /* wdi status */
+  wpt_uint32   wdiStatus;
+}WDI_FatalEventLogsRspParamType;
+
+/*---------------------------------------------------------------------------
   WDI_AddBAReqinfoType
 ---------------------------------------------------------------------------*/
 typedef struct
@@ -2607,6 +2899,49 @@ typedef struct
   void*             pUserData;
 }WDI_DelBAReqParamsType;
 
+/*---------------------------------------------------------------------------
+  WDI_UpdateChannelReqinfoType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+    /** primary 20 MHz channel frequency in mhz */
+  wpt_uint32 mhz;
+  /** Center frequency 1 in MHz*/
+  wpt_uint32 band_center_freq1;
+  /** Center frequency 2 in MHz - valid only for 11acvht 80plus80 mode*/
+  wpt_uint32 band_center_freq2;
+  /* The first 26 bits are a bit mask to indicate any channel flags,
+     (see WLAN_HAL_CHAN_FLAG*)
+     The last 6 bits indicate the mode (see tChannelPhyModeType)*/
+  wpt_uint32 channel_info;
+  /** contains min power, max power, reg power and reg class id. */
+  wpt_uint32 reg_info_1;
+  /** contains antennamax */
+  wpt_uint32 reg_info_2;
+}WDI_UpdateChannelReqinfoType;
+
+typedef struct
+{
+    wpt_uint8 numchan;
+    WDI_UpdateChannelReqinfoType *pchanParam;
+}WDI_UpdateChannelReqType;
+/*---------------------------------------------------------------------------
+  WDI_UpdateChReqParamsType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  /*BA Info */
+  WDI_UpdateChannelReqType  wdiUpdateChanParams;
+
+  /*Request status callback offered by UMAC - it is called if the current
+    req has returned PENDING as status; it delivers the status of sending
+    the message over the BUS */
+  WDI_ReqStatusCb   wdiReqStatusCB;
+
+  /*The user data passed in by UMAC, it will be sent back when the above
+    function pointer will be called */
+  void*             pUserData;
+}WDI_UpdateChReqParamsType;
 
 /*---------------------------------------------------------------------------
   WDI_SwitchCHRspParamsType
@@ -2625,6 +2960,26 @@ typedef struct
 #endif
 
 }WDI_SwitchCHRspParamsType;
+
+/*--------------------------------------------------------------------
+  WDI_SwitchChRspParamsType_V1
+--------------------------------------------------------------------*/
+typedef struct
+{
+   /*Status of the response*/
+  WDI_Status    wdiStatus;
+
+  /*Indicates the channel that WLAN is on*/
+  wpt_uint8     ucChannel;
+
+#ifdef WLAN_FEATURE_VOWIFI
+  /*HAL fills in the tx power used for mgmt frames in this field.*/
+  wpt_int8     ucTxMgmtPower;
+#endif
+
+  /* Source of Channel Switch */
+  WDI_ChanSwitchSource channelSwitchSrc;
+}WDI_SwitchChRspParamsType_V1;
 
 /*---------------------------------------------------------------------------
   WDI_ConfigSTAReqParamsType
@@ -2854,7 +3209,7 @@ typedef struct
    * structure depending on statsMask.*/
 }WDI_GetStatsRspParamsType;
 
-#if defined WLAN_FEATURE_VOWIFI_11R || defined FEATURE_WLAN_CCX || defined(FEATURE_WLAN_LFR)
+#if defined WLAN_FEATURE_VOWIFI_11R || defined FEATURE_WLAN_ESE || defined(FEATURE_WLAN_LFR)
 /*---------------------------------------------------------------------------
   WDI_GetRoamRssiParamsInfoType
 ---------------------------------------------------------------------------*/
@@ -2904,7 +3259,7 @@ typedef struct
 }WDI_GetRoamRssiRspParamsType;
 #endif
 
-#ifdef FEATURE_WLAN_CCX
+#ifdef FEATURE_WLAN_ESE
 /*---------------------------------------------------------------------------
   WDI_TSMStatsParamsInfoType
 ---------------------------------------------------------------------------*/
@@ -3145,6 +3500,45 @@ typedef struct
 }WDI_SetMaxTxPowerParamsType;
 
 /*---------------------------------------------------------------------------
+  WDI_Band
+---------------------------------------------------------------------------*/
+typedef enum
+{
+    WDI_BAND_ALL,
+    WDI_BAND_24,
+    WDI_BAND_5G,
+    WDI_BAND_MAX,
+}eWDIBand;
+
+/*---------------------------------------------------------------------------
+  WDI_MaxTxPowerPerBandInfoType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  eWDIBand   bandInfo;
+  /* In request  power == MaxTxpower to be used.*/
+  wpt_uint8  ucPower;
+}WDI_MaxTxPowerPerBandInfoType;
+
+/*---------------------------------------------------------------------------
+  WDI_SetMaxTxPowerPerBandParamsType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  /*Link Info*/
+  WDI_MaxTxPowerPerBandInfoType  wdiMaxTxPowerPerBandInfo;
+
+  /*Request status callback offered by UMAC - it is called if the current
+    req has returned PENDING as status; it delivers the status of sending
+    the message over the BUS */
+  WDI_ReqStatusCb   wdiReqStatusCB;
+
+  /*The user data passed in by UMAC, it will be sent back when the above
+    function pointer will be called */
+  void*             pUserData;
+}WDI_SetMaxTxPowerPerBandParamsType;
+
+/*---------------------------------------------------------------------------
   WDI_SetTxPowerParamsType
 ---------------------------------------------------------------------------*/
 typedef struct
@@ -3175,6 +3569,19 @@ typedef struct
   WDI_Status wdiStatus;
  
 }WDI_SetMaxTxPowerRspMsg;
+
+/*---------------------------------------------------------------------------
+  WDI_SetMaxTxPowerPerBandRspMsg
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  /* In response, power==tx power used for management frames*/
+  wpt_int8  ucPower;
+
+  /*Result of the operation*/
+  WDI_Status wdiStatus;
+
+}WDI_SetMaxTxPowerPerBandRspMsg;
 
 /*---------------------------------------------------------------------------
   WDI_SetTxPowerRspMsg
@@ -3219,6 +3626,9 @@ typedef struct
   void*             pUserData;
 }WDI_SetP2PGONOAReqParamsType;
 
+#define WDI_MAX_SUPP_CHANNELS 128
+#define WDI_MAX_SUPP_OPER_CLASSES 32
+
 typedef struct
 {
     wpt_uint16 uStaIdx;
@@ -3226,6 +3636,13 @@ typedef struct
     wpt_uint8  uUapsdQueues;
     wpt_uint8  uMaxSp;
     wpt_uint8  uIsBufSta;
+    wpt_uint8  uIsOffChannelSupported;
+    wpt_uint8   peerCurrOperClass;
+    wpt_uint8   selfCurrOperClass;
+    wpt_uint8  validChannelsLen;
+    wpt_uint8  validChannels[WDI_MAX_SUPP_CHANNELS];
+    wpt_uint8  validOperClassesLen;
+    wpt_uint8  validOperClasses[WDI_MAX_SUPP_OPER_CLASSES];
 }WDI_SetTDLSLinkEstablishReqInfoType;
 /*---------------------------------------------------------------------------
   WDI_SetTDLSLinkEstablishReqParamsType
@@ -3245,7 +3662,6 @@ typedef struct
   void*             pUserData;
 }WDI_SetTDLSLinkEstablishReqParamsType;
 
-
 typedef struct
 {
   /*Result of the operation*/
@@ -3255,6 +3671,37 @@ typedef struct
   wpt_uint16 uStaIdx;
 }WDI_SetTdlsLinkEstablishReqResp;
 
+
+
+typedef struct
+{
+   /*STA Index*/
+   wpt_uint8  staIdx;
+   /* if this is 1, self is initiator otherwise responder only*/
+   wpt_uint8  isOffchannelInitiator;
+   /*TDLS off channel related params */
+   wpt_uint8  targetOperClass;
+   wpt_uint8  targetChannel;
+   wpt_uint8   secondaryChannelOffset;
+   wpt_uint8  reserved[64];
+}WDI_SetTDLSChanSwitchReqInfoType;
+
+typedef struct
+{
+  WDI_SetTDLSChanSwitchReqInfoType  wdiTDLSChanSwitchReqInfo;
+  WDI_ReqStatusCb   wdiReqStatusCB;
+  void*  pUserData;
+}WDI_SetTDLSChanSwitchReqParamsType;
+
+
+typedef struct
+{
+  /*Result of the operation*/
+  WDI_Status wdiStatus;
+
+  /*STA Idx*/
+  wpt_uint16 uStaIdx;
+}WDI_SetTdlsChanSwitchReqResp;
 /*---------------------------------------------------------------------------
   WDI_SetAddSTASelfParamsType
 ---------------------------------------------------------------------------*/
@@ -3398,7 +3845,7 @@ typedef struct
    DXE when DXE wakes up from power save*/
    unsigned int      dxePhyAddr;
 
-   // For CCX and 11R Roaming
+   // For ESE and 11R Roaming
    wpt_uint32 rssiFilterPeriod;
    wpt_uint32 numBeaconPerRssiAverage;
    wpt_uint8  bRssiFilterEnable;
@@ -3420,6 +3867,35 @@ typedef struct
    function pointer will be called */ 
    void*                    pUserData; 
 }WDI_EnterBmpsReqParamsType;
+
+/*---------------------------------------------------------------------------
+  WDI_EnterImpsReqParamsType
+  Enter IMPS parameters passed to WDI from WDA
+---------------------------------------------------------------------------*/
+typedef struct
+{
+   /*Request status callback offered by UMAC - it is called if the current req
+   has returned PENDING as status; it delivers the status of sending the message
+   over the BUS */
+   WDI_ReqStatusCb          wdiReqStatusCB;
+   /*The user data passed in by UMAC, it will be sent back when the above
+   function pointer will be called */
+   void*                    pUserData;
+}WDI_EnterImpsReqParamsType;
+
+/*---------------------------------------------------------------------------
+  WDI_ExitImpsReqParamsType
+  Exit IMPS parameters passed to WDI from WDA
+----------------------------------------------------------------------------*/
+typedef struct
+{
+   /*Request status callback offered by UMAC */
+   WDI_ReqStatusCb         wdiReqStatusCB;
+   /*The user data passed in by UMAC, it will be sent back when the above
+   function pointer will be called */
+   void*                   pUserData;
+
+}WDI_ExitImpsReqParamsType;
 
 /*---------------------------------------------------------------------------
   WDI_EnterBmpsReqParamsType
@@ -3614,6 +4090,35 @@ typedef struct
    function pointer will be called */ 
    void*                      pUserData; 
 }WDI_ConfigureRxpFilterReqParamsType;
+
+typedef struct
+{
+   wpt_uint8 enableFlag;
+   wpt_uint8 frameType;
+   wpt_uint8 frameSize;
+   wpt_uint8 bufferMode;
+   wpt_uint8 continuousFrameLogging;
+   wpt_uint8 minLogBufferSize;
+   wpt_uint8 maxLogBufferSize;
+}WDI_FWLoggingInitReqInfoType;
+
+typedef struct
+{
+    wpt_uint32 reason_code;
+}WDI_FatalEventLogsReqInfoType;
+
+
+typedef struct
+{
+   wpt_uint8 flags;
+}WDI_GetFrameLogReqInfoType;
+
+typedef struct
+{
+   wpt_uint64 logBuffAddress[MAX_NUM_OF_BUFFER];
+   wpt_uint32 status;
+   wpt_uint32 logBuffLength[MAX_NUM_OF_BUFFER];
+}WDI_FWLoggingDXEdoneIndInfoType;
 
 /*---------------------------------------------------------------------------
   WDI_BeaconFilterInfoType
@@ -4483,6 +4988,8 @@ typedef struct
    wpt_uint16 timeout;
    wpt_uint8  session;
    wpt_uint8  gateway_mac[WDI_MAC_ADDR_LEN];
+   wpt_uint16 timePeriodSec; // in seconds
+   wpt_uint32 tcpSn;
 } WDI_LPHBTcpParamStruct;
 
 typedef struct
@@ -4779,9 +5286,8 @@ typedef struct
 
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 
-#define WDI_ROAM_SCAN_MAX_CHANNELS       80 /* NUM_RF_CHANNELS */
+#define WDI_ROAM_SCAN_MAX_CHANNELS       80
 #define WDI_ROAM_SCAN_MAX_PROBE_SIZE     450
-#define WDI_ROAM_SCAN_RESERVED_BYTES     61
 
 typedef struct
 {
@@ -4821,6 +5327,7 @@ typedef struct
   wpt_boolean RoamScanOffloadEnabled;
   wpt_boolean MAWCEnabled;
   wpt_uint8   LookupThreshold;
+  wpt_uint8   RxSensitivityThreshold;
   wpt_uint8   RoamRssiDiff;
   wpt_uint8   ChannelCacheType;
   wpt_uint8   Command;
@@ -4832,7 +5339,7 @@ typedef struct
   wpt_uint16  EmptyRefreshScanPeriod;
   wpt_uint8   ValidChannelCount;
   wpt_uint8   ValidChannelList[WDI_ROAM_SCAN_MAX_CHANNELS];
-  wpt_boolean IsCCXEnabled;
+  wpt_boolean IsESEEnabled;
   /*Probe template for 2.4GHz band*/
   wpt_uint16  us24GProbeSize;
   wpt_uint8   a24GProbeTemplate[WDI_ROAM_SCAN_MAX_PROBE_SIZE];
@@ -4846,7 +5353,6 @@ typedef struct
   WDI_MobilityDomainInfo  MDID;
   wpt_uint8               nProbes;
   wpt_uint16              HomeAwayTime;
-  wpt_uint8               ReservedBytes[WDI_ROAM_SCAN_RESERVED_BYTES];
 } WDI_RoamOffloadScanInfo;
 
 typedef struct
@@ -4862,6 +5368,49 @@ typedef struct
    void*                      pUserData;
 } WDI_RoamScanOffloadReqParamsType;
 #endif //WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+
+/*---------------------------------------------------------------------------
+  WDI_HT40ObssScanIndType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+    wpt_uint8     cmdType;
+    wpt_uint8     scanType;
+    wpt_uint16    OBSSScanPassiveDwellTime; // In TUs
+    wpt_uint16    OBSSScanActiveDwellTime;  // In TUs
+    wpt_uint16    BSSChannelWidthTriggerScanInterval; // In seconds
+    wpt_uint16    OBSSScanPassiveTotalPerChannel; // In TUs
+    wpt_uint16    OBSSScanActiveTotalPerChannel;  // In TUs
+    wpt_uint16    BSSWidthChannelTransitionDelayFactor;
+    wpt_uint16    OBSSScanActivityThreshold;
+    wpt_uint8     selfStaIdx;
+    wpt_uint8     bssIdx;
+    wpt_uint8     fortyMHZIntolerent;
+    wpt_uint8     channelCount;
+    wpt_uint8     channels[WDI_ROAM_SCAN_MAX_CHANNELS];
+    wpt_uint8     currentOperatingClass;
+    wpt_uint16    ieFieldLen;
+    wpt_uint8     ieField[WDI_ROAM_SCAN_MAX_PROBE_SIZE];
+} WDI_HT40ObssScanIndType;
+
+
+/*---------------------------------------------------------------------------
+  WDI_OBSSScanIndParamsType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  WDI_HT40ObssScanIndType wdiHT40ObssScanParam;
+
+   /*Request status callback offered by UMAC - it is called if the current
+    req has returned PENDING as status; it delivers the status of sending
+    the message over the BUS */
+  WDI_ReqStatusCb   wdiReqStatusCB;
+
+  /*The user data passed in by UMAC, it will be sent back when the above
+    function pointer will be called */
+  void*             pUserData;
+
+}WDI_HT40ObssScanParamsType;
 
 /*---------------------------------------------------------------------------
   WDI_UpdateScanParamsInfo
@@ -5262,6 +5811,16 @@ typedef struct
 } WDI_AddPeriodicTxPtrnParamsType;
 
 /*---------------------------------------------------------------------------
+  WDI_NanRequestType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+    wpt_uint16 request_data_len;
+    wpt_uint8 request_data[1];
+} WDI_NanRequestType;
+
+
+/*---------------------------------------------------------------------------
   WDI_DelPeriodicTxPtrnParamsType
 ---------------------------------------------------------------------------*/
 typedef struct
@@ -5277,6 +5836,311 @@ typedef struct
     function pointer will be called */
   void*             pUserData;
 } WDI_DelPeriodicTxPtrnParamsType;
+
+#ifdef WLAN_FEATURE_EXTSCAN
+
+#define WDI_WLAN_EXTSCAN_MAX_CHANNELS                 16
+#define WDI_WLAN_EXTSCAN_MAX_BUCKETS                  16
+#define WDI_WLAN_EXTSCAN_MAX_HOTLIST_APS              128
+#define WDI_WLAN_EXTSCAN_MAX_SIGNIFICANT_CHANGE_APS   64
+
+typedef enum
+{
+    WDI_WIFI_BAND_UNSPECIFIED,
+    WDI_WIFI_BAND_BG             = 1,    // 2.4 GHz
+    WDI_WIFI_BAND_A              = 2,    // 5 GHz without DFS
+    WDI_WIFI_BAND_ABG            = 3,    // 2.4 GHz + 5 GHz; no DFS
+    WDI_WIFI_BAND_A_DFS          = 4,    // 5 GHz DFS only
+    WDI_WIFI_BAND_A_WITH_DFS     = 6,    // 5 GHz with DFS
+    WDI_WIFI_BAND_ABG_WITH_DFS   = 7,    // 2.4 GHz + 5 GHz with DFS
+
+    /* Keep it last */
+    WDI_WIFI_BAND_MAX
+} WDI_WifiBand;
+
+typedef struct
+{
+    wpt_uint32      channel;        // frequency
+    wpt_uint32      dwellTimeMs;    // dwell time hint
+    wpt_uint8       passive;        // 0 => active,
+                                  // 1 => passive scan; ignored for DFS
+    wpt_uint8       chnlClass;
+} WDI_WifiScanChannelSpec;
+
+typedef struct
+{
+    wpt_uint8       bucket;  // bucket index, 0 based
+    WDI_WifiBand     band;    // when UNSPECIFIED, use channel list
+
+    /*
+     * desired period, in millisecond; if this is too
+     * low, the firmware should choose to generate results as fast as
+     * it can instead of failing the command byte
+     */
+    wpt_uint32      period;
+
+    /*
+     * 0 => normal reporting (reporting rssi history
+     * only, when rssi history buffer is % full)
+     * 1 => same as 0 + report a scan completion event after scanning
+     * this bucket
+     * 2 => same as 1 + forward scan results (beacons/probe responses + IEs)
+     * in real time to HAL
+     */
+    wpt_uint8      reportEvents;
+
+    wpt_uint8      numChannels;
+
+    /*
+     * channels to scan; these may include DFS channels
+     */
+    WDI_WifiScanChannelSpec channels[WDI_WLAN_EXTSCAN_MAX_CHANNELS];
+} WDI_WifiScanBucketSpec;
+
+typedef struct
+{
+    wpt_uint32                requestId;
+    wpt_uint8                 sessionId;
+    wpt_uint32                basePeriod;   // base timer period
+    wpt_uint32                maxAPperScan;
+
+    /* in %, when buffer is this much full, wake up host */
+    wpt_uint32                reportThreshold;
+
+    wpt_uint8                numBuckets;
+    WDI_WifiScanBucketSpec  buckets[WDI_WLAN_EXTSCAN_MAX_BUCKETS];
+} WDI_EXTScanStartReqParams;
+
+typedef struct
+{
+    wpt_uint32      requestId;
+    wpt_uint8       sessionId;
+} WDI_EXTScanStopReqParams;
+
+typedef struct
+{
+    wpt_uint32      requestId;
+    wpt_uint8       sessionId;
+
+    /*
+     * 1 return cached results and flush it
+     * 0 return cached results and do not flush
+     */
+    wpt_boolean  flush;
+} WDI_EXTScanGetCachedResultsReqParams;
+
+typedef struct
+{
+    wpt_uint32    requestId;
+    wpt_uint8     sessionId;
+} WDI_EXTScanGetCapabilitiesReqParams;
+
+typedef struct
+{
+   wpt_uint8   bssid[6];     /* BSSID */
+   wpt_int32    low;     // low threshold
+   wpt_int32    high;    // high threshold
+   wpt_uint32   channel; // channel hint
+} WDI_APThresholdParam;
+
+typedef struct
+{
+    wpt_int32   requestId;
+    wpt_int8    sessionId;    // session Id mapped to vdev_id
+
+    wpt_int32   numAp;        // number of hotlist APs
+    WDI_APThresholdParam   ap[WDI_WLAN_EXTSCAN_MAX_HOTLIST_APS];    // hotlist APs
+} WDI_EXTScanSetBSSIDHotlistReqParams;
+
+typedef struct
+{
+    wpt_uint32    requestId;
+    wpt_uint8     sessionId;
+} WDI_EXTScanResetBSSIDHotlistReqParams;
+
+
+typedef struct
+{
+    wpt_int32   requestId;
+    wpt_int8    sessionId;    // session Id mapped to vdev_id
+
+    /* number of samples for averaging RSSI */
+    wpt_int32              rssiSampleSize;
+
+    /* number of missed samples to confirm AP loss */
+    wpt_int32              lostApSampleSize;
+
+    /* number of APs breaching threshold required for firmware
+     * to generate event
+     */
+    wpt_int32              minBreaching;
+
+    wpt_int32   numAp;        // number of hotlist APs
+    WDI_APThresholdParam   ap[WDI_WLAN_EXTSCAN_MAX_HOTLIST_APS];    // hotlist APs
+} WDI_EXTScanSetSignfRSSIChangeReqParams;
+
+typedef struct
+{
+    wpt_uint32    requestId;
+    wpt_uint8     sessionId;
+} WDI_EXTScanResetSignfRSSIChangeReqParams;
+#endif /* WLAN_FEATURE_EXTSCAN */
+
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+typedef struct
+{
+   wpt_uint32  reqId;
+   wpt_macAddr macAddr;
+   wpt_uint32  mpduSizeThreshold;
+   wpt_uint32  aggressiveStatisticsGathering;
+}WDI_LLStatsSetReqType;
+
+typedef struct
+{
+   wpt_uint32  reqId;
+   wpt_macAddr macAddr;
+   wpt_uint32  paramIdMask;
+}WDI_LLStatsGetReqType;
+
+typedef struct
+{
+   wpt_uint32  reqId;
+   wpt_macAddr macAddr;
+   wpt_uint32  statsClearReqMask;
+   wpt_uint8   stopReq;
+}WDI_LLStatsClearReqType;
+
+#endif /* WLAN_FEATURE_LINK_LAYER_STATS */
+
+/*---------------------------------------------------------------------------
+  WDI_SPOOF_MAC_ADDR_REQ
+---------------------------------------------------------------------------*/
+typedef struct
+{
+   /* Spoof MAC Address for FW  */
+   wpt_macAddr macAddr;
+
+   /* Reserved Params/fields */
+   wpt_uint32 params;
+   wpt_uint32 reserved;
+} WDI_SpoofMacAddrInfoType;
+
+//This is to force compiler to use the maximum of an int for enum
+#define SIR_MAX_ENUM_SIZE    0x7FFFFFFF
+// Enum to specify whether key is used
+// for TX only, RX only or both
+typedef enum
+{
+    eWDI_TX_ONLY,
+    eWDI_RX_ONLY,
+    eWDI_TX_RX,
+    eWDI_TX_DEFAULT,
+    eWDI_DONOT_USE_KEY_DIRECTION = SIR_MAX_ENUM_SIZE
+} tWDIKeyDirection;
+
+// MAX key length when ULA is used
+#define SIR_MAC_MAX_KEY_LENGTH               32
+/* Max key size  including the WAPI and TKIP */
+#define WLAN_MAX_KEY_RSC_LEN         16
+// Definition for Encryption Keys
+//typedef struct sSirKeys
+typedef struct
+{
+    wpt_uint8                  keyId;
+    wpt_uint8                  unicast;     // 0 for multicast
+    tWDIKeyDirection    keyDirection;
+    wpt_uint8                  keyRsc[WLAN_MAX_KEY_RSC_LEN];   // Usage is unknown
+    wpt_uint8                  paeRole;     // =1 for authenticator,
+                                     // =0 for supplicant
+    wpt_uint16                 keyLength;
+    wpt_uint8                  key[SIR_MAC_MAX_KEY_LENGTH];
+} tWDIKeys, *tpWDIKeys;
+
+typedef enum
+{
+    eWDI_WEP_STATIC,
+    eWDI_WEP_DYNAMIC,
+} tWDIWepType;
+
+// Encryption type enum used with peer
+typedef enum
+{
+    eWDI_ED_NONE,
+    eWDI_ED_WEP40,
+    eWDI_ED_WEP104,
+    eWDI_ED_TKIP,
+    eWDI_ED_CCMP,
+#if defined(FEATURE_WLAN_WAPI)
+    eWDI_ED_WPI,
+#endif
+    /* DPU HW treats encryption mode 4 plus RMF bit set in TX BD as BIP.
+     * Thus while setting BIP encryption mode in corresponding DPU Desc
+     * eSIR_ED_AES_128_CMAC should be set to eSIR_ED_CCMP
+     */
+    eWDI_ED_AES_128_CMAC,
+    eWDI_ED_NOT_IMPLEMENTED = SIR_MAX_ENUM_SIZE
+} tWDIEdType;
+#define SIR_WDI_MAX_NUM_OF_DEFAULT_KEYS      4
+/*
+ * This is used by PE to configure the key information on a given station.
+ * When the secType is WEP40 or WEP104, the defWEPIdx is used to locate
+ * a preconfigured key from a BSS the station assoicated with; otherwise
+ * a new key descriptor is created based on the key field.
+ */
+typedef struct
+{
+    wpt_uint16          staIdx;
+    tWDIEdType          encType;        // Encryption/Decryption type
+    tWDIWepType         wepType;        // valid only for WEP
+    wpt_uint8           defWEPIdx;      // Default WEP key, valid only for static WEP, must between 0 and 3
+    tWDIKeys            key[SIR_WDI_MAX_NUM_OF_DEFAULT_KEYS];            // valid only for non-static WEP encyrptions
+    wpt_uint8           singleTidRc;    // 1=Single TID based Replay Count, 0=Per TID based RC
+    wpt_uint8           sessionId; // PE session id for PE<->HAL interface
+} tWDISetStaKeyParams, *tpWDISetStaKeyParams;
+
+typedef struct
+{
+    tWDISetStaKeyParams     keyParams;
+    wpt_uint8 pn[6];
+}wpt_encConfigParams;
+
+typedef struct
+{
+    wpt_uint16  length;
+    wpt_uint8 data[WDI_DISA_MAX_PAYLOAD_SIZE];
+}wpt_payload;
+
+typedef struct
+{
+    wpt_80211Header macHeader;
+    wpt_encConfigParams encParams;
+    wpt_payload data;
+}wpt_pkt80211;
+
+#define NUM_FILTERS_SUPPORTED 1
+typedef struct
+{
+   wpt_macAddr macAddr;
+   wpt_uint8 isA1filter;
+   wpt_uint8 isA2filter;
+   wpt_uint8 isA3filter;
+}WDI_filter;
+
+typedef struct
+{
+   /* start or stop */
+   wpt_uint8 state;
+   /*Conversion of packet required or not*/
+   wpt_uint8 is80211to803ConReq;
+   wpt_uint32 ChannelNo;
+   wpt_uint32 ChannelBW;
+   wpt_uint8 crcCheckEnabled;
+   wpt_uint8 numOfMacFilters;
+   WDI_filter mmFilters[NUM_FILTERS_SUPPORTED];
+   wpt_uint64 typeSubtypeBitmap;
+   wpt_uint64 rsvd;
+
+}WDI_MonStartReqType;
 
 /*----------------------------------------------------------------------------
  *   WDI callback types
@@ -5590,14 +6454,12 @@ typedef void  (*WDI_RemoveBSSKeyRspCb)(WDI_Status   wdiStatus,
     pUserData:  user data  
   
     
-  
   RETURN VALUE 
     The result code associated with performing the operation
 ---------------------------------------------------------------------------*/
 typedef void  (*WDI_SetSTAKeyRspCb)(WDI_Status   wdiStatus,
                                     void*        pUserData);
 
- 
 /*---------------------------------------------------------------------------
    WDI_StartRspCb
  
@@ -5612,8 +6474,7 @@ typedef void  (*WDI_SetSTAKeyRspCb)(WDI_Status   wdiStatus,
     wdiStatus:  response status received from HAL
     pUserData:  user data  
 
-    
-  
+
   RETURN VALUE 
     The result code associated with performing the operation
 ---------------------------------------------------------------------------*/
@@ -5621,7 +6482,7 @@ typedef void  (*WDI_RemoveSTAKeyRspCb)(WDI_Status   wdiStatus,
                                        void*        pUserData);
 
 
-#ifdef FEATURE_WLAN_CCX 
+#ifdef FEATURE_WLAN_ESE
 /*---------------------------------------------------------------------------
    WDI_TsmRspCb
  
@@ -5778,6 +6639,9 @@ typedef void  (*WDI_DelBARspCb)(WDI_Status   wdiStatus,
 typedef void  (*WDI_SwitchChRspCb)(WDI_SwitchCHRspParamsType*  pwdiSwitchChRsp,
                                    void*                       pUserData);
 
+typedef void  (*WDI_SwitchChRspCb_V1)(WDI_SwitchChRspParamsType_V1*  pwdiSwitchChRsp,
+                                      void* pUserData);
+
  
 /*---------------------------------------------------------------------------
    WDI_StartRspCb
@@ -5845,7 +6709,7 @@ typedef void  (*WDI_SetLinkStateRspCb)( WDI_Status   wdiStatus,
 typedef void  (*WDI_GetStatsRspCb)(WDI_GetStatsRspParamsType*  pwdiGetStatsRsp,
                                    void*                       pUserData);
 
-#if defined WLAN_FEATURE_VOWIFI_11R || defined FEATURE_WLAN_CCX || defined(FEATURE_WLAN_LFR)
+#if defined WLAN_FEATURE_VOWIFI_11R || defined FEATURE_WLAN_ESE || defined(FEATURE_WLAN_LFR)
 /*---------------------------------------------------------------------------
    WDI_GetRoamRssiRspCb
 
@@ -6000,6 +6864,27 @@ typedef void (*WDA_SetMaxTxPowerRspCb)(WDI_SetMaxTxPowerRspMsg *wdiSetMaxTxPower
                                              void* pUserData);
 
 /*---------------------------------------------------------------------------
+   WDA_SetMaxTxPowerPerBandRspCb
+
+   DESCRIPTION
+
+   This callback is invoked by DAL when it has received a
+   set max Tx Power Per Band response from the underlying device.
+
+   PARAMETERS
+
+    IN
+    wdiSetMaxTxPowerPerBandRsp:  response status received from HAL
+    pUserData:  user data
+
+  RETURN VALUE
+    The result code associated with performing the operation
+---------------------------------------------------------------------------*/
+typedef void (*WDA_SetMaxTxPowerPerBandRspCb)(WDI_SetMaxTxPowerPerBandRspMsg
+                                              *wdiSetMaxTxPowerPerBandRsp,
+                                              void* pUserData);
+
+/*---------------------------------------------------------------------------
    WDA_SetTxPowerRspCb
 
    DESCRIPTION
@@ -6086,6 +6971,28 @@ typedef void  (*WDI_SetTDLSLinkEstablishReqParamsRspCb)(WDI_SetTdlsLinkEstablish
                                 wdiSetTdlsLinkEstablishReqRsp,
                                 void*        pUserData);
 
+/*---------------------------------------------------------------------------
+   WDI_SetTDLSChanSwitchReqParamsRspCb
+
+   DESCRIPTION
+
+   This callback is invoked by DAL when it has received a TDLS Link Establish Req response from
+   the underlying device.
+
+   PARAMETERS
+
+    IN
+    wdiStatus:  response status received from HAL
+    pUserData:  user data
+
+
+
+  RETURN VALUE
+    The result code associated with performing the operation
+---------------------------------------------------------------------------*/
+typedef void  (*WDI_SetTDLSChanSwitchReqParamsRspCb)(WDI_SetTdlsChanSwitchReqResp *
+                                wdiSetTdlsChanSwitchReqRsp,
+                                void*        pUserData);
 /*---------------------------------------------------------------------------
    WDI_SetPwrSaveCfgCb
  
@@ -6798,6 +7705,9 @@ typedef void  (*WDI_UpdateScanParamsCb)(WDI_Status  wdiStatus,
                                         void*       pUserData);
 #endif // FEATURE_WLAN_SCAN_PNO
 
+typedef void  (*WDI_UpdateChannelRspCb)(WDI_Status  wdiStatus,
+                                        void*       pUserData);
+
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 /*---------------------------------------------------------------------------
    WDI_RoamOffloadScanCb
@@ -7106,6 +8016,52 @@ typedef void (*WDI_SetBatchScanCb)(void *pData, WDI_SetBatchScanRspType *pRsp);
 
 #endif
 
+typedef void (*WDI_GetBcnMissRateCb)(wpt_uint8 status, wpt_uint32 bcnMissRate,
+                                     void* pUserData);
+
+#ifdef WLAN_FEATURE_EXTSCAN
+typedef void  (*WDI_EXTScanStartRspCb)(void *pEventData,
+                                       void *pUserData);
+typedef void  (*WDI_EXTScanStopRspCb)(void *pEventData,
+                                       void *pUserData);
+typedef void  (*WDI_EXTScanGetCachedResultsRspCb)(void *pEventData,
+                                       void *pUserData);
+typedef void  (*WDI_EXTScanGetCapabilitiesRspCb)(void *pEventData,
+                                       void *pUserData);
+typedef void  (*WDI_EXTScanSetBSSIDHotlistRspCb)(void *pEventData,
+                                       void *pUserData);
+typedef void  (*WDI_EXTScanResetBSSIDHotlistRspCb)(void *pEventData,
+                                       void *pUserData);
+typedef void  (*WDI_EXTScanSetSignfRSSIChangeRspCb)(void *pEventData,
+                                       void *pUserData);
+typedef void  (*WDI_EXTScanResetSignfRSSIChangeRspCb)(void *pEventData,
+                                       void *pUserData);
+#endif /* WLAN_FEATURE_EXTSCAN */
+
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+typedef void  (*WDI_LLStatsSetRspCb)(void *pEventData,
+                                       void *pUserData);
+typedef void  (*WDI_LLStatsGetRspCb)(void *pEventData,
+                                       void *pUserData);
+typedef void  (*WDI_LLStatsClearRspCb)(void *pEventData,
+                                       void *pUserData);
+#endif /* WLAN_FEATURE_LINK_LAYER_STATS */
+
+typedef void  (*WDI_SetSpoofMacAddrRspCb)(
+                        WDI_SpoofMacAddrRspParamType* wdiRsp, void *pUserData);
+
+typedef void  (*WDI_FWStatsGetRspCb)(WDI_Status status,void *fwStatsResp,
+                                         void *pUserData);
+
+typedef void  (*WDI_EncryptMsgRspCb)(wpt_uint8 status, void *pEventData, void* pUserData);
+typedef void  (*WDI_FWLoggingInitRspCb)(
+                        WDI_FWLoggingInitRspParamType *wdiRsp, void *pUserData);
+typedef void  (*WDI_GetFrameLogRspCb)(
+                        WDI_GetFrameLogRspParamType *wdiRsp, void *pUserData);
+typedef void  (*WDI_FatalEventLogsRspCb)(
+                         WDI_FatalEventLogsRspParamType *wdiRsp, void *pUserData);
+
+typedef void  (*WDI_MonModeRspCb)(void *pEventData,void *pUserData);
 
 /*========================================================================
  *     Function Declarations and Documentation
@@ -7124,8 +8080,7 @@ typedef void (*WDI_SetBatchScanCb)(void *pData, WDI_SetBatchScanRspType *pRsp);
  open both the data and the control transport which in their turn will open
  DXE/SMD or any other drivers that they need. 
  
- @param pOSContext: pointer to the OS context provided by the UMAC
-                    will be passed on to PAL on Open
+ @param devHandle: pointer to the OS specific device handle
         ppWDIGlobalCtx: output pointer of Global Context
         pWdiDevCapability: output pointer of device capability
 
@@ -7134,7 +8089,7 @@ typedef void (*WDI_SetBatchScanCb)(void *pData, WDI_SetBatchScanRspType *pRsp);
 WDI_Status 
 WDI_Init
 ( 
-  void*                      pOSContext,
+  void*                      devHandle,
   void**                     ppWDIGlobalCtx,
   WDI_DeviceCapabilityType*  pWdiDevCapability,
   unsigned int               driverType
@@ -7830,7 +8785,38 @@ WDI_SetMaxTxPowerReq
   void*                          pUserData
 );
 
-#ifdef FEATURE_WLAN_CCX
+/**
+ @brief WDI_SetMaxTxPowerPerBandReq will be called when the upper
+        MAC wants to set Max Tx Power to HW for specific band. Upon the
+        call of this API the WLAN DAL will pack and send a HAL
+        Set Max Tx Power Per Band request message to the lower RIVA
+        sub-system if DAL is in state STARTED.
+
+        In state BUSY this request will be queued. Request won't
+        be allowed in any other state.
+
+
+ @param WDI_SetMaxTxPowerPerBandParamsType: Max Tx Per Band Info
+
+        WDA_SetMaxTxPowerPerBandRspCb: This callback is invoked by DAL
+        when it has received a set max Tx Power Per Band response from
+        the underlying device.
+
+        pUserData: user data will be passed back with the
+        callback
+
+ @see WDI_SetMaxTxPowerPerBandReq
+ @return Result of the function call
+*/
+WDI_Status
+WDI_SetMaxTxPowerPerBandReq
+(
+  WDI_SetMaxTxPowerPerBandParamsType*   pwdiSetMaxTxPowerPerBandParams,
+  WDA_SetMaxTxPowerPerBandRspCb         wdiReqStatusCb,
+  void*                                 pUserData
+);
+
+#ifdef FEATURE_WLAN_ESE
 /**
  @brief WDI_TSMStatsReq will be called by the upper MAC to fetch 
         Traffic Stream metrics. 
@@ -8204,6 +9190,13 @@ WDI_SetTDLSLinkEstablishReq
   void*                            pUserData
 );
 
+WDI_Status
+WDI_SetTDLSChanSwitchReq
+(
+  WDI_SetTDLSChanSwitchReqParamsType*    pwdiTDLSChanSwitchReqParams,
+  WDI_SetTDLSChanSwitchReqParamsRspCb    wdiTDLSChanSwitchRReqRspCb,
+  void*                            pUserData
+);
 /*======================================================================== 
  
                             Power Save APIs
@@ -8267,6 +9260,7 @@ WDI_SetPwrSaveCfgReq
 WDI_Status 
 WDI_EnterImpsReq
 (
+   WDI_EnterImpsReqParamsType *pwdiEnterImpsReqParams,
    WDI_EnterImpsRspCb  wdiEnterImpsRspCb,
    void*                   pUserData
 );
@@ -8295,6 +9289,7 @@ WDI_EnterImpsReq
 WDI_Status 
 WDI_ExitImpsReq
 (
+   WDI_ExitImpsReqParamsType *pwdiExitImpsReqParams,
    WDI_ExitImpsRspCb  wdiExitImpsRspCb,
    void*                   pUserData
 );
@@ -8494,6 +9489,100 @@ WDI_SetUapsdAcParamsReq
   WDI_SetUapsdAcParamsReqParamsType*      pwdiPowerSaveCfg,
   WDI_SetUapsdAcParamsCb  wdiSetUapsdAcParamsCb,
   void*                   pUserData
+);
+
+
+/**
+ @brief WDI_FatalEventLogsReq will be called when the upper
+        MAC wants to send the fatal event req. Upon the call of
+        this API the WLAN DAL will pack and send a HAL
+        Fatal event request message to the lower RIVA sub-system.
+
+        In state BUSY this request will be queued. Request won't
+        be allowed in any other state.
+
+
+ @param pwdiFatalEventLogsReqInfo: the Fatal event logs params
+                      as specified by the Device Interface
+
+        wdiFatalEventLogsRspCb: callback for passing back the
+        response of the fatal event operation received
+        from the device
+
+        pUserData: user data will be passed back with the
+        callback
+
+ @return Result of the function call
+*/
+
+WDI_Status
+WDI_FatalEventLogsReq
+(
+   WDI_FatalEventLogsReqInfoType      *pwdiFatalEventLogsReqInfo,
+   WDI_FatalEventLogsRspCb             wdiFatalEventLogsRspCb,
+   void*                               pUserData
+);
+
+/**
+ @brief WDI_GetFrameLogReq will be called when the upper
+        MAC wants to initialize frame logging. Upon the call of
+        this API the WLAN DAL will pack and send a HAL
+        Frame logging init request message to
+        the lower RIVA sub-system.
+
+        In state BUSY this request will be queued. Request won't
+        be allowed in any other state.
+
+
+ @param pwdiGetFrameLogReqInfo: the Frame Logging params
+                      as specified by the Device Interface
+
+        wdiGetFrameLogReqCb: callback for passing back the
+        response of the frame logging init operation received
+        from the device
+
+        pUserData: user data will be passed back with the
+        callback
+
+ @return Result of the function call
+*/
+WDI_Status
+WDI_GetFrameLogReq
+(
+   WDI_GetFrameLogReqInfoType    *pwdiGetFrameLogReqInfo,
+   WDI_GetFrameLogRspCb             wdiGetFrameLogReqCb,
+   void*                                pUserData
+);
+
+/**
+ @brief WDI_FWLoggingInitReq will be called when the upper
+        MAC wants to initialize frame logging. Upon the call of
+        this API the WLAN DAL will pack and send a HAL
+        Frame logging init request message to
+        the lower RIVA sub-system.
+
+        In state BUSY this request will be queued. Request won't
+        be allowed in any other state.
+
+
+ @param pwdiFWLoggingInitReqParams: the Frame Logging params
+                      as specified by the Device Interface
+
+        wdiFWLoggingInitReqCb: callback for passing back the
+        response of the frame logging init operation received
+        from the device
+
+        pUserData: user data will be passed back with the
+        callback
+
+ @return Result of the function call
+*/
+WDI_Status
+WDI_FWLoggingInitReq
+(
+   WDI_FWLoggingInitReqInfoType      *pwdiFWLoggingInitReqInfo,
+   WDI_FWLoggingInitRspCb             wdiFWLoggingInitReqCb,
+   void*                                pUserData
 );
 
 /**
@@ -8991,7 +10080,59 @@ WDI_SwitchChReq
   void*                      pUserData
 );
 
+/**
+ @brief WDI_SwitchChReq_V1 is similar to WDI_SwitchChReq except
+        it also send type source for the channel change.
+        WDI_Start must have been called.
 
+ @param wdiSwitchChReqParams: the switch ch parameters as
+        specified by the Device Interface
+
+        wdiSwitchChRspCb: callback for passing back the response
+        of the switch ch operation received from the device
+
+        pUserData: user data will be passed back with the
+        callback
+
+ @see WDI_Start
+ @return Result of the function call
+*/
+
+WDI_Status
+WDI_SwitchChReq_V1
+(
+  WDI_SwitchChReqParamsType_V1* pwdiSwitchChReqParams,
+  WDI_SwitchChRspCb_V1          wdiSwitchChRspCb,
+  void*                      pUserData
+);
+
+/**
+ @brief WDI_UpdateChannelReq will be called when the upper MAC
+        wants to update the channel list on change in country code.
+        In state BUSY this request will be queued. Request won't
+        be allowed in any other state.
+
+ WDI_UpdateChannelReq must have been called.
+
+ @param wdiUpdateChannelReqParams: the updated channel parameters
+                      as specified by the Device Interface
+
+        wdiUpdateChannelRspCb: callback for passing back the
+        response of the update channel operation received from
+        the device
+
+        pUserData: user data will be passed back with the
+        callback
+
+ @return Result of the function call
+*/
+WDI_Status
+WDI_UpdateChannelReq
+(
+  WDI_UpdateChReqParamsType *pwdiUpdateChannelReqParams,
+  WDI_UpdateChannelRspCb     wdiUpdateChannelRspCb,
+  void*                     pUserData
+);
 
 /**
  @brief WDI_ConfigSTAReq will be called when the upper MAC 
@@ -9092,7 +10233,7 @@ WDI_GetStatsReq
   void*                      pUserData
 );
 
-#if defined WLAN_FEATURE_VOWIFI_11R || defined FEATURE_WLAN_CCX || defined(FEATURE_WLAN_LFR)
+#if defined WLAN_FEATURE_VOWIFI_11R || defined FEATURE_WLAN_ESE || defined(FEATURE_WLAN_LFR)
 /**
  @brief WDI_GetRoamRssiReq will be called when the upper MAC wants
         to get roam rssi from the device. Upon
@@ -9264,6 +10405,24 @@ wpt_boolean WDI_IsHwFrameTxTranslationCapable
 (
   wpt_uint8 uSTAIdx
 );
+
+
+/**
+ @brief WDI_IsSelfSTA - check if staid is self sta index
+
+ @param  pWDICtx:   pointer to the WLAN DAL context
+         ucSTAIdx:  station index
+
+ @return Result of the function call
+*/
+
+wpt_boolean
+WDI_IsSelfSTA
+(
+   void*  pWDICtx,
+   wpt_uint8 ucSTAIdx
+);
+
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
 /**
@@ -9833,6 +10992,26 @@ WDI_dhcpStopInd
   WDI_DHCPInd *wdiDHCPInd
 );
 
+/**
+ @brief WDI_RateUpdateInd will be called when the upper MAC
+        requests the device to update rates.
+
+        In state BUSY this request will be queued. Request won't
+        be allowed in any other state.
+
+
+ @param wdiRateUpdateIndParams
+
+
+ @see WDI_Start
+ @return Result of the function call
+*/
+WDI_Status
+WDI_RateUpdateInd
+(
+  WDI_RateUpdateIndParams  *wdiRateUpdateIndParams
+);
+
 #ifdef WLAN_FEATURE_GTK_OFFLOAD
 /**
  @brief WDI_GTKOffloadReq will be called when the upper MAC 
@@ -10008,17 +11187,28 @@ WDI_UpdateVHTOpModeReq
     Or if host driver detects any abnormal stcuk may display
 
  @param  displaySnapshot : Display DXE snapshot option
- @param  enableStallDetect : Enable stall detect feature
-                        This feature will take effect to data performance
-                        Not integrate till fully verification
+ @param  debugFlags      : Enable stall detect features
+                           defined by WPAL_DeviceDebugFlags
+                           These features may effect
+                           data performance.
  @see
  @return none
 */
 void WDI_TransportChannelDebug
 (
    wpt_boolean  displaySnapshot,
-   wpt_boolean  toggleStallDetect
+   wpt_uint8    debugFlags
 );
+
+/**
+ @brief WDI_TransportKickDxe -
+    Request Kick DXE when first HDD TX time out
+    happens
+ @param  none
+ @see
+ @return none
+*/
+void WDI_TransportKickDxe(void);
 
 /**
  @brief WDI_SsrTimerCB
@@ -10066,6 +11256,219 @@ WDI_Status WDI_LPHBConfReq
 );
 #endif /* FEATURE_WLAN_LPHB */
 
+#ifdef WLAN_FEATURE_EXTSCAN
+/**
+ @brief WDI_EXTScanStartReq
+    This API is called to send EXTScan start request to FW
+
+ @param pwdiEXTScanStartReqParams : pointer to the request params.
+        wdiEXTScanStartRspCb  : callback on getting the response.
+        usrData : Client context
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_EXTScanStartReq
+(
+   WDI_EXTScanStartReqParams* pwdiEXTScanStartReqParams,
+   WDI_EXTScanStartRspCb          wdiEXTScanStartRspCb,
+   void*                   pUserData
+);
+
+/**
+ @brief WDI_EXTScanStopReq
+    This API is called to stop the EXTScan operations in the FW
+
+ @param pwdiEXTScanStopReqParams : pointer to the request params.
+        wdiEXTScanStopRspCb   : callback on getting the response.
+        usrData : Client context
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_EXTScanStopReq
+(
+   WDI_EXTScanStopReqParams* pwdiEXTScanStopReqParams,
+   WDI_EXTScanStopRspCb          wdiEXTScanStopRspCb,
+   void*                   pUserData
+);
+
+/**
+ @brief WDI_EXTScanGetCachedResultsReq
+    This API is called to send get link layer stats request in FW
+
+ @param pwdiEXTScanGetCachedResultsReqParams : pointer to the request params.
+        wdiEXTScanGetCachedResultsRspCb : callback on getting the response.
+        usrData : Client context
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_EXTScanGetCachedResultsReq
+(
+   WDI_EXTScanGetCachedResultsReqParams* pwdiEXTScanGetCachedResultsReqParams,
+   WDI_EXTScanGetCachedResultsRspCb          wdiEXTScanGetCachedResultsRspCb,
+   void*                   pUserData
+);
+
+/**
+ @brief WDI_EXTScanGetCapabilitiesReq
+    This API is called to send get EXTScan capabilities from FW
+
+ @param pwdiEXTScanGetCachedResultsReqParams  : pointer to the request params.
+        wdiEXTScanGetCachedResultsRspCb   : callback on getting the response.
+        usrData : Client context
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_EXTScanGetCapabilitiesReq
+(
+   WDI_EXTScanGetCapabilitiesReqParams* pwdiEXTScanGetCapabilitiesReqParams,
+   WDI_EXTScanGetCapabilitiesRspCb       wdiEXTScanGetCapabilitiesRspCb,
+   void*                   pUserData
+);
+
+/**
+ @brief WDI_EXTScanSetBSSIDHotlistReq
+    This API is called to send Set BSSID Hotlist Request FW
+
+ @param pwdiEXTScanSetBssidHotlistReqParams : pointer to the request params.
+        wdiEXTScanSetBSSIDHotlistRspCb   : callback on getting the response.
+        usrData : Client context
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_EXTScanSetBSSIDHotlistReq
+(
+   WDI_EXTScanSetBSSIDHotlistReqParams* pwdiEXTScanSetBSSIDHotlistReqParams,
+   WDI_EXTScanSetBSSIDHotlistRspCb     wdiEXTScanSetBSSIDHotlistRspCb,
+   void*                   pUserData
+);
+
+/**
+ @brief WDI_EXTScanResetBSSIDHotlistReq
+    This API is called to send Reset BSSID Hotlist Request FW
+
+ @param pwdiEXTScanResetBssidHotlistReqParams : pointer to the request params.
+        wdiEXTScanGetCachedResultsRspCb   : callback on getting the response.
+        usrData : Client context
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_EXTScanResetBSSIDHotlistReq
+(
+   WDI_EXTScanResetBSSIDHotlistReqParams* pwdiEXTScanResetBSSIDHotlistReqParams,
+   WDI_EXTScanResetBSSIDHotlistRspCb     wdiEXTScanResetBSSIDHotlistRspCb,
+   void*                   pUserData
+);
+
+/**
+ @brief WDI_EXTScanSetSignfRSSIChangeReq
+    This API is called to send Set Significant RSSI Request FW
+
+ @param pwdiEXTScanSetSignfRSSIChangeReqParams : pointer to the request params.
+        wdiEXTScanSetSignfRSSIChangeRspCb   : callback on getting the response.
+        usrData : Client context
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_EXTScanSetSignfRSSIChangeReq
+(
+   WDI_EXTScanSetSignfRSSIChangeReqParams*
+                                    pwdiEXTScanSetSignfRSSIChangeReqParams,
+   WDI_EXTScanSetSignfRSSIChangeRspCb   wdiEXTScanSetSignfRSSIChangeRspCb,
+   void*                   pUserData
+);
+
+/**
+ @brief WDI_EXTScanResetSignfRSSIChangeReq
+    This API is called to send Reset BSSID Hotlist Request FW
+
+ @param pwdiEXTScanResetSignfRSSIChangeReqParams : pointer to the request params.
+        wdiEXTScanResetSignfRSSIChangeRs  : callback on getting the response.
+        usrData : Client context
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_EXTScanResetSignfRSSIChangeReq
+(
+   WDI_EXTScanResetSignfRSSIChangeReqParams*
+                                       pwdiEXTScanResetSignfRSSIChangeReqParams,
+   WDI_EXTScanResetSignfRSSIChangeRspCb     wdiEXTScanResetSignfRSSIChangeRspCb,
+   void*                   pUserData
+);
+#endif /* WLAN_FEATURE_EXTSCAN */
+
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+/**
+ @brief WDI_LLStatsSetReq
+    This API is called to send set link layer stats request to FW
+
+ @param pwdiLLStatsSetReqParams : pointer to  set link layer stats params
+        wdiLLStatsSetRspCb     : set link layer stats response callback
+        usrData : Client context
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_LLStatsSetReq
+(
+   WDI_LLStatsSetReqType* pwdiLLStatsSetReqParams,
+   WDI_LLStatsSetRspCb          wdiLLStatsSetRspCb,
+   void*                   pUserData
+);
+
+/**
+ @brief WDI_LLStatsGetReq
+    This API is called to send get link layer stats request in FW
+
+ @param pwdiLLStatsGetParams  : pointer to get link layer stats params
+        wdiLLStatsGetRspCb    : get link layer stats response callback
+        usrData : Client context
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_LLStatsGetReq
+(
+   WDI_LLStatsGetReqType* pwdiLLStatsGetReqParams,
+   WDI_LLStatsGetRspCb          wdiLLStatsGetRspCb,
+   void*                   pUserData
+);
+
+/**
+ @brief WDI_LLStatsClearReq
+    This API is called to set clear link layer stats request in FW
+
+ @param pwdiLLStatsClearReqParams : pointer to  clear link layer stats params
+        iwdiLLStatsClearRspCb     : clear link layer stats response callback
+        usrData : Client context
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_LLStatsClearReq
+(
+   WDI_LLStatsClearReqType* pwdiLLStatsClearReqParams,
+   WDI_LLStatsClearRspCb    wdiLLStatsClearRspCb,
+   void*                    pUserData
+);
+#endif /* WLAN_FEATURE_LINK_LAYER_STATS */
+
+WDI_Status WDI_FWStatsGetReq
+(
+   void* pwdiFWStatsGetReqParams,
+   WDI_FWStatsGetRspCb          wdiFWStatsGetRspCb,
+   wpt_uint32                   pUserData
+);
+
+WDI_Status WDI_MonStartReq
+(
+    WDI_MonStartReqType*   pwdiMonStartReqParams,
+    WDI_MonModeRspCb       wdiMonModeRspCb,
+    void*                  pUserData
+);
+
+WDI_Status WDI_MonStopReq
+(
+    WDI_MonModeRspCb       wdiMonModeRspCb,
+    void*                  pUserData
+);
+
 #ifdef FEATURE_WLAN_BATCH_SCAN
 /**
  @brief WDI_SetBatchScanReq
@@ -10112,9 +11515,105 @@ WDI_TriggerBatchScanResultInd(WDI_TriggerBatchScanResultIndType *pWdiReq);
 
 #endif /*FEATURE_WLAN_BATCH_SCAN*/
 
+/**
+ @brief wdi_HT40OBSSScanInd
+    This API is called to start OBSS scan
+
+ @param pWdiReq : pointer to get  ind param
+ @see
+ @return SUCCESS or FAIL
+*/
+
+WDI_Status WDI_HT40OBSSScanInd(WDI_HT40ObssScanParamsType *pWdiReq);
+
+/**
+ @brief wdi_HT40OBSSStopScanInd
+    This API is called to stop OBSS scan
+
+ @param bssIdx : bssIdx to stop
+ @see
+ @return SUCCESS or FAIL
+*/
+
+WDI_Status WDI_HT40OBSSStopScanInd(wpt_uint8  bssIdx);
+
+
+WDI_Status WDI_GetBcnMissRate( void *pUserData,
+                                WDI_GetBcnMissRateCb wdiGetBcnMissRateCb,
+                                wpt_uint8   *bssid
+                             );
+WDI_Status
+WDI_SetSpoofMacAddrReq
+(
+WDI_SpoofMacAddrInfoType *pWdiReq,
+  WDI_SetSpoofMacAddrRspCb          setSpoofMacAddrRspCb,
+  void*                          pUserData
+);
+
+WDI_Status
+WDI_EncryptMsgReq(void* pwdiEncryptMsgParams,
+        WDI_EncryptMsgRspCb wdiEncryptMsgCbRsp,
+        void*                   pUserData
+        );
+
+/**
+ @brief WDI_NanRequest
+        NAN request
+
+ @param pwdiNanRequest: data
+
+        pwdiNanCb: callback
+
+        usrData: user data will be passed back with the
+        callback
+
+ @return Result of the function call
+*/
+WDI_Status
+WDI_NanRequest
+(
+    WDI_NanRequestType           *pwdiNanRequest,
+    void                         *usrData
+);
+
+/**
+ @brief WDI_SetRtsCtsHTVhtInd
+        Set RTS/CTS indication for diff modes.
+
+ @param rtsCtsVal: Bit mask value to enable RTS/CTS for different modes
+
+ @return Result of the function call
+*/
+
+WDI_Status
+WDI_SetRtsCtsHTVhtInd
+(
+  wpt_uint32 rtsCtsVal
+);
+
+WDI_Status
+WDI_FWLoggingDXEdoneInd
+(
+  WDI_FWLoggingDXEdoneIndInfoType*    pwdiFWLoggingDXEdoneInd
+);
+
+/**
+ @brief WDI_EnableDisableCAEventInd
+        Enable/Disable Chan Avoidance indication
+
+ @param val: Enable/Disable Chan Avoidance indication
+
+ @return Result of the function call
+*/
+
+WDI_Status
+WDI_EnableDisableCAEventInd
+(
+wpt_uint32 val
+);
+
 #ifdef __cplusplus
  }
 #endif 
-
 
 #endif /* #ifndef WLAN_QCT_WDI_H */

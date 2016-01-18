@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18,34 +18,17 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 /*===========================================================================
   @file vos_sched.c
   @brief VOS Scheduler Implementation
 
-  Copyright (c) 2011 QUALCOMM Incorporated.
-  All Rights Reserved.
-  Qualcomm Confidential and Proprietary
 ===========================================================================*/
 /*===========================================================================
                        EDIT HISTORY FOR FILE
@@ -76,10 +59,28 @@
 #include "wlan_qct_pal_msg.h"
 #include <linux/spinlock.h>
 #include <linux/kthread.h>
+#include <linux/wcnss_wlan.h>
+
 /*---------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
  * ------------------------------------------------------------------------*/
 #define VOS_SCHED_THREAD_HEART_BEAT    INFINITE
+/* Milli seconds to delay SSR thread when an Entry point is Active */
+#define SSR_WAIT_SLEEP_TIME 100
+/* MAX iteration count to wait for Entry point to exit before
+ * we proceed with SSR in WD Thread
+ */
+#define MAX_SSR_WAIT_ITERATIONS 200
+/* Timer value for detecting thread stuck issues */
+#define THREAD_STUCK_TIMER_VAL 5000 // 5 seconds
+#define THREAD_STUCK_COUNT 3
+
+#define MC_Thread 0
+#define TX_Thread 1
+#define RX_Thread 2
+
+static atomic_t ssr_protect_entry_count;
+
 /*---------------------------------------------------------------------------
  * Type Declarations
  * ------------------------------------------------------------------------*/
@@ -211,7 +212,7 @@ vos_sched_open
   }
   wake_up_process(pSchedContext->TxThread);
   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
-             ("VOSS TX thread Created\n"));
+             ("VOSS TX thread Created"));
 
   pSchedContext->RxThread = kthread_create(VosRXThread, pSchedContext,
                                            "VosRXThread");
@@ -225,7 +226,7 @@ vos_sched_open
   }
   wake_up_process(pSchedContext->RxThread);
   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
-             ("VOSS RX thread Created\n"));
+             ("VOSS RX thread Created"));
 
   /*
   ** Now make sure all threads have started before we exit.
@@ -306,6 +307,7 @@ VOS_STATUS vos_watchdog_open
 
   // Initialize the lock
   spin_lock_init(&pWdContext->wdLock);
+  spin_lock_init(&pWdContext->thread_stuck_lock);
 
   //Create the Watchdog thread
   pWdContext->WdThread = kthread_create(VosWDThread, pWdContext,"VosWDThread");
@@ -410,10 +412,9 @@ VosMCThread
                 "%s: MC thread signaled to shutdown", __func__);
         shutdown = VOS_TRUE;
         /* Check for any Suspend Indication */
-        if(test_bit(MC_SUSPEND_EVENT_MASK, &pSchedContext->mcEventFlag))
+        if (test_and_clear_bit(MC_SUSPEND_EVENT_MASK,
+                               &pSchedContext->mcEventFlag))
         {
-           clear_bit(MC_SUSPEND_EVENT_MASK, &pSchedContext->mcEventFlag);
-        
            /* Unblock anyone waiting on suspend */
            complete(&pHddCtx->mc_sus_event_var);
         }
@@ -429,16 +430,13 @@ VosMCThread
         /*
         ** Service the WDI message queue
         */
-        VOS_TRACE(VOS_MODULE_ID_WDI, VOS_TRACE_LEVEL_INFO,
-                  ("Servicing the VOS MC WDI Message queue"));
-
         pMsgWrapper = vos_mq_get(&pSchedContext->wdiMcMq);
 
         if (pMsgWrapper == NULL)
         {
            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                "%s: pMsgWrapper is NULL", __func__);
-           VOS_ASSERT(0);
+           VOS_BUG(0);
            break;
         }
 
@@ -448,7 +446,7 @@ VosMCThread
         {
            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                "%s: WDI Msg or Callback is NULL", __func__);
-           VOS_ASSERT(0);
+           VOS_BUG(0);
            break;
         }
 
@@ -607,9 +605,9 @@ VosMCThread
         continue;
       }
       /* Check for any Suspend Indication */
-      if(test_bit(MC_SUSPEND_EVENT_MASK, &pSchedContext->mcEventFlag))
+      if (test_and_clear_bit(MC_SUSPEND_EVENT_MASK,
+                             &pSchedContext->mcEventFlag))
       {
-        clear_bit(MC_SUSPEND_EVENT_MASK, &pSchedContext->mcEventFlag);
         spin_lock(&pSchedContext->McThreadLock);
 
         /* Mc Thread Suspended */
@@ -629,19 +627,153 @@ VosMCThread
       "%s: MC Thread exiting!!!!", __func__);
   complete_and_exit(&pSchedContext->McShutdown, 0);
 } /* VosMCThread() */
-int isWDresetInProgress(void)
+
+v_BOOL_t isSsrPanicOnFailure(void)
 {
-   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
-                "%s: Reset is in Progress...",__func__);
-   if(gpVosWatchdogContext!=NULL)
-   {
-      return gpVosWatchdogContext->resetInProgress;
-   }
-   else
-   {
-      return 0;
-   }
+    hdd_context_t *pHddCtx = NULL;
+    v_CONTEXT_t pVosContext = NULL;
+
+    /* Get the Global VOSS Context */
+    pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+    if(!pVosContext)
+    {
+      hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Global VOS context is Null", __func__);
+      return FALSE;
+    }
+
+    /* Get the HDD context */
+    pHddCtx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD, pVosContext);
+    if((NULL == pHddCtx) || (NULL == pHddCtx->cfg_ini))
+    {
+      hddLog(VOS_TRACE_LEVEL_FATAL,"%s: HDD context is Null", __func__);
+      return FALSE;
+    }
+
+    return (pHddCtx->cfg_ini->fIsSsrPanicOnFailure);
 }
+/**
+ * vos_wd_detect_thread_stuck()- Detect thread stuck
+ * by probing the MC, TX, RX threads and take action if
+ * Thread doesnt respond.
+ *
+ * This function is called to detect thread stuck
+ * and probe threads.
+ *
+ * Return: void
+ */
+static void vos_wd_detect_thread_stuck(void)
+{
+  unsigned long flags;
+
+  spin_lock_irqsave(&gpVosWatchdogContext->thread_stuck_lock, flags);
+
+  if ((gpVosWatchdogContext->mcThreadStuckCount == THREAD_STUCK_COUNT) ||
+      (gpVosWatchdogContext->txThreadStuckCount == THREAD_STUCK_COUNT) ||
+      (gpVosWatchdogContext->rxThreadStuckCount == THREAD_STUCK_COUNT))
+  {
+     spin_unlock_irqrestore(&gpVosWatchdogContext->thread_stuck_lock, flags);
+     hddLog(LOGE, FL("Thread Stuck !!! MC Count %d RX count %d TX count %d"),
+         gpVosWatchdogContext->mcThreadStuckCount,
+         gpVosWatchdogContext->rxThreadStuckCount,
+         gpVosWatchdogContext->txThreadStuckCount);
+     vos_wlanRestart();
+     return;
+  }
+
+  if (gpVosWatchdogContext->mcThreadStuckCount ||
+      gpVosWatchdogContext->txThreadStuckCount ||
+      gpVosWatchdogContext->rxThreadStuckCount)
+  {
+     spin_unlock_irqrestore(&gpVosWatchdogContext->thread_stuck_lock, flags);
+
+     hddLog(LOG1, FL("MC Count %d RX count %d TX count %d"),
+        gpVosWatchdogContext->mcThreadStuckCount,
+        gpVosWatchdogContext->rxThreadStuckCount,
+        gpVosWatchdogContext->txThreadStuckCount);
+
+     if (gpVosWatchdogContext->mcThreadStuckCount)
+     {
+         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                             "%s: Invoking dump stack for MC thread",__func__);
+         vos_dump_stack(MC_Thread);
+     }
+     if (gpVosWatchdogContext->txThreadStuckCount)
+     {
+         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                             "%s: Invoking dump stack for TX thread",__func__);
+         vos_dump_stack(TX_Thread);
+     }
+     if (gpVosWatchdogContext->rxThreadStuckCount)
+     {
+         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                             "%s: Invoking dump stack for RX thread",__func__);
+         vos_dump_stack(RX_Thread);
+     }
+
+     spin_lock_irqsave(&gpVosWatchdogContext->thread_stuck_lock, flags);
+  }
+
+  /* Increment the thread stuck count for all threads */
+  gpVosWatchdogContext->mcThreadStuckCount++;
+  gpVosWatchdogContext->txThreadStuckCount++;
+  gpVosWatchdogContext->rxThreadStuckCount++;
+
+  spin_unlock_irqrestore(&gpVosWatchdogContext->thread_stuck_lock, flags);
+  vos_probe_threads();
+
+  /* Restart the timer */
+  if (VOS_STATUS_SUCCESS !=
+      vos_timer_start(&gpVosWatchdogContext->threadStuckTimer,
+             THREAD_STUCK_TIMER_VAL))
+     hddLog(LOGE, FL("Unable to start thread stuck timer"));
+}
+
+/**
+ * wlan_wd_detect_thread_stuck_cb()- Call back of the
+ * thread stuck timer.
+ * @priv: timer data.
+ * This function is called when the thread stuck timer
+ * expire to detect thread stuck and probe threads.
+ *
+ * Return: void
+ */
+static void vos_wd_detect_thread_stuck_cb(void *priv)
+{
+  if (!(vos_is_logp_in_progress(VOS_MODULE_ID_SYS, NULL) ||
+       vos_is_load_unload_in_progress(VOS_MODULE_ID_SYS, NULL)))
+  {
+     set_bit(WD_WLAN_DETECT_THREAD_STUCK_MASK,
+                      &gpVosWatchdogContext->wdEventFlag);
+     set_bit(WD_POST_EVENT_MASK, &gpVosWatchdogContext->wdEventFlag);
+     wake_up_interruptible(&gpVosWatchdogContext->wdWaitQueue);
+  }
+}
+
+/**
+ * wlan_logging_reset_thread_stuck_count()- Callback to
+ * probe msg sent to Threads.
+ *
+ * @threadId: passed threadid
+ *
+ * This function is called to by the thread after
+ * processing the probe msg, with their own thread id.
+ *
+ * Return: void.
+ */
+void vos_wd_reset_thread_stuck_count(int threadId)
+{
+  unsigned long flags;
+
+  spin_lock_irqsave(&gpVosWatchdogContext->thread_stuck_lock, flags);
+  if (vos_sched_is_mc_thread(threadId))
+     gpVosWatchdogContext->mcThreadStuckCount = 0;
+  else if (vos_sched_is_tx_thread(threadId))
+     gpVosWatchdogContext->txThreadStuckCount = 0;
+  else if (vos_sched_is_rx_thread(threadId))
+     gpVosWatchdogContext->rxThreadStuckCount = 0;
+  spin_unlock_irqrestore(&gpVosWatchdogContext->thread_stuck_lock, flags);
+}
+
 /*---------------------------------------------------------------------------
   \brief VosWdThread() - The VOSS Watchdog thread
   The \a VosWdThread() is the Watchdog thread:
@@ -658,7 +790,10 @@ VosWDThread
   pVosWatchdogContext pWdContext = (pVosWatchdogContext)Arg;
   int retWaitStatus              = 0;
   v_BOOL_t shutdown              = VOS_FALSE;
+  int count                      = 0;
   VOS_STATUS vosStatus = VOS_STATUS_SUCCESS;
+  hdd_context_t *pHddCtx         = NULL;
+  v_CONTEXT_t pVosContext        = NULL;
   set_user_nice(current, -3);
 
   if (Arg == NULL)
@@ -668,9 +803,41 @@ VosWDThread
      return 0;
   }
 
+  /* Get the Global VOSS Context */
+  pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+
+  if(!pVosContext)
+  {
+     hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Global VOS context is Null", __func__);
+     return 0;
+  }
+
+  /* Get the HDD context */
+  pHddCtx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD, pVosContext );
+
+  if(!pHddCtx)
+  {
+     hddLog(VOS_TRACE_LEVEL_FATAL,"%s: HDD context is Null",__func__);
+     return 0;
+  }
+
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0))
   daemonize("WD_Thread");
 #endif
+  /* Initialize the timer to detect thread stuck issues */
+  if (vos_timer_init(&pWdContext->threadStuckTimer, VOS_TIMER_TYPE_SW,
+          vos_wd_detect_thread_stuck_cb, NULL)) {
+       hddLog(LOGE, FL("Unable to initialize thread stuck timer"));
+  }
+  else
+  {
+       if (VOS_STATUS_SUCCESS !=
+             vos_timer_start(&pWdContext->threadStuckTimer,
+                 THREAD_STUCK_TIMER_VAL))
+          hddLog(LOGE, FL("Unable to start thread stuck timer"));
+       else
+          hddLog(LOG1, FL("Successfully started thread stuck timer"));
+  }
 
   /*
   ** Ack back to the context from which the Watchdog thread has been
@@ -694,12 +861,38 @@ VosWDThread
     clear_bit(WD_POST_EVENT_MASK, &pWdContext->wdEventFlag);
     while(1)
     {
+      /* Check for any Active Entry Points
+       * If active, delay SSR until no entry point is active or
+       * delay until count is decremented to ZERO
+       */
+      count = MAX_SSR_WAIT_ITERATIONS;
+      while (count)
+      {
+         if (!atomic_read(&ssr_protect_entry_count))
+         {
+             /* no external threads are executing */
+             break;
+         }
+         /* at least one external thread is executing */
+         if (--count)
+         {
+             VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                       "%s: Waiting for active entry points to exit", __func__);
+             msleep(SSR_WAIT_SLEEP_TIME);
+         }
+      }
+      /* at least one external thread is executing */
+      if (!count)
+      {
+          VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                    "%s: Continuing SSR when %d Entry points are still active",
+                     __func__, atomic_read(&ssr_protect_entry_count));
+      }
       // Check if Watchdog needs to shutdown
       if(test_bit(WD_SHUTDOWN_EVENT_MASK, &pWdContext->wdEventFlag))
       {
         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                 "%s: Watchdog thread signaled to shutdown", __func__);
-
         clear_bit(WD_SHUTDOWN_EVENT_MASK, &pWdContext->wdEventFlag);
         shutdown = VOS_TRUE;
         break;
@@ -737,7 +930,8 @@ VosWDThread
         if(!pWdContext->resetInProgress)
         {
           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
-          "%s: Trying to do WLAN re-init when it is not shutdown !!",__func__);
+          "%s: Do WLAN re-init only when it is shutdown !!",__func__);
+          break;
         }
         vosStatus = hdd_wlan_re_init();
 
@@ -746,9 +940,23 @@ VosWDThread
           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
                   "%s: Failed to re-init WLAN",__func__);
           VOS_ASSERT(0);
-          goto err_reset;
+          pWdContext->isFatalError = true;
         }
+        else
+        {
+          pWdContext->isFatalError = false;
+          pHddCtx->isLogpInProgress = FALSE;
+          vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, FALSE);
+        }
+        atomic_set(&pHddCtx->isRestartInProgress, 0);
         pWdContext->resetInProgress = false;
+        complete(&pHddCtx->ssr_comp_var);
+      }
+      /* Post Msg to detect thread stuck */
+      else if(test_and_clear_bit(WD_WLAN_DETECT_THREAD_STUCK_MASK,
+                                          &pWdContext->wdEventFlag))
+      {
+        vos_wd_detect_thread_stuck();
       }
       else
       {
@@ -760,6 +968,7 @@ VosWDThread
     } // while message loop processing
   } // while shutdown
 
+  vos_timer_destroy(&pWdContext->threadStuckTimer);
   // If we get here the Watchdog thread must exit
   VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
       "%s: Watchdog Thread exiting !!!!", __func__);
@@ -854,10 +1063,9 @@ static int VosTXThread ( void * Arg )
                  "%s: TX thread signaled to shutdown", __func__);
         shutdown = VOS_TRUE;
         /* Check for any Suspend Indication */
-        if(test_bit(TX_SUSPEND_EVENT_MASK, &pSchedContext->txEventFlag))
+        if (test_and_clear_bit(TX_SUSPEND_EVENT_MASK,
+                               &pSchedContext->txEventFlag))
         {
-           clear_bit(TX_SUSPEND_EVENT_MASK, &pSchedContext->txEventFlag);
-        
            /* Unblock anyone waiting on suspend */
            complete(&pHddCtx->tx_sus_event_var);
         }
@@ -917,16 +1125,13 @@ static int VosTXThread ( void * Arg )
       if (!vos_is_mq_empty(&pSchedContext->wdiTxMq))
       {
         wpt_msg *pWdiMsg;
-        VOS_TRACE(VOS_MODULE_ID_WDI, VOS_TRACE_LEVEL_INFO,
-                  "%s: Servicing the VOS TX WDI Message queue",__func__);
-
         pMsgWrapper = vos_mq_get(&pSchedContext->wdiTxMq);
 
         if (pMsgWrapper == NULL)
         {
            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                "%s: pMsgWrapper is NULL", __func__);
-           VOS_ASSERT(0);
+           VOS_BUG(0);
            break;
         }
 
@@ -936,7 +1141,7 @@ static int VosTXThread ( void * Arg )
         {
            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                "%s: WDI Msg or Callback is NULL", __func__);
-           VOS_ASSERT(0);
+           VOS_BUG(0);
            break;
         }
         
@@ -948,9 +1153,9 @@ static int VosTXThread ( void * Arg )
         continue;
       }
       /* Check for any Suspend Indication */
-      if(test_bit(TX_SUSPEND_EVENT_MASK, &pSchedContext->txEventFlag))
+      if (test_and_clear_bit(TX_SUSPEND_EVENT_MASK,
+                             &pSchedContext->txEventFlag))
       {
-        clear_bit(TX_SUSPEND_EVENT_MASK, &pSchedContext->txEventFlag);
         spin_lock(&pSchedContext->TxThreadLock);
 
         /* Tx Thread Suspended */
@@ -1054,10 +1259,9 @@ static int VosRXThread ( void * Arg )
                  "%s: RX thread signaled to shutdown", __func__);
         shutdown = VOS_TRUE;
         /* Check for any Suspend Indication */
-        if(test_bit(RX_SUSPEND_EVENT_MASK, &pSchedContext->rxEventFlag))
+        if (test_and_clear_bit(RX_SUSPEND_EVENT_MASK,
+                               &pSchedContext->rxEventFlag))
         {
-           clear_bit(RX_SUSPEND_EVENT_MASK, &pSchedContext->rxEventFlag);
-        
            /* Unblock anyone waiting on suspend */
            complete(&pHddCtx->rx_sus_event_var);
         }
@@ -1091,19 +1295,42 @@ static int VosRXThread ( void * Arg )
         continue;
       }
 
+      // Check now the TL queue
+      if (!vos_is_mq_empty(&pSchedContext->tlRxMq))
+      {
+        // Service the TL message queue
+        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                "%s: Servicing the VOS TL RX Message queue",__func__);
+        pMsgWrapper = vos_mq_get(&pSchedContext->tlRxMq);
+        if (pMsgWrapper == NULL)
+        {
+           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+               "%s: pMsgWrapper is NULL", __func__);
+           VOS_ASSERT(0);
+           break;
+        }
+        vStatus = WLANTL_RxProcessMsg( pSchedContext->pVContext,
+                                       pMsgWrapper->pVosMsg);
+        if (!VOS_IS_STATUS_SUCCESS(vStatus))
+        {
+          VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                     "%s: Issue Processing RX TL message",__func__);
+        }
+        // return message to the Core
+        vos_core_return_msg(pSchedContext->pVContext, pMsgWrapper);
+        continue;
+      }
+
       // Check the WDI queue
       if (!vos_is_mq_empty(&pSchedContext->wdiRxMq))
       {
         wpt_msg *pWdiMsg;
-        VOS_TRACE(VOS_MODULE_ID_WDI, VOS_TRACE_LEVEL_INFO,
-                  "%s: Servicing the VOS RX WDI Message queue",__func__);
-
         pMsgWrapper = vos_mq_get(&pSchedContext->wdiRxMq);
         if ((NULL == pMsgWrapper) || (NULL == pMsgWrapper->pVosMsg))
         {
           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                     "%s: wdiRxMq message is NULL", __func__);
-          VOS_ASSERT(0);
+          VOS_BUG(0);
           // we won't return this wrapper since it is corrupt
         }
         else
@@ -1113,7 +1340,7 @@ static int VosRXThread ( void * Arg )
           {
             VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                       "%s: WDI Msg or callback is NULL", __func__);
-            VOS_ASSERT(0);
+            VOS_BUG(0);
           }
           else
           {
@@ -1128,9 +1355,9 @@ static int VosRXThread ( void * Arg )
       }
 
       /* Check for any Suspend Indication */
-      if(test_bit(RX_SUSPEND_EVENT_MASK, &pSchedContext->rxEventFlag))
+      if (test_and_clear_bit(RX_SUSPEND_EVENT_MASK,
+                             &pSchedContext->rxEventFlag))
       {
-        clear_bit(RX_SUSPEND_EVENT_MASK, &pSchedContext->rxEventFlag);
         spin_lock(&pSchedContext->RxThreadLock);
 
         /* Rx Thread Suspended */
@@ -1175,7 +1402,7 @@ VOS_STATUS vos_sched_close ( v_PVOID_t pVosContext )
     if (gpVosSchedContext == NULL)
     {
        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-           "%s: gpVosSchedContext == NULL\n",__func__);
+           "%s: gpVosSchedContext == NULL",__func__);
        return VOS_STATUS_E_FAILURE;
     }
 
@@ -1221,7 +1448,7 @@ VOS_STATUS vos_watchdog_close ( v_PVOID_t pVosContext )
     if (gpVosWatchdogContext == NULL)
     {
        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-           "%s: gpVosWatchdogContext is NULL\n",__func__);
+           "%s: gpVosWatchdogContext is NULL",__func__);
        return VOS_STATUS_E_FAILURE;
     }
     set_bit(WD_SHUTDOWN_EVENT_MASK, &gpVosWatchdogContext->wdEventFlag);
@@ -1231,11 +1458,6 @@ VOS_STATUS vos_watchdog_close ( v_PVOID_t pVosContext )
     wait_for_completion(&gpVosWatchdogContext->WdShutdown);
     return VOS_STATUS_SUCCESS;
 } /* vos_watchdog_close() */
-
-VOS_STATUS vos_watchdog_chip_reset ( vos_chip_reset_reason_type  reason )
-{
-    return VOS_STATUS_SUCCESS;
-} /* vos_watchdog_chip_reset() */
 
 /*---------------------------------------------------------------------------
   \brief vos_sched_init_mqs: Initialize the vOSS Scheduler message queues
@@ -1325,6 +1547,18 @@ VOS_STATUS vos_sched_init_mqs ( pVosSchedContext pSchedContext )
     VOS_ASSERT(0);
     return vStatus;
   }
+
+  VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
+            "%s: Initializing the TL Rx Message queue",__func__);
+  vStatus = vos_mq_init(&pSchedContext->tlRxMq);
+  if (! VOS_IS_STATUS_SUCCESS(vStatus))
+  {
+    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+            "%s: Failed to init TL RX Message queue",__func__);
+    VOS_ASSERT(0);
+    return vStatus;
+  }
+
   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
             "%s: Initializing the WDI Tx Message queue",__func__);
   vStatus = vos_mq_init(&pSchedContext->wdiTxMq);
@@ -1410,6 +1644,12 @@ void vos_sched_deinit_mqs ( pVosSchedContext pSchedContext )
   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
             "%s De-Initializing the TL Tx Message queue",__func__);
   vos_mq_deinit(&pSchedContext->tlTxMq);
+
+  //Rx TL
+  VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
+            "%s De-Initializing the TL Rx Message queue",__func__);
+  vos_mq_deinit(&pSchedContext->tlRxMq);
+
   //Tx WDI
   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO_HIGH,
             "%s: DeInitializing the WDI Tx Message queue",__func__);
@@ -1448,7 +1688,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   */
   VOS_TRACE( VOS_MODULE_ID_VOSS,
              VOS_TRACE_LEVEL_INFO,
-             ("Flushing the MC Thread message queue\n") );
+             ("Flushing the MC Thread message queue") );
 
   if (NULL == pSchedContext)
   {
@@ -1469,7 +1709,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->sysMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_ERROR,
+               VOS_TRACE_LEVEL_INFO,
                "%s: Freeing MC SYS message type %d ",__func__,
                pMsgWrapper->pVosMsg->type );
     sysMcFreeMsg(pSchedContext->pVContext, pMsgWrapper->pVosMsg);
@@ -1480,7 +1720,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   {
     if(pMsgWrapper->pVosMsg != NULL) 
     {
-        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                    "%s: Freeing MC WDA MSG message type %d",
                    __func__, pMsgWrapper->pVosMsg->type );
         if (pMsgWrapper->pVosMsg->bodyptr) {
@@ -1499,7 +1739,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   {
     if(pMsgWrapper->pVosMsg != NULL)
     {
-        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
                    "%s: Freeing MC WDI MSG message type %d",
                    __func__, pMsgWrapper->pVosMsg->type );
 
@@ -1532,7 +1772,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->peMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_ERROR,
+               VOS_TRACE_LEVEL_INFO,
                "%s: Freeing MC PE MSG message type %d",__func__,
                pMsgWrapper->pVosMsg->type );
     peFreeMsg(vosCtx->pMACContext, (tSirMsgQ*)pMsgWrapper->pVosMsg);
@@ -1542,7 +1782,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->smeMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_ERROR,
+               VOS_TRACE_LEVEL_INFO,
                "%s: Freeing MC SME MSG message type %d", __func__,
                pMsgWrapper->pVosMsg->type );
     sme_FreeMsg(vosCtx->pMACContext, pMsgWrapper->pVosMsg);
@@ -1552,7 +1792,7 @@ void vos_sched_flush_mc_mqs ( pVosSchedContext pSchedContext )
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->tlMcMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
-               VOS_TRACE_LEVEL_ERROR,
+               VOS_TRACE_LEVEL_INFO,
                "%s: Freeing MC TL message type %d",__func__,
                pMsgWrapper->pVosMsg->type );
     WLANTL_McFreeMsg(pSchedContext->pVContext, pMsgWrapper->pVosMsg);
@@ -1644,6 +1884,15 @@ void vos_sched_flush_rx_mqs ( pVosSchedContext pSchedContext )
     sysTxFreeMsg(pSchedContext->pVContext, pMsgWrapper->pVosMsg);
   }
 
+  while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->tlRxMq) ))
+  {
+    VOS_TRACE( VOS_MODULE_ID_VOSS,
+               VOS_TRACE_LEVEL_INFO,
+               "%s: Freeing RX TL MSG message type %d",__func__,
+               pMsgWrapper->pVosMsg->type );
+    sysTxFreeMsg(pSchedContext->pVContext, pMsgWrapper->pVosMsg);
+  }
+
   while( NULL != (pMsgWrapper = vos_mq_get(&pSchedContext->sysRxMq) ))
   {
     VOS_TRACE( VOS_MODULE_ID_VOSS,
@@ -1685,6 +1934,24 @@ int vos_sched_is_rx_thread(int threadID)
    }
    return ((gpVosSchedContext->RxThread) && (threadID == gpVosSchedContext->RxThread->pid));
 }
+
+/*-------------------------------------------------------------------------
+ This helper function helps determine if thread id is of MC thread
+ ------------------------------------------------------------------------*/
+int vos_sched_is_mc_thread(int threadID)
+{
+   // Make sure that Vos Scheduler context has been initialized
+   VOS_ASSERT( NULL != gpVosSchedContext);
+   if (gpVosSchedContext == NULL)
+   {
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+          "%s: gpVosSchedContext == NULL",__func__);
+      return 0;
+   }
+   return ((gpVosSchedContext->McThread) &&
+           (threadID == gpVosSchedContext->McThread->pid));
+}
+
 /*-------------------------------------------------------------------------
  Helper function to get the scheduler context
  ------------------------------------------------------------------------*/
@@ -1730,14 +1997,25 @@ VOS_STATUS vos_watchdog_wlan_shutdown(void)
     v_CONTEXT_t pVosContext = NULL;
     hdd_context_t *pHddCtx = NULL;
 
-    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
-        "%s: WLAN driver is shutting down ", __func__);
     if (NULL == gpVosWatchdogContext)
     {
        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
            "%s: Watchdog not enabled. LOGP ignored.", __func__);
        return VOS_STATUS_E_FAILURE;
     }
+
+    if (gpVosWatchdogContext->isFatalError)
+    {
+       /* If we hit this, it means wlan driver is in bad state and needs
+       * driver unload and load.
+       */
+       VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+           "%s: Driver in bad state and need unload and load", __func__);
+       return VOS_STATUS_E_FAILURE;
+    }
+
+    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+        "%s: WLAN driver is shutting down ", __func__);
 
     pVosContext = vos_get_global_context(VOS_MODULE_ID_HDD, NULL);
     pHddCtx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD, pVosContext );
@@ -1771,17 +2049,9 @@ VOS_STATUS vos_watchdog_wlan_shutdown(void)
         /* Release the lock here */
         spin_unlock(&gpVosWatchdogContext->wdLock);
         return VOS_STATUS_E_FAILURE;
-    } 
+    }
 
-    /* Set the flags so that all future CMD53 and Wext commands get blocked right away */
-    vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
-    vos_set_reinit_in_progress(VOS_MODULE_ID_VOSS, FALSE);
-    pHddCtx->isLogpInProgress = TRUE;
-
-    /* Release the lock here */
-    spin_unlock(&gpVosWatchdogContext->wdLock);
-
-    if (pHddCtx->isLoadUnloadInProgress)
+    if (WLAN_HDD_IS_LOAD_UNLOAD_IN_PROGRESS(pHddCtx))
     {
         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
                 "%s: Load/unload in Progress. Ignoring signaling Watchdog",
@@ -1789,8 +2059,19 @@ VOS_STATUS vos_watchdog_wlan_shutdown(void)
         /* wcnss has crashed, and SSR has alredy been started by Kernel driver.
          * So disable SSR from WLAN driver */
         hdd_set_ssr_required( HDD_SSR_DISABLED );
+
+        /* Release the lock here before returning */
+        spin_unlock(&gpVosWatchdogContext->wdLock);
         return VOS_STATUS_E_FAILURE;
     }
+    /* Set the flags so that all commands from userspace get blocked right away */
+    vos_set_logp_in_progress(VOS_MODULE_ID_VOSS, TRUE);
+    vos_set_reinit_in_progress(VOS_MODULE_ID_VOSS, FALSE);
+    pHddCtx->isLogpInProgress = TRUE;
+
+    /* Release the lock here */
+    spin_unlock(&gpVosWatchdogContext->wdLock);
+
     /* Update Riva Reset Statistics */
     pHddCtx->hddRivaResetStats++;
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -1828,4 +2109,66 @@ VOS_STATUS vos_watchdog_wlan_re_init(void)
     wake_up_interruptible(&gpVosWatchdogContext->wdWaitQueue);
 
     return VOS_STATUS_SUCCESS;
+}
+
+/**
+  @brief vos_ssr_protect()
+
+  This function is called to keep track of active driver entry points
+
+  @param
+         caller_func - Name of calling function.
+  @return
+         void
+*/
+void vos_ssr_protect(const char *caller_func)
+{
+     int count;
+     count = atomic_inc_return(&ssr_protect_entry_count);
+}
+
+/**
+  @brief vos_ssr_unprotect()
+
+  @param
+         caller_func - Name of calling function.
+  @return
+         void
+*/
+void vos_ssr_unprotect(const char *caller_func)
+{
+   int count;
+   count = atomic_dec_return(&ssr_protect_entry_count);
+}
+/**
+ * vos_is_wd_thread()- Check if threadid is
+ * of Watchdog thread
+ *
+ * @threadId: passed threadid
+ *
+ * This function is called to check if threadid is
+ * of wd thread.
+ *
+ * Return: true if threadid is of wd thread.
+ */
+bool vos_is_wd_thread(int threadId)
+{
+   return ((gpVosWatchdogContext->WdThread) &&
+       (threadId == gpVosWatchdogContext->WdThread->pid));
+}
+
+void vos_dump_stack(uint8_t thread_id)
+{
+   switch (thread_id)
+   {
+      case MC_Thread:
+          wcnss_dump_stack(gpVosSchedContext->McThread);
+      case TX_Thread:
+          wcnss_dump_stack(gpVosSchedContext->TxThread);
+      case RX_Thread:
+          wcnss_dump_stack(gpVosSchedContext->RxThread);
+      default:
+          VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                             "%s: Invalid thread invoked",__func__);
+   }
 }

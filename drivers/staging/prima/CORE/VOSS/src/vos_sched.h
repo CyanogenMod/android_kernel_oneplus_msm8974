@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18,25 +18,11 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 #if !defined( __VOS_SCHED_H )
@@ -56,9 +42,6 @@
    by vOSS.
     
   
-   Copyright 2008 (c) Qualcomm, Incorporated.  All Rights Reserved.
-   
-   Qualcomm Confidential and Proprietary.
   
   ========================================================================*/
 
@@ -85,11 +68,14 @@
   Include Files
   ------------------------------------------------------------------------*/
 #include <vos_event.h>
+#include <vos_nvitem.h>
+#include <vos_mq.h>
 #include "i_vos_types.h"
 #include "i_vos_packet.h"
 #include <linux/wait.h>
 #include <linux/wakelock.h>
-#include <vos_power.h>
+#include <vos_timer.h>
+
 
 #define TX_POST_EVENT_MASK               0x001
 #define TX_SUSPEND_EVENT_MASK            0x002
@@ -105,6 +91,8 @@
 #define WD_CHIP_RESET_EVENT_MASK         0x004
 #define WD_WLAN_SHUTDOWN_EVENT_MASK      0x008
 #define WD_WLAN_REINIT_EVENT_MASK        0x010
+#define WD_WLAN_DETECT_THREAD_STUCK_MASK 0x020
+
 
  
  
@@ -173,6 +161,9 @@ typedef struct _VosSchedContext
 
    /* TL Message queue on the Tx thread */
    VosMqType           tlTxMq;
+
+   /* TL Message queue on the Rx thread */
+   VosMqType           tlRxMq;
 
    /* SYS Message queue on the Tx thread */
    VosMqType           sysTxMq;
@@ -269,10 +260,18 @@ typedef struct _VosWatchdogContext
 
    v_BOOL_t resetInProgress;
 
-   vos_chip_reset_reason_type reason;
+   v_BOOL_t isFatalError;
 
    /* Lock for preventing multiple reset being triggered simultaneously */
    spinlock_t wdLock;
+   /* Timer to detect thread stuck issue */
+   vos_timer_t threadStuckTimer;
+   /* Count for each thread to determine thread stuck */
+   unsigned int mcThreadStuckCount;
+   unsigned int txThreadStuckCount;
+   unsigned int rxThreadStuckCount;
+   /* lock to synchronize access to the thread stuck counts */
+   spinlock_t thread_stuck_lock;
 
 } VosWatchdogContext, *pVosWatchdogContext;
 
@@ -344,6 +343,14 @@ typedef struct _VosContextType
    /* SSR re-init in progress */
    volatile v_U8_t     isReInitInProgress;
 
+   /* NV BIN Version */
+   eNvVersionType     nvVersion;
+
+   /* Roam delay statistic enabled in ini*/
+   v_U8_t             roamDelayStatsEnabled;
+
+   /*Fw log complete Event*/
+   vos_event_t fwLogsComplete;
 } VosContextType, *pVosContextType;
 
 
@@ -354,6 +361,7 @@ typedef struct _VosContextType
  
 int vos_sched_is_tx_thread(int threadID);
 int vos_sched_is_rx_thread(int threadID);
+int vos_sched_is_mc_thread(int threadID);
 /*---------------------------------------------------------------------------
   
   \brief vos_sched_open() - initialize the vOSS Scheduler  
@@ -492,6 +500,7 @@ VOS_STATUS vos_watchdog_close ( v_PVOID_t pVosContext );
 VOS_STATUS vos_mq_init(pVosMqType pMq);
 void vos_mq_deinit(pVosMqType pMq);
 void vos_mq_put(pVosMqType pMq, pVosMsgWrapper pMsgWrapper);
+void vos_mq_put_front(pVosMqType pMq, pVosMsgWrapper pMsgWrapper);
 pVosMsgWrapper vos_mq_get(pVosMqType pMq);
 v_BOOL_t vos_is_mq_empty(pVosMqType pMq);
 pVosSchedContext get_vos_sched_ctxt(void);
@@ -501,11 +510,17 @@ void vos_sched_deinit_mqs (pVosSchedContext pSchedContext);
 void vos_sched_flush_mc_mqs  (pVosSchedContext pSchedContext);
 void vos_sched_flush_tx_mqs  (pVosSchedContext pSchedContext);
 void vos_sched_flush_rx_mqs  (pVosSchedContext pSchedContext);
-VOS_STATUS vos_watchdog_chip_reset ( vos_chip_reset_reason_type reason );
 void clearWlanResetReason(void);
 
 void vos_timer_module_init( void );
 VOS_STATUS vos_watchdog_wlan_shutdown(void);
 VOS_STATUS vos_watchdog_wlan_re_init(void);
+v_BOOL_t isSsrPanicOnFailure(void);
+void vos_ssr_protect(const char *caller_func);
+void vos_ssr_unprotect(const char *caller_func);
+void vos_wd_reset_thread_stuck_count(int threadId);
+bool vos_is_wd_thread(int threadId);
+void vos_dump_stack(uint8_t value);
+
 
 #endif // #if !defined __VOSS_SCHED_H

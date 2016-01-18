@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18,25 +18,11 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 /**=========================================================================
@@ -48,9 +34,6 @@
   This file implements the device specific HW access interface
   required by the WLAN Platform Abstraction Layer (WPAL)
 
-  Copyright (c) 2011 QUALCOMM Incorporated.
-  All Rights Reserved.
-  Qualcomm Confidential and Proprietary
 ========================================================================*/
 
 /*===========================================================================
@@ -77,22 +60,21 @@
 #include <linux/irqreturn.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#ifdef EXISTS_MSM_SMSM
 #include <mach/msm_smsm.h>
+#else
+#include <soc/qcom/smsm.h>
+#endif
 #include "wlan_qct_pal_api.h"
 #include "wlan_qct_pal_device.h"
 #include "wlan_hdd_main.h"
 #include "linux/wcnss_wlan.h"
+#include <linux/ratelimit.h>
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
  * -------------------------------------------------------------------------*/
 
-// address in the Host physical memory map
-#ifdef WCN_PRONTO
-#define WCNSS_BASE_ADDRESS 0xFB000000
-#else
-#define WCNSS_BASE_ADDRESS 0x03000000
-#endif
 /*----------------------------------------------------------------------------
  * Type Declarations
  * -------------------------------------------------------------------------*/
@@ -116,11 +98,23 @@ typedef struct {
    void            *rx_context;
    int              rx_registered;
    int              tx_registered;
+   u8               rx_isr_enabled;
+   u64              *rx_disable_return;
+   u64              *rx_enable_return;
+   u8               rx_isr_enable_failure;
+   u8               rx_isr_enable_partial_failure;
+   u8               tx_isr_enabled;
 } wcnss_env;
 
 static wcnss_env  gEnv;
 static wcnss_env *gpEnv = NULL;
 
+#define WPAL_READ_REGISTER_RATELIMIT_INTERVAL 20*HZ
+#define WPAL_READ_REGISTER_RATELIMIT_BURST    1
+
+static DEFINE_RATELIMIT_STATE(wpalReadRegister_rs, \
+        WPAL_READ_REGISTER_RATELIMIT_INTERVAL,     \
+        WPAL_READ_REGISTER_RATELIMIT_BURST);
 /*----------------------------------------------------------------------------
  * Static Function Declarations and Definitions
  * -------------------------------------------------------------------------*/
@@ -339,10 +333,12 @@ wpt_status wpalEnableInterrupt
 )
 {
    int ret;
+   wpt_status status = eWLAN_PAL_STATUS_SUCCESS;
    
    switch (intType) 
    {
    case DXE_INTERRUPT_RX_READY:
+      gpEnv->rx_enable_return = VOS_RETURN_ADDRESS;
       if (!gpEnv->rx_registered) 
       {
          gpEnv->rx_registered = 1;
@@ -352,6 +348,7 @@ wpt_status wpalEnableInterrupt
             WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
                        "%s: RX IRQ request failure",
                        __func__);
+           gpEnv->rx_isr_enable_failure = 1;
            break;
          }
       
@@ -361,6 +358,7 @@ wpt_status wpalEnableInterrupt
             WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
                        "%s: enable_irq_wake failed for RX IRQ",
                        __func__);
+           gpEnv->rx_isr_enable_partial_failure = 1;
             /* not fatal -- keep on going */
          }
       }
@@ -368,6 +366,7 @@ wpt_status wpalEnableInterrupt
       {
          enable_irq(gpEnv->rx_irq);
       }
+      gpEnv->rx_isr_enabled = 1;
       break;
    case DXE_INTERRUPT_TX_COMPLE:
       if (!gpEnv->tx_registered) 
@@ -395,16 +394,18 @@ wpt_status wpalEnableInterrupt
       {
          enable_irq(gpEnv->tx_irq);
       }
+      gpEnv->tx_isr_enabled = 1;
       break;
    default:
       WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
                     "%s: unknown interrupt: %d",
                     __func__, (int)intType);
+      status = eWLAN_PAL_STATUS_E_INVAL;
       break;
    }
    /* on the integrated platform there is no platform-specific
       interrupt control */
-   return eWLAN_PAL_STATUS_SUCCESS;
+   return status;
 }
 
 /**
@@ -427,24 +428,30 @@ wpt_status wpalDisableInterrupt
    wpt_uint32    intType
 )
 {
-   switch (intType) 
+   wpt_status status = eWLAN_PAL_STATUS_SUCCESS;
+
+   switch (intType)
    {
    case DXE_INTERRUPT_RX_READY:
+      gpEnv->rx_disable_return = VOS_RETURN_ADDRESS;
       disable_irq_nosync(gpEnv->rx_irq);
+      gpEnv->rx_isr_enabled = 0;
       break;
    case DXE_INTERRUPT_TX_COMPLE:
       disable_irq_nosync(gpEnv->tx_irq);
+      gpEnv->tx_isr_enabled = 0;
       break;
    default:
       WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
                     "%s: unknown interrupt: %d",
                     __func__, (int)intType);
+      status = eWLAN_PAL_STATUS_E_INVAL;
       break;
    }
 
    /* on the integrated platform there is no platform-specific
       interrupt control */
-   return eWLAN_PAL_STATUS_SUCCESS;
+   return status;
 }
 
 /**
@@ -464,7 +471,7 @@ wpt_status wpalWriteRegister
 {
    /* if SSR is in progress, and WCNSS is not out of reset (re-init
     * not invoked), then do not access WCNSS registers */
-   if (NULL == gpEnv ||
+   if (NULL == gpEnv || wcnss_device_is_shutdown() ||
         (vos_is_logp_in_progress(VOS_MODULE_ID_WDI, NULL) &&
             !vos_is_reinit_in_progress(VOS_MODULE_ID_WDI, NULL))) {
       WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
@@ -473,12 +480,15 @@ wpt_status wpalWriteRegister
       return eWLAN_PAL_STATUS_E_INVAL;
    }
 
+   address = (address | gpEnv->wcnss_memory->start);
+
    if ((address < gpEnv->wcnss_memory->start) ||
        (address > gpEnv->wcnss_memory->end)) {
       WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
                  "%s: Register address 0x%0x out of range 0x%0x - 0x%0x",
                  __func__, address,
-                 gpEnv->wcnss_memory->start, gpEnv->wcnss_memory->end);
+                 (u32) gpEnv->wcnss_memory->start,
+                 (u32) gpEnv->wcnss_memory->end);
       return eWLAN_PAL_STATUS_E_INVAL;
    }
 
@@ -490,7 +500,7 @@ wpt_status wpalWriteRegister
    }
 
    wmb();
-   writel_relaxed(data, gpEnv->mmio + (address - WCNSS_BASE_ADDRESS));
+   writel_relaxed(data, gpEnv->mmio + (address - gpEnv->wcnss_memory->start));
 
    return eWLAN_PAL_STATUS_SUCCESS;
 }
@@ -512,21 +522,31 @@ wpt_status wpalReadRegister
 {
    /* if SSR is in progress, and WCNSS is not out of reset (re-init
     * not invoked), then do not access WCNSS registers */
-   if (NULL == gpEnv ||
+   if (NULL == gpEnv || wcnss_device_is_shutdown() ||
         (vos_is_logp_in_progress(VOS_MODULE_ID_WDI, NULL) &&
             !vos_is_reinit_in_progress(VOS_MODULE_ID_WDI, NULL))) {
-      WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
-                 "%s: invoked before subsystem initialized",
-                 __func__);
-      return eWLAN_PAL_STATUS_E_INVAL;
+       /* Ratelimit wpalReadRegister failure messages which
+        * can flood serial console during improper system
+        * initialization or wcnss_device in shutdown state.
+        * wpalRegisterInterrupt() call to wpalReadRegister is
+        * likely to cause flooding. */
+       if (__ratelimit(&wpalReadRegister_rs)) {
+           WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+                   "%s: invoked before subsystem initialized",
+                   __func__);
+       }
+       return eWLAN_PAL_STATUS_E_INVAL;
    }
+
+   address = (address | gpEnv->wcnss_memory->start);
 
    if ((address < gpEnv->wcnss_memory->start) ||
        (address > gpEnv->wcnss_memory->end)) {
       WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
                  "%s: Register address 0x%0x out of range 0x%0x - 0x%0x",
                  __func__, address,
-                 gpEnv->wcnss_memory->start, gpEnv->wcnss_memory->end);
+                 (u32) gpEnv->wcnss_memory->start,
+                 (u32) gpEnv->wcnss_memory->end);
       return eWLAN_PAL_STATUS_E_INVAL;
    }
 
@@ -537,7 +557,7 @@ wpt_status wpalReadRegister
       return eWLAN_PAL_STATUS_E_INVAL;
    }
 
-   *data = readl_relaxed(gpEnv->mmio + (address - WCNSS_BASE_ADDRESS));
+   *data = readl_relaxed(gpEnv->mmio + (address - gpEnv->wcnss_memory->start));
    rmb();
 
    return eWLAN_PAL_STATUS_SUCCESS;
@@ -563,7 +583,7 @@ wpt_status wpalWriteDeviceMemory
 {
    /* if SSR is in progress, and WCNSS is not out of reset (re-init
     * not invoked), then do not access WCNSS registers */
-   if (NULL == gpEnv ||
+   if (NULL == gpEnv || wcnss_device_is_shutdown() ||
         (vos_is_logp_in_progress(VOS_MODULE_ID_WDI, NULL) &&
             !vos_is_reinit_in_progress(VOS_MODULE_ID_WDI, NULL))) {
       WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
@@ -572,16 +592,20 @@ wpt_status wpalWriteDeviceMemory
       return eWLAN_PAL_STATUS_E_INVAL;
    }
 
+   address = (address | gpEnv->wcnss_memory->start);
+
    if ((address < gpEnv->wcnss_memory->start) ||
        ((address + len) > gpEnv->wcnss_memory->end)) {
       WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
                  "%s: Memory address 0x%0x len %d out of range 0x%0x - 0x%0x",
                  __func__, address, len,
-                 gpEnv->wcnss_memory->start, gpEnv->wcnss_memory->end);
+                 (u32) gpEnv->wcnss_memory->start,
+                 (u32) gpEnv->wcnss_memory->end);
       return eWLAN_PAL_STATUS_E_INVAL;
    }
 
-   memcpy(gpEnv->mmio + (address - WCNSS_BASE_ADDRESS), s_buffer, len);
+   vos_mem_copy(gpEnv->mmio + (address - gpEnv->wcnss_memory->start),
+                                                            s_buffer, len);
    wmb();
 
    return eWLAN_PAL_STATUS_SUCCESS;
@@ -607,7 +631,7 @@ wpt_status wpalReadDeviceMemory
 {
    /* if SSR is in progress, and WCNSS is not out of reset (re-init
     * not invoked), then do not access WCNSS registers */
-   if (NULL == gpEnv ||
+   if (NULL == gpEnv || wcnss_device_is_shutdown() ||
         (vos_is_logp_in_progress(VOS_MODULE_ID_WDI, NULL) &&
             !vos_is_reinit_in_progress(VOS_MODULE_ID_WDI, NULL))) {
       WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
@@ -616,16 +640,20 @@ wpt_status wpalReadDeviceMemory
       return eWLAN_PAL_STATUS_E_INVAL;
    }
 
+   address = (address | gpEnv->wcnss_memory->start);
+
    if ((address < gpEnv->wcnss_memory->start) ||
        ((address + len) > gpEnv->wcnss_memory->end)) {
       WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
                  "%s: Memory address 0x%0x len %d out of range 0x%0x - 0x%0x",
                  __func__, address, len,
-                 gpEnv->wcnss_memory->start, gpEnv->wcnss_memory->end);
+                 (u32) gpEnv->wcnss_memory->start,
+                 (u32) gpEnv->wcnss_memory->end);
       return eWLAN_PAL_STATUS_E_INVAL;
    }
 
-   memcpy(d_buffer, gpEnv->mmio + (address - WCNSS_BASE_ADDRESS), len);
+   vos_mem_copy(d_buffer,
+                   gpEnv->mmio + (address - gpEnv->wcnss_memory->start), len);
    rmb();
 
    return eWLAN_PAL_STATUS_SUCCESS;
@@ -643,11 +671,10 @@ wpt_status wpalReadDeviceMemory
 */
 wpt_status wpalDeviceInit
 (
-   void * deviceCB
+   void * devHandle
 )
 {
-   hdd_context_t *pHddCtx = (hdd_context_t *)deviceCB;
-   struct device *wcnss_device = pHddCtx->parent_dev;
+   struct device *wcnss_device = (struct device *)devHandle;
    struct resource *wcnss_memory;
    int tx_irq;
    int rx_irq;
@@ -710,6 +737,7 @@ wpt_status wpalDeviceInit
       exclusive access to that memory */
 
    gpEnv->mmio = ioremap(wcnss_memory->start, resource_size(wcnss_memory));
+
    if (NULL == gpEnv->mmio) {
       WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
                  "%s: memory remap failure",

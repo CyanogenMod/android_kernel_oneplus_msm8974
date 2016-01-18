@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18,25 +18,11 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 #if !defined( __WLAN_QCT_PAL_API_H )
@@ -50,9 +36,6 @@
                
    Definitions for platform independent
   
-   Copyright 2010 (c) Qualcomm, Incorporated.  All Rights Reserved.
-   
-   Qualcomm Confidential and Proprietary.
   
   ========================================================================*/
 
@@ -62,6 +45,14 @@
 #ifdef MEMORY_DEBUG
 #include "vos_memory.h"
 #endif /* MEMORY_DEBUG */
+
+typedef struct sPalStruct
+{
+   /*?must check the data type*/
+   void* devHandle;
+} tPalContext;
+
+extern tPalContext gContext;
 
 /*********************************MACRO**********************/
 
@@ -119,12 +110,11 @@
        ppPalContext – pointer to a caller allocated pointer. It is opaque to caller.
                       Caller save the returned pointer for future use when calling
                       PAL APIs. If this is NULL, it means that PAL doesn't need it.
-       pOSContext - Pointer to a context that is OS specific. This is NULL is a 
-                     particular PAL doesn't use it for that OS.
+       devHandle - pointer to the OS specific device handle
     Return:
        eWLAN_PAL_STATUS_SUCCESS - success. Otherwise fail.
 ---------------------------------------------------------------------------*/
-wpt_status wpalOpen(void **ppPalContext, void *pOSContext);
+wpt_status wpalOpen(void **ppPalContext, void *devHandle);
 
 /*---------------------------------------------------------------------------
     wpalClose - Release PAL
@@ -336,19 +326,30 @@ void wpalWlanReload(void);
 void wpalWcnssResetIntr(void);
 
 /*---------------------------------------------------------------------------
+    wpalWcnssIsProntoHwVer3 -  Check for Pronto ver3 HW
+
+    Param:
+       None
+    Return:
+       TRUE if Ponto Hw Ver 3
+       Therefore use WQ6 instead of WQ23 for TX Low/High Priority Channel
+---------------------------------------------------------------------------*/
+int wpalWcnssIsProntoHwVer3(void);
+/*---------------------------------------------------------------------------
     wpalFwDumpReq -  Trigger the dump commands to Firmware
 
     Param:
-       cmd - Command No. to execute
-       arg1 - argument 1 to cmd
-       arg2 - argument 2 to cmd
-       arg3 - argument 3 to cmd
-       arg4 - argument 4 to cmd
+       cmd -   Command No. to execute
+       arg1 -  argument 1 to cmd
+       arg2 -  argument 2 to cmd
+       arg3 -  argument 3 to cmd
+       arg4 -  argument 4 to cmd
+       async -asynchronous event. Don't wait for completion.
     Return:
        NONE
 ---------------------------------------------------------------------------*/
 void wpalFwDumpReq(wpt_uint32 cmd, wpt_uint32 arg1, wpt_uint32 arg2,
-                    wpt_uint32 arg3, wpt_uint32 arg4);
+                    wpt_uint32 arg3, wpt_uint32 arg4, wpt_boolean async);
 
 /*---------------------------------------------------------------------------
     wpalDevicePanic -  Trigger Device Panic
@@ -361,4 +362,31 @@ void wpalFwDumpReq(wpt_uint32 cmd, wpt_uint32 arg1, wpt_uint32 arg2,
        NONE
 ---------------------------------------------------------------------------*/
 void wpalDevicePanic(void);
+
+/*---------------------------------------------------------------------------
+    wpalIslogPInProgress -  calls vos API vos_is_logp_in_progress()
+
+    Param:
+       NONE
+    Return:
+       STATUS
+--------------------------------------------------------------------------*/
+int  wpalIslogPInProgress(void);
+
+/*---------------------------------------------------------------------------
+    wpalIsSsrPanicOnFailure -  calls vos API isSsrPanicOnFailure()
+
+    Param:
+       NONE
+    Return:
+       STATUS
+--------------------------------------------------------------------------*/
+int  wpalIsSsrPanicOnFailure(void);
+
+int  wpalGetDxeReplenishRXTimerVal(void);
+int  wpalIsDxeSSREnable(void);
+
+wpt_uint8 wpalIsFwLoggingEnabled(void);
+wpt_uint8 wpalIsFwLoggingSupported(void);
+wpt_uint8 wpalIsFwEvLoggingEnabled(void);
 #endif // __WLAN_QCT_PAL_API_H

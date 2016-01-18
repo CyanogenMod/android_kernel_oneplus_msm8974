@@ -1,25 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
- */
-/*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -40,8 +20,13 @@
  */
 
 /*
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
+ */
+
+/*
  *
- * Airgo Networks, Inc proprietary. All rights reserved.
  * This file contains the source code for CFG API functions.
  *
  * Author:      Kevin Nguyen
@@ -65,13 +50,13 @@ static tANI_U32  __gCfgIBufMax[CFG_STA_IBUF_MAX_SIZE]          ;
 static tANI_U32  __gCfgIBuf[CFG_STA_IBUF_MAX_SIZE]             ;
 static tANI_U8   __gCfgSBuf[CFG_STA_SBUF_MAX_SIZE]             ;
 static tANI_U8   __gSBuffer[CFG_MAX_STR_LEN]                   ;
-static tANI_U32  __gParamList[WNI_CFG_MAX_PARAM_NUM + 
-                              WNI_CFG_GET_PER_STA_STAT_RSP_NUM];
+
 
 static void Notify(tpAniSirGlobal, tANI_U16, tANI_U32);
 
-
-// ---------------------------------------------------------------------
+extern tAniSirCfgStaticString cfgStaticString[CFG_MAX_STATIC_STRING];
+extern tAniSirCgStatic cfgStatic[CFG_PARAM_MAX_NUM] ;
+//---------------------------------------------------------------------
 tANI_U32 cfgNeedRestart(tpAniSirGlobal pMac, tANI_U16 cfgId)
 {
     if (!pMac->cfg.gCfgEntry)
@@ -127,18 +112,46 @@ wlan_cfgInit(tpAniSirGlobal pMac)
 
 } /*** end wlan_cfgInit() ***/
 
+void cfgGetStrIndex(tpAniSirGlobal pMac, tANI_U16 cfgId)
+{
+    tANI_U16 i = 0;
+
+    for(i = 0; i < CFG_MAX_STATIC_STRING; i++)
+    {
+        if(cfgId == cfgStaticString[i].cfgId)
+            break;
+    }
+    if(i == CFG_MAX_STATIC_STRING)
+    {
+        PELOGE(cfgLog(pMac, LOGE, FL("Entry not found for cfg id :%d"), cfgId);)
+        cfgStatic[cfgId].pStrData = NULL;
+        return;
+    }
+    cfgStatic[cfgId].pStrData = &cfgStaticString[i];
+}
 
 //---------------------------------------------------------------------
 tSirRetStatus cfgInit(tpAniSirGlobal pMac)
 {
+   tANI_U16 i = 0;
    pMac->cfg.gCfgIBufMin  = __gCfgIBufMin;
    pMac->cfg.gCfgIBufMax  = __gCfgIBufMax;
    pMac->cfg.gCfgIBuf     = __gCfgIBuf;
    pMac->cfg.gCfgSBuf     = __gCfgSBuf;
    pMac->cfg.gSBuffer     = __gSBuffer;
    pMac->cfg.gCfgEntry    = __gCfgEntry;
-   pMac->cfg.gParamList   = __gParamList;
-        
+
+   for(i=0; i<CFG_PARAM_MAX_NUM; i++)
+   {
+       if (!(cfgStatic[i].control & CFG_CTL_INT))
+       {
+           cfgGetStrIndex(pMac, i);
+       }
+       else
+       {
+           cfgStatic[i].pStrData = NULL;
+       }
+   }
    return (eSIR_SUCCESS);
 }
 
@@ -151,7 +164,6 @@ void cfgDeInit(tpAniSirGlobal pMac)
    pMac->cfg.gCfgSBuf     = NULL;
    pMac->cfg.gSBuffer     = NULL;
    pMac->cfg.gCfgEntry    = NULL;
-   pMac->cfg.gParamList   = NULL;
 }
 
 // ---------------------------------------------------------------------
@@ -213,13 +225,23 @@ cfgSetInt(tpAniSirGlobal pMac, tANI_U16 cfgId, tANI_U32 value)
     // Check if parameter is valid
     if ((control & CFG_CTL_VALID) == 0)
     {
-        PELOGE(cfgLog(pMac, LOGE, FL("Not valid cfg id %d"), cfgId);)
+        PELOGE(cfgLog(pMac, LOG3, FL("Not valid cfg id %d"), cfgId);)
         retVal = eSIR_CFG_INVALID_ID;
     }
-    else if ((pMac->cfg.gCfgIBufMin[index] > value) ||
-             (pMac->cfg.gCfgIBufMax[index] < value))
+    else if ((pMac->cfg.gCfgIBufMin[index] < pMac->cfg.gCfgIBufMax[index]) &&
+             ((pMac->cfg.gCfgIBufMin[index] > value) ||
+             (pMac->cfg.gCfgIBufMax[index] < value)))
     {
-        PELOGE(cfgLog(pMac, LOGE, FL("Value %d out of range [%d,%d] cfg id %d"),
+        PELOGE(cfgLog(pMac, LOGE, FL("Value %u out of range [%u,%u] cfgid %hu"),
+               value, pMac->cfg.gCfgIBufMin[index],
+               pMac->cfg.gCfgIBufMax[index], cfgId);)
+        retVal = eSIR_CFG_INVALID_ID;
+    }
+    else if (!(pMac->cfg.gCfgIBufMin[index] < pMac->cfg.gCfgIBufMax[index]) &&
+             (((tANI_S32)(pMac->cfg.gCfgIBufMin[index]) > (tANI_S32)value) ||
+              ((tANI_S32)(pMac->cfg.gCfgIBufMax[index]) < (tANI_S32)value)))
+    {
+        PELOGE(cfgLog(pMac, LOGE, FL("Value %d out of range [%d,%d] cfgid %hu"),
                value, pMac->cfg.gCfgIBufMin[index],
                pMac->cfg.gCfgIBufMax[index], cfgId);)
         retVal = eSIR_CFG_INVALID_ID;
@@ -345,7 +367,7 @@ wlan_cfgGetInt(tpAniSirGlobal pMac, tANI_U16 cfgId, tANI_U32 *pValue)
     // Check if parameter is valid
     if ((control & CFG_CTL_VALID) == 0)
     {
-        PELOGE(cfgLog(pMac, LOGE, FL("Not valid cfg id %d"), cfgId);)
+        PELOGE(cfgLog(pMac, LOG3, FL("Not valid cfg id %d"), cfgId);)
         retVal = eSIR_CFG_INVALID_ID;
     }
     else {
@@ -407,7 +429,7 @@ cfgIncrementInt(tpAniSirGlobal pMac, tANI_U16 cfgId, tANI_U32 value)
     // Check if parameter is valid
     if ((control & CFG_CTL_VALID) == 0)
     {
-        PELOGE(cfgLog(pMac, LOGE, FL("Not valid cfg id %d"), cfgId);)
+        PELOGE(cfgLog(pMac, LOG3, FL("Not valid cfg id %d"), cfgId);)
         retVal = eSIR_CFG_INVALID_ID;
     }
     else
@@ -620,7 +642,7 @@ wlan_cfgGetStr(tpAniSirGlobal pMac, tANI_U16 cfgId, tANI_U8 *pBuf, tANI_U32 *pLe
     // Check if parameter is valid
     if ((control & CFG_CTL_VALID) == 0)
     {
-        PELOGE(cfgLog(pMac, LOGE, FL("Not valid cfg id %d"), cfgId);)
+        PELOGE(cfgLog(pMac, LOG3, FL("Not valid cfg id %d"), cfgId);)
         retVal = eSIR_CFG_INVALID_ID;
     }
     else
@@ -701,7 +723,7 @@ wlan_cfgGetStrMaxLen(tpAniSirGlobal pMac, tANI_U16 cfgId, tANI_U32 *pLength)
     // Check if parameter is valid
     if ((control & CFG_CTL_VALID) == 0)
     {
-        PELOGE(cfgLog(pMac, LOGE, FL("Not valid cfg id %d"), cfgId);)
+        PELOGE(cfgLog(pMac, LOG3, FL("Not valid cfg id %d"), cfgId);)
         retVal = eSIR_CFG_INVALID_ID;
     }
     else
@@ -767,7 +789,7 @@ wlan_cfgGetStrLen(tpAniSirGlobal pMac, tANI_U16 cfgId, tANI_U32 *pLength)
     // Check if parameter is valid
     if ((control & CFG_CTL_VALID) == 0)
     {
-        PELOGE(cfgLog(pMac, LOGE, FL("Not valid cfg id %d"), cfgId);)
+        PELOGE(cfgLog(pMac, LOG3, FL("Not valid cfg id %d"), cfgId);)
         retVal = eSIR_CFG_INVALID_ID;
     }
     else
@@ -994,7 +1016,7 @@ cfgGetCapabilityInfo(tpAniSirGlobal pMac, tANI_U16 *pCap,tpPESession sessionEntr
     }
 
     // Spectrum Management bit
-    if((eLIM_STA_IN_IBSS_ROLE != systemRole) &&
+    if((eLIM_STA_IN_IBSS_ROLE != systemRole) && (eLIM_AP_ROLE != systemRole) &&
             sessionEntry->lim11hEnable )
     {
       if (wlan_cfgGetInt(pMac, WNI_CFG_11H_ENABLED, &val) != eSIR_SUCCESS)

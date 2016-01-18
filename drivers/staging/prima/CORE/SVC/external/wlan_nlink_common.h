@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18,25 +18,11 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 /*===========================================================================
@@ -46,9 +32,6 @@
   message types and definitions that is shared between the user space service
   (e.g. BTC service) and WLAN kernel module.
 
-  Copyright (c) 2009 QUALCOMM Incorporated.
-  All Rights Reserved.
-  Qualcomm Confidential and Proprietary
 
 ===========================================================================*/
 
@@ -56,7 +39,7 @@
 #define WLAN_NLINK_COMMON_H__
 
 #include <linux/netlink.h>
-
+#include <linux/if.h>
 /*---------------------------------------------------------------------------
  * External Functions
  *-------------------------------------------------------------------------*/
@@ -102,8 +85,10 @@
 // Special Message Type used by SoftAP, intercepted by send_btc_nlink_msg() and
 // replaced by WLAN_STA_ASSOC_DONE_IND
 #define WLAN_BTC_SOFTAP_BSS_START      0x11
+#define WLAN_MSG_RPS_ENABLE_IND        0x10A
+#define WLAN_SVC_IFACE_NUM_QUEUES      6
 
-
+#define WLAN_SVC_SAP_RESTART_IND 0x108
 // Event data for WLAN_BTC_QUERY_STATE_RSP & WLAN_STA_ASSOC_DONE_IND
 typedef struct
 {
@@ -116,11 +101,19 @@ typedef enum eAniNlModuleTypes {
    ANI_NL_MSG_PUMAC = ANI_NL_MSG_BASE + 0x01,// PTT Socket App
    ANI_NL_MSG_PTT   = ANI_NL_MSG_BASE + 0x07,// Quarky GUI
    WLAN_NL_MSG_BTC,
+   WLAN_NL_MSG_SVC  = ANI_NL_MSG_BASE + 0x0A,
+   ANI_NL_MSG_LOG   = ANI_NL_MSG_BASE + 0x0C,
    ANI_NL_MSG_MAX  
 } tAniNlModTypes, tWlanNlModTypes;
 
 #define WLAN_NL_MSG_BASE ANI_NL_MSG_BASE
 #define WLAN_NL_MSG_MAX  ANI_NL_MSG_MAX
+
+struct wlan_rps_data {
+   char ifname[IFNAMSIZ];
+   uint16_t num_queues;
+   uint16_t cpu_map[WLAN_SVC_IFACE_NUM_QUEUES];
+};
 
 //All Netlink messages must contain this header
 typedef struct sAniHdr {

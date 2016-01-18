@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18,25 +18,11 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * This file was originally distributed by Qualcomm Atheros, Inc.
+ * under proprietary terms before Copyright ownership was assigned
+ * to the Linux Foundation.
  */
 
 #ifndef WLAN_QCT_DXE_H
@@ -49,8 +35,6 @@
   @brief 
                
    This file contains the external API exposed by the wlan data transfer abstraction layer module.
-   Copyright (c) 2008 QUALCOMM Incorporated. All Rights Reserved.
-   Qualcomm Confidential and Proprietary
 ========================================================================*/
 
 /*===========================================================================
@@ -98,6 +82,13 @@ when           who        what, where, why
 /* Default RX OS frame buffer size
  * Size must be same with Vos Packet Size */
 #define WLANDXE_DEFAULT_RX_OS_BUFFER_SIZE  (VPKT_SIZE_BUFFER)
+
+/*reserve 30B of skb buff, to add NL header*/
+#define WLANDXE_NL_HEADER_SZ (30)
+
+/*MAX data transferred in one skb*/
+#define WLANDXE_FW_LOGGING_XFSIZE  (WLANDXE_DEFAULT_RX_OS_BUFFER_SIZE - \
+                                    WLANDXE_NL_HEADER_SZ)
 
 /*The maximum number of packets that can be chained in dxe for the Low 
   priority channel
@@ -188,6 +179,23 @@ typedef WDTS_LowResourceCbType WLANDXE_LowResourceCbType;
 
 /*==========================================================================
   @  Type Name
+  WLANDXE_MbReceiveMsgCbType
+
+  @  Description
+  DXE Mailbox mes receive indiacation
+
+  @  Parameters
+  void
+
+  @  Return
+  void
+===========================================================================*/
+typedef WDTS_MbReceiveMsgType WLANDXE_MbReceiveMsgCbType;
+
+typedef WDTS_RxLogDoneType WLANDXE_RxLogDoneType;
+
+/*==========================================================================
+  @  Type Name
       WLANDXE_SetPowerStateCbType 
 
   @  Description 
@@ -235,9 +243,7 @@ void *WLANDXE_Open
 
   @  Parameters
       pVoid                       pDXEContext : DXE module control block
-      WDTS_RxFrameReadyCbType     rxFrameReadyCB : RX Frame ready CB function pointer
-      WDTS_TxCompleteCbType       txCompleteCB : TX complete CB function pointer
-      WDTS_LowResourceCbType      lowResourceCB : Low DXE resource notification CB function pointer
+      WDTS_ClientCallbacks        WDTSCb : Callbacks to WDTS to indicate various events
       void                       *userContext : DXE Cliennt control block
 
   @  Return
@@ -246,9 +252,7 @@ void *WLANDXE_Open
 wpt_status WLANDXE_ClientRegistration
 (
    void                       *pDXEContext,
-   WDTS_RxFrameReadyCbType     rxFrameReadyCB,
-   WDTS_TxCompleteCbType       txCompleteCB,
-   WDTS_LowResourceCbType      lowResourceCB,
+   WDTS_ClientCallbacks       WDTSCb,
    void                       *userContext
 );
 
@@ -423,9 +427,10 @@ wpt_uint32 WLANDXE_GetFreeTxDataResNumber
 
   @  Parameters
     displaySnapshot : Display DXE snapshot option
-    enableStallDetect : Enable stall detect feature
-                        This feature will take effect to data performance
-                        Not integrate till fully verification
+    debugFlags      : Enable stall detect features
+                      defined by WPAL_DeviceDebugFlags
+                      These features may effect
+                      data performance.
 
   @  Return
     NONE
@@ -434,57 +439,36 @@ wpt_uint32 WLANDXE_GetFreeTxDataResNumber
 void WLANDXE_ChannelDebug
 (
    wpt_boolean    displaySnapshot,
-   wpt_boolean    enableStallDetect   
+   wpt_uint8      debugFlags
 );
 
-#ifdef WLANDXE_TEST_CHANNEL_ENABLE
 /*==========================================================================
-  @  Function Name 
-      WLANDXE_UnitTest
+  @  Function Name
+    WLANDXE_KickDxe
 
-  @  Description 
-      Temporary for the DXE module test
+  @  Description
+    Kick Dxe when HDD TX timeout happen
 
   @  Parameters
-      NONE
+    NONE
 
   @  Return
-      NONE
+    NONE
 
 ===========================================================================*/
-void WLANDXE_UnitTestStartDXE
+void WLANDXE_KickDxe
 (
    void
 );
 
-/*==========================================================================
-  @  Function Name 
-
-  @  Description 
-
-  @  Parameters
-
-  @  Return
-
-===========================================================================*/
-void WLANDXE_UnitTestDataTransfer
+wpt_uint32 WLANDXE_SetupLogTransfer
 (
-   void
+   wpt_uint64 bufferAddr,
+   wpt_uint32 bufferLen
 );
 
-/*==========================================================================
-  @  Function Name 
-
-  @  Description 
-
-  @  Parameters
-
-  @  Return
-
-===========================================================================*/
-void WLANDXE_UnitTestEventHandle
+wpt_status WLANDXE_StartLogTransfer
 (
-   void     *dxeCB
+void
 );
-#endif /* WLANDXE_TEST_CHANNEL_ENABLE */
 #endif /* WLAN_QCT_DXE_H */
