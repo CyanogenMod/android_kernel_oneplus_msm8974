@@ -1689,7 +1689,6 @@ static int mdss_mdp_overlay_queue(struct msm_fb_data_type *mfd,
 	struct mdss_mdp_data *src_data;
 	int ret;
 	u32 flags;
-	struct mdss_data_type *mdata = mfd_to_mdata(mfd);
 
 	pipe = mdss_mdp_pipe_get(mdata, req->id);
 	if (IS_ERR_OR_NULL(pipe)) {
