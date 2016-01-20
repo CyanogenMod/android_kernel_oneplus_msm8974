@@ -10,7 +10,7 @@
 #include <linux/idr.h>
 #include <linux/bitops.h>
 #include <linux/kthread.h>
-#include <linux/qpnp-charger.h>
+#include <linux/qpnp-charger-oppo.h>
 
 //bq24196 reg
 #define INPUT_SOURCE_CTRL 			0x00
