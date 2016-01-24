@@ -16,12 +16,12 @@ DEFCONFIG="radioactive_defconfig"
 
 # Kernel Details
 BASE_RADIOACTIVE_VER="RADIOACTIVE_REBORN"
-VER="_V1.12"
+VER="_V1.13"
 RADIOACTIVE_VER="$BASE_RADIOACTIVE_VER$VER"
 
 # Vars
 export LOCALVERSION=~`echo $RADIOACTIVE_VER`
-export CROSS_COMPILE=${HOME}/Android/toolchains/uber5.3/bin/arm-eabi-
+export CROSS_COMPILE=${HOME}/Android/toolchains/uber5.2/bin/arm-eabi-
 export ARCH=arm
 export SUBARCH=arm
 export KBUILD_BUILD_USER=R.Cuenca
