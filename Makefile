@@ -585,6 +585,9 @@ endif
 ifdef CONFIG_CC_OPTIMIZE_MORE
 KBUILD_CFLAGS += $(call cc-disable-warning,maybe-uninitialized) -Ofast -g0 -fmodulo-sched -fmodulo-sched-allow-regmoves -fno-tree-vectorize -Wno-array-bounds -fivopts -fno-inline-functions
 endif
+ifdef CONFIG_CC_OPTIMIZE_FAST
+KBUILD_CFLAGS += -Ofast
+endif
 
 # Tell gcc to never replace conditional load with a non-conditional one
 KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
