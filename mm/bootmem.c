@@ -42,7 +42,7 @@ static int bootmem_debug;
 
 static int __init bootmem_debug_setup(char *buf)
 {
-	bootmem_debug = 1;
+	bootmem_debug = 0;
 	return 0;
 }
 early_param("bootmem_debug", bootmem_debug_setup);
