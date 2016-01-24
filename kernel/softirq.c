@@ -171,13 +171,8 @@ static inline void _local_bh_enable_ip(unsigned long ip)
  	 */
 	sub_preempt_count(SOFTIRQ_DISABLE_OFFSET - 1);
 
-	if (unlikely(!in_interrupt() && local_softirq_pending())) {
-		/*
-		 * Run softirq if any pending. And do it in its own stack
-		 * as we may be calling this deep in a task call stack already.
-		 */
+	if (unlikely(!in_interrupt() && local_softirq_pending()))
 		do_softirq();
-	}
 
 	dec_preempt_count();
 #ifdef CONFIG_TRACE_IRQFLAGS
@@ -282,6 +277,8 @@ restart:
 	WARN_ON_ONCE(in_interrupt());
 }
 
+
+
 asmlinkage void do_softirq(void)
 {
 	__u32 pending;
@@ -354,6 +351,7 @@ void irq_exit(void)
 #else
 	WARN_ON_ONCE(!irqs_disabled());
 #endif
+
 	account_system_vtime(current);
 	trace_hardirq_exit();
 	sub_preempt_count(HARDIRQ_OFFSET);
@@ -768,27 +766,8 @@ static void run_ksoftirqd(unsigned int cpu)
 		local_irq_enable();
 		cond_resched();
 
-		__set_current_state(TASK_RUNNING);
-
-		while (local_softirq_pending()) {
-			/* Preempt disable stops cpu going offline.
-			   If already offline, we'll be on wrong CPU:
-			   don't process */
-			if (cpu_is_offline((long)__bind_cpu))
-				goto wait_to_die;
-			local_irq_disable();
-			if (local_softirq_pending())
-		/*
-		 * We can safely run softirq on inline stack, as we are not deep
-		 * in the task stack here.
-		 */
-				__do_softirq();
-			local_irq_enable();
-			sched_preempt_enable_no_resched();
-			cond_resched();
-			preempt_disable();
-			rcu_note_context_switch((long)__bind_cpu);
-		}
+		preempt_disable();
+		rcu_note_context_switch(cpu);
 		preempt_enable();
 
 		return;
