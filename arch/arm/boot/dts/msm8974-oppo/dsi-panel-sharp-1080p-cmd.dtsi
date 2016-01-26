@@ -99,5 +99,6 @@
 		cm,mdss-livedisplay-post-cmd = [
 			05 01 00 00 10 00 02 29 00];
 		qcom,cont-splash-enabled;
+		qcom,ulps-enabled;
 	};
 };

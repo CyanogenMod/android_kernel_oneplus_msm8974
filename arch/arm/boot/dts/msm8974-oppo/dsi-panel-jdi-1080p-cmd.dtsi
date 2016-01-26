@@ -129,5 +129,6 @@
 			23 01 00 00 00 00 02 d6 01
 			23 01 00 00 01 00 02 b0 03];
 		qcom,cont-splash-enabled;
+		qcom,ulps-enabled;
 	};
 };
