@@ -12,16 +12,16 @@ clear
 THREAD="-j$(grep -c ^processor /proc/cpuinfo)"
 KERNEL="zImage"
 DTBIMAGE="dtb"
-DEFCONFIG="radioactive_defconfig"
+DEFCONFIG="cyanogenmod_bacon_defconfig"
 
 # Kernel Details
 BASE_RADIOACTIVE_VER="RADIOACTIVE_REBORN"
-VER="_V1.14"
+VER="_V2.01"
 RADIOACTIVE_VER="$BASE_RADIOACTIVE_VER$VER"
 
 # Vars
 export LOCALVERSION=~`echo $RADIOACTIVE_VER`
-export CROSS_COMPILE=${HOME}/Android/toolchains/uber5.2/bin/arm-eabi-
+export CROSS_COMPILE=${HOME}/Android/toolchains/uber4.9/bin/arm-eabi-
 export ARCH=arm
 export SUBARCH=arm
 export KBUILD_BUILD_USER=R.Cuenca
