@@ -351,7 +351,7 @@ static ssize_t store_input_event_timeout(struct kobject *a, struct attribute *b,
 	return count;
 }
 
-static int two_phase_freq_array[NR_CPUS] = {[0 ... NR_CPUS-1] = 1728000} ;
+static int two_phase_freq_array[NR_CPUS] = {[0 ... NR_CPUS-1] = 1267200} ;
 
 static ssize_t show_two_phase_freq
 (struct kobject *kobj, struct attribute *attr, char *buf)
@@ -387,7 +387,7 @@ static ssize_t store_two_phase_freq(struct kobject *a, struct attribute *b,
 	return count;
 }
 
-static int input_event_min_freq_array[NR_CPUS] = {1728000, 1267200, 1267200, 1267200} ;
+static int input_event_min_freq_array[NR_CPUS] = {1267200, 1267200, 1267200, 1267200} ;
 
 static ssize_t show_input_event_min_freq
 (struct kobject *kobj, struct attribute *attr, char *buf)
