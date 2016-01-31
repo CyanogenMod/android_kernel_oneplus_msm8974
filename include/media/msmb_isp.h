@@ -9,10 +9,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
 #ifdef CONFIG_OPPO_CAMERA
 #include <media/msmb_isp_oppo.h>
 #else
+
 #ifndef __MSMB_ISP__
 #define __MSMB_ISP__
 

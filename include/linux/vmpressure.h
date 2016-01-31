@@ -11,7 +11,6 @@
 struct vmpressure {
 	unsigned long scanned;
 	unsigned long reclaimed;
-	unsigned long stall;
 	/* The lock is used to keep the scanned/reclaimed above in sync. */
 	struct mutex sr_lock;
 
@@ -25,13 +24,11 @@ struct vmpressure {
 
 struct mem_cgroup;
 
-extern int vmpressure_notifier_register(struct notifier_block *nb);
-extern int vmpressure_notifier_unregister(struct notifier_block *nb);
+#ifdef CONFIG_CGROUP_MEM_RES_CTLR
 extern void vmpressure(gfp_t gfp, struct mem_cgroup *memcg,
 		       unsigned long scanned, unsigned long reclaimed);
 extern void vmpressure_prio(gfp_t gfp, struct mem_cgroup *memcg, int prio);
 
-#ifdef CONFIG_CGROUP_MEM_RES_CTLR
 extern void vmpressure_init(struct vmpressure *vmpr);
 extern struct vmpressure *memcg_to_vmpressure(struct mem_cgroup *memcg);
 extern struct cgroup_subsys_state *vmpressure_to_css(struct vmpressure *vmpr);
@@ -42,9 +39,9 @@ extern int vmpressure_register_event(struct cgroup *cg, struct cftype *cft,
 extern void vmpressure_unregister_event(struct cgroup *cg, struct cftype *cft,
 					struct eventfd_ctx *eventfd);
 #else
-static inline struct vmpressure *memcg_to_vmpressure(struct mem_cgroup *memcg)
-{
-	return NULL;
-}
+static inline void vmpressure(gfp_t gfp, struct mem_cgroup *memcg,
+			      unsigned long scanned, unsigned long reclaimed) {}
+static inline void vmpressure_prio(gfp_t gfp, struct mem_cgroup *memcg,
+				   int prio) {}
 #endif /* CONFIG_CGROUP_MEM_RES_CTLR */
 #endif /* __LINUX_VMPRESSURE_H */

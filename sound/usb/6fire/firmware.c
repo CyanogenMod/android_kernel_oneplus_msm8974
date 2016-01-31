@@ -209,7 +209,7 @@ static int usb6fire_fw_ezusb_upload(
 	int ret;
 	u8 data;
 	struct usb_device *device = interface_to_usbdev(intf);
-	const struct firmware *fw = NULL;
+	const struct firmware *fw = 0;
 	struct ihex_record *rec = kmalloc(sizeof(struct ihex_record),
 			GFP_KERNEL);
 
@@ -346,10 +346,11 @@ static int usb6fire_fw_check(u8 *version)
 		if (!memcmp(version, known_fw_versions + i, 4))
 			return 0;
 
-	snd_printk(KERN_ERR PREFIX "invalid fimware version in device: %4ph. "
+	snd_printk(KERN_ERR PREFIX "invalid fimware version in device: "
+			"%02x %02x %02x %02x. "
 			"please reconnect to power. if this failure "
 			"still happens, check your firmware installation.",
-			version);
+			version[0], version[1], version[2], version[3]);
 	return -EINVAL;
 }
 

@@ -8,6 +8,7 @@ amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
 apm	Applied Micro Circuits Corporation (APM)
 arm	ARM Ltd.
 atmel	Atmel Corporation
+avago	Avago Technologies
 bosch	Bosch Sensortec GmbH
 capella	Capella Microsystems, Inc.
 cavium	Cavium, Inc.
@@ -17,6 +18,7 @@ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
 denx	Denx Software Engineering
 epson	Seiko Epson Corp.
 est	ESTeem Wireless Modems
+fairchild	Fairchild Semiconductor International, Inc.
 focaltech Focaltech systems
 fsl	Freescale Semiconductor
 GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
@@ -27,6 +29,7 @@ ibm	International Business Machines (IBM)
 idt	Integrated Device Technologies, Inc.
 intercontrol	Inter Control Group
 invn	InvenSense Inc.
+lattice	Lattice Semiconductor.
 linux	Linux-specific binding
 kionix	Kionix Inc.
 marvell	Marvell Technology Group Ltd.

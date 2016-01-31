@@ -45,17 +45,17 @@
 
 #define LOW_WATERMARK		2
 #define HIGH_WATERMARK		4
-#define DEFAULT_POLLING_MIN_SLEEP (1000)
+#define DEFAULT_POLLING_MIN_SLEEP (950)
 #define MAX_POLLING_SLEEP (6050)
 #define MIN_POLLING_SLEEP (950)
 
 static int msm_bam_dmux_debug_enable;
 module_param_named(debug_enable, msm_bam_dmux_debug_enable,
 		   int, S_IRUGO | S_IWUSR | S_IWGRP);
-static int POLLING_MIN_SLEEP = 4950;
+static int POLLING_MIN_SLEEP = 2950;
 module_param_named(min_sleep, POLLING_MIN_SLEEP,
 		   int, S_IRUGO | S_IWUSR | S_IWGRP);
-static int POLLING_MAX_SLEEP = 5000;
+static int POLLING_MAX_SLEEP = 3050;
 module_param_named(max_sleep, POLLING_MAX_SLEEP,
 		   int, S_IRUGO | S_IWUSR | S_IWGRP);
 static int POLLING_INACTIVITY = 1;
@@ -100,7 +100,6 @@ static uint32_t bam_dmux_write_cpy_cnt;
 static uint32_t bam_dmux_write_cpy_bytes;
 static uint32_t bam_dmux_tx_sps_failure_cnt;
 static uint32_t bam_dmux_tx_stall_cnt;
-static uint32_t bam_dmux_ratelimit;
 static atomic_t bam_dmux_ack_out_cnt = ATOMIC_INIT(0);
 static atomic_t bam_dmux_ack_in_cnt = ATOMIC_INIT(0);
 static atomic_t bam_dmux_a2_pwr_cntl_in_cnt = ATOMIC_INIT(0);
@@ -1538,7 +1537,6 @@ static inline void ul_powerdown_finish(void)
 		unvote_dfab();
 		complete_all(&dfab_unvote_completion);
 		wait_for_dfab = 0;
-		bam_dmux_ratelimit = 0;
 	}
 }
 
@@ -1620,13 +1618,8 @@ static void ul_timeout(struct work_struct *work)
 
 				info = list_first_entry(&bam_tx_pool,
 						struct tx_pkt_info, list_node);
-				if (!bam_dmux_ratelimit) {
-					DMUX_LOG_KERR
-					    ("%s: UL delayed ts=%u.%09lu\n",
-					     __func__, info->ts_sec,
-					     info->ts_nsec);
-					bam_dmux_ratelimit++;
-				}
+				DMUX_LOG_KERR("%s: UL delayed ts=%u.%09lu\n",
+					__func__, info->ts_sec, info->ts_nsec);
 				DBG_INC_TX_STALL_CNT();
 				ul_packet_written = 1;
 			}
@@ -1661,10 +1654,8 @@ static int ssrestart_check(void)
 								__func__);
 	in_global_reset = 1;
 	ret = subsystem_restart("modem");
-	if (ret == -ENODEV) {
-		DMUX_LOG_KERR("%s: modem subsystem restart failed\n", __func__);
-		dump_stack();
-	}
+	if (ret == -ENODEV)
+		panic("modem subsystem restart failed\n");
 	return 1;
 }
 

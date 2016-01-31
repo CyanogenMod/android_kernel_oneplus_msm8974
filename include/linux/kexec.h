@@ -111,10 +111,6 @@ struct kimage {
 #define KEXEC_TYPE_CRASH   1
 	unsigned int preserve_context : 1;
 
-#ifdef CONFIG_KEXEC_HARDBOOT
-	unsigned int hardboot : 1;
-#endif
-
 #ifdef ARCH_HAS_KIMAGE_ARCH
 	struct kimage_arch arch;
 #endif
@@ -182,11 +178,6 @@ extern struct kimage *kexec_crash_image;
 
 #define KEXEC_ON_CRASH		0x00000001
 #define KEXEC_PRESERVE_CONTEXT	0x00000002
-
-#ifdef CONFIG_KEXEC_HARDBOOT
-#define KEXEC_HARDBOOT		0x00000004
-#endif
-
 #define KEXEC_ARCH_MASK		0xffff0000
 
 /* These values match the ELF architecture values.
@@ -205,14 +196,10 @@ extern struct kimage *kexec_crash_image;
 #define KEXEC_ARCH_MIPS    ( 8 << 16)
 
 /* List of defined/legal kexec flags */
-#if defined(CONFIG_KEXEC_JUMP) && defined(CONFIG_KEXEC_HARDBOOT)
-#define KEXEC_FLAGS    (KEXEC_ON_CRASH | KEXEC_PRESERVE_CONTEXT | KEXEC_HARDBOOT)
-#elif defined(CONFIG_KEXEC_JUMP)
-#define KEXEC_FLAGS    (KEXEC_ON_CRASH | KEXEC_PRESERVE_CONTEXT)
-#elif defined(CONFIG_KEXEC_HARDBOOT)
-#define KEXEC_FLAGS    (KEXEC_ON_CRASH | KEXEC_HARDBOOT)
+#ifndef CONFIG_KEXEC_JUMP
+#define KEXEC_FLAGS    KEXEC_ON_CRASH
 #else
-#define KEXEC_FLAGS    (KEXEC_ON_CRASH)
+#define KEXEC_FLAGS    (KEXEC_ON_CRASH | KEXEC_PRESERVE_CONTEXT)
 #endif
 
 #define VMCOREINFO_BYTES           (4096)

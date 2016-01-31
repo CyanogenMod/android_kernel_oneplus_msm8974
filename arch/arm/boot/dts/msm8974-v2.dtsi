@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -41,6 +41,7 @@
 		compatible = "qcom,android-usb";
 		reg = <0xfe8050c8 0xc8>;
 		qcom,pm-qos-latency = <2 1001 30001>;
+		qcom,android-usb-uicc-nluns = /bits/ 8 <1>;
 	};
 
 	qcom,msm-imem@fe805000 {
@@ -92,19 +93,6 @@
 	qcom,mdss-has-decimation;
 	qcom,mdss-ad-off = <0x0013100 0x00013300>;
 	vdd-cx-supply = <&pm8841_s2_corner>;
-	qcom,mdp-settings = <0x000002E0 0x000000E9>,
-			    <0x000002E4 0x00000055>,
-			    <0x000003AC 0xC0000CCC>,
-			    <0x000003B4 0xC0000CCC>,
-			    <0x000003BC 0x00CCCCCC>,
-			    <0x000004A8 0x0CCCC0C0>,
-			    <0x000004B0 0xCCCCC0C0>,
-			    <0x000004B8 0xCCCCC000>,
-			    <0x00011148 0x00000058>,
-			    <0x00011548 0x00000058>,
-			    <0x00011948 0x00000058>,
-			    <0x00011D48 0x00000058>,
-			    <0x00012148 0x00000058>;
 };
 
 &mdss_hdmi_tx {
@@ -211,17 +199,17 @@
 
 &cci {
 
-	qcom,camera@6e {
+	qcom,camera@0 {
 		qcom,vdd-cx-supply = <&pm8841_s2>;
 		qcom,vdd-cx-name = "qcom,vdd-cx";
 	};
 
-	qcom,camera@20 {
+	qcom,camera@1 {
 		qcom,vdd-cx-supply = <&pm8841_s2>;
 		qcom,vdd-cx-name = "qcom,vdd-cx";
 	};
 
-	qcom,camera@6c {
+	qcom,camera@2 {
 		qcom,vdd-cx-supply = <&pm8841_s2>;
 		qcom,vdd-cx-name = "qcom,vdd-cx";
 	};

@@ -473,8 +473,7 @@ static int kgsl_contiguous_vmfault(struct kgsl_memdesc *memdesc,
 static void kgsl_cma_coherent_free(struct kgsl_memdesc *memdesc)
 {
 	if (memdesc->hostptr) {
-		atomic_sub(memdesc->size,
-				&kgsl_driver.stats.coherent);
+		atomic_sub(memdesc->size, &kgsl_driver.stats.vmalloc);
 		dma_free_coherent(memdesc->dev, memdesc->size,
 				memdesc->hostptr, memdesc->physaddr);
 	}

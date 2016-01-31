@@ -8,19 +8,6 @@ menu "File systems"
 config DCACHE_WORD_ACCESS
        bool
 
-config FS_TRANSPARENT_COMPRESSION
-	bool "Transparent compression"
-	select ZLIB_INFLATE
-	select ZLIB_DEFLATE
-	select LZ4_COMPRESS
-	select LZ4_DECOMPRESS
-	help
-	  If you say Y here, then the kernel will be able to transparently
-	  compress and decompress individual files on a filesystem.
-
-	  Transparent compression is indicated by setting file xattrs
-	  user.compression.method and user.compression.realsize.
-
 if BLOCK
 
 source "fs/ext2/Kconfig"
@@ -238,7 +225,6 @@ source "fs/pstore/Kconfig"
 source "fs/sysv/Kconfig"
 source "fs/ufs/Kconfig"
 source "fs/exofs/Kconfig"
-source "fs/f2fs/Kconfig"
 
 endif # MISC_FILESYSTEMS
 
@@ -295,28 +281,4 @@ endif # NETWORK_FILESYSTEMS
 source "fs/nls/Kconfig"
 source "fs/dlm/Kconfig"
 
-config RESTRICT_ROOTFS_SLAVE
-	bool "Android: Restrict rootfs slave mountspace to /storage"
-	help
-	  Restrict slave mountspace so Dalvik apps can mount system-wide volumes
-
-	  Android 4.2 implements multi-user storage using per-process mount
-	  namespaces.  Everything under "/" (the entire filesystem hierarchy) is
-	  marked as a recursive-slave mountspace for all zygote instances.  This is
-	  done so that user-storage sandbox mounts under /storage/emulated are hidden
-	  from other apps and users.  Unfortunately this means that any Dalvik app
-	  (actually, any program whose clone/fork ancestry includes a Dalvik zygote,
-	  which is everything except services spawned directly from init) cannot
-	  mount system-wide volumes.
-
-	  This option restricts rootfs-slave calls to /storage (and
-	  /mnt/shell/emulated) so that Dalvik apps can mount system-wide volumes
-	  elsewhere (with appropriate permission, as in earlier versions of Android),
-	  while retaining full multi-user storage compatibility.  It is made
-	  available as a kernel-based workaround for instances where libdvm can not
-	  be modified.
-
-	  This option requires that a tmpfs volume is mounted as /storage in
-	  Android init.rc.  If this volume is unavailable, then we fall back to the
-	  previous behavior of marking the entire filesystem hierarchy as slave.
 endmenu

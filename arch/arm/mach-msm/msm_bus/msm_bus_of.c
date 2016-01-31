@@ -290,7 +290,7 @@ static u64 *get_th_params(struct platform_device *pdev,
 
 	ret_arr = devm_kzalloc(&pdev->dev, (*nports * sizeof(u64)),
 							GFP_KERNEL);
-	arr = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+	arr = kzalloc(size, GFP_KERNEL);
 	if ((size > 0) && (ZERO_OR_NULL_PTR(arr)
 				|| ZERO_OR_NULL_PTR(ret_arr))) {
 		pr_err("Error: Failed to alloc mem for %s\n", prop);
@@ -311,7 +311,7 @@ static u64 *get_th_params(struct platform_device *pdev,
 	for (i = 0; i < *nports; i++)
 		MSM_BUS_DBG("Th %d val %llu", i, ret_arr[i]);
 
-	devm_kfree(&pdev->dev, arr);
+	kfree(arr);
 	return ret_arr;
 err:
 	devm_kfree(&pdev->dev, arr);

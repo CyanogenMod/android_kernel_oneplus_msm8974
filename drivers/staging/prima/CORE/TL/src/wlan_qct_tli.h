@@ -282,6 +282,8 @@ typedef enum
 
   WLANTL_TX_FW_DEBUG = 8,
 
+  WLANTL_TX_KICKDXE = 9,
+
   WLANTL_TX_MAX
 }WLANTL_TxSignalsType;
 

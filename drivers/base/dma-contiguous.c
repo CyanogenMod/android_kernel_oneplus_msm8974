@@ -230,10 +230,10 @@ int __init cma_fdt_scan(unsigned long node, const char *uname,
 	__be32 *prop;
 	char *name;
 	bool in_system;
+	phys_addr_t limit = MEMBLOCK_ALLOC_ANYWHERE;
 	unsigned long size_cells = dt_root_size_cells;
 	unsigned long addr_cells = dt_root_addr_cells;
 	bool remove;
-	phys_addr_t limit = MEMBLOCK_ALLOC_ANYWHERE;
 	char *status;
 
 	if (!of_get_flat_dt_prop(node, "linux,reserve-contiguous-region", NULL))
@@ -645,11 +645,10 @@ unsigned long dma_alloc_from_contiguous(struct device *dev, int count,
 		mutex_unlock(&cma->lock);
 
 		pfn = cma->base_pfn + pageno;
-		if (cma->in_system) {
-			mutex_lock(&cma_mutex);
+		mutex_lock(&cma_mutex);
+		if (cma->in_system)
 			ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
-			mutex_unlock(&cma_mutex);
-		}
+		mutex_unlock(&cma_mutex);
 		if (ret == 0) {
 			break;
 		} else if (ret != -EBUSY) {
@@ -667,6 +666,7 @@ unsigned long dma_alloc_from_contiguous(struct device *dev, int count,
 		start = pageno + mask + 1;
 	}
 
+	mutex_unlock(&cma_mutex);
 	pr_debug("%s(): returned %lx\n", __func__, pfn);
 	return pfn;
 }

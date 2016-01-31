@@ -82,7 +82,7 @@ static struct msm_camera_i2c_reg_array adp1660_low_array[] = {
 static struct msm_camera_i2c_reg_array adp1660_high_array[] = {
 	{0x0f, 0x00},
     {0x06, 0x2d},/*562.5mA, current=12.5*reg_val*/
-    {0x09, 0x2d},
+    {0x09, 0x28},
     {0x02, 0x4f},/*1000ms, time=100(reg_val&0x0f+1)*/
 #ifdef CONFIG_HARDWARE_TRIGGER
 	{0x01, 0xfb},
@@ -240,11 +240,6 @@ static void msm_led_cci_set_brightness(struct msm_led_cci_ctrl_t *fctrl,
         pr_err("val of reg 0x0f is 0x%x\n", reg_val);
         reg_val = 0;
 #endif
-        if (fctrl->led_info->status != MSM_CAMERA_LED_LOW
-            && fctrl->led_info->status != MSM_CAMERA_LED_HIGH) {
-            pr_err("not low or hight,do nothing");
-            break;
-        }
         rc = i2c_client->i2c_func_tbl->i2c_read(i2c_client, led_info->fault_info_reg,
             &reg_val, MSM_CAMERA_I2C_BYTE_DATA);
         if (rc < 0) {

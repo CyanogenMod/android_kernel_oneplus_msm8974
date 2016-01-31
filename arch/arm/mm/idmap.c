@@ -115,7 +115,6 @@ void setup_mm_for_reboot(void)
 {
 	/* Switch to the identity mapping. */
 	cpu_switch_mm(idmap_pgd, &init_mm);
-	local_flush_bp_all();
 
 #ifdef CONFIG_CPU_HAS_ASID
 	/*

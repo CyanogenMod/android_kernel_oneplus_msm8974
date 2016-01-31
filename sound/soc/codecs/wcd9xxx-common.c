@@ -1038,7 +1038,7 @@ static void wcd9xxx_clsh_state_hph_lo(struct snd_soc_codec *codec,
 			break;
 		default:
 			dev_dbg(codec->dev,
-				 "%s:Invalid state:0x%x,enable:0x%x\n",
+				"%s:Invalid state:0x%x,enable:0x%x\n",
 				__func__, req_state, is_enable);
 			break;
 		}

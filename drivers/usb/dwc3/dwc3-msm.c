@@ -901,7 +901,7 @@ static int dwc3_msm_ep_queue(struct usb_ep *ep,
 	 * Override req->complete function, but before doing that,
 	 * store it's original pointer in the req_complete_list.
 	 */
-	req_complete = kzalloc(sizeof(*req_complete), gfp_flags);
+	req_complete = kzalloc(sizeof(*req_complete), GFP_KERNEL);
 	if (!req_complete) {
 		dev_err(mdwc->dev, "%s: not enough memory\n", __func__);
 		return -ENOMEM;
@@ -2005,12 +2005,16 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	if (!host_bus_suspend)
 		dwc3_msm_config_gdsc(mdwc, 0);
 
-	clk_disable_unprepare(mdwc->iface_clk);
-	clk_disable_unprepare(mdwc->utmi_clk);
-
 	if (!host_ss_suspend) {
 		clk_disable_unprepare(mdwc->core_clk);
 		mdwc->lpm_flags |= MDWC3_PHY_REF_AND_CORECLK_OFF;
+	}
+	clk_disable_unprepare(mdwc->iface_clk);
+
+	if (!host_bus_suspend)
+		clk_disable_unprepare(mdwc->utmi_clk);
+
+	if (!host_bus_suspend) {
 		/* USB PHY no more requires TCXO */
 		clk_disable_unprepare(mdwc->xo_clk);
 		mdwc->lpm_flags |= MDWC3_TCXO_SHUTDOWN;
@@ -2096,7 +2100,8 @@ static int dwc3_msm_resume(struct dwc3_msm *mdwc)
 	if (!host_bus_suspend)
 		dwc3_msm_config_gdsc(mdwc, 1);
 
-	clk_prepare_enable(mdwc->utmi_clk);
+	if (!host_bus_suspend)
+		clk_prepare_enable(mdwc->utmi_clk);
 
 	if (mdwc->otg_xceiv && mdwc->ext_xceiv.otg_capability && !dcp &&
 							!host_bus_suspend)
@@ -2398,14 +2403,14 @@ static int dwc3_msm_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TYPE:
 		val->intval = psy->type;
 		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		val->intval = get_prop_usbin_voltage_now(mdwc);
+		break;
 #ifdef CONFIG_MACH_OPPO
 	case POWER_SUPPLY_PROP_POWER_NOW:
 		val->intval = mdwc->power_now;
 		break;
 #endif
-	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		val->intval = get_prop_usbin_voltage_now(mdwc);
-		break;
 	default:
 		return -EINVAL;
 	}

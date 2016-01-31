@@ -153,7 +153,7 @@ int apr_get_svc(const char *svc_name, int dest_id, int *client_id,
 void apr_cb_func(void *buf, int len, void *priv);
 struct apr_svc *apr_register(char *dest, char *svc_name, apr_fn svc_fn,
 					uint32_t src_port, void *priv);
-void *apr_fill_hdr(void *handle, uint32_t *buf, uint16_t src_port,
+inline int apr_fill_hdr(void *handle, uint32_t *buf, uint16_t src_port,
 			uint16_t msg_type, uint16_t dest_port,
 			uint32_t token, uint32_t opcode, uint16_t len);
 
@@ -168,4 +168,5 @@ enum apr_subsys_state apr_get_q6_state(void);
 int apr_set_q6_state(enum apr_subsys_state state);
 void apr_set_subsys_state(void);
 const char *apr_get_lpass_subsys_name(void);
+extern int is_modem_up;
 #endif

@@ -1,7 +1,7 @@
 #ifndef PIC16F_FASTCG_MICROCHIP_H
 #define PIC16F_FASTCG_MICROCHIP_H
 
-#ifdef CONFIG_MACH_FIND7	//FIND7/FIND7WX:pic1503
+#if defined CONFIG_MACH_FIND7 || defined CONFIG_MACH_FIND7WX	//FIND7/FIND7WX:pic1503
 
 unsigned char Pic16F_firmware_data[] = {
 

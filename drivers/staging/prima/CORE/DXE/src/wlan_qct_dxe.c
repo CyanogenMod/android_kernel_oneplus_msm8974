@@ -3230,13 +3230,15 @@ static wpt_status dxeTXPushFrame
 {
    wpt_status                  status = eWLAN_PAL_STATUS_SUCCESS;
    WLANDXE_DescCtrlBlkType    *currentCtrlBlk = NULL;
+   WLANDXE_DescCtrlBlkType    *tailCtrlBlk    = NULL;
    WLANDXE_DescType           *currentDesc    = NULL;
    WLANDXE_DescType           *firstDesc      = NULL;
    WLANDXE_DescType           *LastDesc       = NULL;
+   WLANDXE_DescType           *tailDesc       = NULL;
    void                       *sourcePhysicalAddress = NULL;
    wpt_uint32                  xferSize = 0;
    wpt_iterator                iterator;
-   wpt_uint32                  KickDxe = 0;
+   wpt_uint8                   KickDxe   = 0;
 
    HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_LOW,
             "%s Enter", __func__);
@@ -3250,7 +3252,17 @@ static wpt_status dxeTXPushFrame
 
    /* Kick DXE when the ring is about to fill */
    if (WLANDXE_TX_LOW_RES_THRESHOLD >= channelEntry->numFreeDesc)
+   {
        KickDxe = 1;
+       tailCtrlBlk = channelEntry->tailCtrlBlk;
+       tailDesc = tailCtrlBlk->linkedDesc;
+
+       if(tailDesc->descCtrl.ctrl& WLANDXE_DESC_CTRL_VALID)
+       {
+          HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO,
+                   "dxeTXPushFrame Descs threshold reached No DMA");
+       }
+   }
 
    channelEntry->numFragmentCurrentChain = 0;
    currentCtrlBlk = channelEntry->headCtrlBlk;
@@ -5728,6 +5740,29 @@ void WLANDXE_ChannelDebug
    }
 
    return;
+}
+
+/*==========================================================================
+  @  Function Name
+    WLANDXE_KickDxe
+
+  @  Description
+    Kick DXE when HDD TX time out happen
+
+  @  Parameters
+    NONE
+
+  @  Return
+    NONE
+
+===========================================================================*/
+void WLANDXE_KickDxe(void)
+{
+   HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+               "%s: Kick Dxe for HDD TX timeout",__func__);
+   /* Make wake up HW */
+   dxeNotifySmsm(eWLAN_PAL_FALSE, eWLAN_PAL_TRUE);
+   dxeNotifySmsm(eWLAN_PAL_TRUE, eWLAN_PAL_FALSE);
 }
 
 wpt_uint32 WLANDXE_SetupLogTransfer(wpt_uint64 bufferAddr, wpt_uint32 bufferLen)

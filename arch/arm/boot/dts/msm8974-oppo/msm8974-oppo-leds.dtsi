@@ -19,11 +19,11 @@
 
 	qcom,leds@d300 {
 		qcom,flash_0 {
-			qcom,current = <560>;
+			qcom,current = <220>;
 		};
 
 		qcom,flash_1 {
-			qcom,current = <560>;
+			qcom,current = <220>;
 		};
 
 		qcom,flash_torch {

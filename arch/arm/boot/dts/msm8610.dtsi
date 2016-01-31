@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -256,6 +256,7 @@
 		reg = <0xfe8050c8 0xc8>;
 		qcom,pm-qos-latency = <2 1001 12701>;
 		qcom,streaming-func = "rndis";
+		qcom,android-usb-uicc-nluns = <1>;
 	};
 
 	rmtfs_sharedmem {
@@ -285,6 +286,7 @@
 		interrupt-names = "hc_irq", "pwr_irq";
 
 		qcom,bus-width = <8>;
+		qcom,cpu-dma-latency-us = <701>;
 		status = "disabled";
 	};
 
@@ -297,6 +299,7 @@
 		interrupt-names = "hc_irq", "pwr_irq";
 
 		qcom,bus-width = <4>;
+		qcom,cpu-dma-latency-us = <701>;
 		status = "disabled";
 	};
 
@@ -399,14 +402,25 @@
 
 	qcom,clock-a7@f9011050 {
 		compatible = "qcom,clock-a7-8226";
-		reg = <0xf9011050 0x8>;
-		reg-names = "rcg-base";
+		reg = <0xf9011050 0x8>,
+		      <0xfc4b80b8 0x8>;
+		reg-names = "rcg-base", "efuse";
 		clock-names = "clk-4", "clk-5";
 		qcom,speed0-bin-v0 =
 			<         0 0>,
 			< 384000000 1>,
 			< 787200000 2>,
 			<1190400000 3>;
+		qcom,speed1-bin-v0 =
+			<         0 0>,
+			< 384000000 1>,
+			< 787200000 2>,
+			<1094400000 3>;
+		qcom,speed1-bin-v2 =
+			<         0 0>,
+			< 384000000 1>,
+			< 787200000 2>,
+			<1094400000 3>;
 
 		cpu-vdd-supply = <&apc_vreg_corner>;
 	};
@@ -534,6 +548,7 @@
                 qcom,i2c-src-freq = <19200000>;
                 qcom,sda-gpio = <&msmgpio 10 0>;
                 qcom,scl-gpio = <&msmgpio 11 0>;
+		qcom,clk-ctl-xfer;
                 qcom,master-id = <86>;
 	};
 
@@ -552,6 +567,7 @@
 		qcom,gpio-miso = <&msmgpio 87 0>;
 		qcom,gpio-clk  = <&msmgpio 89 0>;
 		qcom,gpio-cs0  = <&msmgpio 88 0>;
+		qcom,gpio-cs2  = <&msmgpio 85 0>;
 
 		qcom,infinite-mode = <0>;
 		qcom,use-bam;
@@ -559,6 +575,21 @@
 		qcom,bam-consumer-pipe-index = <18>;
 		qcom,bam-producer-pipe-index = <19>;
 		qcom,master-id = <86>;
+
+		lattice,spi-usb@2 {
+			compatible = "lattice,ice40-spi-usb";
+			reg = <2>;
+			spi-max-frequency = <50000000>;
+			spi-cpol = <1>;
+			spi-cpha = <1>;
+			core-vcc-supply = <&pm8110_l2>;
+			spi-vcc-supply = <&pm8110_l6>;
+			gpio-supply = <&pm8110_l22>;
+			lattice,reset-gpio = <&msmgpio 95 0>;
+			lattice,slave-select-gpio = <&msmgpio 85 0>;
+			lattice,config-done-gpio = <&msmgpio 94 0>;
+			lattice,vcc-en-gpio = <&msmgpio 96 0>;
+		};
 	};
 
 	qcom,pronto@fb21b000 {
@@ -725,6 +756,11 @@
 			compatible = "qcom,msm-dai-q6-dev";
 			qcom,msm-dai-q6-dev-id = <32773>;
 		};
+
+		qcom,msm-dai-q6-incall-music-2-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <32770>;
+		};
 	};
 
 	qcom,msm-pcm-hostless {
@@ -828,6 +864,9 @@
 		qcom,hotplug-temp-hysteresis = <20>;
 		qcom,cpu-sensors = "tsens_tz_sensor5", "tsens_tz_sensor5",
 				"tsens_tz_sensor5", "tsens_tz_sensor5";
+		qcom,default-temp = <80>;
+		qcom,efuse-data = <0xfc4b8000 0x1000 23 30 0x3>;
+		qcom,efuse-temperature-map = <0x1 70>;
 		qcom,vdd-restriction-temp = <5>;
 		qcom,vdd-restriction-temp-hysteresis = <10>;
 		vdd-dig-supply = <&pm8110_s1_floor_corner>;
@@ -864,15 +903,16 @@
 		qcom,disk-encrypt-pipe-pair = <2>;
 		qcom,hlos-ce-hw-instance = <0>;
 		qcom,qsee-ce-hw-instance = <0>;
+		qcom,support-bus-scaling;
 		qcom,msm-bus,name = "qseecom-noc";
 		qcom,msm-bus,num-cases = <4>;
 		qcom,msm-bus,active-only = <0>;
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps =
 				<55 512 0 0>,
-				<55 512 3936000 393600>,
-				<55 512 3936000 393600>,
-				<55 512 3936000 393600>;
+				<55 512 0 0>,
+				<55 512 120000 1200000>,
+				<55 512 393600 3936000>;
 	};
 
         qcom,msm-rng@f9bff000 {
@@ -974,6 +1014,12 @@
 		qcom,irq-is-percpu;
 		interrupts = <1 7 0xf00>;
 	};
+
+	bimc_sharedmem {
+		compatible = "qcom,sharedmem-uio";
+		reg = <0xfc380000 0x00100000>;
+		reg-names = "bimc";
+	};
 };
 
 &gdsc_vfe {
@@ -1032,7 +1078,7 @@
 		label = "vchg_sns";
 		reg = <2>;
 		qcom,decimation = <0>;
-		qcom,pre-div-channel-scaling = <2>;
+		qcom,pre-div-channel-scaling = <5>;
 		qcom,calibration-type = "absolute";
 		qcom,scale-function = <0>;
 		qcom,hw-settle-time = <0>;

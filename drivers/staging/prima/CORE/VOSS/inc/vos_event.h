@@ -55,6 +55,10 @@
 extern "C" {
 #endif /* __cplusplus */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
+#define INIT_COMPLETION(event) reinit_completion(&event)
+#endif
+
 /*-------------------------------------------------------------------------- 
   Type declarations
   ------------------------------------------------------------------------*/

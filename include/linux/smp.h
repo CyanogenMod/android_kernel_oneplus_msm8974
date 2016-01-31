@@ -91,6 +91,7 @@ void ipi_call_lock(void);
 void ipi_call_unlock(void);
 void ipi_call_lock_irq(void);
 void ipi_call_unlock_irq(void);
+
 #define generic_smp_call_function_interrupt \
 	generic_smp_call_function_single_interrupt
 #else

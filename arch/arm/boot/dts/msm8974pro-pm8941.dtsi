@@ -39,22 +39,22 @@
 };
 
 &krait0_vreg {
-		regulator-max-microvolt = <1250000>;
+		regulator-max-microvolt = <1120000>;
 		qcom,ldo-delta-voltage = <12500>;
 };
 
 &krait1_vreg {
-		regulator-max-microvolt = <1250000>;
+		regulator-max-microvolt = <1120000>;
 		qcom,ldo-delta-voltage = <12500>;
 };
 
 &krait2_vreg {
-		regulator-max-microvolt = <1250000>;
+		regulator-max-microvolt = <1120000>;
 		qcom,ldo-delta-voltage = <12500>;
 };
 
 &krait3_vreg {
-		regulator-max-microvolt = <1250000>;
+		regulator-max-microvolt = <1120000>;
 		qcom,ldo-delta-voltage = <12500>;
 };
 
@@ -69,6 +69,11 @@
 &usb3 {
 	qcom,usbin-vadc = <&pm8941_vadc>;
 	qcom,utmi-clk-rate = <24000000>;
+};
+
+&ehci {
+	hsusb_vdd_dig-supply = <&pm8841_s2_corner>;
+	qcom,vdd-voltage-level = <1 2 3 5 7>;
 };
 
 &krait_regulator_pmic {

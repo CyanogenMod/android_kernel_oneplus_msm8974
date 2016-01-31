@@ -3739,6 +3739,20 @@ typedef struct sAniGetFrameLogReq
     tANI_U8                getFrameLogCmdFlag;
 } tAniGetFrameLogReq,      *tpAniGetFrameLogReq;
 
+/**
+ * struct s_ani_set_tx_max_pwr - Req params to set max tx power
+ * @bssid: bssid to set the power cap for
+ * @self_mac_addr:self mac address
+ * @power: power to set in dB
+ */
+struct s_ani_set_tx_max_pwr
+{
+    tSirMacAddr   bssid;
+    tSirMacAddr   self_sta_mac_addr;
+    tPowerdBm     power;
+};
+
+
 
 typedef struct sSirFWLoggingInitParam
 {

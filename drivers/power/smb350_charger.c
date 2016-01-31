@@ -29,6 +29,7 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/printk.h>
+#include <linux/wakelock.h>
 
 /* Register definitions */
 #define CHG_CURRENT_REG			0x00	/* Non-Volatile + mirror */

@@ -658,7 +658,7 @@ void device_initialize(struct device *dev)
 	set_dev_node(dev, -1);
 }
 
-struct kobject *virtual_device_parent(struct device *dev)
+static struct kobject *virtual_device_parent(struct device *dev)
 {
 	static struct kobject *virtual_dir = NULL;
 

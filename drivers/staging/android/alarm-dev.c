@@ -415,8 +415,6 @@ static int __init alarm_dev_init(void)
 	}
 
 	wakeup_source_init(&alarm_wake_lock, "alarm");
-
-	power_on_alarm_init();
 	return 0;
 }
 

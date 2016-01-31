@@ -484,7 +484,6 @@ struct input_keymap_entry {
 #define KEY_GESTURE_LTR		253
 #define KEY_GESTURE_GTR		254
 #define KEY_DOUBLE_TAP      255
-#define KEY_SWEEP_WAKE		116
 
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
@@ -888,7 +887,7 @@ struct input_keymap_entry {
 #define SW_HPHL_OVERCURRENT    0x0e  /* set = over current on left hph */
 #define SW_HPHR_OVERCURRENT    0x0f  /* set = over current on right hph */
 #define SW_UNSUPPORT_INSERT	0x10  /* set = unsupported device inserted */
-#define SW_MICROPHONE2_INSERT  0x11  /* set = inserted */
+#define SW_MICROPHONE2_INSERT   0x11  /* set = inserted */
 #define SW_MUTE_DEVICE		0x12  /* set = device disabled */
 #define SW_MAX			0x20
 #define SW_CNT			(SW_MAX+1)
@@ -1213,18 +1212,6 @@ struct ff_effect {
 #include <linux/mod_devicetable.h>
 
 /**
- * struct input_value - input value representation
- * @type: type of value (EV_KEY, EV_ABS, etc)
- * @code: the value code
- * @value: the value
- */
-struct input_value {
-	__u16 type;
-	__u16 code;
-	__s32 value;
-};
-
-/**
  * struct input_dev - represents an input device
  * @name: name of the device
  * @phys: physical path to the device in the system hierarchy
@@ -1300,6 +1287,7 @@ struct input_value {
  *	last user closes the device
  * @going_away: marks devices that are in a middle of unregistering and
  *	causes input_open_device*() fail with -ENODEV.
+ * @sync: set to %true when there were no new events since last EV_SYN
  * @dev: driver model's view of this device
  * @h_list: list of input handles associated with the device. When
  *	accessing the list dev->mutex must be held
@@ -1367,14 +1355,12 @@ struct input_dev {
 	unsigned int users;
 	bool going_away;
 
+	bool sync;
+
 	struct device dev;
 
 	struct list_head	h_list;
 	struct list_head	node;
-
-	unsigned int num_vals;
-	unsigned int max_vals;
-	struct input_value *vals;
 };
 #define to_input_dev(d) container_of(d, struct input_dev, dev)
 
@@ -1435,9 +1421,6 @@ struct input_handle;
  * @event: event handler. This method is being called by input core with
  *	interrupts disabled and dev->event_lock spinlock held and so
  *	it may not sleep
- * @events: event sequence handler. This method is being called by
- *	input core with interrupts disabled and dev->event_lock
- *	spinlock held and so it may not sleep
  * @filter: similar to @event; separates normal event handlers from
  *	"filters".
  * @match: called after comparing device's id with handler's id_table
@@ -1474,8 +1457,6 @@ struct input_handler {
 	void *private;
 
 	void (*event)(struct input_handle *handle, unsigned int type, unsigned int code, int value);
-	void (*events)(struct input_handle *handle,
-		       const struct input_value *vals, unsigned int count);
 	bool (*filter)(struct input_handle *handle, unsigned int type, unsigned int code, int value);
 	bool (*match)(struct input_handler *handler, struct input_dev *dev);
 	int (*connect)(struct input_handler *handler, struct input_dev *dev, const struct input_device_id *id);

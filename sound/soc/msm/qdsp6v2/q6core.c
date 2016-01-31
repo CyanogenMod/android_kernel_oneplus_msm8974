@@ -24,12 +24,6 @@
 #include <sound/q6core.h>
 
 #define TIMEOUT_MS 1000
-
-/*
- * AVS bring up in the modem is optimitized for the new
- * Sub System Restart design and 100 milliseconds timeout
- * is sufficient to make sure the Q6 will be ready.
- */
 #define Q6_READY_TIMEOUT_MS 100
 
 struct q6core_str {

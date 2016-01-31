@@ -88,7 +88,8 @@
 
 /* Slimbus QMI service */
 #define SLIMBUS_QMI_SVC_ID 0x0301
-#define SLIMBUS_QMI_INS_ID 1
+#define SLIMBUS_QMI_SVC_V1 1
+#define SLIMBUS_QMI_INS_ID 0
 
 #define PGD_THIS_EE(r, v) ((v) ? PGD_THIS_EE_V2(r) : PGD_THIS_EE_V1(r))
 #define PGD_PORT(r, p, v) ((v) ? PGD_PORT_V2(r, p) : PGD_PORT_V1(r, p))
@@ -198,7 +199,6 @@ struct msm_slim_endp {
 	struct sps_register_event	event;
 	struct sps_mem_buffer		buf;
 	bool				connected;
-	int				port_b;
 };
 
 struct msm_slim_qmi {
@@ -246,7 +246,7 @@ struct msm_slim_ctrl {
 	int			ee;
 	struct completion	**wr_comp;
 	struct msm_slim_sat	*satd[MSM_MAX_NSATS];
-	struct msm_slim_endp	*pipes;
+	struct msm_slim_endp	pipes[7];
 	struct msm_slim_sps_bam	bam;
 	struct msm_slim_endp	tx_msgq;
 	struct msm_slim_endp	rx_msgq;
@@ -259,7 +259,7 @@ struct msm_slim_ctrl {
 	u8			pgdla;
 	enum msm_slim_msgq	use_rx_msgqs;
 	enum msm_slim_msgq	use_tx_msgqs;
-	int			port_nums;
+	int			port_b;
 	struct completion	reconf;
 	bool			reconf_busy;
 	bool			chan_active;
@@ -378,7 +378,7 @@ int msm_send_msg_buf(struct msm_slim_ctrl *dev, u32 *buf, u8 len, u32 tx_reg);
 u32 *msm_get_msg_buf(struct msm_slim_ctrl *dev, int len,
 			struct completion *comp);
 u32 *msm_slim_manage_tx_msgq(struct msm_slim_ctrl *dev, bool getbuf,
-			struct completion *comp, int err);
+			struct completion *comp);
 int msm_slim_rx_msgq_get(struct msm_slim_ctrl *dev, u32 *data, int offset);
 int msm_slim_sps_init(struct msm_slim_ctrl *dev, struct resource *bam_mem,
 			u32 pipe_reg, bool remote);

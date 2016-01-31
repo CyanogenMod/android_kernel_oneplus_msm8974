@@ -37,10 +37,6 @@
 	 (((_mi) & 0xFF) << 8) | \
 	 ((_pa) & 0xFF))
 
-#ifdef CONFIG_CPU_FREQ_GOV_ELEMENTALX
-extern int graphics_boost;
-#endif
-
 enum kgsl_iommu_context_id {
 	KGSL_IOMMU_CONTEXT_USER = 0,
 	KGSL_IOMMU_CONTEXT_PRIV = 1,
@@ -71,6 +67,7 @@ struct kgsl_device_iommu_data {
 struct kgsl_pwrlevel {
 	unsigned int gpu_freq;
 	unsigned int bus_freq;
+	unsigned int io_fraction;
 };
 
 struct kgsl_device_platform_data {
@@ -90,6 +87,7 @@ struct kgsl_device_platform_data {
 	struct coresight_device *csdev;
 	struct coresight_platform_data *coresight_pdata;
 	unsigned int chipid;
+	unsigned int pm_qos_latency;
 };
 
 #endif

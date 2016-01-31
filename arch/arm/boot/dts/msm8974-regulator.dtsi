@@ -131,8 +131,8 @@
 	rpm-regulator-smpb4 {
 		status = "okay";
 		pm8841_s4: regulator-s4 {
-			regulator-min-microvolt = <675000>;
-			regulator-max-microvolt = <815000>;
+			regulator-min-microvolt = <815000>;
+			regulator-max-microvolt = <900000>;
 			status = "okay";
 		};
 		pm8841_s4_corner: regulator-s4-corner {
@@ -141,18 +141,15 @@
 			qcom,set = <3>;
 			qcom,use-voltage-corner;
 			regulator-min-microvolt = <1>;
-			/* limit max corner to Turbo state */
-			regulator-max-microvolt = <5>;
-			/* init state start from SVS Krait state */
-			qcom,init-voltage-corner = <2>; /* SVS Krait */
+			regulator-max-microvolt = <7>;
+			qcom,init-voltage-corner = <3>; /* SVS SOC */
 		};
 		pm8841_s4_floor_corner: regulator-s4-floor-corner {
 			compatible = "qcom,rpm-regulator-smd";
 			regulator-name = "8841_s4_floor_corner";
 			qcom,set = <3>;
 			regulator-min-microvolt = <1>;
-			/* limit max corner to Turbo state */
-			regulator-max-microvolt = <5>;
+			regulator-max-microvolt = <7>;
 			qcom,use-voltage-floor-corner;
 			qcom,always-send-voltage;
 		};
@@ -480,8 +477,7 @@
 			regulator-min-microvolt = <500000>;
 			regulator-max-microvolt = <1100000>;
 			qcom,headroom-voltage = <150000>;
-			/* reduce retention voltage */
-			qcom,retention-voltage = <600000>;
+			qcom,retention-voltage = <675000>;
 			qcom,ldo-default-voltage = <750000>;
 			qcom,ldo-threshold-voltage = <850000>;
 			qcom,ldo-delta-voltage = <50000>;
@@ -497,8 +493,7 @@
 			regulator-min-microvolt = <500000>;
 			regulator-max-microvolt = <1100000>;
 			qcom,headroom-voltage = <150000>;
-			/* reduce retention voltage */
-			qcom,retention-voltage = <600000>;
+			qcom,retention-voltage = <675000>;
 			qcom,ldo-default-voltage = <750000>;
 			qcom,ldo-threshold-voltage = <850000>;
 			qcom,ldo-delta-voltage = <50000>;
@@ -514,8 +509,7 @@
 			regulator-min-microvolt = <500000>;
 			regulator-max-microvolt = <1100000>;
 			qcom,headroom-voltage = <150000>;
-			/* reduce retention voltage */
-			qcom,retention-voltage = <600000>;
+			qcom,retention-voltage = <675000>;
 			qcom,ldo-default-voltage = <750000>;
 			qcom,ldo-threshold-voltage = <850000>;
 			qcom,ldo-delta-voltage = <50000>;
@@ -531,8 +525,7 @@
 			regulator-min-microvolt = <500000>;
 			regulator-max-microvolt = <1100000>;
 			qcom,headroom-voltage = <150000>;
-			/* reduce retention voltage */
-			qcom,retention-voltage = <600000>;
+			qcom,retention-voltage = <675000>;
 			qcom,ldo-default-voltage = <750000>;
 			qcom,ldo-threshold-voltage = <850000>;
 			qcom,ldo-delta-voltage = <50000>;
@@ -575,4 +568,8 @@
 
 &pm8941_chg_otg {
 	regulator-name = "8941_smbb_otg";
+};
+
+&pm8941_chg_chgr {
+	regulator-name = "flash_wa";
 };

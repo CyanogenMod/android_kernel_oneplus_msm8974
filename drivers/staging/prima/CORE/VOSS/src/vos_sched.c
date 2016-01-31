@@ -59,6 +59,8 @@
 #include "wlan_qct_pal_msg.h"
 #include <linux/spinlock.h>
 #include <linux/kthread.h>
+#include <linux/wcnss_wlan.h>
+
 /*---------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
  * ------------------------------------------------------------------------*/
@@ -73,6 +75,9 @@
 #define THREAD_STUCK_TIMER_VAL 5000 // 5 seconds
 #define THREAD_STUCK_COUNT 3
 
+#define MC_Thread 0
+#define TX_Thread 1
+#define RX_Thread 2
 
 static atomic_t ssr_protect_entry_count;
 
@@ -685,6 +690,25 @@ static void vos_wd_detect_thread_stuck(void)
         gpVosWatchdogContext->mcThreadStuckCount,
         gpVosWatchdogContext->rxThreadStuckCount,
         gpVosWatchdogContext->txThreadStuckCount);
+
+     if (gpVosWatchdogContext->mcThreadStuckCount)
+     {
+         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                             "%s: Invoking dump stack for MC thread",__func__);
+         vos_dump_stack(MC_Thread);
+     }
+     if (gpVosWatchdogContext->txThreadStuckCount)
+     {
+         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                             "%s: Invoking dump stack for TX thread",__func__);
+         vos_dump_stack(TX_Thread);
+     }
+     if (gpVosWatchdogContext->rxThreadStuckCount)
+     {
+         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                             "%s: Invoking dump stack for RX thread",__func__);
+         vos_dump_stack(RX_Thread);
+     }
 
      spin_lock_irqsave(&gpVosWatchdogContext->thread_stuck_lock, flags);
   }
@@ -2133,3 +2157,18 @@ bool vos_is_wd_thread(int threadId)
        (threadId == gpVosWatchdogContext->WdThread->pid));
 }
 
+void vos_dump_stack(uint8_t thread_id)
+{
+   switch (thread_id)
+   {
+      case MC_Thread:
+          wcnss_dump_stack(gpVosSchedContext->McThread);
+      case TX_Thread:
+          wcnss_dump_stack(gpVosSchedContext->TxThread);
+      case RX_Thread:
+          wcnss_dump_stack(gpVosSchedContext->RxThread);
+      default:
+          VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                             "%s: Invalid thread invoked",__func__);
+   }
+}

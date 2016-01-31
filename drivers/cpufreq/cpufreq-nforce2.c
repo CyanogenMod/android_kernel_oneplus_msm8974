@@ -303,7 +303,9 @@ static int nforce2_verify(struct cpufreq_policy *policy)
 	if (policy->min < (fsb_pol_max * fid * 100))
 		policy->max = (fsb_pol_max + 1) * fid * 100;
 
-	cpufreq_verify_within_cpu_limits(policy);
+	cpufreq_verify_within_limits(policy,
+				     policy->cpuinfo.min_freq,
+				     policy->cpuinfo.max_freq);
 	return 0;
 }
 

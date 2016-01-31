@@ -81,35 +81,34 @@
 #define MSMFB_ASYNC_BLIT              _IOW(MSMFB_IOCTL_MAGIC, 168, unsigned int)
 #define MSMFB_OVERLAY_PREPARE		_IOWR(MSMFB_IOCTL_MAGIC, 169, \
 						struct mdp_overlay_list)
-#define MSMFB_LPM_ENABLE       _IOWR(MSMFB_IOCTL_MAGIC, 170, unsigned int)
-
+#define MSMFB_LPM_ENABLE        _IOWR(MSMFB_IOCTL_MAGIC, 170, unsigned int)
 #define FB_TYPE_3D_PANEL 0x10101010
 #define MDP_IMGTYPE2_START 0x10000
 #define MSMFB_DRIVER_VERSION	0xF9E8D701
 
 /* HW Revisions for different MDSS targets */
-#define MDSS_GET_MAJOR(rev)            ((rev) >> 28)
-#define MDSS_GET_MINOR(rev)            (((rev) >> 16) & 0xFFF)
-#define MDSS_GET_STEP(rev)             ((rev) & 0xFFFF)
-#define MDSS_GET_MAJOR_MINOR(rev)      ((rev) >> 16)
+#define MDSS_GET_MAJOR(rev)		((rev) >> 28)
+#define MDSS_GET_MINOR(rev)		(((rev) >> 16) & 0xFFF)
+#define MDSS_GET_STEP(rev)		((rev) & 0xFFFF)
+#define MDSS_GET_MAJOR_MINOR(rev)	((rev) >> 16)
 
-#define IS_MDSS_MAJOR_MINOR_SAME(rev1, rev2)   \
-	   (MDSS_GET_MAJOR_MINOR((rev1)) == MDSS_GET_MAJOR_MINOR((rev2)))
+#define IS_MDSS_MAJOR_MINOR_SAME(rev1, rev2)	\
+	(MDSS_GET_MAJOR_MINOR((rev1)) == MDSS_GET_MAJOR_MINOR((rev2)))
 
-#define MDSS_MDP_REV(major, minor, step)       \
-	   ((((major) & 0x000F) << 28) |           \
-		(((minor) & 0x0FFF) << 16) |           \
-		((step)   & 0xFFFF))
+#define MDSS_MDP_REV(major, minor, step)	\
+	((((major) & 0x000F) << 28) |		\
+	 (((minor) & 0x0FFF) << 16) |		\
+	 ((step)   & 0xFFFF))
 
-#define MDSS_MDP_HW_REV_100    MDSS_MDP_REV(1, 0, 0) /* 8974 v1.0 */
-#define MDSS_MDP_HW_REV_101    MDSS_MDP_REV(1, 1, 0) /* 8x26 v1.0 */
-#define MDSS_MDP_HW_REV_101_1  MDSS_MDP_REV(1, 1, 1) /* 8x26 v2.0, 8926 v1.0 */
-#define MDSS_MDP_HW_REV_101_2  MDSS_MDP_REV(1, 1, 2) /* 8926 v2.0 */
-#define MDSS_MDP_HW_REV_102    MDSS_MDP_REV(1, 2, 0) /* 8974 v2.0 */
-#define MDSS_MDP_HW_REV_102_1  MDSS_MDP_REV(1, 2, 1) /* 8974 v3.0 (Pro) */
-#define MDSS_MDP_HW_REV_103    MDSS_MDP_REV(1, 3, 0) /* 8084 v1.0 */
-#define MDSS_MDP_HW_REV_103_1  MDSS_MDP_REV(1, 3, 1) /* 8084 v1.1 */
-#define MDSS_MDP_HW_REV_200    MDSS_MDP_REV(2, 0, 0) /* 8092 v1.0 */
+#define MDSS_MDP_HW_REV_100	MDSS_MDP_REV(1, 0, 0) /* 8974 v1.0 */
+#define MDSS_MDP_HW_REV_101	MDSS_MDP_REV(1, 1, 0) /* 8x26 v1.0 */
+#define MDSS_MDP_HW_REV_101_1	MDSS_MDP_REV(1, 1, 1) /* 8x26 v2.0, 8926 v1.0 */
+#define MDSS_MDP_HW_REV_101_2	MDSS_MDP_REV(1, 1, 2) /* 8926 v2.0 */
+#define MDSS_MDP_HW_REV_102	MDSS_MDP_REV(1, 2, 0) /* 8974 v2.0 */
+#define MDSS_MDP_HW_REV_102_1	MDSS_MDP_REV(1, 2, 1) /* 8974 v3.0 (Pro) */
+#define MDSS_MDP_HW_REV_103	MDSS_MDP_REV(1, 3, 0) /* 8084 v1.0 */
+#define MDSS_MDP_HW_REV_103_1	MDSS_MDP_REV(1, 3, 1) /* 8084 v1.1 */
+#define MDSS_MDP_HW_REV_200	MDSS_MDP_REV(2, 0, 0) /* 8092 v1.0 */
 
 enum {
 	NOTIFY_UPDATE_INIT,
@@ -634,14 +633,12 @@ struct mdp_overlay {
 	uint32_t flags;
 	uint32_t pipe_type;
 	uint32_t id;
-	uint8_t priority;
 	uint32_t user_data[6];
 	uint32_t bg_color;
 	uint8_t horz_deci;
 	uint8_t vert_deci;
 	struct mdp_overlay_pp_params overlay_pp_cfg;
 	struct mdp_scale_data scale;
-	uint8_t color_space;
 };
 
 struct msmfb_overlay_3d {
@@ -848,15 +845,6 @@ struct mdp_calib_dcm_state {
 	uint32_t dcm_state;
 };
 
-struct mdp_pp_init_data {
-	uint32_t init_request;
-};
-
-enum {
-	MDP_PP_DISABLE,
-	MDP_PP_ENABLE,
-};
-
 enum {
 	DCM_UNINIT,
 	DCM_UNBLANK,
@@ -970,7 +958,6 @@ enum {
 	mdp_op_calib_mode,
 	mdp_op_calib_buffer,
 	mdp_op_calib_dcm_state,
-	mdp_op_pp_init_cfg,
 	mdp_op_max,
 };
 
@@ -1003,7 +990,6 @@ struct msmfb_mdp_pp {
 		struct mdss_ad_input ad_input;
 		struct mdp_calib_config_buffer calib_buffer;
 		struct mdp_calib_dcm_state calib_dcm;
-		struct mdp_pp_init_data init_data;
 	} data;
 };
 
@@ -1057,7 +1043,7 @@ struct msmfb_metadata {
 
 #define MDP_MAX_FENCE_FD	32
 #define MDP_BUF_SYNC_FLAG_WAIT	1
-#define MDP_BUF_SYNC_FLAG_RETIRE_FENCE 0x10
+#define MDP_BUF_SYNC_FLAG_RETIRE_FENCE	0x10
 
 struct mdp_buf_sync {
 	uint32_t flags;
@@ -1080,8 +1066,7 @@ struct mdp_display_commit {
 	uint32_t flags;
 	uint32_t wait_for_finish;
 	struct fb_var_screeninfo var;
-	struct mdp_rect l_roi;
-	struct mdp_rect r_roi;
+	struct mdp_rect roi;
 };
 
 /**
@@ -1139,9 +1124,6 @@ enum {
 	MDP_WRITEBACK_MIRROR_PAUSE,
 	MDP_WRITEBACK_MIRROR_RESUME,
 };
-
-/* let users know that we have the new struct formats */
-#define DUAL_DSI
 
 #ifdef __KERNEL__
 int msm_fb_get_iommu_domain(struct fb_info *info, int domain);

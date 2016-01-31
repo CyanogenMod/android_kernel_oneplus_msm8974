@@ -348,9 +348,17 @@ static void zram_free_page(struct zram *zram, size_t index)
 
 	zs_free(meta->mem_pool, handle);
 
+<<<<<<< HEAD:drivers/block/zram/zram_drv.c
 	atomic64_sub(zram_get_obj_size(meta, index),
 			&zram->stats.compr_data_size);
 	atomic64_dec(&zram->stats.pages_stored);
+=======
+	if (size <= PAGE_SIZE / 2)
+		zram->stats.good_compress--;
+
+	atomic64_sub(meta->table[index].size, &zram->stats.compr_size);
+	zram->stats.pages_stored--;
+>>>>>>> ed12cd71f747981e396570526f5c65e556891a85:drivers/staging/zram/zram_drv.c
 
 	meta->table[index].handle = 0;
 	zram_set_obj_size(meta, index, 0);

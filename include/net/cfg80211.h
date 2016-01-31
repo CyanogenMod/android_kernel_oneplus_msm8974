@@ -3444,7 +3444,7 @@ cfg80211_testmode_alloc_event_skb(struct wiphy *wiphy, int approxlen, gfp_t gfp)
 /**
  * cfg80211_testmode_event - send the event
  * @skb: The skb, must have been allocated with
- *  cfg80211_testmode_alloc_event_skb()
+ *	cfg80211_testmode_alloc_event_skb()
  * @gfp: allocation flags
  *
  * This function sends the given @skb, which must have been allocated

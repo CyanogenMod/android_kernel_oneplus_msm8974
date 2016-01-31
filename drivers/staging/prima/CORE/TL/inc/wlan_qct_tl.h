@@ -609,8 +609,8 @@ typedef tSap_SoftapStats WLANTL_TRANSFER_STA_TYPE;
 typedef enum
 {
   WLANTL_DEBUG_TX_SNAPSHOT = 1<<0,
-
   WLANTL_DEBUG_FW_CLEANUP = 1<<1,
+  WLANTL_DEBUG_KICKDXE = 1<<2
 }WLANTL_DebugFlags;
 
 /*----------------------------------------------------------------------------
