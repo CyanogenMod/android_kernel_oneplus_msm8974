@@ -211,17 +211,15 @@ static void adreno_input_work(struct work_struct *work)
 			struct adreno_device, input_work);
 	struct kgsl_device *device = &adreno_dev->dev;
 
-	if (!_wake_timeout)
-		return;
-
 	kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 
 	device->flags |= KGSL_FLAG_WAKE_ON_TOUCH;
 
 	/*
-	 * Schedule adreno_start in a high priority workqueue.
+	 * Don't schedule adreno_start in a high priority workqueue, we are
+	 * already in a workqueue which should be sufficient
 	 */
-	kgsl_pwrctrl_wake(device, 1);
+	kgsl_pwrctrl_wake(device, 0);
 
 	/*
 	 * When waking up from a touch event we want to stay active long enough
@@ -324,8 +322,7 @@ static const struct input_device_id adreno_input_ids[] = {
 		/* assumption: MT_.._X & MT_.._Y are in the same long */
 		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
 				BIT_MASK(ABS_MT_POSITION_X) |
-				BIT_MASK(ABS_MT_POSITION_Y) |
-				BIT_MASK(ABS_MT_TRACKING_ID) },
+				BIT_MASK(ABS_MT_POSITION_Y) },
 	},
 	{ },
 };
@@ -1363,6 +1360,10 @@ static int adreno_of_get_pwrlevels(struct device_node *parent,
 		if (adreno_of_read_property(child, "qcom,bus-freq",
 			&level->bus_freq))
 			goto done;
+
+		if (adreno_of_read_property(child, "qcom,io-fraction",
+			&level->io_fraction))
+			level->io_fraction = 0;
 	}
 
 	if (adreno_of_read_property(parent, "qcom,initial-pwrlevel",
@@ -1496,6 +1497,12 @@ static int adreno_of_get_pdata(struct platform_device *pdev)
 	ret = adreno_of_get_pwrlevels(pdev->dev.of_node, pdata);
 	if (ret)
 		goto err;
+
+	/* get pm-qos-latency from target, set it to default if not found */
+	if (adreno_of_read_property(pdev->dev.of_node, "qcom,pm-qos-latency",
+		&pdata->pm_qos_latency))
+		pdata->pm_qos_latency = 501;
+
 
 	if (adreno_of_read_property(pdev->dev.of_node, "qcom,idle-timeout",
 		&pdata->idle_timeout))
@@ -1901,10 +1908,8 @@ static int adreno_stop(struct kgsl_device *device)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 
-	if (!test_bit(ADRENO_DEVICE_STARTED, &adreno_dev->priv))
-		return 0;
-
-	kgsl_pwrctrl_enable(device);
+	if (adreno_dev->drawctxt_active)
+		kgsl_context_put(&adreno_dev->drawctxt_active->base);
 
 	adreno_dev->drawctxt_active = NULL;
 
@@ -1984,31 +1989,6 @@ int adreno_reset(struct kgsl_device *device)
 			KGSL_MEMSTORE_GLOBAL);
 
 	return ret;
-}
-
-/**
- * _ft_sysfs_store() -  Common routine to write to FT sysfs files
- * @buf: value to write
- * @count: size of the value to write
- * @sysfs_cfg: KGSL FT sysfs config to write
- *
- * This is a common routine to write to FT sysfs files.
- */
-static int _ft_sysfs_store(const char *buf, size_t count, int *ptr)
-{
-	char temp[20];
-	long val;
-	int rc;
-
-	snprintf(temp, sizeof(temp), "%.*s",
-			 (int)min(count, sizeof(temp) - 1), buf);
-	rc = kstrtol(temp, 0, &val);
-	if (rc)
-		return rc;
-
-	*ptr = val;
-
-	return count;
 }
 
 /**
@@ -2293,7 +2273,7 @@ static ssize_t _ft_hang_intr_status_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count)
 {
-	unsigned int new_setting = 0, old_setting = 0;
+	unsigned int new_setting, old_setting;
 	struct kgsl_device *device = kgsl_device_from_dev(dev);
 	struct adreno_device *adreno_dev;
 	int ret;
@@ -2303,7 +2283,7 @@ static ssize_t _ft_hang_intr_status_store(struct device *dev,
 
 	mutex_lock(&device->mutex);
 	ret = kgsl_sysfs_store(buf, &new_setting);
-	if (ret != count)
+	if (ret)
 		goto done;
 	if (new_setting)
 		new_setting = 1;
@@ -2343,7 +2323,7 @@ static ssize_t _ft_hang_intr_status_store(struct device *dev,
 	}
 done:
 	mutex_unlock(&device->mutex);
-	return ret;
+	return ret < 0 ? ret : count;
 }
 
 /**
@@ -2364,36 +2344,6 @@ static ssize_t _ft_hang_intr_status_show(struct device *dev,
 		test_bit(ADRENO_DEVICE_HANG_INTR, &adreno_dev->priv) ? 1 : 0);
 }
 
-/**
- * _wake_nice_store() - Store nice level for the higher priority GPU start
- * thread
- * @dev: device ptr
- * @attr: Device attribute
- * @buf: value to write
- * @count: size of the value to write
- *
- */
-static ssize_t _wake_nice_store(struct device *dev,
-				     struct device_attribute *attr,
-				     const char *buf, size_t count)
-{
-	return _ft_sysfs_store(buf, count, &_wake_nice);
-}
-
-/**
- * _wake_nice_show() -  Show nice level for the higher priority GPU start
- * thread
- * @dev: device ptr
- * @attr: Device attribute
- * @buf: value read
- */
-static ssize_t _wake_nice_show(struct device *dev,
-					struct device_attribute *attr,
-					char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%d\n", _wake_nice);
-}
-
 #define FT_DEVICE_ATTR(name) \
 	DEVICE_ATTR(name, 0644,	_ ## name ## _show, _ ## name ## _store);
 
@@ -2403,7 +2353,7 @@ FT_DEVICE_ATTR(ft_fast_hang_detect);
 FT_DEVICE_ATTR(ft_long_ib_detect);
 FT_DEVICE_ATTR(ft_hang_intr_status);
 
-static FT_DEVICE_ATTR(wake_nice);
+static DEVICE_INT_ATTR(wake_nice, 0644, _wake_nice);
 static FT_DEVICE_ATTR(wake_timeout);
 
 const struct device_attribute *ft_attr_list[] = {
@@ -2411,7 +2361,7 @@ const struct device_attribute *ft_attr_list[] = {
 	&dev_attr_ft_pagefault_policy,
 	&dev_attr_ft_fast_hang_detect,
 	&dev_attr_ft_long_ib_detect,
-	&dev_attr_wake_nice,
+	&dev_attr_wake_nice.attr,
 	&dev_attr_wake_timeout,
 	&dev_attr_ft_hang_intr_status,
 	NULL,
@@ -3134,13 +3084,6 @@ static inline s64 adreno_ticks_to_us(u32 ticks, u32 freq)
 	return ticks / freq;
 }
 
-/**
- * adreno_power_stats() - Reads the counters needed for freq decisions
- * @device: Pointer to device whose counters are read
- * @stats: Pointer to stats set that needs updating
- * Power: The caller is expected to be in a clock enabled state as this
- * function does reg reads
- */
 static void adreno_power_stats(struct kgsl_device *device,
 				struct kgsl_power_stats *stats)
 {
@@ -3149,6 +3092,14 @@ static void adreno_power_stats(struct kgsl_device *device,
 	struct adreno_busy_data busy_data;
 
 	memset(stats, 0, sizeof(*stats));
+
+	/*
+	 * If we're not currently active, there shouldn't have been
+	 * any cycles since the last time this function was called.
+	 */
+
+	if (device->state != KGSL_STATE_ACTIVE)
+		return;
 
 	/* Get the busy cycles counted since the counter was last reset */
 	adreno_dev->gpudev->busy_cycles(adreno_dev, &busy_data);

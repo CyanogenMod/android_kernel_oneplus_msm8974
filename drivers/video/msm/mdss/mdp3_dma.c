@@ -16,6 +16,7 @@
 #include "mdp3.h"
 #include "mdp3_dma.h"
 #include "mdp3_hwio.h"
+#include "mdss_debug.h"
 
 #define DMA_STOP_POLL_SLEEP_US 1000
 #define DMA_STOP_POLL_TIMEOUT_US 200000
@@ -610,17 +611,20 @@ static int mdp3_dmap_update(struct mdp3_dma *dma, void *buf,
 	int cb_type = MDP3_DMA_CALLBACK_TYPE_VSYNC;
 	int rc = 0;
 
+	ATRACE_BEGIN(__func__);
 	pr_debug("mdp3_dmap_update\n");
 
 	if (dma->output_config.out_sel == MDP3_DMA_OUTPUT_SEL_DSI_CMD) {
 		cb_type = MDP3_DMA_CALLBACK_TYPE_DMA_DONE;
 		if (intf->active) {
+			ATRACE_BEGIN("mdp3_wait_for_dma_comp");
 			rc = wait_for_completion_timeout(&dma->dma_comp,
 				KOFF_TIMEOUT);
 			if (rc <= 0) {
 				WARN(1, "cmd kickoff timed out (%d)\n", rc);
 				rc = -1;
 			}
+			ATRACE_END("mdp3_wait_for_dma_comp");
 		}
 	}
 	if (dma->update_src_cfg) {
@@ -652,12 +656,15 @@ static int mdp3_dmap_update(struct mdp3_dma *dma, void *buf,
 	mdp3_dma_callback_enable(dma, cb_type);
 	pr_debug("mdp3_dmap_update wait for vsync_comp in\n");
 	if (dma->output_config.out_sel == MDP3_DMA_OUTPUT_SEL_DSI_VIDEO) {
+		ATRACE_BEGIN("mdp3_wait_for_vsync_comp");
 		rc = wait_for_completion_timeout(&dma->vsync_comp,
 			KOFF_TIMEOUT);
 		if (rc <= 0)
 			rc = -1;
+		ATRACE_END("mdp3_wait_for_vsync_comp");
 	}
 	pr_debug("mdp3_dmap_update wait for vsync_comp out\n");
+	ATRACE_END(__func__);
 	return rc;
 }
 
@@ -763,7 +770,7 @@ static int mdp3_dmap_histo_get(struct mdp3_dma *dma)
 			MDP3_REG_READ(MDP3_REG_DMA_P_HIST_EXTRA_INFO_1);
 
 	spin_lock_irqsave(&dma->histo_lock, flag);
-	init_completion(&dma->histo_comp);
+	INIT_COMPLETION(dma->histo_comp);
 	MDP3_REG_WRITE(MDP3_REG_DMA_P_HIST_START, 1);
 	wmb();
 	dma->histo_state = MDP3_DMA_HISTO_STATE_START;
@@ -781,7 +788,7 @@ static int mdp3_dmap_histo_start(struct mdp3_dma *dma)
 
 	spin_lock_irqsave(&dma->histo_lock, flag);
 
-	init_completion(&dma->histo_comp);
+	INIT_COMPLETION(dma->histo_comp);
 	MDP3_REG_WRITE(MDP3_REG_DMA_P_HIST_START, 1);
 	wmb();
 	dma->histo_state = MDP3_DMA_HISTO_STATE_START;
@@ -800,7 +807,7 @@ static int mdp3_dmap_histo_reset(struct mdp3_dma *dma)
 
 	spin_lock_irqsave(&dma->histo_lock, flag);
 
-	init_completion(&dma->histo_comp);
+	INIT_COMPLETION(dma->histo_comp);
 
 	mdp3_dma_clk_auto_gating(dma, 0);
 

@@ -522,7 +522,7 @@ static int __devinit bcl_probe(struct platform_device *pdev)
 		return ret;
 	}
 	platform_set_drvdata(pdev, bcl);
-	INIT_DEFERRABLE_WORK(&bcl->bcl_iavail_work, bcl_iavail_work);
+	INIT_DELAYED_WORK_DEFERRABLE(&bcl->bcl_iavail_work, bcl_iavail_work);
 
 	return 0;
 }

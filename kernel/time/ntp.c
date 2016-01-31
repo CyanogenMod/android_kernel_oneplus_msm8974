@@ -15,7 +15,6 @@
 #include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/module.h>
-#include <linux/rtc.h>
 
 #include "tick-internal.h"
 
@@ -23,7 +22,7 @@
  * NTP timekeeping variables:
  */
 
-DEFINE_RAW_SPINLOCK(ntp_lock);
+DEFINE_SPINLOCK(ntp_lock);
 
 
 /* USER_HZ period (usecs): */
@@ -348,7 +347,7 @@ void ntp_clear(void)
 {
 	unsigned long flags;
 
-	raw_spin_lock_irqsave(&ntp_lock, flags);
+	spin_lock_irqsave(&ntp_lock, flags);
 
 	time_adjust	= 0;		/* stop active adjtime() */
 	time_status	|= STA_UNSYNC;
@@ -362,7 +361,7 @@ void ntp_clear(void)
 
 	/* Clear PPS state variables */
 	pps_clear();
-	raw_spin_unlock_irqrestore(&ntp_lock, flags);
+	spin_unlock_irqrestore(&ntp_lock, flags);
 
 }
 
@@ -372,9 +371,9 @@ u64 ntp_tick_length(void)
 	unsigned long flags;
 	s64 ret;
 
-	raw_spin_lock_irqsave(&ntp_lock, flags);
+	spin_lock_irqsave(&ntp_lock, flags);
 	ret = tick_length;
-	raw_spin_unlock_irqrestore(&ntp_lock, flags);
+	spin_unlock_irqrestore(&ntp_lock, flags);
 	return ret;
 }
 
@@ -395,7 +394,7 @@ int second_overflow(unsigned long secs)
 	int leap = 0;
 	unsigned long flags;
 
-	raw_spin_lock_irqsave(&ntp_lock, flags);
+	spin_lock_irqsave(&ntp_lock, flags);
 
 	/*
 	 * Leap second processing. If in leap-insert state at the end of the
@@ -481,12 +480,13 @@ int second_overflow(unsigned long secs)
 
 
 out:
-	raw_spin_unlock_irqrestore(&ntp_lock, flags);
+	spin_unlock_irqrestore(&ntp_lock, flags);
 
 	return leap;
 }
 
-#if defined(CONFIG_GENERIC_CMOS_UPDATE) || defined(CONFIG_RTC_SYSTOHC)
+#ifdef CONFIG_GENERIC_CMOS_UPDATE
+
 static void sync_cmos_clock(struct work_struct *work);
 
 static DECLARE_DELAYED_WORK(sync_cmos_work, sync_cmos_clock);
@@ -502,7 +502,6 @@ static void sync_cmos_clock(struct work_struct *work)
 	 * called as close as possible to 500 ms before the new second starts.
 	 * This code is run on a timer.  If the clock is set, that timer
 	 * may not expire at the correct time.  Thus, we adjust...
-	 * We want the clock to be within a couple of ticks from the target.
 	 */
 	if (!ntp_synced()) {
 		/*
@@ -513,26 +512,14 @@ static void sync_cmos_clock(struct work_struct *work)
 	}
 
 	getnstimeofday(&now);
-	if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec * 5) {
-		struct timespec adjust = now;
-
-		fail = -ENODEV;
-		if (persistent_clock_is_local)
-			adjust.tv_sec -= (sys_tz.tz_minuteswest * 60);
-#ifdef CONFIG_GENERIC_CMOS_UPDATE
-		fail = update_persistent_clock(adjust);
-#endif
-#ifdef CONFIG_RTC_SYSTOHC
-		if (fail == -ENODEV)
-			fail = rtc_set_ntp_time(adjust);
-#endif
-	}
+	if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec / 2)
+		fail = update_persistent_clock(now);
 
 	next.tv_nsec = (NSEC_PER_SEC / 2) - now.tv_nsec - (TICK_NSEC / 2);
 	if (next.tv_nsec <= 0)
 		next.tv_nsec += NSEC_PER_SEC;
 
-	if (!fail || fail == -ENODEV)
+	if (!fail)
 		next.tv_sec = 659;
 	else
 		next.tv_sec = 0;
@@ -541,13 +528,12 @@ static void sync_cmos_clock(struct work_struct *work)
 		next.tv_sec++;
 		next.tv_nsec -= NSEC_PER_SEC;
 	}
-	queue_delayed_work(system_power_efficient_wq,
-	&sync_cmos_work, timespec_to_jiffies(&next));
+	schedule_delayed_work(&sync_cmos_work, timespec_to_jiffies(&next));
 }
 
 static void notify_cmos_timer(void)
 {
-	queue_delayed_work(system_power_efficient_wq, &sync_cmos_work, 0);
+	schedule_delayed_work(&sync_cmos_work, 0);
 }
 
 #else
@@ -687,7 +673,7 @@ int do_adjtimex(struct timex *txc)
 
 	getnstimeofday(&ts);
 
-	raw_spin_lock_irq(&ntp_lock);
+	spin_lock_irq(&ntp_lock);
 
 	if (txc->modes & ADJ_ADJTIME) {
 		long save_adjust = time_adjust;
@@ -729,7 +715,7 @@ int do_adjtimex(struct timex *txc)
 	/* fill PPS status fields */
 	pps_fill_timex(txc);
 
-	raw_spin_unlock_irq(&ntp_lock);
+	spin_unlock_irq(&ntp_lock);
 
 	txc->time.tv_sec = ts.tv_sec;
 	txc->time.tv_usec = ts.tv_nsec;
@@ -927,7 +913,7 @@ void hardpps(const struct timespec *phase_ts, const struct timespec *raw_ts)
 
 	pts_norm = pps_normalize_ts(*phase_ts);
 
-	raw_spin_lock_irqsave(&ntp_lock, flags);
+	spin_lock_irqsave(&ntp_lock, flags);
 
 	/* clear the error bits, they will be set again if needed */
 	time_status &= ~(STA_PPSJITTER | STA_PPSWANDER | STA_PPSERROR);
@@ -940,7 +926,7 @@ void hardpps(const struct timespec *phase_ts, const struct timespec *raw_ts)
 	 * just start the frequency interval */
 	if (unlikely(pps_fbase.tv_sec == 0)) {
 		pps_fbase = *raw_ts;
-		raw_spin_unlock_irqrestore(&ntp_lock, flags);
+		spin_unlock_irqrestore(&ntp_lock, flags);
 		return;
 	}
 
@@ -955,7 +941,7 @@ void hardpps(const struct timespec *phase_ts, const struct timespec *raw_ts)
 		time_status |= STA_PPSJITTER;
 		/* restart the frequency calibration interval */
 		pps_fbase = *raw_ts;
-		raw_spin_unlock_irqrestore(&ntp_lock, flags);
+		spin_unlock_irqrestore(&ntp_lock, flags);
 		pr_err("hardpps: PPSJITTER: bad pulse\n");
 		return;
 	}
@@ -972,7 +958,7 @@ void hardpps(const struct timespec *phase_ts, const struct timespec *raw_ts)
 
 	hardpps_update_phase(pts_norm.nsec);
 
-	raw_spin_unlock_irqrestore(&ntp_lock, flags);
+	spin_unlock_irqrestore(&ntp_lock, flags);
 }
 EXPORT_SYMBOL(hardpps);
 

@@ -19,6 +19,7 @@
 #include <linux/io.h>
 
 #include <asm/smp_scu.h>
+#include <asm/hardware/gic.h>
 
 #include "core.h"
 
@@ -26,6 +27,7 @@ extern void secondary_startup(void);
 
 void __cpuinit platform_secondary_init(unsigned int cpu)
 {
+	gic_secondary_init(0);
 }
 
 int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)

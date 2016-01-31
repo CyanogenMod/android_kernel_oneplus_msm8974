@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -49,7 +49,7 @@ static void mdp3_bufq_deinit(struct mdp3_buffer_queue *bufq)
 	if (!count)
 		return;
 
-	while (count--) {
+	while (count-- && (bufq->pop_idx >= 0)) {
 		struct mdp3_img_data *data = &bufq->img_data[bufq->pop_idx];
 		bufq->pop_idx = (bufq->pop_idx + 1) % MDP3_MAX_BUF_QUEUE;
 		mdp3_put_img(data, MDP3_CLIENT_DMA_P);
@@ -672,15 +672,17 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 
 	mdp3_histogram_stop(mdp3_session, MDP_BLOCK_DMA_P);
 
-	rc = mdp3_session->dma->stop(mdp3_session->dma, mdp3_session->intf);
-	if (rc)
-		pr_debug("fail to stop the MDP3 dma\n");
-
-
 	if (panel->event_handler)
 		rc = panel->event_handler(panel, MDSS_EVENT_PANEL_OFF, NULL);
 	if (rc)
 		pr_err("fail to turn off the panel\n");
+
+	rc = mdp3_session->dma->stop(mdp3_session->dma, mdp3_session->intf);
+	if (rc)
+		pr_debug("fail to stop the MDP3 dma\n");
+	msleep(20);
+
+	mfd->panel_info->cont_splash_enabled = 0;
 
 	mdp3_irq_deregister();
 
@@ -708,10 +710,12 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 	mdp3_session->in_splash_screen = 0;
 off_error:
 	mdp3_session->status = 0;
-	mdp3_bufq_deinit(&mdp3_session->bufq_out);
-	if (mdp3_session->overlay.id != MSMFB_NEW_REQUEST) {
-		mdp3_session->overlay.id = MSMFB_NEW_REQUEST;
-		mdp3_bufq_deinit(&mdp3_session->bufq_in);
+	if (!panel->panel_info.dynamic_switch_pending) {
+		mdp3_bufq_deinit(&mdp3_session->bufq_out);
+		if (mdp3_session->overlay.id != MSMFB_NEW_REQUEST) {
+			mdp3_session->overlay.id = MSMFB_NEW_REQUEST;
+			mdp3_bufq_deinit(&mdp3_session->bufq_in);
+		}
 	}
 	mutex_unlock(&mdp3_session->lock);
 	return 0;
@@ -758,6 +762,7 @@ static int mdp3_ctrl_reset_cmd(struct msm_fb_data_type *mfd)
 		mdp3_dma->vsync_enable(mdp3_dma, &vsync_client);
 
 	mdp3_session->first_commit = true;
+	mfd->panel_info->cont_splash_enabled = 0;
 	mdp3_session->in_splash_screen = 0;
 
 reset_error:
@@ -847,6 +852,7 @@ static int mdp3_ctrl_reset(struct msm_fb_data_type *mfd)
 		mdp3_dma->vsync_enable(mdp3_dma, &vsync_client);
 
 	mdp3_session->first_commit = true;
+	mfd->panel_info->cont_splash_enabled = 0;
 	mdp3_session->in_splash_screen = 0;
 
 reset_error:
@@ -969,12 +975,6 @@ static int mdp3_overlay_play(struct msm_fb_data_type *mfd,
 
 	mutex_lock(&mdp3_session->lock);
 
-	if (mdp3_session->overlay.id == MSMFB_NEW_REQUEST) {
-		pr_err("overlay play without overlay set first\n");
-		mutex_unlock(&mdp3_session->lock);
-		return -EINVAL;
-	}
-
 	if (mdss_fb_is_power_on(mfd))
 		rc = mdp3_overlay_queue_buffer(mfd, req);
 	else
@@ -990,7 +990,7 @@ static int mdp3_ctrl_display_commit_kickoff(struct msm_fb_data_type *mfd,
 {
 	struct mdp3_session_data *mdp3_session;
 	struct mdp3_img_data *data;
-	struct mdss_panel_info *panel_info = mfd->panel_info;
+	struct mdss_panel_info *panel_info;
 	int rc = 0;
 	bool reset_done = false;
 	struct mdss_panel_data *panel;
@@ -998,6 +998,7 @@ static int mdp3_ctrl_display_commit_kickoff(struct msm_fb_data_type *mfd,
 	if (!mfd || !mfd->mdp.private1)
 		return -EINVAL;
 
+	panel_info = mfd->panel_info;
 	mdp3_session = mfd->mdp.private1;
 	if (!mdp3_session || !mdp3_session->dma)
 		return -EINVAL;
@@ -1054,7 +1055,8 @@ static int mdp3_ctrl_display_commit_kickoff(struct msm_fb_data_type *mfd,
 	if (mdp3_bufq_count(&mdp3_session->bufq_out) > 1) {
 		mdp3_release_splash_memory(mfd);
 		data = mdp3_bufq_pop(&mdp3_session->bufq_out);
-		mdp3_put_img(data, MDP3_CLIENT_DMA_P);
+		if (data)
+			mdp3_put_img(data, MDP3_CLIENT_DMA_P);
 	}
 
 	if (mdp3_session->first_commit) {
@@ -1080,13 +1082,14 @@ static void mdp3_ctrl_pan_display(struct msm_fb_data_type *mfd)
 	struct mdp3_session_data *mdp3_session;
 	u32 offset;
 	int bpp;
-	struct mdss_panel_info *panel_info = mfd->panel_info;
+	struct mdss_panel_info *panel_info;
 	int rc;
 
 	pr_debug("mdp3_ctrl_pan_display\n");
 	if (!mfd || !mfd->mdp.private1)
 		return;
 
+	panel_info = mfd->panel_info;
 	mdp3_session = (struct mdp3_session_data *)mfd->mdp.private1;
 	if (!mdp3_session || !mdp3_session->dma)
 		return;
@@ -1590,8 +1593,9 @@ static int mdp3_ctrl_lut_update(struct msm_fb_data_type *mfd,
 	lut_config.lut_sel = mdp3_session->lut_sel;
 	lut_config.lut_position = 0;
 	lut_config.lut_dirty = true;
-	lut.color0_lut = r;
-	lut.color1_lut = g;
+	/* In HW the order is color0 = g, color1 = r and color2 = b*/
+	lut.color0_lut = g;
+	lut.color1_lut = r;
 	lut.color2_lut = b;
 
 	mutex_lock(&mdp3_session->lock);
@@ -1781,6 +1785,48 @@ int mdp3_wait_for_dma_done(struct mdp3_session_data *session)
 	return rc;
 }
 
+static int mdp3_update_panel_info(struct msm_fb_data_type *mfd, int mode)
+{
+	int ret = 0;
+	struct mdp3_session_data *mdp3_session;
+	struct mdss_panel_data *panel;
+	u32 intf_type = 0;
+
+	if (!mfd || !mfd->mdp.private1)
+		return -EINVAL;
+
+	mdp3_session = mfd->mdp.private1;
+	panel = mdp3_session->panel;
+
+	if (!panel->event_handler)
+		return 0;
+	ret = panel->event_handler(panel, MDSS_EVENT_DSI_DYNAMIC_SWITCH,
+						(void *)(unsigned long)mode);
+	if (ret)
+		pr_err("Dynamic switch to %s mode failed!\n",
+					mode ? "command" : "video");
+	if (mode == 1)
+		mfd->panel.type = MIPI_CMD_PANEL;
+	else
+		mfd->panel.type = MIPI_VIDEO_PANEL;
+
+	if (mfd->panel.type != MIPI_VIDEO_PANEL)
+		mdp3_session->wait_for_dma_done = mdp3_wait_for_dma_done;
+
+	intf_type = mdp3_ctrl_get_intf_type(mfd);
+	mdp3_session->intf->cfg.type = intf_type;
+	mdp3_session->intf->available = 1;
+	mdp3_session->intf->in_use = 1;
+	mdp3_res->intf[intf_type].in_use = 1;
+
+	mdp3_intf_init(mdp3_session->intf);
+
+	mdp3_session->dma->output_config.out_sel = intf_type;
+	mdp3_session->status = mdp3_session->intf->active;
+
+	return 0;
+}
+
 int mdp3_ctrl_init(struct msm_fb_data_type *mfd)
 {
 	struct device *dev = mfd->fbi->dev;
@@ -1803,6 +1849,7 @@ int mdp3_ctrl_init(struct msm_fb_data_type *mfd)
 	mdp3_interface->ioctl_handler = mdp3_ctrl_ioctl_handler;
 	mdp3_interface->kickoff_fnc = mdp3_ctrl_display_commit_kickoff;
 	mdp3_interface->lut_update = mdp3_ctrl_lut_update;
+	mdp3_interface->configure_panel = mdp3_update_panel_info;
 
 	mdp3_session = kmalloc(sizeof(struct mdp3_session_data), GFP_KERNEL);
 	if (!mdp3_session) {

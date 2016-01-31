@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -50,11 +50,13 @@
 #define WCD9XXX_DMIC_SAMPLE_RATE_DIV_3    0x1
 #define WCD9XXX_DMIC_SAMPLE_RATE_DIV_4    0x2
 
-#define WCD9XXX_DMIC_CLK_DIV_2 0x00
-#define WCD9XXX_DMIC_CLK_DIV_3 0x01
-#define WCD9XXX_DMIC_CLK_DIV_4 0x02
-#define WCD9XXX_DMIC_CLK_DIV_6 0x03
-#define WCD9XXX_DMIC_CLK_DIV_16 0x04
+#define WCD9XXX_DMIC_B1_CTL_DIV_2 0x00
+#define WCD9XXX_DMIC_B1_CTL_DIV_3 0x22
+#define WCD9XXX_DMIC_B1_CTL_DIV_4 0x44
+
+#define WCD9XXX_DMIC_B2_CTL_DIV_2 0x00
+#define WCD9XXX_DMIC_B2_CTL_DIV_3 0x02
+#define WCD9XXX_DMIC_B2_CTL_DIV_4 0x04
 
 #define WCD9XXX_ANC_DMIC_X2_ON    0x1
 #define WCD9XXX_ANC_DMIC_X2_OFF   0x0

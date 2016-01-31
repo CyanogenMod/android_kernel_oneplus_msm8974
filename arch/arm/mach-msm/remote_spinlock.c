@@ -157,9 +157,7 @@ static void __raw_remote_swp_spin_lock(raw_remote_spinlock_t *lock)
 	unsigned long tmp;
 
 	__asm__ __volatile__(
-"1:     ldrex   %0, [%1]; \n"
-"       cmp     %0, %2; \n"
-"       strexne %0, %2, [%1]; \n"
+"1:     swp     %0, %2, [%1]\n"
 "       teq     %0, #0\n"
 "       bne     1b"
 	: "=&r" (tmp)
@@ -174,9 +172,7 @@ static int __raw_remote_swp_spin_trylock(raw_remote_spinlock_t *lock)
 	unsigned long tmp;
 
 	__asm__ __volatile__(
-"      ldrex   %0, [%1]; \n"
-"       cmp     %0, %2; \n"
-"       strexne %0, %2, [%1]; \n"
+"       swp     %0, %2, [%1]\n"
 	: "=&r" (tmp)
 	: "r" (&lock->lock), "r" (1)
 	: "cc");

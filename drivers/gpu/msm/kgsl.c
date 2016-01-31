@@ -52,17 +52,17 @@
 
 static int kgsl_pagetable_count = KGSL_PAGETABLE_COUNT;
 
-#ifdef CONFIG_ARM_LPAE
-#define KGSL_DMA_BIT_MASK	DMA_BIT_MASK(64)
-#else
-#define KGSL_DMA_BIT_MASK	DMA_BIT_MASK(32)
-#endif
-
 /*
  * Define an kmem cache for the memobj structures since we allocate and free
  * them so frequently
  */
 static struct kmem_cache *memobjs_cache;
+
+#ifdef CONFIG_ARM_LPAE
+#define KGSL_DMA_BIT_MASK	DMA_BIT_MASK(64)
+#else
+#define KGSL_DMA_BIT_MASK	DMA_BIT_MASK(32)
+#endif
 
 static char *ksgl_mmu_type;
 module_param_named(ptcount, kgsl_pagetable_count, int, 0);
@@ -1037,6 +1037,8 @@ int kgsl_close_device(struct kgsl_device *device)
 		/* Fail if the wait times out */
 		BUG_ON(atomic_read(&device->active_cnt) > 0);
 
+		/* Force power on to do the stop */
+		kgsl_pwrctrl_enable(device);
 		result = device->ftbl->stop(device);
 		kgsl_pwrctrl_set_state(device, KGSL_STATE_INIT);
 	}
@@ -4578,20 +4580,6 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 		goto error_close_mmu;
 	}
 
-	/*
-	 * The default request type PM_QOS_REQ_ALL_CORES is
-	 * applicable to all CPU cores that are online and
-	 * would have a power impact when there are more
-	 * number of CPUs. PM_QOS_REQ_AFFINE_IRQ request
-	 * type shall update/apply the vote only to that CPU to
-	 * which IRQ's affinity is set to.
-	 */
-#ifdef CONFIG_SMP
-
-	device->pwrctrl.pm_qos_req_dma.type = PM_QOS_REQ_AFFINE_IRQ;
-	device->pwrctrl.pm_qos_req_dma.irq = device->pwrctrl.interrupt_num;
-
-#endif
 	pm_qos_add_request(&device->pwrctrl.pm_qos_req_dma,
 				PM_QOS_CPU_DMA_LATENCY,
 				PM_QOS_DEFAULT_VALUE);

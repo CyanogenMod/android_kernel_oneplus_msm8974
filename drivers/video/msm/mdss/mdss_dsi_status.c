@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,7 +32,7 @@
 
 #define STATUS_CHECK_INTERVAL_MS 5000
 #define STATUS_CHECK_INTERVAL_MIN_MS 200
-#define DSI_STATUS_CHECK_DISABLE 1
+#define DSI_STATUS_CHECK_DISABLE 0
 
 static uint32_t interval = STATUS_CHECK_INTERVAL_MS;
 static uint32_t dsi_status_disable = DSI_STATUS_CHECK_DISABLE;
@@ -60,6 +60,12 @@ static void check_dsi_ctrl_status(struct work_struct *work)
 		return;
 	}
 
+	if (mdss_panel_is_power_off(pdsi_status->mfd->panel_power_state) ||
+			pdsi_status->mfd->shutdown_pending) {
+		pr_err("%s: panel off\n", __func__);
+		return;
+	}
+
 	pdsi_status->mfd->mdp.check_dsi_status(work, interval);
 }
 
@@ -81,20 +87,36 @@ static int fb_event_callback(struct notifier_block *self,
 	struct dsi_status_data *pdata = container_of(self,
 				struct dsi_status_data, fb_notifier);
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo;
+	struct msm_fb_data_type *mfd;
 
-	pdata->mfd = evdata->info->par;
-	ctrl_pdata = container_of(dev_get_platdata(&pdata->mfd->pdev->dev),
+	if (!evdata) {
+		pr_err("%s: event data not available\n", __func__);
+		return NOTIFY_BAD;
+	}
+
+	mfd = evdata->info->par;
+	ctrl_pdata = container_of(dev_get_platdata(&mfd->pdev->dev),
 				struct mdss_dsi_ctrl_pdata, panel_data);
 	if (!ctrl_pdata) {
 		pr_err("%s: DSI ctrl not available\n", __func__);
 		return NOTIFY_BAD;
 	}
+
+	pinfo = &ctrl_pdata->panel_data.panel_info;
+
+	if (!(pinfo->esd_check_enabled)) {
+		pr_debug("ESD check is not enaled in panel dtsi\n");
+		return NOTIFY_DONE;
+	}
+
 	if (dsi_status_disable) {
 		pr_debug("%s: DSI status disabled\n", __func__);
 		return NOTIFY_DONE;
 	}
 
-	if (event == FB_EVENT_BLANK && evdata) {
+	pdata->mfd = evdata->info->par;
+	if (event == FB_EVENT_BLANK) {
 		int *blank = evdata->data;
 		struct dsi_status_data *pdata = container_of(self,
 				struct dsi_status_data, fb_notifier);

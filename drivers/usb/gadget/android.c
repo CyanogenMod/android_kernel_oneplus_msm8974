@@ -47,6 +47,9 @@
 #include "epautoconf.c"
 #include "composite.c"
 
+#ifdef CONFIG_SND_RAWMIDI
+#include "f_midi.c"
+#endif
 #include "f_diag.c"
 #include "f_qdss.c"
 #include "f_rmnet_smd.c"
@@ -58,7 +61,6 @@
 #include "f_audio_source.c"
 #endif
 #include "f_fs.c"
-#include "f_midi.c"
 #include "f_mass_storage.c"
 #include "u_serial.c"
 #include "u_sdio.c"
@@ -108,11 +110,10 @@ static const char longname[] = "Gadget Android";
 #define PRODUCT_ID		0x0001
 
 #define ANDROID_DEVICE_NODE_NAME_LENGTH 11
-
 /* f_midi configuration */
 #define MIDI_INPUT_PORTS    1
 #define MIDI_OUTPUT_PORTS   1
-#define MIDI_BUFFER_SIZE    256
+#define MIDI_BUFFER_SIZE    1024
 #define MIDI_QUEUE_LENGTH   32
 
 struct android_usb_function {
@@ -617,6 +618,7 @@ ffs_aliases_store(struct device *pdev, struct device_attribute *attr,
 
 	dev = list_first_entry(&android_dev_list, struct android_dev,
 			list_item);
+
 	mutex_lock(&dev->mutex);
 
 	if (dev->enabled) {
@@ -2141,10 +2143,6 @@ error:
 
 static void mass_storage_function_cleanup(struct android_usb_function *f)
 {
-	struct mass_storage_function_config *config;
-
-	config = f->config;
-	fsg_common_put(config->common);
 	kfree(f->config);
 	f->config = NULL;
 }
@@ -2270,7 +2268,8 @@ static ssize_t audio_source_pcm_show(struct device *dev,
 	struct audio_source_config *config = f->config;
 
 	/* print PCM card and device numbers */
-	return sprintf(buf, "%d %d\n", config->card, config->device);
+	return snprintf(buf, PAGE_SIZE,
+			"%d %d\n", config->card, config->device);
 }
 
 static DEVICE_ATTR(pcm, S_IRUGO | S_IWUSR, audio_source_pcm_show, NULL);
@@ -2336,6 +2335,7 @@ static struct android_usb_function uasp_function = {
 	.bind_config	= uasp_function_bind_config,
 };
 
+#ifdef CONFIG_SND_RAWMIDI
 static int midi_function_init(struct android_usb_function *f,
 					struct usb_composite_dev *cdev)
 {
@@ -2389,7 +2389,7 @@ static struct android_usb_function midi_function = {
 	.bind_config	= midi_function_bind_config,
 	.attributes	= midi_function_attributes,
 };
-
+#endif
 static struct android_usb_function *supported_functions[] = {
 	&ffs_function,
 	&mbim_function,
@@ -2419,8 +2419,10 @@ static struct android_usb_function *supported_functions[] = {
 #ifdef CONFIG_SND_PCM
 	&audio_source_function,
 #endif
-	&midi_function,
 	&uasp_function,
+#ifdef CONFIG_SND_RAWMIDI
+	&midi_function,
+#endif
 	&charger_function,
 	NULL
 };
@@ -2698,7 +2700,7 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 	struct android_configuration *conf;
 	char *conf_str;
 	struct android_usb_function_holder *f_holder;
-	char *name;
+	char *name = NULL;
 	char buf[256], *b;
 	char aliases[256], *a;
 	int err;
@@ -2743,8 +2745,10 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 			conf = alloc_android_config(dev);
 
 		curr_conf = curr_conf->next;
+
 		while (conf_str) {
 			name = strsep(&conf_str, ",");
+
 			is_ffs = 0;
 			strlcpy(aliases, dev->ffs_aliases, sizeof(aliases));
 			a = aliases;
@@ -2771,7 +2775,7 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 			err = android_enable_function(dev, conf, name);
 			if (err)
 				pr_err("android_usb: Cannot enable '%s' (%d)",
-								   name, err);
+						name, err);
 		}
 	}
 
@@ -2917,27 +2921,6 @@ out:
 	return snprintf(buf, PAGE_SIZE, "%s\n", state);
 }
 
-#define DESCRIPTOR_ATTR(field, format_string)				\
-static ssize_t								\
-field ## _show(struct device *dev, struct device_attribute *attr,	\
-		char *buf)						\
-{									\
-	return snprintf(buf, PAGE_SIZE,					\
-			format_string, device_desc.field);		\
-}									\
-static ssize_t								\
-field ## _store(struct device *dev, struct device_attribute *attr,	\
-		const char *buf, size_t size)				\
-{									\
-	int value;							\
-	if (sscanf(buf, format_string, &value) == 1) {			\
-		device_desc.field = value;				\
-		return size;						\
-	}								\
-	return -1;							\
-}									\
-static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, field ## _show, field ## _store);
-
 #define ANDROID_DEV_ATTR(field, format_string)				\
 static ssize_t								\
 field ## _show(struct device *pdev, struct device_attribute *attr,	\
@@ -2960,6 +2943,27 @@ field ## _store(struct device *pdev, struct device_attribute *attr,	\
 		return size;						\
 	}								\
 	return -EINVAL;							\
+}									\
+static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, field ## _show, field ## _store);
+
+#define DESCRIPTOR_ATTR(field, format_string)				\
+static ssize_t								\
+field ## _show(struct device *dev, struct device_attribute *attr,	\
+		char *buf)						\
+{									\
+	return snprintf(buf, PAGE_SIZE,					\
+			format_string, device_desc.field);		\
+}									\
+static ssize_t								\
+field ## _store(struct device *dev, struct device_attribute *attr,	\
+		const char *buf, size_t size)				\
+{									\
+	int value;							\
+	if (sscanf(buf, format_string, &value) == 1) {			\
+		device_desc.field = value;				\
+		return size;						\
+	}								\
+	return -1;							\
 }									\
 static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, field ## _show, field ## _store);
 
@@ -3399,6 +3403,11 @@ static int __devinit android_probe(struct platform_device *pdev)
 			return -ENOMEM;
 		}
 
+		pdata->cdrom = of_property_read_bool(pdev->dev.of_node,
+				"qcom,android-usb-cdrom");
+		pdata->internal_ums = of_property_read_bool(pdev->dev.of_node,
+				"qcom,android-usb-internal-ums");
+
 		of_get_property(pdev->dev.of_node, "qcom,pm-qos-latency",
 								&prop_len);
 		if (prop_len == sizeof(pdata->pm_qos_latency)) {
@@ -3409,10 +3418,6 @@ static int __devinit android_probe(struct platform_device *pdev)
 			pr_info("pm_qos latency not specified %d\n", prop_len);
 		}
 
-		pdata->cdrom = of_property_read_bool(pdev->dev.of_node,
-				"qcom,android-usb-cdrom");
-		pdata->internal_ums = of_property_read_bool(pdev->dev.of_node,
-				"qcom,android-usb-internal-ums");
 		len = of_property_count_strings(pdev->dev.of_node,
 				"qcom,streaming-func");
 		if (len > MAX_STREAMING_FUNCS) {

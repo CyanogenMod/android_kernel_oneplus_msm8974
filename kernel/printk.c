@@ -1024,7 +1024,6 @@ static int syslog_print_all(char __user *buf, int size, bool clear)
 			struct log *msg = log_from_idx(idx);
 
 			len += msg_print_text(msg, prev, true, NULL, 0);
-			prev = msg->flags;
 			idx = log_next(idx);
 			seq++;
 		}
@@ -1037,7 +1036,6 @@ static int syslog_print_all(char __user *buf, int size, bool clear)
 			struct log *msg = log_from_idx(idx);
 
 			len -= msg_print_text(msg, prev, true, NULL, 0);
-			prev = msg->flags;
 			idx = log_next(idx);
 			seq++;
 		}
@@ -1900,10 +1898,8 @@ static int __cpuinit console_cpu_notify(struct notifier_block *self,
 	case CPU_DEAD:
 	case CPU_DOWN_FAILED:
 	case CPU_UP_CANCELED:
-#ifdef CONFIG_CONSOLE_FLUSH_ON_HOTPLUG
 		console_lock();
 		console_unlock();
-#endif
 		break;
 	case CPU_ONLINE:
 	case CPU_DYING:

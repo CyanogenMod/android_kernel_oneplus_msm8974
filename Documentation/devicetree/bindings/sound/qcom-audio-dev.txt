@@ -467,14 +467,11 @@ Optional properties:
 			    codec.
 - qcom,mbhc-bias-internal: Flag to indicate if internal micbias should be used
 			   for headset detection.
-- qcom,dock-plug-det-irq: Interrupt line to detect Docking/Undocking of Liquid
-			  device
 - qcom,mbhc-audio-jack-type : String to indicate the jack type on the hardware.
 		Possible Values:
 		4-pole-jack : Jack on the hardware is 4-pole.
 		5-pole-jack : Jack on the hardware is 5-pole.
 		6-pole-jack : Jack on the hardware is 6-pole.
-
 * APQ8074 ASoC Machine driver
 
 Required properties:

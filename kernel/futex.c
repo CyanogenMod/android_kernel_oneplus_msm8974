@@ -62,13 +62,14 @@
 #include <linux/ptrace.h>
 #include <linux/hugetlb.h>
 #include <linux/freezer.h>
-#include <linux/bootmem.h>
 
 #include <asm/futex.h>
 
 #include "rtmutex_common.h"
 
 int __read_mostly futex_cmpxchg_enabled;
+
+#define FUTEX_HASHBITS (CONFIG_BASE_SMALL ? 4 : 8)
 
 /*
  * Futex flags used to encode options to functions and preserve them across
@@ -147,11 +148,9 @@ static const struct futex_q futex_q_init = {
 struct futex_hash_bucket {
 	spinlock_t lock;
 	struct plist_head chain;
-} ____cacheline_aligned_in_smp;
+};
 
-static unsigned long __read_mostly futex_hashsize;
-
-static struct futex_hash_bucket *futex_queues;
+static struct futex_hash_bucket futex_queues[1<<FUTEX_HASHBITS];
 
 /*
  * We hash on the keys returned from get_futex_key (see below).
@@ -161,7 +160,7 @@ static struct futex_hash_bucket *hash_futex(union futex_key *key)
 	u32 hash = jhash2((u32*)&key->both.word,
 			  (sizeof(key->both.word)+sizeof(key->both.ptr))/4,
 			  key->both.offset);
-	return &futex_queues[hash & (futex_hashsize - 1)];
+	return &futex_queues[hash & ((1 << FUTEX_HASHBITS)-1)];
 }
 
 /*
@@ -192,8 +191,6 @@ static void get_futex_key_refs(union futex_key *key)
 	case FUT_OFF_MMSHARED:
 		atomic_inc(&key->private.mm->mm_count);
 		break;
-	default:
-		smp_mb(); /* explicit MB (B) */
 	}
 }
 
@@ -1920,8 +1917,11 @@ static void futex_wait_queue_me(struct futex_hash_bucket *hb, struct futex_q *q,
 	queue_me(q, hb);
 
 	/* Arm the timer */
-	if (timeout)
+	if (timeout) {
 		hrtimer_start_expires(&timeout->timer, HRTIMER_MODE_ABS);
+		if (!hrtimer_active(&timeout->timer))
+			timeout->task = NULL;
+	}
 
 	/*
 	 * If we have been removed from the hash list, then another task
@@ -2112,7 +2112,7 @@ static long futex_wait_restart(struct restart_block *restart)
  * if there are waiters then it will block, it does PI, etc. (Due to
  * races the kernel might see a 0 value of the futex too.)
  */
-static int futex_lock_pi(u32 __user *uaddr, unsigned int flags,
+static int futex_lock_pi(u32 __user *uaddr, unsigned int flags, int detect,
 			 ktime_t *time, int trylock)
 {
 	struct hrtimer_sleeper timeout, *to = NULL;
@@ -2816,11 +2816,11 @@ long do_futex(u32 __user *uaddr, int op, u32 val, ktime_t *timeout,
 	case FUTEX_WAKE_OP:
 		return futex_wake_op(uaddr, flags, uaddr2, val, val2, val3);
 	case FUTEX_LOCK_PI:
-		return futex_lock_pi(uaddr, flags, timeout, 0);
+		return futex_lock_pi(uaddr, flags, val, timeout, 0);
 	case FUTEX_UNLOCK_PI:
 		return futex_unlock_pi(uaddr, flags);
 	case FUTEX_TRYLOCK_PI:
-		return futex_lock_pi(uaddr, flags, NULL, 1);
+		return futex_lock_pi(uaddr, flags, 0, timeout, 1);
 	case FUTEX_WAIT_REQUEUE_PI:
 		val3 = FUTEX_BITSET_MATCH_ANY;
 		return futex_wait_requeue_pi(uaddr, flags, val, timeout, val3,
@@ -2868,21 +2868,8 @@ SYSCALL_DEFINE6(futex, u32 __user *, uaddr, int, op, u32, val,
 static int __init futex_init(void)
 {
 	u32 curval;
-	unsigned int futex_shift;
-	unsigned long i;
+	int i;
 
-#if CONFIG_BASE_SMALL
-	futex_hashsize = 16;
-#else
-	futex_hashsize = roundup_pow_of_two(256 * num_possible_cpus());
-#endif
-
-	futex_queues = alloc_large_system_hash("futex", sizeof(*futex_queues),
-					       futex_hashsize, 0,
-					       futex_hashsize < 256 ? HASH_SMALL : 0,
-					       &futex_shift, NULL,
-					       futex_hashsize, futex_hashsize);
-	futex_hashsize = 1UL << futex_shift;
 	/*
 	 * This will fail and we want it. Some arch implementations do
 	 * runtime detection of the futex_atomic_cmpxchg_inatomic()
@@ -2896,7 +2883,7 @@ static int __init futex_init(void)
 	if (cmpxchg_futex_value_locked(&curval, NULL, 0, 0) == -EFAULT)
 		futex_cmpxchg_enabled = 1;
 
-	for (i = 0; i < futex_hashsize; i++) {
+	for (i = 0; i < ARRAY_SIZE(futex_queues); i++) {
 		plist_head_init(&futex_queues[i].chain);
 		spin_lock_init(&futex_queues[i].lock);
 	}

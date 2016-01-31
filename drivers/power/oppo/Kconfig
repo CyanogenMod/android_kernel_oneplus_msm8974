@@ -1,0 +1,37 @@
+if MACH_OPPO
+
+config BATTERY_BQ27541_OPPO
+	tristate "BQ27541 battery driver"
+	depends on I2C
+	default n
+	help
+	  Say Y here to enable support for batteries with BQ27541 (I2C) chips.
+
+config HMAC_SHA1_BQ27541_OPPO
+	bool "BQ27541 HMAC SHA1 support"
+	depends on BATTERY_BQ27541_OPPO
+	help
+	  Say Y here to enable support for BQ27541 battery HMAC SHA1 support.
+
+config BQ24196_CHARGER_OPPO
+	tristate "BQ24196 Charger driver"
+	help
+	  Say Y here to enable the BQ24196 battery charger device.
+
+config QPNP_CHARGER_OPPO
+	tristate "QPNP Charger driver"
+	depends on SPMI
+	depends on OF_SPMI
+	depends on THERMAL_QPNP_ADC_TM
+	help
+	  Say Y here to enable the switch mode battery charger
+	  and boost device which supports USB detection and charging. The driver
+	  also offers relevant information to userspace via the power supply
+	  framework.
+
+config PIC1503_FASTCG_OPPO
+	tristate "PIC1503 Fast-charge Driver"
+	help
+	  Say Y here to enable the PIC1503 fast charger
+
+endif

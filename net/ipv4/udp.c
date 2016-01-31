@@ -2081,14 +2081,18 @@ static void udp4_format_sock(struct sock *sp, struct seq_file *f,
 		int bucket)
 {
 	struct inet_sock *inet = inet_sk(sp);
+	struct udp_sock *up = udp_sk(sp);
 	__be32 dest = inet->inet_daddr;
 	__be32 src  = inet->inet_rcv_saddr;
 	__u16 destp	  = ntohs(inet->inet_dport);
 	__u16 srcp	  = ntohs(inet->inet_sport);
+	__u8 state = sp->sk_state;
+	if (up->encap_rcv)
+		state |= 0xF0;
 
 	seq_printf(f, "%5d: %08X:%04X %08X:%04X"
-		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %pK %d",
-		bucket, src, srcp, dest, destp, sp->sk_state,
+		" %02X %08X:%08X %02X:%08lX %08X %5u %8d %lu %d %pK %d",
+		bucket, src, srcp, dest, destp, state,
 		sk_wmem_alloc_get(sp),
 		sk_rmem_alloc_get(sp),
 		0, 0L, 0, sock_i_uid(sp), 0, sock_i_ino(sp),
@@ -2173,16 +2177,26 @@ void __init udp_table_init(struct udp_table *table, const char *name)
 {
 	unsigned int i;
 
-	table->hash = alloc_large_system_hash(name,
-					      2 * sizeof(struct udp_hslot),
-					      uhash_entries,
-					      21, /* one slot per 2 MB */
-					      0,
-					      &table->log,
-					      &table->mask,
-					      UDP_HTABLE_SIZE_MIN,
-					      64 * 1024);
-
+	if (!CONFIG_BASE_SMALL)
+		table->hash = alloc_large_system_hash(name,
+			2 * sizeof(struct udp_hslot),
+			uhash_entries,
+			21, /* one slot per 2 MB */
+			0,
+			&table->log,
+			&table->mask,
+			64 * 1024);
+	/*
+	 * Make sure hash table has the minimum size
+	 */
+	if (CONFIG_BASE_SMALL || table->mask < UDP_HTABLE_SIZE_MIN - 1) {
+		table->hash = kmalloc(UDP_HTABLE_SIZE_MIN *
+				      2 * sizeof(struct udp_hslot), GFP_KERNEL);
+		if (!table->hash)
+			panic(name);
+		table->log = ilog2(UDP_HTABLE_SIZE_MIN);
+		table->mask = UDP_HTABLE_SIZE_MIN - 1;
+	}
 	table->hash2 = table->hash + (table->mask + 1);
 	for (i = 0; i <= table->mask; i++) {
 		INIT_HLIST_NULLS_HEAD(&table->hash[i].head, i);

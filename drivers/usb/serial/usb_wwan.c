@@ -801,7 +801,8 @@ int usb_wwan_suspend(struct usb_serial *serial, pm_message_t message)
 
 	spin_lock_irq(&intfdata->susp_lock);
 	if (PMSG_IS_AUTO(message)) {
-		if (intfdata->in_flight || pm_runtime_autosuspend_expiration(&serial->dev->dev))
+		if (intfdata->in_flight ||
+				pm_runtime_autosuspend_expiration(&serial->dev->dev))
 			spin_unlock_irq(&intfdata->susp_lock);
 			return -EBUSY;
 		}
@@ -858,6 +859,7 @@ int usb_wwan_resume(struct usb_serial *serial)
 
 	spin_lock_irq(&intfdata->susp_lock);
 	intfdata->suspended = 0;
+
 	for (i = 0; i < serial->num_ports; i++) {
 		/* walk all ports */
 		port = serial->port[i];
@@ -901,7 +903,6 @@ int usb_wwan_resume(struct usb_serial *serial)
 			}
 		}
 	}
-	intfdata->suspended = 0;
 	spin_unlock_irq(&intfdata->susp_lock);
 
 	if (err_count)

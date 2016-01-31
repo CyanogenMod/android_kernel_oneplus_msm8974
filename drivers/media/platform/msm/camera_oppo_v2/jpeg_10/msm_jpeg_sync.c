@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,7 +16,6 @@
 #include <linux/list.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
-#include <linux/ratelimit.h>
 #include <media/msm_jpeg.h>
 #include "msm_jpeg_sync.h"
 #include "msm_jpeg_core.h"
@@ -723,9 +722,6 @@ int msm_jpeg_ioctl_hw_cmds(struct msm_jpeg_device *pgmn_dev,
 			kfree(hw_cmds_p);
 			return -EFAULT;
 		}
-	} else {
-		kfree(hw_cmds_p);
-		return is_copy_to_user;
 	}
 	kfree(hw_cmds_p);
 	return 0;
@@ -769,12 +765,11 @@ int msm_jpeg_start(struct msm_jpeg_device *pgmn_dev, void * __user arg)
 	for (i = 0; i < 2; i++)
 		kfree(buf_out_free[i]);
 
-	pgmn_dev->state = MSM_JPEG_EXECUTING;
 	JPEG_DBG_HIGH("%s:%d] START\n", __func__, __LINE__);
 	wmb();
 	rc = msm_jpeg_ioctl_hw_cmds(pgmn_dev, arg);
 	wmb();
-
+	pgmn_dev->state = MSM_JPEG_EXECUTING;
 	JPEG_DBG("%s:%d]", __func__, __LINE__);
 	return rc;
 }
@@ -915,7 +910,7 @@ long __msm_jpeg_ioctl(struct msm_jpeg_device *pgmn_dev,
 		rc = msm_jpeg_ioctl_set_clk_rate(pgmn_dev, arg);
 		break;
 	default:
-		pr_err_ratelimited("%s:%d] cmd = %d not supported\n",
+		JPEG_PR_ERR(KERN_INFO "%s:%d] cmd = %d not supported\n",
 			__func__, __LINE__, _IOC_NR(cmd));
 		rc = -EINVAL;
 		break;

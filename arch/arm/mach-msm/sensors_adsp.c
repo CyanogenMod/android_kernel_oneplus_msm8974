@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, 2015 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,7 +10,6 @@
  * GNU General Public License for more details.
  */
 
-#include <mach/sensors_adsp.h>
 #include <linux/msm_dsps.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -158,8 +157,7 @@ static int sensors_adsp_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id msm_adsp_sensors_dt_match[] = {
-	{.compatible = "qcom,msm-adsp-sensors"},
-	{},
+	{.compatible = "qcom,msm-adsp-sensors"}
 };
 MODULE_DEVICE_TABLE(of, msm_adsp_sensors_dt_match);
 

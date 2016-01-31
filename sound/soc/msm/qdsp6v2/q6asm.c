@@ -1826,7 +1826,7 @@ static void q6asm_add_hdr_custom_topology(struct audio_client *ac,
 	hdr->src_port = ((ac->session << 8) & 0xFF00) | 0x01;
 	hdr->dest_port = 0;
 	if (cmd_flg) {
-		hdr->token = ((ac->session << 8) | 0x0001);
+		hdr->token = ((ac->session << 8) | 0x0001) ;
 	}
 	hdr->pkt_size  = pkt_size;
 	mutex_unlock(&ac->cmd_lock);
@@ -2653,7 +2653,6 @@ int q6asm_cfg_aac_sel_mix_coef(struct audio_client *ac, uint32_t mix_coeff)
 		pr_err("%s:Command opcode[0x%x]paramid[0x%x] failed\n",
 			__func__, ASM_STREAM_CMD_SET_ENCDEC_PARAM,
 			ASM_PARAM_ID_AAC_STEREO_MIX_COEFF_SELECTION_FLAG_V2);
-		rc = -EINVAL;
 		goto fail_cmd;
 	}
 	rc = wait_event_timeout(ac->cmd_wait,
@@ -2661,11 +2660,12 @@ int q6asm_cfg_aac_sel_mix_coef(struct audio_client *ac, uint32_t mix_coeff)
 	if (!rc) {
 		pr_err("%s:timeout opcode[0x%x]\n",
 			__func__, aac_mix_coeff.hdr.opcode);
+		rc = -ETIMEDOUT;
 		goto fail_cmd;
 	}
 	return 0;
 fail_cmd:
-	return -EINVAL;
+	return rc;
 }
 
 int q6asm_enc_cfg_blk_qcelp(struct audio_client *ac, uint32_t frames_per_buf,

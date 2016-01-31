@@ -960,14 +960,14 @@ static void _iface_stat_set_active(struct iface_stat *entry,
 		IF_DEBUG("qtaguid: %s(%s): "
 			 "enable tracking. rfcnt=%d\n", __func__,
 			 entry->ifname,
-			 __this_cpu_read(*net_dev->pcpu_refcnt));
+			 percpu_read(*net_dev->pcpu_refcnt));
 	} else {
 		entry->active = false;
 		entry->net_dev = NULL;
 		IF_DEBUG("qtaguid: %s(%s): "
 			 "disable tracking. rfcnt=%d\n", __func__,
 			 entry->ifname,
-			 __this_cpu_read(*net_dev->pcpu_refcnt));
+			 percpu_read(*net_dev->pcpu_refcnt));
 
 	}
 }
@@ -1714,6 +1714,10 @@ static struct sock *qtaguid_find_sk(const struct sk_buff *skb,
 	if (sk) {
 		MT_DEBUG("qtaguid[%d]: %p->sk_proto=%u->sk_state=%d\n",
 			 par->hooknum, sk, sk->sk_protocol, sk->sk_state);
+		/*
+		 * When in TCP_TIME_WAIT the sk is not a "struct sock" but
+		 * "struct inet_timewait_sock" which is missing fields.
+		 */
 		if (sk->sk_state  == TCP_TIME_WAIT) {
 			xt_socket_put_sk(sk);
 			sk = NULL;

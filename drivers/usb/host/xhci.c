@@ -395,7 +395,7 @@ static inline void xhci_cleanup_msix(struct xhci_hcd *xhci)
 {
 }
 
-#endif
+#endif /* CONFIG_PCI */
 
 static void compliance_mode_recovery(unsigned long arg)
 {

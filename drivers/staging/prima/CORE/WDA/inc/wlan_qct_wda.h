@@ -2063,6 +2063,22 @@ void WDA_TransportChannelDebug
 );
 
 /*==========================================================================
+  FUNCTION   WDA_TransportKickDxe
+
+  DESCRIPTION
+    Request Kick DXE when first hdd TX time out
+    happens
+
+  PARAMETERS
+    NONE
+
+  RETURN VALUE
+    NONE
+
+===========================================================================*/
+void WDA_TransportKickDxe(void);
+
+/*==========================================================================
   FUNCTION   WDA_TrafficStatsTimerActivate
 
   DESCRIPTION

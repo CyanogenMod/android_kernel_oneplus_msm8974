@@ -24,7 +24,6 @@
 #include <linux/tick.h>
 #include <linux/suspend.h>
 #include <linux/pm_qos.h>
-#include <linux/quickwakeup.h>
 #include <linux/of_platform.h>
 #include <mach/mpm.h>
 #include <mach/cpuidle.h>
@@ -100,7 +99,7 @@ static struct notifier_block __refdata lpm_cpu_nblk = {
 };
 
 static uint32_t allowed_l2_mode;
-static uint32_t sysfs_dbg_l2_mode = MSM_SPM_L2_MODE_POWER_COLLAPSE;
+static uint32_t sysfs_dbg_l2_mode __refdata = MSM_SPM_L2_MODE_POWER_COLLAPSE;
 static uint32_t default_l2_mode;
 
 
@@ -250,7 +249,7 @@ static void lpm_system_level_update(void)
 	struct lpm_system_level *l = NULL;
 	uint32_t max_l2_mode;
 	static DEFINE_MUTEX(lpm_lock);
-	
+
 	mutex_lock(&lpm_lock);
 
 	if (num_powered_cores == 1)
@@ -276,8 +275,7 @@ static int lpm_system_mode_select(
 	int i;
 	uint32_t best_level_pwr = ~0U;
 	uint32_t pwr;
-	uint32_t latency_us = pm_qos_request_for_cpu(PM_QOS_CPU_DMA_LATENCY,
-			smp_processor_id());
+	uint32_t latency_us = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
 
 	if (!system_state->system_level)
 		return -EINVAL;
@@ -513,7 +511,7 @@ static noinline int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 {
 	int best_level = -1;
 	uint32_t best_level_pwr = ~0U;
-	uint32_t latency_us = pm_qos_request_for_cpu(PM_QOS_CPU_DMA_LATENCY, dev->cpu);
+	uint32_t latency_us = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
 	uint32_t sleep_us =
 		(uint32_t)(ktime_to_us(tick_nohz_get_sleep_length()));
 	uint32_t modified_time_us = 0;
@@ -524,7 +522,8 @@ static noinline int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 	if (!sys_state.cpu_level)
 		return -EINVAL;
 
-	next_event_us = (uint32_t)(ktime_to_us(get_next_event_time(dev->cpu)));
+	if (!dev->cpu)
+		next_event_us = (uint32_t)(ktime_to_us(get_next_event_time()));
 
 	for (i = 0; i < sys_state.num_cpu_levels; i++) {
 		struct lpm_cpu_level *level = &sys_state.cpu_level[i];
@@ -564,11 +563,6 @@ static noinline int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 			if (!dev->cpu && msm_rpm_waiting_for_ack())
 					break;
 
-		if ((MSM_PM_SLEEP_MODE_POWER_COLLAPSE == mode)
-				&& (num_online_cpus() > 1)
-				&& !sys_state.allow_synched_levels)
-			continue;
-
 		if ((next_wakeup_us >> 10) > pwr->time_overhead_us) {
 			power = pwr->ss_power;
 		} else {
@@ -590,7 +584,7 @@ static noinline int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 		}
 	}
 
-	if (modified_time_us)
+	if (modified_time_us && !dev->cpu)
 		msm_pm_set_timer(modified_time_us);
 
 	return best_level;
@@ -835,7 +829,6 @@ static const struct platform_suspend_ops lpm_suspend_ops = {
 	.valid = suspend_valid_only_mem,
 	.prepare_late = lpm_suspend_prepare,
 	.wake = lpm_suspend_wake,
-	.suspend_again = quickwakeup_suspend_again,
 };
 
 static void setup_broadcast_timer(void *arg)
@@ -1124,7 +1117,7 @@ fail:
 	return -EFAULT;
 }
 
-static struct of_device_id cpu_modes_mtch_tbl[] = {
+static struct of_device_id cpu_modes_mtch_tbl[] __initdata = {
 	{.compatible = "qcom,cpu-modes"},
 	{},
 };
@@ -1138,7 +1131,7 @@ static struct platform_driver cpu_modes_driver = {
 	},
 };
 
-static struct of_device_id system_modes_mtch_tbl[] = {
+static struct of_device_id system_modes_mtch_tbl[] __initdata = {
 	{.compatible = "qcom,system-modes"},
 	{},
 };
@@ -1152,7 +1145,7 @@ static struct platform_driver system_modes_driver = {
 	},
 };
 
-static struct of_device_id lpm_levels_match_table[] = {
+static struct of_device_id lpm_levels_match_table[] __initdata = {
 	{.compatible = "qcom,lpm-levels"},
 	{},
 };

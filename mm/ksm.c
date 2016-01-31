@@ -33,7 +33,7 @@
 #include <linux/mmu_notifier.h>
 #include <linux/swap.h>
 #include <linux/ksm.h>
-#include <linux/hashtable.h>
+#include <linux/hash.h>
 #include <linux/freezer.h>
 #include <linux/oom.h>
 
@@ -156,8 +156,9 @@ struct rmap_item {
 static struct rb_root root_stable_tree = RB_ROOT;
 static struct rb_root root_unstable_tree = RB_ROOT;
 
-#define MM_SLOTS_HASH_BITS 10
-static DEFINE_HASHTABLE(mm_slots_hash, MM_SLOTS_HASH_BITS);
+#define MM_SLOTS_HASH_SHIFT 10
+#define MM_SLOTS_HASH_HEADS (1 << MM_SLOTS_HASH_SHIFT)
+static struct hlist_head mm_slots_hash[MM_SLOTS_HASH_HEADS];
 
 static struct mm_slot ksm_mm_head = {
 	.mm_list = LIST_HEAD_INIT(ksm_mm_head.mm_list),
@@ -277,21 +278,26 @@ static inline void free_mm_slot(struct mm_slot *mm_slot)
 
 static struct mm_slot *get_mm_slot(struct mm_struct *mm)
 {
+	struct mm_slot *mm_slot;
+	struct hlist_head *bucket;
 	struct hlist_node *node;
-	struct mm_slot *slot;
 
-	hash_for_each_possible(mm_slots_hash, slot, node, link, (unsigned long)mm)
-		if (slot->mm == mm)
-			return slot;
-
+	bucket = &mm_slots_hash[hash_ptr(mm, MM_SLOTS_HASH_SHIFT)];
+	hlist_for_each_entry(mm_slot, node, bucket, link) {
+		if (mm == mm_slot->mm)
+			return mm_slot;
+	}
 	return NULL;
 }
 
 static void insert_to_mm_slots_hash(struct mm_struct *mm,
 				    struct mm_slot *mm_slot)
 {
+	struct hlist_head *bucket;
+
+	bucket = &mm_slots_hash[hash_ptr(mm, MM_SLOTS_HASH_SHIFT)];
 	mm_slot->mm = mm;
-	hash_add(mm_slots_hash, &mm_slot->link, (unsigned long)mm);
+	hlist_add_head(&mm_slot->link, bucket);
 }
 
 static inline int in_stable_tree(struct rmap_item *rmap_item)
@@ -555,9 +561,7 @@ static void remove_rmap_item_from_tree(struct rmap_item *rmap_item)
 		 * than left over from before.
 		 */
 		age = (unsigned char)(ksm_scan.seqnr - rmap_item->address);
-#ifndef CONFIG_KSM_CHECK_PAGE
 		BUG_ON(age > 1);
-#endif
 		if (!age)
 			rb_erase(&rmap_item->node, &root_unstable_tree);
 
@@ -646,7 +650,7 @@ static int unmerge_and_remove_all_rmap_items(void)
 		ksm_scan.mm_slot = list_entry(mm_slot->mm_list.next,
 						struct mm_slot, mm_list);
 		if (ksm_test_exit(mm)) {
-			hash_del(&mm_slot->link);
+			hlist_del(&mm_slot->link);
 			list_del(&mm_slot->mm_list);
 			spin_unlock(&ksm_mmlist_lock);
 
@@ -1384,7 +1388,7 @@ next_mm:
 		 * or when all VM_MERGEABLE areas have been unmapped (and
 		 * mmap_sem then protects against race with MADV_MERGEABLE).
 		 */
-		hash_del(&slot->link);
+		hlist_del(&slot->link);
 		list_del(&slot->mm_list);
 		spin_unlock(&ksm_mmlist_lock);
 
@@ -1406,31 +1410,6 @@ next_mm:
 	return NULL;
 }
 
-static inline int is_page_scanned(struct page *page)
-{
-#ifdef CONFIG_KSM_CHECK_PAGE
-	/* page is already marked as ksm, so this will be simple merge */
-	if (PageKsm(page))
-		return 0;
-
-	if (ksm_scan.seqnr & 0x1) {
-		/* odd cycle */
-		/* clear even cycle bit */
-		ClearPageKsmScan0(page);
-		/* get old value and mark it scanned */
-		return TestSetPageKsmScan1(page);
-	} else {
-		/* even cycle */
-		/* clear odd cycle bit */
-		ClearPageKsmScan1(page);
-		/* get old value and mark it scanned */
-		return TestSetPageKsmScan0(page);
-	}
-#else
-	return 0;
-#endif
-}
-
 /**
  * ksm_do_scan  - the ksm scanner main worker function.
  * @scan_npages - number of pages we want to scan before we return.
@@ -1445,10 +1424,8 @@ static void ksm_do_scan(unsigned int scan_npages)
 		rmap_item = scan_get_next_rmap_item(&page);
 		if (!rmap_item)
 			return;
-		if (!PageKsm(page) || !in_stable_tree(rmap_item)) {
-			if (!is_page_scanned(page))
-				cmp_and_merge_page(page, rmap_item);
-		}
+		if (!PageKsm(page) || !in_stable_tree(rmap_item))
+			cmp_and_merge_page(page, rmap_item);
 		put_page(page);
 	}
 }
@@ -1613,7 +1590,7 @@ void __ksm_exit(struct mm_struct *mm)
 	mm_slot = get_mm_slot(mm);
 	if (mm_slot && ksm_scan.mm_slot != mm_slot) {
 		if (!mm_slot->rmap_list) {
-			hash_del(&mm_slot->link);
+			hlist_del(&mm_slot->link);
 			list_del(&mm_slot->mm_list);
 			easy_to_free = 1;
 		} else {

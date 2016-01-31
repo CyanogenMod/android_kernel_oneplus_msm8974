@@ -29,6 +29,8 @@
    the kernel context */
 #define __cold			__attribute__((__cold__))
 
+#define __linktime_error(message) __attribute__((__error__(message)))
+
 /*
  * GCC 'asm goto' miscompiles certain code sequences:
  *
@@ -44,8 +46,6 @@
 #else
 # define asm_volatile_goto(x...)	do { asm goto(x); } while (0)
 #endif
-
-#define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), __COUNTER__)
 
 #if __GNUC_MINOR__ >= 5
 /*
@@ -63,13 +63,6 @@
 #define __noclone	__attribute__((__noclone__))
 
 #endif
-#endif
-
-#if __GNUC_MINOR__ >= 6
-/*
- * Tell the optimizer that something else uses this function or variable.
- */
-#define __visible __attribute__((externally_visible))
 #endif
 
 #if __GNUC_MINOR__ > 0

@@ -22,7 +22,6 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/pm_qos.h>
-#include <linux/quickwakeup.h>
 #include <linux/suspend.h>
 #include <linux/io.h>
 #include <linux/tick.h>
@@ -1609,7 +1608,6 @@ suspend_exit:
 static struct platform_suspend_ops msm_pm_ops = {
 	.enter = msm_pm_enter,
 	.valid = suspend_valid_only_mem,
-	.suspend_again = quickwakeup_suspend_again,
 };
 
 /* Hotplug the "non boot" CPU's and put

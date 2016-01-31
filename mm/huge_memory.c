@@ -17,7 +17,6 @@
 #include <linux/khugepaged.h>
 #include <linux/freezer.h>
 #include <linux/mman.h>
-#include <linux/hashtable.h>
 #include <asm/tlb.h>
 #include <asm/pgalloc.h>
 #include "internal.h"
@@ -58,12 +57,12 @@ static DECLARE_WAIT_QUEUE_HEAD(khugepaged_wait);
 static unsigned int khugepaged_max_ptes_none __read_mostly = HPAGE_PMD_NR-1;
 
 static int khugepaged(void *none);
+static int mm_slots_hash_init(void);
 static int khugepaged_slab_init(void);
 static void khugepaged_slab_free(void);
 
-#define MM_SLOTS_HASH_BITS 10
-static DEFINE_HASHTABLE(mm_slots_hash, MM_SLOTS_HASH_BITS);
-
+#define MM_SLOTS_HASH_HEADS 1024
+static struct hlist_head *mm_slots_hash __read_mostly;
 static struct kmem_cache *mm_slot_cache __read_mostly;
 
 /**
@@ -141,7 +140,7 @@ static int start_khugepaged(void)
 	int err = 0;
 	if (khugepaged_enabled()) {
 		int wakeup;
-		if (unlikely(!mm_slot_cache)) {
+		if (unlikely(!mm_slot_cache || !mm_slots_hash)) {
 			err = -ENOMEM;
 			goto out;
 		}
@@ -554,6 +553,12 @@ static int __init hugepage_init(void)
 	err = khugepaged_slab_init();
 	if (err)
 		goto out;
+
+	err = mm_slots_hash_init();
+	if (err) {
+		khugepaged_slab_free();
+		goto out;
+	}
 
 	/*
 	 * By default disable transparent hugepages on smaller systems,
@@ -1530,8 +1535,6 @@ static int __init khugepaged_slab_init(void)
 	if (!mm_slot_cache)
 		return -ENOMEM;
 
-	hash_init(mm_slots_hash);
-
 	return 0;
 }
 
@@ -1553,23 +1556,47 @@ static inline void free_mm_slot(struct mm_slot *mm_slot)
 	kmem_cache_free(mm_slot_cache, mm_slot);
 }
 
+static int __init mm_slots_hash_init(void)
+{
+	mm_slots_hash = kzalloc(MM_SLOTS_HASH_HEADS * sizeof(struct hlist_head),
+				GFP_KERNEL);
+	if (!mm_slots_hash)
+		return -ENOMEM;
+	return 0;
+}
+
+#if 0
+static void __init mm_slots_hash_free(void)
+{
+	kfree(mm_slots_hash);
+	mm_slots_hash = NULL;
+}
+#endif
+
 static struct mm_slot *get_mm_slot(struct mm_struct *mm)
 {
-	struct mm_slot *slot;
+	struct mm_slot *mm_slot;
+	struct hlist_head *bucket;
 	struct hlist_node *node;
 
-	hash_for_each_possible(mm_slots_hash, slot, node, hash, (unsigned long) mm)
-		if (slot->mm == mm)
-			return slot;
-
+	bucket = &mm_slots_hash[((unsigned long)mm / sizeof(struct mm_struct))
+				% MM_SLOTS_HASH_HEADS];
+	hlist_for_each_entry(mm_slot, node, bucket, hash) {
+		if (mm == mm_slot->mm)
+			return mm_slot;
+	}
 	return NULL;
 }
 
 static void insert_to_mm_slots_hash(struct mm_struct *mm,
 				    struct mm_slot *mm_slot)
 {
+	struct hlist_head *bucket;
+
+	bucket = &mm_slots_hash[((unsigned long)mm / sizeof(struct mm_struct))
+				% MM_SLOTS_HASH_HEADS];
 	mm_slot->mm = mm;
-	hash_add(mm_slots_hash, &mm_slot->hash, (long)mm);
+	hlist_add_head(&mm_slot->hash, bucket);
 }
 
 static inline int khugepaged_test_exit(struct mm_struct *mm)
@@ -1643,7 +1670,7 @@ void __khugepaged_exit(struct mm_struct *mm)
 	spin_lock(&khugepaged_mm_lock);
 	mm_slot = get_mm_slot(mm);
 	if (mm_slot && khugepaged_scan.mm_slot != mm_slot) {
-		hash_del(&mm_slot->hash);
+		hlist_del(&mm_slot->hash);
 		list_del(&mm_slot->mm_node);
 		free = 1;
 	}
@@ -2064,7 +2091,7 @@ static void collect_mm_slot(struct mm_slot *mm_slot)
 
 	if (khugepaged_test_exit(mm)) {
 		/* free mm_slot */
-		hash_del(&mm_slot->hash);
+		hlist_del(&mm_slot->hash);
 		list_del(&mm_slot->mm_node);
 
 		/*

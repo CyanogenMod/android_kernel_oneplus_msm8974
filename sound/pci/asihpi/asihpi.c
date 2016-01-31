@@ -969,7 +969,7 @@ static u64 snd_card_asihpi_playback_formats(struct snd_card_asihpi *asihpi,
 		if (!err)
 			err = hpi_outstream_query_format(h_stream, &hpi_format);
 		if (!err && (hpi_to_alsa_formats[format] != -1))
-			formats |= pcm_format_to_bits(hpi_to_alsa_formats[format]);
+			formats |= (1ULL << hpi_to_alsa_formats[format]);
 	}
 	return formats;
 }
@@ -1145,7 +1145,7 @@ static u64 snd_card_asihpi_capture_formats(struct snd_card_asihpi *asihpi,
 		if (!err)
 			err = hpi_instream_query_format(h_stream, &hpi_format);
 		if (!err)
-			formats |= pcm_format_to_bits(hpi_to_alsa_formats[format]);
+			formats |= (1ULL << hpi_to_alsa_formats[format]);
 	}
 	return formats;
 }

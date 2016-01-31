@@ -11201,6 +11201,16 @@ void WDI_TransportChannelDebug
 );
 
 /**
+ @brief WDI_TransportKickDxe -
+    Request Kick DXE when first HDD TX time out
+    happens
+ @param  none
+ @see
+ @return none
+*/
+void WDI_TransportKickDxe(void);
+
+/**
  @brief WDI_SsrTimerCB
     Callback function for SSR timer, if this is called then the graceful
     shutdown for Riva did not happen.

@@ -1645,7 +1645,7 @@ static int hci_fm_set_cal_req_proc(struct radio_hci_dev *hdev,
 	opcode = hci_opcode_pack(HCI_OGF_FM_COMMON_CTRL_CMD_REQ,
 		HCI_OCF_FM_SET_CALIBRATION);
 	return radio_hci_send_cmd(hdev, opcode,
-		sizeof(hci_fm_set_cal_req_proc), cal_req);
+		sizeof(struct hci_fm_set_cal_req_proc), cal_req);
 }
 
 static int hci_fm_do_cal_req(struct radio_hci_dev *hdev,
@@ -3121,8 +3121,6 @@ static int iris_do_calibration(struct iris_device *radio)
 			radio->fm_hdev);
 	if (retval < 0)
 		FMDERR("Disable Failed after calibration %d", retval);
-	else
-		radio->mode = FM_OFF;
 
 	return retval;
 }
@@ -3459,9 +3457,8 @@ static int iris_vidioc_g_ctrl(struct file *file, void *priv,
 END:
 	if (retval > 0)
 		retval = -EINVAL;
-	if (retval < 0)
-		FMDERR("get control failed with %d, id: %d\n",
-			retval, ctrl->id);
+	if (ctrl != NULL && retval < 0)
+		FMDERR("get control failed: %d, ret: %d\n", ctrl->id, retval);
 
 	return retval;
 }
@@ -3721,7 +3718,6 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 		}
 		saved_val = radio->mute_mode.hard_mute;
 		radio->mute_mode.hard_mute = ctrl->value;
-		radio->mute_mode.soft_mute = IOC_SFT_MUTE;
 		retval = hci_set_fm_mute_mode(
 				&radio->mute_mode,
 				radio->fm_hdev);
@@ -4882,7 +4878,7 @@ static int iris_fops_release(struct file *file)
 		return -EINVAL;
 
 	if (radio->mode == FM_OFF)
-		return 0;
+		goto END;
 
 	if (radio->mode == FM_RECV) {
 		radio->mode = FM_OFF;
@@ -4892,7 +4888,13 @@ static int iris_fops_release(struct file *file)
 		radio->mode = FM_OFF;
 		retval = hci_cmd(HCI_FM_DISABLE_TRANS_CMD,
 					radio->fm_hdev);
+	} else if (radio->mode == FM_CALIB) {
+		radio->mode = FM_OFF;
+		return retval;
 	}
+END:
+	if (radio->fm_hdev != NULL)
+		radio->fm_hdev->close_smd();
 	if (retval < 0)
 		FMDERR("Err on disable FM %d\n", retval);
 

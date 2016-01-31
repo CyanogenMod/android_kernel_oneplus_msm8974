@@ -1534,6 +1534,8 @@ static int _regulator_enable(struct regulator_dev *rdev)
 
 			trace_regulator_enable_complete(rdev_get_name(rdev));
 
+			_notifier_call_chain(rdev, REGULATOR_EVENT_ENABLE,
+						NULL);
 		} else if (ret < 0) {
 			rdev_err(rdev, "is_enabled() failed: %d\n", ret);
 			return ret;
@@ -1758,9 +1760,8 @@ int regulator_disable_deferred(struct regulator *regulator, int ms)
 	rdev->deferred_disables++;
 	mutex_unlock(&rdev->mutex);
 
-	ret = queue_delayed_work(system_power_efficient_wq,
-				 &rdev->disable_work,
-				 msecs_to_jiffies(ms));
+	ret = schedule_delayed_work(&rdev->disable_work,
+				    msecs_to_jiffies(ms));
 	if (ret < 0)
 		return ret;
 	else

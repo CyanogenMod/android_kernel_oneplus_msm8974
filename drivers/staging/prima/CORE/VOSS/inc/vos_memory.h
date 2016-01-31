@@ -45,7 +45,7 @@
   Include Files
   ------------------------------------------------------------------------*/
 #include <vos_types.h>
-
+#include <linux/version.h>
 /*-------------------------------------------------------------------------- 
   Preprocessor definitions and constants
   ------------------------------------------------------------------------*/
@@ -210,7 +210,18 @@ v_VOID_t vos_mem_move( v_VOID_t *pDst, const v_VOID_t *pSrc, v_SIZE_t numBytes )
                        locations are equal or not equal. 
     
   -------------------------------------------------------------------------------*/
-v_BOOL_t vos_mem_compare( v_VOID_t *pMemory1, v_VOID_t *pMemory2, v_U32_t numBytes ); 
+v_BOOL_t vos_mem_compare(
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))
+                          const v_VOID_t *pMemory1,
+#else
+                          v_VOID_t *pMemory1,
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))
+                          const v_VOID_t *pMemory2,
+#else
+                          v_VOID_t *pMemory2,
+#endif
+                          v_U32_t numBytes);
 
 
 /** ---------------------------------------------------------------------------

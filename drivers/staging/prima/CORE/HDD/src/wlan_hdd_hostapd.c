@@ -4907,8 +4907,6 @@ VOS_STATUS hdd_init_ap_mode( hdd_adapter_t *pAdapter )
          return status;
     }
     
-    init_completion(&pAdapter->session_close_comp_var);
-    init_completion(&pAdapter->session_open_comp_var);
 
     sema_init(&(WLAN_HDD_GET_AP_CTX_PTR(pAdapter))->semWpsPBCOverlapInd, 1);
  
@@ -4947,8 +4945,11 @@ hdd_adapter_t* hdd_wlan_create_ap_dev( hdd_context_t *pHddCtx, tSirMacAddr macAd
     hdd_adapter_t *pHostapdAdapter = NULL;
     v_CONTEXT_t pVosContext= NULL;
 
-   pWlanHostapdDev = alloc_netdev_mq(sizeof(hdd_adapter_t), iface_name, ether_setup, NUM_TX_QUEUES);
-
+    pWlanHostapdDev = alloc_netdev_mq(sizeof(hdd_adapter_t), iface_name,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0))
+                                      NET_NAME_UNKNOWN,
+#endif
+                                      ether_setup, NUM_TX_QUEUES);
     if (pWlanHostapdDev != NULL)
     {
         pHostapdAdapter = netdev_priv(pWlanHostapdDev);
@@ -4982,13 +4983,6 @@ hdd_adapter_t* hdd_wlan_create_ap_dev( hdd_context_t *pHddCtx, tSirMacAddr macAd
         pWlanHostapdDev->ieee80211_ptr = &pHostapdAdapter->wdev ;
         pHostapdAdapter->wdev.wiphy = pHddCtx->wiphy;  
         pHostapdAdapter->wdev.netdev =  pWlanHostapdDev;
-        init_completion(&pHostapdAdapter->tx_action_cnf_event);
-        init_completion(&pHostapdAdapter->cancel_rem_on_chan_var);
-        init_completion(&pHostapdAdapter->rem_on_chan_ready_event);
-        init_completion(&pHostapdAdapter->ula_complete);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
-        init_completion(&pHostapdAdapter->offchannel_tx_event);
-#endif
 
         SET_NETDEV_DEV(pWlanHostapdDev, pHddCtx->parent_dev);
     }

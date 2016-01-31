@@ -1555,8 +1555,7 @@ static void reg_process_hint(struct regulatory_request *reg_request,
 	 */
 	if (r != -EALREADY &&
 	    reg_initiator == NL80211_REGDOM_SET_BY_USER)
-		queue_delayed_work(system_power_efficient_wq,
-				   &reg_timeout, msecs_to_jiffies(3142));
+		schedule_delayed_work(&reg_timeout, msecs_to_jiffies(3142));
 }
 
 /*
@@ -2192,8 +2191,7 @@ static int __set_regdom(const struct ieee80211_regdomain *rd)
 	if (!request_wiphy &&
 	    (last_request->initiator == NL80211_REGDOM_SET_BY_DRIVER ||
 	     last_request->initiator == NL80211_REGDOM_SET_BY_COUNTRY_IE)) {
-		queue_delayed_work(system_power_efficient_wq,
-				   &reg_timeout, 0);
+		schedule_delayed_work(&reg_timeout, 0);
 		return -ENODEV;
 	}
 

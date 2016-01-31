@@ -192,9 +192,6 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
 extern struct device_node *of_get_next_available_child(
 	const struct device_node *node, struct device_node *prev);
 
-extern struct device_node *of_get_child_by_name(const struct device_node *node,
-					const char *name);
-
 #define for_each_child_of_node(parent, child) \
 	for (child = of_get_next_child(parent, NULL); child != NULL; \
 	     child = of_get_next_child(parent, child))
@@ -241,7 +238,6 @@ extern int of_device_is_available(const struct device_node *device);
 extern const void *of_get_property(const struct device_node *node,
 				const char *name,
 				int *lenp);
-extern struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
 #define for_each_property_of_node(dn, pp) \
 	for (pp = dn->properties; pp != NULL; pp = pp->next)
 
@@ -312,6 +308,7 @@ static inline int of_property_read_u32_index(const struct device_node *np,
 	return -ENOSYS;
 }
 
+<<<<<<< HEAD
 static inline int of_property_read_u8_array(const struct device_node *np,
 			const char *propname, u8 *out_values, size_t sz)
 {
@@ -324,6 +321,8 @@ static inline int of_property_read_u16_array(const struct device_node *np,
 	return -ENOSYS;
 }
 
+=======
+>>>>>>> 0ed0fba... devfreq: Backport MSM devfreq features from 3.10
 static inline int of_property_read_u32_array(const struct device_node *np,
 					     const char *propname,
 					     u32 *out_values, size_t sz)
@@ -348,12 +347,6 @@ static inline int of_property_read_string_helper(struct device_node *np,
 static inline const void *of_get_property(const struct device_node *node,
 				const char *name,
 				int *lenp)
-{
-	return NULL;
-}
-
-static inline struct device_node *of_get_cpu_node(int cpu,
-					unsigned int *thread)
 {
 	return NULL;
 }

@@ -305,17 +305,9 @@ int __init reboot_setup(char *str)
 
 __setup("reboot=", reboot_setup);
 
-/*
- * Called by kexec, immediately prior to machine_kexec().
- *
- * This must completely disable all secondary CPUs; simply causing those CPUs
- * to execute e.g. a RAM-based pin loop is not sufficient. This allows the
- * kexec'd kernel to use any and all RAM as it sees fit, without having to
- * avoid any code or data used by any SW CPU pin loop. The CPU hotplug
- * functionality embodied in disable_nonboot_cpus() to achieve this.
- */
 void machine_shutdown(void)
 {
+	preempt_disable();
 #ifdef CONFIG_SMP
 	/*
 	 * Disable preemption so we're guaranteed to
@@ -325,52 +317,28 @@ void machine_shutdown(void)
 	 * one of the stopped CPUs.
 	 */
 	preempt_disable();
+
+	smp_send_stop();
 #endif
-	disable_nonboot_cpus();
 }
 
-/*
- * Halting simply requires that the secondary CPUs stop performing any
- * activity (executing tasks, handling interrupts). smp_send_stop()
- * achieves this.
- */
 void machine_halt(void)
 {
-	preempt_disable();
-	smp_send_stop();
-
+	machine_shutdown();
 	local_irq_disable();
 	while (1);
 }
 
-/*
- * Power-off simply requires that the secondary CPUs stop performing any
- * activity (executing tasks, handling interrupts). smp_send_stop()
- * achieves this. When the system power is turned off, it will take all CPUs
- * with it.
- */
 void machine_power_off(void)
 {
-	smp_send_stop();
-
+	machine_shutdown();
 	if (pm_power_off)
 		pm_power_off();
 }
 
-/*
- * Restart requires that the secondary CPUs stop performing any activity
- * while the primary CPU resets the system. Systems with a single CPU can
- * use soft_restart() as their machine descriptor's .restart hook, since that
- * will cause the only available CPU to reset. Systems with multiple CPUs must
- * provide a HW restart implementation, to ensure that all CPUs reset at once.
- * This is required so that any code running after reset on the primary CPU
- * doesn't have to co-ordinate with other CPUs to ensure they aren't still
- * executing pre-reset code, and using RAM that the primary CPU's code wishes
- * to use. Implementing such co-ordination would be essentially impossible.
- */
 void machine_restart(char *cmd)
 {
-	smp_send_stop();
+	machine_shutdown();
 
 	/* Flush the console to make sure all the relevant messages make it
 	 * out to the console drivers */
@@ -426,20 +394,24 @@ static void show_data(unsigned long addr, int nbytes, const char *name)
 			 * vmalloc addresses may point to
 			 * memory-mapped peripherals
 			 */
-			if (!virt_addr_valid(p) ||
+			if (is_vmalloc_addr(p) ||
 			    probe_kernel_address(p, data)) {
 				printk(" ********");
 			} else {
-				printk(KERN_CONT " %08x", data);
+				printk(" %08x", data);
 			}
 			++p;
 		}
-		printk(KERN_CONT "\n");
+		printk("\n");
 	}
 }
 
 static void show_extra_register_data(struct pt_regs *regs, int nbytes)
 {
+	mm_segment_t fs;
+
+	fs = get_fs();
+	set_fs(KERNEL_DS);
 	show_data(regs->ARM_pc - nbytes, nbytes * 2, "PC");
 	show_data(regs->ARM_lr - nbytes, nbytes * 2, "LR");
 	show_data(regs->ARM_sp - nbytes, nbytes * 2, "SP");
@@ -456,6 +428,7 @@ static void show_extra_register_data(struct pt_regs *regs, int nbytes)
 	show_data(regs->ARM_r8 - nbytes, nbytes * 2, "R8");
 	show_data(regs->ARM_r9 - nbytes, nbytes * 2, "R9");
 	show_data(regs->ARM_r10 - nbytes, nbytes * 2, "R10");
+	set_fs(fs);
 }
 
 void __show_regs(struct pt_regs *regs)
@@ -517,8 +490,8 @@ void __show_regs(struct pt_regs *regs)
 		printk("Control: %08x%s\n", ctrl, buf);
 	}
 #endif
-	if (get_fs() == get_ds())
-		show_extra_register_data(regs, 128);
+
+	show_extra_register_data(regs, 128);
 }
 
 void show_regs(struct pt_regs * regs)
@@ -705,16 +678,15 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
  * atomic helpers. Insert it into the gate_vma so that it is visible
  * through ptrace and /proc/<pid>/mem.
  */
-static struct vm_area_struct gate_vma = {
-	.vm_start	= 0xffff0000,
-	.vm_end		= 0xffff0000 + PAGE_SIZE,
-	.vm_flags	= VM_READ | VM_EXEC | VM_MAYREAD | VM_MAYEXEC,
-	.vm_mm		= &init_mm,
-};
+static struct vm_area_struct gate_vma;
 
 static int __init gate_vma_init(void)
 {
-	gate_vma.vm_page_prot = PAGE_READONLY_EXEC;
+	gate_vma.vm_start	= 0xffff0000;
+	gate_vma.vm_end		= 0xffff0000 + PAGE_SIZE;
+	gate_vma.vm_page_prot	= PAGE_READONLY_EXEC;
+	gate_vma.vm_flags	= VM_READ | VM_EXEC |
+				  VM_MAYREAD | VM_MAYEXEC;
 	return 0;
 }
 arch_initcall(gate_vma_init);

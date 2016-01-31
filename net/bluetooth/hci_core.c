@@ -638,8 +638,6 @@ static int hci_dev_do_close(struct hci_dev *hdev, u8 is_process)
 
 	BT_DBG("%s %p", hdev->name, hdev);
 
-	cancel_work_sync(&hdev->power_off);
-
 	hci_req_cancel(hdev, ENODEV);
 	hci_req_lock(hdev);
 
@@ -1576,6 +1574,8 @@ int hci_unregister_dev(struct hci_dev *hdev)
 
 	for (i = 0; i < NUM_REASSEMBLY; i++)
 		kfree_skb(hdev->reassembly[i]);
+
+	cancel_work_sync(&hdev->power_on);
 
 	if (!test_bit(HCI_INIT, &hdev->flags) &&
 				!test_bit(HCI_SETUP, &hdev->flags) &&

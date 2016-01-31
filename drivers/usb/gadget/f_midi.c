@@ -103,7 +103,7 @@ DECLARE_USB_MIDI_OUT_JACK_DESCRIPTOR(1);
 DECLARE_USB_MS_ENDPOINT_DESCRIPTOR(16);
 
 /* B.3.1  Standard AC Interface Descriptor */
-static struct usb_interface_descriptor midi_ac_interface_desc /* __initdata */ = {
+static struct usb_interface_descriptor ac_interface_desc /* __initdata */ = {
 	.bLength =		USB_DT_INTERFACE_SIZE,
 	.bDescriptorType =	USB_DT_INTERFACE,
 	/* .bInterfaceNumber =	DYNAMIC */
@@ -114,7 +114,7 @@ static struct usb_interface_descriptor midi_ac_interface_desc /* __initdata */ =
 };
 
 /* B.3.2  Class-Specific AC Interface Descriptor */
-static struct uac1_ac_header_descriptor_1 midi_ac_header_desc /* __initdata */ = {
+static struct uac1_ac_header_descriptor_1 ac_header_desc /* __initdata */ = {
 	.bLength =		UAC_DT_AC_HEADER_SIZE(1),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubtype =	USB_MS_HEADER,
@@ -415,7 +415,7 @@ static void f_midi_unbind(struct usb_configuration *c, struct usb_function *f)
 	card = midi->card;
 	midi->card = NULL;
 	if (card)
-		snd_card_free_when_closed(card);
+		snd_card_free(card);
 
 	kfree(midi->id);
 	midi->id = NULL;
@@ -763,13 +763,13 @@ f_midi_bind(struct usb_configuration *c, struct usb_function *f)
 	status = usb_interface_id(c, f);
 	if (status < 0)
 		goto fail;
-	midi_ac_interface_desc.bInterfaceNumber = status;
+	ac_interface_desc.bInterfaceNumber = status;
 
 	status = usb_interface_id(c, f);
 	if (status < 0)
 		goto fail;
 	ms_interface_desc.bInterfaceNumber = status;
-	midi_ac_header_desc.baInterfaceNr[0] = status;
+	ac_header_desc.baInterfaceNr[0] = status;
 
 	status = -ENODEV;
 
@@ -799,8 +799,8 @@ f_midi_bind(struct usb_configuration *c, struct usb_function *f)
 	 */
 
 	/* add the headers - these are always the same */
-	midi_function[i++] = (struct usb_descriptor_header *) &midi_ac_interface_desc;
-	midi_function[i++] = (struct usb_descriptor_header *) &midi_ac_header_desc;
+	midi_function[i++] = (struct usb_descriptor_header *) &ac_interface_desc;
+	midi_function[i++] = (struct usb_descriptor_header *) &ac_header_desc;
 	midi_function[i++] = (struct usb_descriptor_header *) &ms_interface_desc;
 
 	/* calculate the header's wTotalLength */
@@ -893,8 +893,8 @@ f_midi_bind(struct usb_configuration *c, struct usb_function *f)
 
 	if (gadget_is_dualspeed(c->cdev->gadget)) {
 		c->highspeed = true;
-		bulk_in_desc.wMaxPacketSize = cpu_to_le16(midi->buflen);
-		bulk_out_desc.wMaxPacketSize = cpu_to_le16(midi->buflen);
+		bulk_in_desc.wMaxPacketSize = cpu_to_le16(512);
+		bulk_out_desc.wMaxPacketSize = cpu_to_le16(512);
 		f->hs_descriptors = usb_copy_descriptors(midi_function);
 		if (!f->hs_descriptors)
 			goto fail_f_midi;
@@ -937,7 +937,7 @@ int /* __init */ f_midi_bind_config(struct usb_configuration *c,
 			      unsigned int out_ports,
 			      unsigned int buflen,
 			      unsigned int qlen,
-			      struct midi_alsa_config* config)
+			      struct midi_alsa_config *config)
 {
 	struct f_midi *midi;
 	int status, i;

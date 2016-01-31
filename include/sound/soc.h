@@ -499,12 +499,6 @@ int snd_soc_put_volsw_s8(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol);
 int snd_soc_limit_volume(struct snd_soc_codec *codec,
 	const char *name, int max);
-int snd_soc_bytes_info(struct snd_kcontrol *kcontrol,
-			   struct snd_ctl_elem_info *uinfo);
-int snd_soc_bytes_get(struct snd_kcontrol *kcontrol,
-			  struct snd_ctl_elem_value *ucontrol);
-int snd_soc_bytes_put(struct snd_kcontrol *kcontrol,
-			  struct snd_ctl_elem_value *ucontrol);
 int snd_soc_info_volsw_2r_sx(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_info *uinfo);
 int snd_soc_get_volsw_2r_sx(struct snd_kcontrol *kcontrol,

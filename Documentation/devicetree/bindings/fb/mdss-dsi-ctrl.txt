@@ -42,6 +42,7 @@ Optional properties:
 					-- qcom,supply-max-voltage: maximum voltage level (uV)
 					-- qcom,supply-enable-load: load drawn (uA) from enabled supply
 					-- qcom,supply-disable-load: load drawn (uA) from disabled supply
+					-- qcom,supply-ulp-load: load drawn (uA) from supply in ultra-low power mode
 					-- qcom,supply-pre-on-sleep: time to sleep (ms) before turning on
 					-- qcom,supply-post-on-sleep: time to sleep (ms) after turning on
 					-- qcom,supply-pre-off-sleep: time to sleep (ms) before turning off
@@ -66,6 +67,14 @@ Optional properties:
 - qcom,mmss-ulp-clamp-ctrl-offset:	Specifies the offset for dsi ulps clamp control register.
 - qcom,mmss-phyreset-ctrl-offset:	Specifies the offset for dsi phy reset control register.
 
+- pinctrl-names:			List of names to assign mdss pin states defined in pinctrl device node
+					Refer to pinctrl-bindings.txt
+
+- pinctrl-<0..n>:			Lists phandles each pointing to the pin configuration node within a pin
+					controller. These pin configurations are installed in the pinctrl
+					device node. Refer to pinctrl-bindings.txt
+- qcom,regulator-ldo-mode:		Boolean to enable ldo mode for the dsi phy regulator
+
 Example:
         mdss_dsi0: qcom,mdss_dsi@fd922800 {
 		compatible = "qcom,mdss-dsi-ctrl";
@@ -81,6 +90,7 @@ Example:
 		qcom,dsi-pref-prim-pan = <&dsi_tosh_720_vid>;
 		qcom,platform-strength-ctrl = [ff 06];
 		qcom,platform-bist-ctrl = [00 00 b1 ff 00 00];
+		qcom,regulator-ldo-mode;
 		qcom,platform-regulator-settings = [07 09 03 00 20 00 01];
 		qcom,platform-lane-config = [00 00 00 00 00 00 00 01 97
 			00 00 00 00 05 00 00 01 97
@@ -91,6 +101,9 @@ Example:
 		qcom,mmss-phyreset-ctrl-offset = <0x24>;
 		qcom,mdss-fb-map = <&mdss_fb0>;
 		qcom,mdss-mdp = <&mdss_mdp>;
+		pinctrl-names = "mdss_default", "mdss_sleep";
+		pinctrl-0 = <&mdss_dsi_active>;
+		pinctrl-1 = <&mdss_dsi_suspend>;
 		qcom,platform-reset-gpio = <&msmgpio 25 1>;
 		qcom,platform-te-gpio = <&msmgpio 24 0>;
 		qcom,platform-enable-gpio = <&msmgpio 58 1>;
@@ -143,6 +156,7 @@ Example:
 				qcom,supply-max-voltage = <2800000>;
 				qcom,supply-enable-load = <100000>;
 				qcom,supply-disable-load = <100>;
+				qcom,supply-ulp-load = <100>;
 				qcom,supply-pre-on-sleep = <0>;
 				qcom,supply-post-on-sleep = <0>;
 				qcom,supply-pre-off-sleep = <0>;
@@ -156,6 +170,7 @@ Example:
 				qcom,supply-max-voltage = <1800000>;
 				qcom,supply-enable-load = <100000>;
 				qcom,supply-disable-load = <100>;
+				qcom,supply-ulp-load = <100>;
 				qcom,supply-pre-on-sleep = <0>;
 				qcom,supply-post-on-sleep = <0>;
 				qcom,supply-pre-off-sleep = <0>;

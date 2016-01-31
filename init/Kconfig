@@ -955,20 +955,13 @@ source "usr/Kconfig"
 
 endif
 
-choice
-  prompt "Optimization level"
-  default CC_OPTIMIZE_DEFAULT
-
 config CC_OPTIMIZE_FOR_SIZE
-	bool "Use -Os"
+	bool "Optimize for size"
+	help
+	  Enabling this option will pass "-Os" instead of "-O2" to gcc
+	  resulting in a smaller kernel.
 
-config CC_OPTIMIZE_DEFAULT
-	bool "Use -O2"
-
-config CC_OPTIMIZE_MORE
-	bool "Use -O3"
-
-endchoice
+	  If unsure, say Y.
 
 config SYSCTL
 	bool
@@ -984,6 +977,8 @@ config PANIC_TIMEOUT
 
 menuconfig EXPERT
 	bool "Configure standard kernel features (expert users)"
+	# Unhide debug options, to make the on-by-default options visible
+	select DEBUG_KERNEL
 	help
 	  This option allows certain base kernel options and settings
           to be disabled or tweaked. This is for specialized

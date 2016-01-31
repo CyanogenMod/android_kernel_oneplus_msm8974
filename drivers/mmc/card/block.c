@@ -37,9 +37,6 @@
 #include <linux/compat.h>
 #include <linux/pm_runtime.h>
 
-#define CREATE_TRACE_POINTS
-#include <trace/events/mmc.h>
-
 #include <linux/mmc/ioctl.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -1386,12 +1383,6 @@ retry:
 			goto out;
 	}
 
-	if (mmc_can_sanitize(card)) {
-		trace_mmc_blk_erase_start(EXT_CSD_SANITIZE_START, 0, 0);
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-				 EXT_CSD_SANITIZE_START, 1, 0);
-		trace_mmc_blk_erase_end(EXT_CSD_SANITIZE_START, 0, 0);
-	}
 out_retry:
 	if (err && !mmc_blk_reset(md, card->host, type))
 		goto retry;
@@ -1554,8 +1545,8 @@ static int mmc_blk_err_check(struct mmc_card *card,
 		/* Check stop command response */
 		if (brq->stop.resp[0] & R1_ERROR) {
 			pr_err("%s: %s: general error sending stop command, stop cmd response %#x\n",
-				   req->rq_disk->disk_name, __func__,
-				   brq->stop.resp[0]);
+			       req->rq_disk->disk_name, __func__,
+			       brq->stop.resp[0]);
 			gen_err = 1;
 		}
 
@@ -1570,8 +1561,8 @@ static int mmc_blk_err_check(struct mmc_card *card,
 
 			if (status & R1_ERROR) {
 				pr_err("%s: %s: general error sending status command, card status %#x\n",
-					   req->rq_disk->disk_name, __func__,
-					   status);
+				       req->rq_disk->disk_name, __func__,
+				       status);
 				gen_err = 1;
 			}
 

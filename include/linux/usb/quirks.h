@@ -32,11 +32,11 @@
 
 #define USB_QUIRK_OTG_PET		0x00000080
 
-/* device generates spurious wakeup, ignore remote wakeup capability */
-#define USB_QUIRK_IGNORE_REMOTE_WAKEUP	0x00000200
-
 /* device can't handle device_qualifier descriptor requests */
 #define USB_QUIRK_DEVICE_QUALIFIER	0x00000100
+
+/* device generates spurious wakeup, ignore remote wakeup capability */
+#define USB_QUIRK_IGNORE_REMOTE_WAKEUP	0x00000200
 
 /*
  * For high speed and super speed interupt endpoints, the USB 2.0 and
@@ -47,6 +47,6 @@
  * Devices with this quirk report their bInterval as the result of this
  * calculation instead of the exponent variable used in the calculation.
  */
-#define USB_QUIRK_LINEAR_UFRAME_INTR_BINTERVAL	0x00000080
+#define USB_QUIRK_LINEAR_UFRAME_INTR_BINTERVAL	0x00000400
 
 #endif /* __LINUX_USB_QUIRKS_H */

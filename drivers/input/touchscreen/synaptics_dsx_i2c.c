@@ -16,7 +16,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -144,12 +143,6 @@ static ssize_t synaptics_rmi4_open_or_close_holster_mode_store(struct device *de
 		struct device_attribute *attr, const char *buf, size_t count);
 
 static ssize_t synaptics_rmi4_open_or_close_holster_mode_show(struct device *dev,
-		struct device_attribute *attr, char *buf);
-
-static ssize_t synaptics_rmi4_reset_on_suspend_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count);
-
-static ssize_t synaptics_rmi4_reset_on_suspend_show(struct device *dev,
 		struct device_attribute *attr, char *buf);
 
 struct synaptics_rmi4_f01_device_status {
@@ -289,6 +282,8 @@ struct synaptics_rmi4_f12_finger_data {
 #endif
 };
 
+static struct mutex suspended_mutex;
+
 struct synaptics_rmi4_f1a_query {
 	union {
 		struct {
@@ -395,9 +390,6 @@ static struct device_attribute attrs[] = {
 	__ATTR(suspend, S_IWUSR,
 			synaptics_rmi4_show_error,
 			synaptics_rmi4_suspend_store),
-	__ATTR(reset_on_suspend, (S_IRUGO | S_IWUSR),
-			synaptics_rmi4_reset_on_suspend_show,
-			synaptics_rmi4_reset_on_suspend_store),
 	__ATTR(gesture, (S_IRUGO | S_IWUSR),
 			synaptics_rmi4_gesture_show,
 			synaptics_rmi4_gesture_store),
@@ -431,6 +423,13 @@ static ssize_t synaptics_rmi4_f01_reset_store(struct device *dev,
 	if (reset != 1)
 		return -EINVAL;
 
+	if (rmi4_data->suspended == true) {
+		dev_err(dev,
+			"%s: cannot reset while device is in suspend\n",
+			__func__);
+		return -EBUSY;
+	}
+
 	printk(KERN_ERR "[syna]: reset device[%d]\n",rmi4_data->reset_count);
 	rmi4_data->reset_count = 0;
 	retval = synaptics_rmi4_reset_device(rmi4_data, f01_cmd_base_addr);
@@ -442,34 +441,6 @@ static ssize_t synaptics_rmi4_f01_reset_store(struct device *dev,
 	}
 
 	return count;
-}
-
-static ssize_t synaptics_rmi4_reset_on_suspend_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	unsigned short f01_cmd_base_addr;
-	unsigned int reset;
-	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
-
-	f01_cmd_base_addr = rmi4_data->f01_cmd_base_addr;
-
-	if (sscanf(buf, "%u", &reset) != 1)
-		return -EINVAL;
-
-	if (reset != 0 && reset !=1)
-		return -EINVAL;
-
-	rmi4_data->reset_on_suspend = reset;
-
-	return count;
-}
-
-static ssize_t synaptics_rmi4_reset_on_suspend_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
-
-	return snprintf(buf, PAGE_SIZE, "%d\n", rmi4_data->reset_on_suspend);
 }
 
 static ssize_t synaptics_rmi4_f01_productinfo_show(struct device *dev,
@@ -497,6 +468,9 @@ static ssize_t synaptics_rmi4_f01_flashprog_show(struct device *dev,
 	int retval;
 	struct synaptics_rmi4_f01_device_status device_status;
 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+
+	if (rmi4_data->suspended == true)
+		return snprintf(buf, PAGE_SIZE, "Device is in suspend\n");
 
 	retval = synaptics_rmi4_i2c_read(rmi4_data,
 			rmi4_data->f01_data_base_addr,
@@ -991,10 +965,6 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define Mgestrue            12  // M
 #define Wgestrue            13  // W
 
-#define BLANK		1
-#define UNBLANK		0
-#define DOZE		2
-
 #define SYNA_SMARTCOVER_MIN	0
 #define SYNA_SMARTCOVER_MAN	750
 
@@ -1426,33 +1396,6 @@ static int synaptics_rmi4_proc_flashlight_write(struct file *filp, const char __
 	return len;
 }
 
-static int synaptics_rmi4_proc_sweep_wake_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
-{
-	return sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->sweep_wake_enable));
-}
-
-static int synaptics_rmi4_proc_sweep_wake_write(struct file *filp, const char __user *buff,
-		unsigned long len, void *data)
-{
-	int enable;
-	char buf[2];
-
-	if (len > 2)
-		return 0;
-
-	if (copy_from_user(buf, buff, len)) {
-		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
-	}
-
-	enable = (buf[0] == '0') ? 0 : 1;
-
-	atomic_set(&syna_rmi4_data->sweep_wake_enable, enable);
-
-	return len;
-}
-
 //smartcover proc read function
 static int synaptics_rmi4_proc_smartcover_read(char *page, char **start, off_t off,
 		int count, int *eof, void *data) {
@@ -1723,13 +1666,6 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 	if (proc_entry) {
 		proc_entry->write_proc = synaptics_rmi4_proc_flashlight_write;
 		proc_entry->read_proc = synaptics_rmi4_proc_flashlight_read;
-	}
-
-	// sweep wake
-	proc_entry = create_proc_entry("sweep_wake_enable", 0664, procdir);
-	if (proc_entry) {
-		proc_entry->write_proc = synaptics_rmi4_proc_sweep_wake_write;
-		proc_entry->read_proc = synaptics_rmi4_proc_sweep_wake_read;
 	}
 
 	//for pdoze enable/disable interface
@@ -2302,7 +2238,7 @@ static struct synaptics_dsx_cap_button_map button_map = {
 };
 
 static struct synaptics_dsx_platform_data dsx_platformdata = {
-	.irq_flags = IRQF_ONESHOT | IRQF_TRIGGER_FALLING,
+	.irq_flags = IRQF_TRIGGER_FALLING,
 	.reset_delay_ms = 100,
 	.cap_button_map = &button_map,
 	.regulator_en = 1,
@@ -2452,11 +2388,6 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 				(gestureext[24] == 0x48) ? Down2UpSwip      :
 				(gestureext[24] == 0x80) ? DouSwip          :
 				UnknownGesture;
-			if (gesturemode == Left2RightSwip ||
-					gesturemode == Right2LeftSwip) {
-				if (atomic_read(&syna_rmi4_data->sweep_wake_enable))
-					keyvalue = KEY_SWEEP_WAKE;
-			}
 			if (gesturemode == DouSwip ||
 					gesturemode == Down2UpSwip ||
 					gesturemode == Up2DownSwip) {
@@ -3889,7 +3820,6 @@ static void synaptics_rmi4_set_params(struct synaptics_rmi4_data *rmi4_data)
 	set_bit(KEY_GESTURE_CIRCLE, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_SWIPE_DOWN, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_V, rmi4_data->input_dev->keybit);
-	set_bit(KEY_SWEEP_WAKE, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_LTR, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_GTR, rmi4_data->input_dev->keybit);
 	synaptics_ts_init_virtual_key(rmi4_data);
@@ -3977,7 +3907,6 @@ static int synaptics_rmi4_set_input_dev(struct synaptics_rmi4_data *rmi4_data)
 	atomic_set(&rmi4_data->camera_enable, 0);
 	atomic_set(&rmi4_data->music_enable, 0);
 	atomic_set(&rmi4_data->flashlight_enable, 0);
-	atomic_set(&rmi4_data->sweep_wake_enable, 0);
 
 	rmi4_data->glove_enable = 0;
 	rmi4_data->pdoze_enable = 0;
@@ -4326,15 +4255,41 @@ static int fb_notifier_callback(struct notifier_block *p,
 	switch (event) {
 		case FB_EVENT_BLANK :
 			ev = (*(int *)evdata->data);
-			new_status = (ev == UNBLANK || ev == DOZE) ? UNBLANK : BLANK;
+
+			/*
+			 * Normal Screen Wakeup
+			 *
+			 * <6>[   43.486172] [syna] Event: 4 -> 0
+			 * <6>[   50.488192] [syna] Event: 0 -> 4
+			 *
+			 * Doze Wakeup
+			 *
+			 * <6>[   81.869758] [syna] Event: 4 -> 1
+			 * <6>[   86.458247] [syna] Event: 1 -> 4
+			 *
+			 */
+			switch (ev) {
+				/* Screen On */
+				case FB_BLANK_UNBLANK:
+				case FB_BLANK_NORMAL:
+				case FB_BLANK_VSYNC_SUSPEND:
+				case FB_BLANK_HSYNC_SUSPEND:
+					new_status = 0;
+					break;
+				default:
+					/* Default to screen off to match previous
+					   behaviour */
+					print_ts(TS_INFO, KERN_INFO "[syna] Unhandled event %i\n", ev);
+					/* Fall through */
+				case FB_BLANK_POWERDOWN:
+					new_status = 1;
+					break;
+			}
+
 			if (new_status == syna_rmi4_data->old_status)
 				break;
 
-			if (new_status == BLANK) {
-				if(syna_rmi4_data->reset_on_suspend) {
-					print_ts(TS_DEBUG, KERN_ERR "[syna]:reset tp\n");
-					synaptics_rmi4_reset_device(syna_rmi4_data, syna_rmi4_data->f01_cmd_base_addr);
-				}
+			if (new_status) {
 				print_ts(TS_DEBUG, KERN_ERR "[syna]:suspend tp\n");
 				synaptics_rmi4_suspend(&(syna_rmi4_data->input_dev->dev));
 			}
@@ -4350,6 +4305,95 @@ static int fb_notifier_callback(struct notifier_block *p,
 	return 0;
 }
 #endif
+
+/**
+ * synaptics_rmi4_sensor_wake()
+ *
+ * Called by synaptics_rmi4_resume() and synaptics_rmi4_late_resume().
+ *
+ * This function wakes the sensor from sleep.
+ */
+static void synaptics_rmi4_sensor_wake(struct synaptics_rmi4_data *rmi4_data)
+{
+	int retval;
+	unsigned char device_ctrl;
+	unsigned char no_sleep_setting = rmi4_data->no_sleep_setting;
+
+	retval = synaptics_rmi4_i2c_read(rmi4_data,
+			rmi4_data->f01_ctrl_base_addr,
+			&device_ctrl,
+			sizeof(device_ctrl));
+	if (retval < 0) {
+		dev_err(&(rmi4_data->input_dev->dev),
+				"%s: Failed to wake from sleep mode\n",
+				__func__);
+		rmi4_data->sensor_sleep = true;
+		return;
+	}
+
+	device_ctrl = (device_ctrl & ~MASK_3BIT);
+	device_ctrl = (device_ctrl | no_sleep_setting | NORMAL_OPERATION);
+
+	retval = synaptics_rmi4_i2c_write(rmi4_data,
+			rmi4_data->f01_ctrl_base_addr,
+			&device_ctrl,
+			sizeof(device_ctrl));
+	if (retval < 0) {
+		dev_err(&(rmi4_data->input_dev->dev),
+				"%s: Failed to wake from sleep mode\n",
+				__func__);
+		rmi4_data->sensor_sleep = true;
+		return;
+	} else {
+		rmi4_data->sensor_sleep = false;
+	}
+}
+
+static void synaptics_rmi4_init_work(struct work_struct *work)
+{
+	struct synaptics_rmi4_data *rmi4_data =
+			container_of(work, struct synaptics_rmi4_data, init_work);
+	int retval;
+	unsigned char val = 1;
+
+	if (rmi4_data->smartcover_enable)
+		synaptics_rmi4_open_smartcover();
+
+	if (rmi4_data->glove_enable)
+		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
+				&val, sizeof(val));
+
+	if (atomic_read(&rmi4_data->syna_use_gesture) || rmi4_data->pdoze_enable) {
+		synaptics_enable_gesture(rmi4_data,false);
+		synaptics_enable_pdoze(rmi4_data,false);
+		synaptics_enable_irqwake(rmi4_data,false);
+		atomic_set(&rmi4_data->syna_use_gesture,
+			atomic_read(&rmi4_data->double_tap_enable) ||
+			atomic_read(&rmi4_data->camera_enable) ||
+			atomic_read(&rmi4_data->music_enable) ||
+			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
+		goto out;
+	}
+
+	if (!rmi4_data->sensor_sleep) {
+		goto out;
+	}
+
+	synaptics_rmi4_sensor_wake(rmi4_data);
+	synaptics_rmi4_irq_enable(rmi4_data, true);
+	rmi4_data->touch_stopped = false;
+	retval = synaptics_rmi4_reinit_device(rmi4_data);
+	if (retval < 0) {
+		dev_err(&rmi4_data->i2c_client->dev,
+				"%s: Failed to reinit device\n",
+				__func__);
+	}
+
+out:
+    mutex_lock(&suspended_mutex);
+    rmi4_data->suspended = false;
+    mutex_unlock(&suspended_mutex);
+}
 
 /**
  * synaptics_rmi4_probe()
@@ -4403,6 +4447,7 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 	rmi4_data->sensor_sleep = false;
 	rmi4_data->irq_enabled = false;
 	rmi4_data->fingers_on_2d = false;
+	rmi4_data->suspended = false;
 
 	rmi4_data->i2c_read = synaptics_rmi4_i2c_read;
 	rmi4_data->i2c_write = synaptics_rmi4_i2c_write;
@@ -4524,6 +4569,8 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 		exp_data.initialized = true;
 	}
 
+	mutex_init(&suspended_mutex);
+
 	exp_data.workqueue = create_singlethread_workqueue("dsx_exp_workqueue");
 	INIT_DELAYED_WORK(&exp_data.work, synaptics_rmi4_exp_fn_work);
 	exp_data.rmi4_data = rmi4_data;
@@ -4539,6 +4586,8 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 			break;
 		}
 	}
+
+	INIT_WORK(&rmi4_data->init_work, synaptics_rmi4_init_work);
 
 	for (attr_count = 0; attr_count < ARRAY_SIZE(attrs); attr_count++) {
 		retval = sysfs_create_file(&rmi4_data->input_dev->dev.kobj,
@@ -4559,6 +4608,7 @@ err_sysfs:
 				&attrs[attr_count].attr);
 	}
 
+	cancel_work_sync(&rmi4_data->init_work);
 	cancel_delayed_work_sync(&exp_data.work);
 	flush_workqueue(exp_data.workqueue);
 	destroy_workqueue(exp_data.workqueue);
@@ -4689,49 +4739,6 @@ static void synaptics_rmi4_sensor_sleep(struct synaptics_rmi4_data *rmi4_data)
 }
 
 /**
- * synaptics_rmi4_sensor_wake()
- *
- * Called by synaptics_rmi4_resume() and synaptics_rmi4_late_resume().
- *
- * This function wakes the sensor from sleep.
- */
-static void synaptics_rmi4_sensor_wake(struct synaptics_rmi4_data *rmi4_data)
-{
-	int retval;
-	unsigned char device_ctrl;
-	unsigned char no_sleep_setting = rmi4_data->no_sleep_setting;
-
-	retval = synaptics_rmi4_i2c_read(rmi4_data,
-			rmi4_data->f01_ctrl_base_addr,
-			&device_ctrl,
-			sizeof(device_ctrl));
-	if (retval < 0) {
-		dev_err(&(rmi4_data->input_dev->dev),
-				"%s: Failed to wake from sleep mode\n",
-				__func__);
-		rmi4_data->sensor_sleep = true;
-		return;
-	}
-
-	device_ctrl = (device_ctrl & ~MASK_3BIT);
-	device_ctrl = (device_ctrl | no_sleep_setting | NORMAL_OPERATION);
-
-	retval = synaptics_rmi4_i2c_write(rmi4_data,
-			rmi4_data->f01_ctrl_base_addr,
-			&device_ctrl,
-			sizeof(device_ctrl));
-	if (retval < 0) {
-		dev_err(&(rmi4_data->input_dev->dev),
-				"%s: Failed to wake from sleep mode\n",
-				__func__);
-		rmi4_data->sensor_sleep = true;
-		return;
-	} else {
-		rmi4_data->sensor_sleep = false;
-	}
-}
-
-/**
  * synaptics_rmi4_suspend()
  *
  * Called by the kernel during the suspend phase when the system
@@ -4746,10 +4753,18 @@ static int synaptics_rmi4_suspend(struct device *dev)
 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
 	unsigned char val = 0;
 
-	if (rmi4_data->pwrrunning)
+	if (rmi4_data->suspended) {
+		dev_info(dev, "Already in suspend state\n");
 		return 0;
+	}
 
-	rmi4_data->pwrrunning = true;
+	if (rmi4_data->stay_awake) {
+		rmi4_data->staying_awake = true;
+		goto out;
+	} else
+		rmi4_data->staying_awake = false;
+
+	cancel_work_sync(&rmi4_data->init_work);
 
 	if (rmi4_data->smartcover_enable)
 		synaptics_rmi4_close_smartcover();
@@ -4762,20 +4777,17 @@ static int synaptics_rmi4_suspend(struct device *dev)
 			atomic_read(&rmi4_data->double_tap_enable) ||
 			atomic_read(&rmi4_data->camera_enable) ||
 			atomic_read(&rmi4_data->music_enable) ||
-			atomic_read(&rmi4_data->flashlight_enable) ||
-			atomic_read(&rmi4_data->sweep_wake_enable) ? 1 : 0);
+			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
 
 	if (atomic_read(&rmi4_data->syna_use_gesture) || rmi4_data->pdoze_enable) {
 		synaptics_enable_gesture(rmi4_data,true);
 		synaptics_enable_pdoze(rmi4_data,true);
 		synaptics_enable_irqwake(rmi4_data,true);
-		rmi4_data->pwrrunning = false;
-		return 0;
+		goto out;
 	}
 
 	if (rmi4_data->staying_awake) {
-		rmi4_data->pwrrunning = false;
-		return 0;
+		goto out;
 	}
 
 	if (!rmi4_data->sensor_sleep) {
@@ -4786,14 +4798,18 @@ static int synaptics_rmi4_suspend(struct device *dev)
 		synaptics_rmi4_free_fingers(rmi4_data);
 	}
 
-	rmi4_data->pwrrunning = false;
+out:
+	mutex_lock(&suspended_mutex);
+	rmi4_data->suspended = true;
+	mutex_unlock(&suspended_mutex);
+
 	return 0;
 }
 
 /**
  * synaptics_rmi4_resume()
  *
- * Called by the kernel during the resume phase when the system
+ *truct synaptics_rmi4_data *rmi4_data = Called by the kernel during the resume phase when the system
  * wakes up from suspend.
  *
  * This function turns on the power to the sensor, wakes the sensor
@@ -4802,59 +4818,19 @@ static int synaptics_rmi4_suspend(struct device *dev)
  */
 static int synaptics_rmi4_resume(struct device *dev)
 {
-	int retval;
-	unsigned char val = 1;
 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
 
-	if (rmi4_data->pwrrunning)
-		return 0;
-
-	rmi4_data->pwrrunning = true;
-
-	if (rmi4_data->smartcover_enable)
-		synaptics_rmi4_open_smartcover();
-
-	if (rmi4_data->glove_enable)
-		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
-				&val, sizeof(val));
-
-	if (atomic_read(&rmi4_data->syna_use_gesture) || rmi4_data->pdoze_enable) {
-		synaptics_enable_gesture(rmi4_data,false);
-		synaptics_enable_pdoze(rmi4_data,false);
-		synaptics_enable_irqwake(rmi4_data,false);
-		atomic_set(&rmi4_data->syna_use_gesture,
-			atomic_read(&rmi4_data->double_tap_enable) ||
-			atomic_read(&rmi4_data->camera_enable) ||
-			atomic_read(&rmi4_data->music_enable) ||
-			atomic_read(&rmi4_data->flashlight_enable) ||
-			atomic_read(&rmi4_data->sweep_wake_enable) ? 1 : 0);
-		rmi4_data->pwrrunning = false;
-		return 0;
-	}
-
 	if (rmi4_data->staying_awake) {
-		rmi4_data->pwrrunning = false;
 		return 0;
 	}
 
-	if (!rmi4_data->sensor_sleep) {
-		rmi4_data->pwrrunning = false;
+	flush_workqueue(exp_data.workqueue);
+	if (!rmi4_data->suspended) {
+		dev_info(dev, "Already in awake state\n");
 		return 0;
 	}
 
-	synaptics_rmi4_sensor_wake(rmi4_data);
-	synaptics_rmi4_irq_enable(rmi4_data, true);
-	rmi4_data->touch_stopped = false;
-	retval = synaptics_rmi4_reinit_device(rmi4_data);
-	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Failed to reinit device\n",
-				__func__);
-		rmi4_data->pwrrunning = false;
-		return retval;
-	}
-
-	rmi4_data->pwrrunning = false;
+	queue_work(exp_data.workqueue, &rmi4_data->init_work);
 	return 0;
 }
 

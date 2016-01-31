@@ -1220,6 +1220,21 @@ static int hci_outgoing_auth_needed(struct hci_dev *hdev,
 	return 1;
 }
 
+static inline int hci_resolve_name(struct hci_dev *hdev,
+				   struct inquiry_entry *e)
+{
+	struct hci_cp_remote_name_req cp;
+
+	memset(&cp, 0, sizeof(cp));
+
+	bacpy(&cp.bdaddr, &e->data.bdaddr);
+	cp.pscan_rep_mode = e->data.pscan_rep_mode;
+	cp.pscan_mode = e->data.pscan_mode;
+	cp.clock_offset = e->data.clock_offset;
+
+	return hci_send_cmd(hdev, HCI_OP_REMOTE_NAME_REQ, sizeof(cp), &cp);
+}
+
 static void hci_cs_remote_name_req(struct hci_dev *hdev, __u8 status)
 {
 	struct hci_cp_remote_name_req *cp;
@@ -2313,7 +2328,7 @@ static inline void hci_cmd_complete_evt(struct hci_dev *hdev, struct sk_buff *sk
 	if (ev->opcode != HCI_OP_NOP)
 		del_timer(&hdev->cmd_timer);
 
-	if (ev->ncmd) {
+	if (ev->ncmd && !test_bit(HCI_RESET, &hdev->flags)) {
 		atomic_set(&hdev->cmd_cnt, 1);
 		if (!skb_queue_empty(&hdev->cmd_q))
 			tasklet_schedule(&hdev->cmd_task);

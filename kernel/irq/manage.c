@@ -139,27 +139,7 @@ static inline void
 irq_get_pending(struct cpumask *mask, struct irq_desc *desc) { }
 #endif
 
-int irq_do_set_affinity(struct irq_data *data, const struct cpumask *mask,
-			bool force)
-{
-	struct irq_desc *desc = irq_data_to_desc(data);
-	struct irq_chip *chip = irq_data_get_irq_chip(data);
-	int ret;
-
-	ret = chip->irq_set_affinity(data, mask, force);
-	switch (ret) {
-	case IRQ_SET_MASK_OK:
-		cpumask_copy(data->affinity, mask);
-	case IRQ_SET_MASK_OK_NOCOPY:
-		irq_set_thread_affinity(desc);
-		ret = 0;
-	}
-
-	return ret;
-}
-
-int irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask,
-			    bool force)
+int __irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask)
 {
 	struct irq_chip *chip = irq_data_get_irq_chip(data);
 	struct irq_desc *desc = irq_data_to_desc(data);
@@ -169,7 +149,14 @@ int irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask,
 		return -EINVAL;
 
 	if (irq_can_move_pcntxt(data)) {
-		ret = irq_do_set_affinity(data, mask, force);
+		ret = chip->irq_set_affinity(data, mask, false);
+		switch (ret) {
+		case IRQ_SET_MASK_OK:
+			cpumask_copy(data->affinity, mask);
+		case IRQ_SET_MASK_OK_NOCOPY:
+			irq_set_thread_affinity(desc);
+			ret = 0;
+		}
 	} else {
 		irqd_set_move_pending(data);
 		irq_copy_pending(desc, mask);
@@ -184,7 +171,13 @@ int irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask,
 	return ret;
 }
 
-int __irq_set_affinity(unsigned int irq, const struct cpumask *mask, bool force)
+/**
+ *	irq_set_affinity - Set the irq affinity of a given irq
+ *	@irq:		Interrupt to set affinity
+ *	@mask:		cpumask
+ *
+ */
+int irq_set_affinity(unsigned int irq, const struct cpumask *mask)
 {
 	struct irq_desc *desc = irq_to_desc(irq);
 	unsigned long flags;
@@ -194,7 +187,7 @@ int __irq_set_affinity(unsigned int irq, const struct cpumask *mask, bool force)
 		return -EINVAL;
 
 	raw_spin_lock_irqsave(&desc->lock, flags);
-	ret = irq_set_affinity_locked(irq_desc_get_irq_data(desc), mask, force);
+	ret =  __irq_set_affinity_locked(irq_desc_get_irq_data(desc), mask);
 	raw_spin_unlock_irqrestore(&desc->lock, flags);
 	return ret;
 }
@@ -287,8 +280,9 @@ EXPORT_SYMBOL_GPL(irq_set_affinity_notifier);
 static int
 setup_affinity(unsigned int irq, struct irq_desc *desc, struct cpumask *mask)
 {
+	struct irq_chip *chip = irq_desc_get_chip(desc);
 	struct cpumask *set = irq_default_affinity;
-	int node = desc->irq_data.node;
+	int ret, node = desc->irq_data.node;
 
 	/* Excludes PER_CPU and NO_BALANCE interrupts */
 	if (!irq_can_set_affinity(irq))
@@ -314,7 +308,13 @@ setup_affinity(unsigned int irq, struct irq_desc *desc, struct cpumask *mask)
 		if (cpumask_intersects(mask, nodemask))
 			cpumask_and(mask, mask, nodemask);
 	}
-	irq_do_set_affinity(&desc->irq_data, mask, false);
+	ret = chip->irq_set_affinity(&desc->irq_data, mask, false);
+	switch (ret) {
+	case IRQ_SET_MASK_OK:
+		cpumask_copy(desc->irq_data.affinity, mask);
+	case IRQ_SET_MASK_OK_NOCOPY:
+		irq_set_thread_affinity(desc);
+	}
 	return 0;
 }
 #else
@@ -634,22 +634,6 @@ int __irq_set_trigger(struct irq_desc *desc, unsigned int irq,
 	return ret;
 }
 
-#ifdef CONFIG_HARDIRQS_SW_RESEND
-int irq_set_parent(int irq, int parent_irq)
-{
-	unsigned long flags;
-	struct irq_desc *desc = irq_get_desc_lock(irq, &flags, 0);
-
-	if (!desc)
-		return -EINVAL;
-
-	desc->parent_irq = parent_irq;
-
-	irq_put_desc_unlock(desc, flags);
-	return 0;
-}
-#endif
-
 /*
  * Default primary interrupt handler for threaded interrupts. Is
  * assigned as primary handler when request_threaded_irq is called
@@ -844,8 +828,6 @@ static int irq_thread(void *data)
 
 	sched_setscheduler(current, SCHED_FIFO, &param);
 	current->irq_thread = 1;
-
-	irq_thread_check_affinity(desc, action);
 
 	while (!irq_wait_for_interrupt(action)) {
 		irqreturn_t action_ret;

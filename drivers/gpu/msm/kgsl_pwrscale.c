@@ -370,14 +370,6 @@ int kgsl_devfreq_add_notifier(struct device *dev, struct notifier_block *nb)
 	return srcu_notifier_chain_register(&device->pwrscale.nh, nb);
 }
 
-void kgsl_pwrscale_idle(struct kgsl_device *device)
-{
-	BUG_ON(!mutex_is_locked(&device->mutex));
-	queue_work(device->pwrscale.devfreq_wq,
-		&device->pwrscale.devfreq_notify_ws);
-}
-EXPORT_SYMBOL(kgsl_pwrscale_idle);
-
 /*
  * kgsl_devfreq_del_notifier - remove a fine grained notifier.
  * @dev: The device
@@ -481,9 +473,7 @@ int kgsl_pwrscale_init(struct device *dev, const char *governor)
 	ret = sysfs_create_link(&device->dev->kobj,
 			&devfreq->dev.kobj, "devfreq");
 
-	pwrscale->devfreq_wq = alloc_workqueue("kgsl_devfreq_wq", WQ_HIGHPRI |
-					       WQ_UNBOUND | WQ_FREEZABLE |
-					       WQ_MEM_RECLAIM, 0);
+	pwrscale->devfreq_wq = create_freezable_workqueue("kgsl_devfreq_wq");
 	INIT_WORK(&pwrscale->devfreq_suspend_ws, do_devfreq_suspend);
 	INIT_WORK(&pwrscale->devfreq_resume_ws, do_devfreq_resume);
 	INIT_WORK(&pwrscale->devfreq_notify_ws, do_devfreq_notify);

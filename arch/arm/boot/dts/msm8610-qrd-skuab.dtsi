@@ -88,6 +88,8 @@
 				00 FF FF FF FF FF FF FF 00 00
 				00 FF FF FF FF FF FF FF FF FF
 				F8 FF FF FF E4 01];
+			goodix,have-touch-key;
+			goodix,driver-send-cfg;
 		};
 	};
 	gen-vkeys {
@@ -181,3 +183,14 @@
 &dsi_otm8018b_fwvga_vid {
 	qcom,cont-splash-enabled;
 };
+
+&sdhc_2 {
+        qcom,nonremovable;
+
+        interrupts = <0 1>;
+        interrupt-map = <0 &intc 0 125 0
+                        1 &intc 0 221 0>;
+        interrupt-names = "hc_irq", "pwr_irq";
+        /delete-property/ cd-gpios;
+};
+

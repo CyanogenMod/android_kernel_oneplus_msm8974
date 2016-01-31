@@ -128,10 +128,8 @@ struct msm_cpp_frame_info_t {
 struct cpp_hw_info {
 	uint32_t cpp_hw_version;
 	uint32_t cpp_hw_caps;
-#ifndef CONFIG_OPPO_CAMERA
 	unsigned long freq_tbl[MAX_FREQ_TBL];
 	uint32_t freq_tbl_count;
-#endif
 };
 
 struct msm_vpe_frame_strip_info {

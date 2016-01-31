@@ -388,8 +388,7 @@ extern void remove_percpu_irq(unsigned int irq, struct irqaction *act);
 
 extern void irq_cpu_online(void);
 extern void irq_cpu_offline(void);
-extern int irq_set_affinity_locked(struct irq_data *data,
-				   const struct cpumask *cpumask, bool force);
+extern int __irq_set_affinity_locked(struct irq_data *data,  const struct cpumask *cpumask);
 
 #ifdef CONFIG_GENERIC_HARDIRQS
 
@@ -402,15 +401,6 @@ static inline void irq_move_masked_irq(struct irq_data *data) { }
 #endif
 
 extern int no_irq_affinity;
-
-#ifdef CONFIG_HARDIRQS_SW_RESEND
-int irq_set_parent(int irq, int parent_irq);
-#else
-static inline int irq_set_parent(int irq, int parent_irq)
-{
-	return 0;
-}
-#endif
 
 /*
  * Built-in IRQ handlers for various IRQ types,

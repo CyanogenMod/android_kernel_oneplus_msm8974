@@ -54,7 +54,6 @@
 		qcom,mdss-dsi-traffic-mode = "non_burst_sync_event";
 		qcom,mdss-dsi-bllp-eof-power-mode;
 		qcom,mdss-dsi-bllp-power-mode;
-		qcom,cmd-sync-wait-broadcast;
 		qcom,mdss-dsi-lane-0-state;
 		qcom,mdss-dsi-lane-1-state;
 		qcom,mdss-dsi-lane-2-state;
@@ -76,5 +75,7 @@
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_pwm";
 		qcom,mdss-dsi-reset-sequence = <1 20>, <0 200>, <1 20>;
+		qcom,panel-roi-alignment = <2 2 2 2 0 0>;
+		qcom,partial-update-enabled;
 	};
 };

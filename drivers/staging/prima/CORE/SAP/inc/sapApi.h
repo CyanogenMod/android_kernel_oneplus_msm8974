@@ -1001,7 +1001,12 @@ WLANSAP_StopBss
 VOS_STATUS 
 WLANSAP_DisassocSta
 (
-    v_PVOID_t  pvosGCtx, v_U8_t *pPeerStaMac
+    v_PVOID_t  pvosGCtx,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))
+    const v_U8_t *pPeerStaMac
+#else
+    v_U8_t *pPeerStaMac
+#endif
 );
 
 /*==========================================================================
