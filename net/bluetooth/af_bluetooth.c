@@ -40,6 +40,10 @@
 
 #include <net/bluetooth/bluetooth.h>
 
+#ifdef CONFIG_ANDROID_PARANOID_NETWORK
+#include <linux/android_aid.h>
+#endif
+
 #ifndef CONFIG_BT_SOCK_DEBUG
 #undef  BT_DBG
 #define BT_DBG(D...)
@@ -130,15 +134,15 @@ int bt_sock_unregister(int proto)
 }
 EXPORT_SYMBOL(bt_sock_unregister);
 
-#ifdef CONFIG_PARANOID_NETWORK
+#ifdef CONFIG_ANDROID_PARANOID_NETWORK
 static inline int current_has_bt_admin(void)
 {
-	return !current_euid();
+	return (!current_euid() || in_egroup_p(AID_NET_BT_ADMIN));
 }
 
 static inline int current_has_bt(void)
 {
-	return current_has_bt_admin();
+	return (current_has_bt_admin() || in_egroup_p(AID_NET_BT));
 }
 # else
 static inline int current_has_bt_admin(void)
@@ -286,6 +290,8 @@ int bt_sock_recvmsg(struct kiocb *iocb, struct socket *sock,
 		return err;
 	}
 
+	msg->msg_namelen = 0;
+
 	copied = skb->len;
 	if (len < copied) {
 		msg->msg_flags |= MSG_TRUNC;
@@ -342,6 +348,8 @@ int bt_sock_stream_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 	if (flags & MSG_OOB)
 		return -EOPNOTSUPP;
+
+	msg->msg_namelen = 0;
 
 	BT_DBG("sk %p size %zu", sk, size);
 
