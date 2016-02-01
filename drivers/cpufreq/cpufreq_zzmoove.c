@@ -82,7 +82,7 @@
 #define MAX_CORES					(4)
 
 // ZZ: enable/disable hotplug support
-//#define ENABLE_HOTPLUGGING
+#define ENABLE_HOTPLUGGING
 
 // ZZ: enable support for native hotplugging on snapdragon platform
 #define SNAP_NATIVE_HOTPLUGGING
@@ -5244,6 +5244,7 @@ static ssize_t store_inputboost_typingbooster_up_threshold(struct kobject *a, st
 	return count;
 }
 
+#ifdef ENABLE_HOTPLUGGING
 // ff: added tuneable inputboost_typingbooster_cores -> possible values: range from 0 disabled to 4, if not set default is 0
 static ssize_t store_inputboost_typingbooster_cores(struct kobject *a, struct attribute *b,
 														   const char *buf, size_t count)
@@ -5270,6 +5271,7 @@ static ssize_t store_inputboost_typingbooster_cores(struct kobject *a, struct at
 	dbs_tuners_ins.inputboost_typingbooster_cores = input;
 	return count;
 }
+#endif /* ENABLE_HOTPLUGGING */
 #endif /* ENABLE_INPUTBOOSTER */
 
 #ifdef ENABLE_MUSIC_LIMITS
