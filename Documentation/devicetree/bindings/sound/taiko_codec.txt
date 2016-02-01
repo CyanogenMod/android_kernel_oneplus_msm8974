@@ -78,6 +78,14 @@ Optional properties:
 			 and 4800000 Hz.  The values for 12.288MHz mclk can be
 			 3072200 Hz, 4096000 Hz and 6144000 Hz.
 
+ - qcom,cdc-mad-dmic-rate: Specifies the sample rate of digital mic in HZ to be
+			   used by MAD (Microphone Activity Detection) hardware
+			   block on the codec. The valid set of values are same
+			   as that of cdc-dmic-sample-rate, but this rate will
+			   only be used by MAD and all other audio use cases
+			   involving DMIC will use the rate defined by
+			   cdc-dmic-sample-rate.
+
  - qcom,cdc-on-demand-supplies: List of supplies which can be enabled
 				dynamically.
 				Supplies in this list are off by default.
@@ -87,6 +95,9 @@ Optional properties:
 				are off by default.
 
  - qcom,cdc-micbias2-headset-only: Boolean. Allow micbias 2 only to headset mic.
+
+ - qcom,cdc-variant: Indicates codec variant, WCD9XXX indicates all codecs till Taiko
+			WCD9330 indicates wcd9330 audio codec
 
 Example:
 

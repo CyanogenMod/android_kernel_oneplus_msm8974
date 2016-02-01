@@ -167,7 +167,7 @@ choice
 		  as desired, independently of the disk parameters and with
 		  any workload. It also tries to guarantee low latency to
 		  interactive and soft real-time applications.
-		  
+
 	config DEFAULT_FIOPS
 		bool "FIOPS" if IOSCHED_FIOPS=y
 
@@ -195,13 +195,13 @@ config DEFAULT_IOSCHED
 	string
 	default "deadline" if DEFAULT_DEADLINE
 	default "row" if DEFAULT_ROW
-	default "cfq" if DEFAULT_CFQ
 	default "bfq" if DEFAULT_BFQ
+	default "cfq" if DEFAULT_CFQ
+	default "fiops" if DEFAULT_FIOPS
 	default "sio" if DEFAULT_SIO
 	default "sioplus" if DEFAULT_SIOPLUS
         default "bfq" if DEFAULT_BFQ
 	default "noop" if DEFAULT_NOOP
-    default "fiops" if DEFAULT_FIOPS
 	default "zen" if DEFAULT_ZEN
 	default "vr" if DEFAULT_VR
 	default "tripndroid" if DEFAULT_TRIPNDROID

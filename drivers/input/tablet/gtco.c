@@ -202,7 +202,7 @@ struct hid_descriptor
 static void parse_hid_report_descriptor(struct gtco *device, char * report,
 					int length)
 {
-	int   z, x, i = 0;
+	int   x, i = 0;
 
 	/* Tag primitive vars */
 	__u8   prefix;
@@ -227,8 +227,6 @@ static void parse_hid_report_descriptor(struct gtco *device, char * report,
 	int   indent = 0;
 	char  indentstr[10] = "";
 
-	for (z=0; z<TAG_GLOB_MAX; z++)
-		oldval[z]=0;
 
 	dbg("======>>>>>>PARSE<<<<<<======");
 

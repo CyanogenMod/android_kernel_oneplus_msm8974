@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -73,11 +73,14 @@
 #define WCD9XXX_MCLK_CLK_9P6HZ 9600000
 
 /* Only valid for 9.6 MHz mclk */
+#define WCD9XXX_DMIC_SAMPLE_RATE_600KHZ 600000
 #define WCD9XXX_DMIC_SAMPLE_RATE_2P4MHZ 2400000
 #define WCD9XXX_DMIC_SAMPLE_RATE_3P2MHZ 3200000
 #define WCD9XXX_DMIC_SAMPLE_RATE_4P8MHZ 4800000
 
 /* Only valid for 12.288 MHz mclk */
+#define WCD9XXX_DMIC_SAMPLE_RATE_768KHZ 768000
+#define WCD9XXX_DMIC_SAMPLE_RATE_2P048MHZ 2048000
 #define WCD9XXX_DMIC_SAMPLE_RATE_3P072MHZ 3072000
 #define WCD9XXX_DMIC_SAMPLE_RATE_4P096MHZ 4096000
 #define WCD9XXX_DMIC_SAMPLE_RATE_6P144MHZ 6144000
@@ -129,6 +132,11 @@ struct wcd9xxx_micbias_setting {
 	bool bias2_is_headset_only;
 };
 
+enum codec_variant {
+	WCD9XXX,
+	WCD9330,
+};
+
 struct wcd9xxx_ocp_setting {
 	unsigned int	use_pdata:1; /* 0 - use sys default as recommended */
 	unsigned int	num_attempts:4; /* up to 15 attempts */
@@ -177,6 +185,8 @@ struct wcd9xxx_pdata {
 	struct wcd9xxx_regulator regulator[WCD9XXX_MAX_REGULATOR];
 	u32 mclk_rate;
 	u32 dmic_sample_rate;
+	u32 mad_dmic_sample_rate;
+	enum codec_variant cdc_variant;
 };
 
 #endif
