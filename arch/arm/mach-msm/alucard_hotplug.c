@@ -63,7 +63,7 @@ static struct hotplug_tuners {
 	.hotplug_enable = 1,
 #else
 	.hotplug_sampling_rate = 50,
-	.hotplug_enable = 0,
+	.hotplug_enable = 1,
 #endif
 	.min_cpus_online = 1,
 	.maxcoreslimit = NR_CPUS,
@@ -693,10 +693,10 @@ static int __init alucard_hotplug_init(void)
 		{652800, 1190400},
 		{652800, 0}
 #else
-		{0, 1242000},
-		{810000, 1566000},
-		{918000, 1674000},
-		{1026000, 0}
+		{0, 1497600},
+		{652800, 1190400},
+		{652800, 1190400},
+		{652800, 0}
 #endif
 	};
 	unsigned int hotplug_load[NR_CPUS][2] = {
