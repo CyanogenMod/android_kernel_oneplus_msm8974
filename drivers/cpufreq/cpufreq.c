@@ -1876,18 +1876,6 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 	memcpy(&policy->cpuinfo, &data->cpuinfo,
 				sizeof(struct cpufreq_cpuinfo));
 
-	// if hard limit check is enabled + if new max frequency is above hard limit,
-	// overwrite with hard limit
-	if (min_freq_hardlimit[policy->cpu] != 0)
-		if (policy->min < min_freq_hardlimit[policy->cpu])
-			policy->min = min_freq_hardlimit[policy->cpu];
-
-	// if hard limit check is enabled + if new max frequency is above hard limit,
-	// overwrite with hard limit
-	if (max_freq_hardlimit[policy->cpu] != 0)
-		if (policy->max > max_freq_hardlimit[policy->cpu])
-			policy->max = max_freq_hardlimit[policy->cpu];
-
 	if (policy->min > data->user_policy.max
 		|| policy->max < data->user_policy.min) {
 		ret = -EINVAL;
