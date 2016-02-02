@@ -2031,11 +2031,6 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 			/* save old, working values */
 			struct cpufreq_governor *old_gov = data->governor;
 
-			// if hard limit for governor is set, only allow this governor to be set
-			if ((strlen(governor_hard[policy->cpu]) != 0) && 
-				(! strstr(policy->governor->name, governor_hard[policy->cpu])))
-				policy->governor = __find_governor(governor_hard[policy->cpu]);
-
 			pr_debug("governor switch\n");
 
 			/* end old governor */
