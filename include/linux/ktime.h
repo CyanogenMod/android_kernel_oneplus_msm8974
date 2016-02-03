@@ -301,16 +301,30 @@ static inline int ktime_compare(const ktime_t cmp1, const ktime_t cmp2)
 	return 0;
 }
 
+#if BITS_PER_LONG < 64
+extern u64 __ktime_divns(const ktime_t kt, s64 div);
+static inline u64 ktime_divns(const ktime_t kt, s64 div)
+{
+	if (__builtin_constant_p(div) && !(div >> 32)) {
+		u64 ns = kt.tv64;
+		do_div(ns, div);
+		return ns;
+	} else {
+		return __ktime_divns(kt, div);
+	}
+}
+#else /* BITS_PER_LONG < 64 */
+# define ktime_divns(kt, div)		(u64)((kt).tv64 / (div))
+#endif
+
 static inline s64 ktime_to_us(const ktime_t kt)
 {
-	struct timeval tv = ktime_to_timeval(kt);
-	return (s64) tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
+	return ktime_divns(kt, NSEC_PER_USEC);
 }
 
 static inline s64 ktime_to_ms(const ktime_t kt)
 {
-	struct timeval tv = ktime_to_timeval(kt);
-	return (s64) tv.tv_sec * MSEC_PER_SEC + tv.tv_usec / USEC_PER_MSEC;
+	return ktime_divns(kt, NSEC_PER_MSEC);
 }
 
 static inline s64 ktime_us_delta(const ktime_t later, const ktime_t earlier)

@@ -56,7 +56,7 @@
 
 #define MAX_BUF_SIZE  512
 
-static int msm_pm_debug_mask __refdata = 1;
+static int msm_pm_debug_mask = 0;
 module_param_named(
 	debug_mask, msm_pm_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
 );
@@ -817,7 +817,7 @@ int msm_cpu_pm_enter_sleep(enum msm_pm_sleep_mode mode, bool from_idle)
 
 int msm_pm_wait_cpu_shutdown(unsigned int cpu)
 {
-	int timeout = 10;
+	int timeout = 0;
 
 	if (!msm_pm_slp_sts)
 		return 0;

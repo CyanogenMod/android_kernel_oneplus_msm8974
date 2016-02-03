@@ -565,9 +565,10 @@ static void alucard_check_cpu(struct cpufreq_alucard_cpuinfo *this_alucard_cpuin
 			this_alucard_cpuinfo->up_rate = 1;
 			this_alucard_cpuinfo->down_rate = 1;
 
-			__cpufreq_driver_target(policy,
-									this_alucard_cpuinfo->freq_table[index].frequency,
-									CPUFREQ_RELATION_L);
+			if (this_alucard_cpuinfo->freq_table[index].frequency != CPUFREQ_ENTRY_INVALID)
+				__cpufreq_driver_target(policy,
+										this_alucard_cpuinfo->freq_table[index].frequency,
+										CPUFREQ_RELATION_L);
 		} else {
 			if (this_alucard_cpuinfo->up_rate < cpus_up_rate)
 				++this_alucard_cpuinfo->up_rate;
@@ -584,9 +585,10 @@ static void alucard_check_cpu(struct cpufreq_alucard_cpuinfo *this_alucard_cpuin
 			this_alucard_cpuinfo->up_rate = 1;
 			this_alucard_cpuinfo->down_rate = 1;
 
-			__cpufreq_driver_target(policy,
-									this_alucard_cpuinfo->freq_table[index].frequency,
-									CPUFREQ_RELATION_L);
+			if (this_alucard_cpuinfo->freq_table[index].frequency != CPUFREQ_ENTRY_INVALID)
+				__cpufreq_driver_target(policy,
+										this_alucard_cpuinfo->freq_table[index].frequency,
+										CPUFREQ_RELATION_L);
 		} else {
 			if (this_alucard_cpuinfo->down_rate < cpus_down_rate)
 				++this_alucard_cpuinfo->down_rate;

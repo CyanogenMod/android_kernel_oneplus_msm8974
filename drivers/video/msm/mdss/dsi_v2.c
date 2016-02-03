@@ -105,11 +105,11 @@ static int dsi_panel_handler(struct mdss_panel_data *pdata, int enable)
 				pr_err("%s: panel on failed!\n", __func__);
 		}
 		pdata->panel_info.panel_power_state = MDSS_PANEL_POWER_ON;
-		if (pdata->panel_info.type == MIPI_CMD_PANEL)
-			mdss_dsi_set_tear_on(ctrl_pdata);
+		rc = ctrl_pdata->on(pdata);
+		if (rc)
+			pr_err("dsi_panel_handler panel on failed %d\n", rc);
 	} else if (!enable &&
 		(pdata->panel_info.panel_power_state == MDSS_PANEL_POWER_ON)) {
-		msm_dsi_sw_reset();
 		if (dsi_intf.op_mode_config)
 			dsi_intf.op_mode_config(DSI_CMD_MODE, pdata);
 		if (pdata->panel_info.dynamic_switch_pending) {
