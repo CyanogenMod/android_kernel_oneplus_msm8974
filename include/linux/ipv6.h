@@ -172,6 +172,7 @@ struct ipv6_devconf {
 	__s32		mc_forwarding;
 #endif
 	__s32		disable_ipv6;
+	__s32		drop_unicast_in_l2_multicast;
 	__s32		accept_dad;
 	__s32		force_tllao;
 	__s32		accept_ra_prefix_route;
@@ -223,6 +224,7 @@ enum {
 	DEVCONF_ACCEPT_RA_MTU,
 	DEVCONF_USE_OPTIMISTIC,
 	DEVCONF_USE_OIF_ADDRS_ONLY,
+	DEVCONF_DROP_UNICAST_IN_L2_MULTICAST,
 	DEVCONF_MAX
 };
 

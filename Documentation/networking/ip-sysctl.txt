@@ -1324,6 +1324,12 @@ use_optimistic - BOOLEAN
 		0: disabled (default)
 		1: enabled
 
+drop_unicast_in_l2_multicast - BOOLEAN
+	Drop any unicast IPv6 packets that are received in link-layer
+	multicast (or broadcast) frames.
+
+	By default this is turned off.
+
 icmp/*:
 ratelimit - INTEGER
 	Limit the maximal rates for sending ICMPv6 packets.
