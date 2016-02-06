@@ -998,11 +998,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			phy->state = OTG_STATE_B_IDLE;
 			dotg->vbus_retry_count = 0;
 			work = 1;
-		} else {/*
-#ifdef CONFIG_BQ24196_CHARGER
-			/* Wait until I2C bus is active */
-			bq24196_wait_for_resume();
-#endif*/
+		} else {
 			phy->state = OTG_STATE_A_HOST;
 				/* Wait, as host must be enabled after power */
 				if (ID_MODE == ID_A) {
