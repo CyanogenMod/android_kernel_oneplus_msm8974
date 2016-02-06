@@ -493,7 +493,7 @@ static int f2fs_drop_inode(struct inode *inode)
 
 			/* some remained atomic pages should discarded */
 			if (f2fs_is_atomic_file(inode))
-				commit_inmem_pages(inode, true);
+				drop_inmem_pages(inode);
 
 			i_size_write(inode, 0);
 
