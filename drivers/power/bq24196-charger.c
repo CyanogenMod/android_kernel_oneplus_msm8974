@@ -28,6 +28,7 @@
 //set charge parameter limit
 #define BQ24196_CHG_IBATMAX_MIN		512
 #define BQ24196_CHG_IBATMAX_MAX		2496
+#define BQ24196_CHG_IBATMAX_HRM		2048
 #define BQ24196_TERM_CURR_MIN		128
 #define BQ24196_TERM_CURR_MAX		2048
 #define BQ24196_CHG_IUSBMAX_MIN		100
@@ -47,6 +48,7 @@ struct bq24196_device_info {
 	struct i2c_client		*client;
 	struct task_struct		*feedwdt_task;
 	struct mutex			i2c_lock;
+	atomic_t suspended; //sjc1118
 
 	/* 300ms delay is needed after bq27541 is powered up
 	 * and before any successful I2C transaction
@@ -57,10 +59,19 @@ struct bq24196_device_info {
 struct bq24196_device_info *bq24196_di;
 struct i2c_client *bq24196_client;
 
+/* Ensure I2C bus is active for OTG */
+static bool suspended = false;
+static DECLARE_COMPLETION(resume_done);
+static DEFINE_SPINLOCK(resume_lock);
+
 static int bq24196_read_i2c(struct bq24196_device_info *di,u8 reg,u8 length,char *buf)
 {
 	struct i2c_client *client = di->client;
 	int retval;
+
+	if (atomic_read(&di->suspended) == 1) //sjc1118
+		return -1;
+
 	mutex_lock(&bq24196_di->i2c_lock);
 	retval = i2c_smbus_read_i2c_block_data(client,reg,length,&buf[0]);
 	mutex_unlock(&bq24196_di->i2c_lock);
@@ -73,6 +84,10 @@ static int bq24196_write_i2c(struct bq24196_device_info *di,u8 reg,u8 length,cha
 {
 	struct i2c_client *client = di->client;
 	int retval;
+
+	if (atomic_read(&di->suspended) == 1) //sjc1118
+		return -1;
+	
 	mutex_lock(&bq24196_di->i2c_lock);
 	retval = i2c_smbus_write_i2c_block_data(client,reg,length,&buf[0]);
 	mutex_unlock(&bq24196_di->i2c_lock);
@@ -90,7 +105,7 @@ static int bq24196_write(struct bq24196_device_info *di,u8 reg,u8 length,char *b
 	return di->bus->write(di,reg,length,buf);
 }
 
-static int 
+static int
 bq24196_chg_masked_write(struct bq24196_device_info *di, u8 reg,
 						u8 mask, u8 value, int length)
 {
@@ -124,7 +139,17 @@ bq24196_ibatmax_set(struct bq24196_device_info *di, int chg_current)
 		value <<= 2;
 		value |= 1;
 		return bq24196_chg_masked_write(di,CHARGE_CURRENT_CTRL,BQ24196_IBATMAX_BITS,value,1);
-	} else if(chg_current == 500) {
+	} 
+#ifdef CONFIG_MACH_MSM8974_14001
+       /* yangfangbiao@oneplus.cn, 2015/03/15	set charge current 300ma  */
+	else if(chg_current == 300) {
+		value = (1536 - BQ24196_CHG_IBATMAX_MIN)/64;
+		value <<= 2;
+		value |= 1;
+		return bq24196_chg_masked_write(di,CHARGE_CURRENT_CTRL,BQ24196_IBATMAX_BITS,value,1);
+	} 
+#endif /*CONFIG_MACH_MSM8974_14001*/
+	else if(chg_current == 500) {
 		value = (2496 - BQ24196_CHG_IBATMAX_MIN)/64;
 		value <<= 2;
 		value |= 1;
@@ -135,6 +160,13 @@ bq24196_ibatmax_set(struct bq24196_device_info *di, int chg_current)
 			chg_current = BQ24196_CHG_IBATMAX_MIN;
 			pr_err("bad ibatmA=%d,default to 512mA\n", chg_current);
 		}
+
+#ifdef CONFIG_MACH_MSM8974_14001
+// Jingchun.Wang@Phone.Bsp.Driver, 2014/09/30  Add for avoid BATFET OCP when ibat<1024mA 
+		if(chg_current < 1024) {
+			chg_current = BQ24196_CHG_IBATMAX_HRM;
+		}
+#endif /*CONFIG_MACH_MSM8974_14001*/
 		
 
 		value = (chg_current - BQ24196_CHG_IBATMAX_MIN)/64;
@@ -160,7 +192,7 @@ bq24196_ibatterm_set(struct bq24196_device_info *di, int term_current)
 }
 
 #define BQ24196_IUSBMAX_BITS	0X07
-static int 
+static int
 bq24196_iusbmax_set(struct bq24196_device_info *di, int mA)
 {
 	u8 value = 0;
@@ -191,7 +223,7 @@ bq24196_iusbmax_set(struct bq24196_device_info *di, int mA)
 }
 
 #define BQ24196_VBATDET_BITS	0x1
-static int 
+static int
 bq24196_vbatdet_set(struct bq24196_device_info *di, int vbatdet)
 {
 	u8 value = 0;
@@ -214,7 +246,7 @@ bq24196_vbatdet_set(struct bq24196_device_info *di, int vbatdet)
 #define BQ24196_CHG_VDDMAX_MAX 4400
 #define BQ24196_VDDMAX_BITS		0xFC
 
-static int 
+static int
 bq24196_vddmax_set(struct bq24196_device_info *di, int voltage)
 {
 	u8 value = 0;
@@ -235,7 +267,7 @@ bq24196_vddmax_set(struct bq24196_device_info *di, int voltage)
 #define BQ24196_VINMIN_MIN	3880
 #define BQ24196_VINMIN_MAX	5080
 #define BQ24196_VINMIN_BITS	0x78
-static int 
+static int
 bq24196_vinmin_set(struct bq24196_device_info *di, int voltage)
 {
 	u8 value = 0;
@@ -252,11 +284,17 @@ bq24196_vinmin_set(struct bq24196_device_info *di, int voltage)
 }
 
 #define BQ24196_CHARGE_TIMEOUT_BITS		0x06
-static int 
+static int
 bq24196_check_charge_timeout(struct bq24196_device_info *di,int hours)
 {
 	u8 value = 0;
-	
+
+#ifdef CONGIF_OPPO_CMCC_OPTR
+/* OPPO 2014-06-19 sjc Add for CMCC test: disable HW timer */
+	if (hours >= 1000)
+		return bq24196_chg_masked_write(di, CHARGE_TERM_TIMER_CTRL, 0x08, 0x0, 1);
+#endif
+
 	if( hours >= 20 )	//20 hours
 		value = 0x06;
 	else if( hours >= 12 )	//12 hours
@@ -300,7 +338,7 @@ bq24196_wdt_set(struct bq24196_device_info *di,int seconds)
 }
 
 #define BQ24196_REGS_RESET_BITS		0x80
-static int 
+static int
 bq24196_regs_reset(struct bq24196_device_info *di,int reset)
 {
 	u8 value = 0;
@@ -312,7 +350,7 @@ bq24196_regs_reset(struct bq24196_device_info *di,int reset)
 }
 
 #define BQ24196_CHARGEEN_BITS	0x30
-static int 
+static int
 bq24196_charge_en(struct bq24196_device_info *di, int enable)
 {
 	u8 value = 0;
@@ -520,6 +558,7 @@ static int bq24196_probe(struct i2c_client *client, const struct i2c_device_id *
 	di->client = client;
 	bq24196_client = client;
 	bq24196_di = di;
+	atomic_set(&di->suspended, 0); //sjc1118
 	mutex_init(&di->i2c_lock);
 	bq24196_hw_config_init(di);
 	
@@ -557,11 +596,65 @@ static const struct i2c_device_id bq24196_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, bq24196_id);
 
+static void bq24196_suspended(bool state)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&resume_lock, flags);
+	suspended = state;
+	spin_unlock_irqrestore(&resume_lock, flags);
+
+	if (!suspended)
+		complete_all(&resume_done);
+}
+
+void bq24196_wait_for_resume(void)
+{
+	unsigned long flags;
+	bool asleep;
+
+	spin_lock_irqsave(&resume_lock, flags);
+	asleep = suspended;
+	spin_unlock_irqrestore(&resume_lock, flags);
+
+	if (asleep) {
+		INIT_COMPLETION(resume_done);
+		wait_for_completion_timeout(&resume_done,
+					msecs_to_jiffies(50));
+	}
+}
+
+static int bq24196_suspend(struct device *dev) //sjc1118
+{
+	struct bq24196_device_info *chip = dev_get_drvdata(dev);
+
+	bq24196_suspended(true);
+	atomic_set(&chip->suspended, 1);
+
+	return 0;
+}
+
+static int bq24196_resume(struct device *dev) //sjc1118
+{
+	struct bq24196_device_info *chip = dev_get_drvdata(dev);
+
+	atomic_set(&chip->suspended, 0);
+	bq24196_suspended(false);
+
+	return 0;
+}
+
+static const struct dev_pm_ops bq24196_pm_ops = { //sjc1118
+	.resume		= bq24196_resume,
+	.suspend		= bq24196_suspend,
+};
+
 static struct i2c_driver bq24196_charger_driver = {
 	.driver		= {
 		.name = "bq24196_charger",
 		.owner	= THIS_MODULE,
 		.of_match_table = bq24196_match,
+		.pm		= &bq24196_pm_ops,
 	},
 	.probe		= bq24196_probe,
 	.remove		= bq24196_remove,
