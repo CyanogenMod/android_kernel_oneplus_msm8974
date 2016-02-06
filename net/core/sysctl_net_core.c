@@ -88,8 +88,18 @@ static int rps_sock_flow_sysctl(ctl_table *table, int write,
 }
 #endif /* CONFIG_RPS */
 
+extern int randomize_mac;
+
 static struct ctl_table net_core_table[] = {
 #ifdef CONFIG_NET
+	{
+		.procname	= "randomize_mac",
+		.data		= &randomize_mac,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+
 	{
 		.procname	= "wmem_max",
 		.data		= &sysctl_wmem_max,
