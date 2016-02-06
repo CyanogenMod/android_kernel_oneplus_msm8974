@@ -54,10 +54,6 @@ static void dwc3_otg_reset(struct dwc3_otg *dotg);
 static void dwc3_otg_notify_host_mode(struct usb_otg *otg, int host_mode);
 static void dwc3_otg_reset(struct dwc3_otg *dotg);
 
-#ifdef CONFIG_BQ24196_CHARGER
-extern void bq24196_wait_for_resume(void);
-#endif
-
 /**
  * dwc3_otg_set_host_regs - reset dwc3 otg registers to host operation.
  *
@@ -1002,11 +998,11 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			phy->state = OTG_STATE_B_IDLE;
 			dotg->vbus_retry_count = 0;
 			work = 1;
-		} else {
+		} else {/*
 #ifdef CONFIG_BQ24196_CHARGER
 			/* Wait until I2C bus is active */
 			bq24196_wait_for_resume();
-#endif
+#endif*/
 			phy->state = OTG_STATE_A_HOST;
 				/* Wait, as host must be enabled after power */
 				if (ID_MODE == ID_A) {
