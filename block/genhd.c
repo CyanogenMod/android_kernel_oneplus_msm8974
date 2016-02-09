@@ -1503,9 +1503,11 @@ static void __disk_unblock_events(struct gendisk *disk, bool check_now)
 	intv = disk_events_poll_jiffies(disk);
 	set_timer_slack(&ev->dwork.timer, intv / 4);
 	if (check_now)
-		queue_delayed_work(system_nrt_freezable_wq, &ev->dwork, 0);
+		queue_delayed_work(system_freezable_power_efficient_wq,
+				&ev->dwork, 0);
 	else if (intv)
-		queue_delayed_work(system_nrt_freezable_wq, &ev->dwork, intv);
+		queue_delayed_work(system_freezable_power_efficient_wq,
+				&ev->dwork, intv);
 out_unlock:
 	spin_unlock_irqrestore(&ev->lock, flags);
 }
@@ -1549,7 +1551,8 @@ void disk_flush_events(struct gendisk *disk, unsigned int mask)
 	ev->clearing |= mask;
 	if (!ev->block) {
 		cancel_delayed_work(&ev->dwork);
-		queue_delayed_work(system_nrt_freezable_wq, &ev->dwork, 0);
+		queue_delayed_work(system_freezable_power_efficient_wq,
+				&ev->dwork, 0);
 	}
 	spin_unlock_irq(&ev->lock);
 }
@@ -1623,7 +1626,8 @@ static void disk_events_workfn(struct work_struct *work)
 
 	intv = disk_events_poll_jiffies(disk);
 	if (!ev->block && intv)
-		queue_delayed_work(system_nrt_freezable_wq, &ev->dwork, intv);
+		queue_delayed_work(system_freezable_power_efficient_wq,
+				&ev->dwork, intv);
 
 	spin_unlock_irq(&ev->lock);
 

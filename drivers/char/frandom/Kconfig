@@ -1,0 +1,6 @@
+config FRANDOM
+	tristate "frandom support"
+	default m
+	---help---
+	   Say Y to compile frandom as module.
+	   The module will be called frandom.ko.

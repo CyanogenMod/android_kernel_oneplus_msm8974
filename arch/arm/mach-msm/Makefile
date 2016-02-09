@@ -1,3 +1,5 @@
+CFLAGS_KERNEL	:= -Wno-unused-variable
+
 CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
 
 obj-y += io.o dma.o memory.o
@@ -424,3 +426,10 @@ obj-$(CONFIG_WALL_CLK_SYSFS) += wallclk_sysfs.o
 obj-$(CONFIG_HAS_MACH_MEMUTILS) += memutils/
 obj-$(CONFIG_ARCH_RANDOM) += early_random.o
 obj-$(CONFIG_PERFMAP) += perfmap.o
+obj-$(CONFIG_MSM_LIMITER) += msm_limiter.o
+obj-$(CONFIG_MSM_HOTPLUG) += msm_hotplug.o
+obj-$(CONFIG_INTELLI_HOTPLUG) += intelli_hotplug.o
+obj-$(CONFIG_BRICKED_HOTPLUG) += bricked_hotplug.o
+obj-$(CONFIG_ZEN_DECISION) += msm_zen_decision.o
+obj-$(CONFIG_ALUCARD_HOTPLUG) += alucard_hotplug.o
+obj-$(CONFIG_CHARGE_LEVEL) += charge_level.o

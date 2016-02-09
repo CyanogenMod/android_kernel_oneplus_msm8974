@@ -27,12 +27,19 @@ enum wcd9xxx_cdc_type {
 	WCD9XXX_CDC_TYPE_TAIKO,
 	WCD9XXX_CDC_TYPE_TAPAN,
 	WCD9XXX_CDC_TYPE_HELICON,
+	WCD9XXX_CDC_TYPE_TOMTOM,
 };
 
 enum wcd9xxx_clock_type {
 	WCD9XXX_CLK_OFF,
 	WCD9XXX_CLK_RCO,
 	WCD9XXX_CLK_MCLK,
+};
+
+enum wcd9xxx_clock_config_mode {
+	WCD9XXX_CFG_MCLK = 0,
+	WCD9XXX_CFG_RCO,
+	WCD9XXX_CFG_CAL_RCO,
 };
 
 enum wcd9xxx_cfilt_sel {
@@ -111,6 +118,10 @@ enum wcd9xxx_notify_event {
 	WCD9XXX_EVENT_LAST,
 };
 
+struct wcd9xxx_resmgr_cb {
+	int (*cdc_rco_ctrl)(struct snd_soc_codec *, bool);
+};
+
 struct wcd9xxx_resmgr {
 	struct snd_soc_codec *codec;
 	struct wcd9xxx_core_resource *core_res;
@@ -132,6 +143,7 @@ struct wcd9xxx_resmgr {
 	enum wcd9xxx_clock_type clk_type;
 	u16 clk_rco_users;
 	u16 clk_mclk_users;
+	u16 ext_clk_users;
 
 	/* cfilt users per cfilts */
 	u16 cfilt_users[WCD9XXX_NUM_OF_CFILT];
@@ -161,6 +173,8 @@ struct wcd9xxx_resmgr {
 	struct mutex codec_bg_clk_lock;
 
 	enum wcd9xxx_cdc_type codec_type;
+
+	const struct wcd9xxx_resmgr_cb *resmgr_cb;
 };
 
 int wcd9xxx_resmgr_init(struct wcd9xxx_resmgr *resmgr,
@@ -169,6 +183,7 @@ int wcd9xxx_resmgr_init(struct wcd9xxx_resmgr *resmgr,
 			struct wcd9xxx_pdata *pdata,
 			struct wcd9xxx_micbias_setting *micbias_pdata,
 			struct wcd9xxx_reg_address *reg_addr,
+			const struct wcd9xxx_resmgr_cb *resmgr_cb,
 			enum wcd9xxx_cdc_type cdc_type);
 void wcd9xxx_resmgr_deinit(struct wcd9xxx_resmgr *resmgr);
 
@@ -188,6 +203,7 @@ void wcd9xxx_resmgr_cfilt_get(struct wcd9xxx_resmgr *resmgr,
 			      enum wcd9xxx_cfilt_sel cfilt_sel);
 void wcd9xxx_resmgr_cfilt_put(struct wcd9xxx_resmgr *resmgr,
 			      enum wcd9xxx_cfilt_sel cfilt_sel);
+int wcd9xxx_resmgr_get_clk_type(struct wcd9xxx_resmgr *resmgr);
 
 void wcd9xxx_resmgr_bcl_lock(struct wcd9xxx_resmgr *resmgr);
 void wcd9xxx_resmgr_post_ssr(struct wcd9xxx_resmgr *resmgr);

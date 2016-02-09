@@ -20,9 +20,11 @@ config ARM
 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
 	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
+	select HAVE_EFFICIENT_UNALIGNED_ACCESS
 	select HAVE_GENERIC_DMA_COHERENT
 	select HAVE_KERNEL_GZIP
 	select HAVE_KERNEL_LZO
+	select HAVE_KERNEL_LZ4
 	select HAVE_KERNEL_LZMA
 	select HAVE_KERNEL_XZ
 	select HAVE_IRQ_WORK
@@ -187,10 +189,9 @@ config ARM_TICKET_LOCKS
 
 config RWSEM_GENERIC_SPINLOCK
 	bool
-	default y
 
 config RWSEM_XCHGADD_ALGORITHM
-	bool
+	def_bool y
 
 config ARCH_HAS_ILOG2_U32
 	bool
@@ -320,6 +321,7 @@ config ARM_USER_ACCESSIBLE_TIMER_BASE
 
 config ARCH_RANDOM
 	bool "SOC specific random number generation"
+	default y
 	help
 	 Allow the kernel to use an architecture specific implementation for
 	 random number generation
@@ -1674,6 +1676,7 @@ config ARM_CPU_TOPOLOGY
 config SCHED_MC
 	bool "Multi-core scheduler support"
 	depends on ARM_CPU_TOPOLOGY
+	default y
 	help
 	  Multi-core scheduler support improves the CPU scheduler's decision
 	  making when dealing with multi-core CPU chips at a cost of slightly
@@ -1682,6 +1685,7 @@ config SCHED_MC
 config SCHED_SMT
 	bool "SMT scheduler support"
 	depends on ARM_CPU_TOPOLOGY
+	default y
 	help
 	  Improves the CPU scheduler's decision making when dealing with
 	  MultiThreading at a cost of slightly increased overhead in some
@@ -2035,6 +2039,19 @@ config UACCESS_WITH_MEMCPY
 	  However, if the CPU data cache is using a write-allocate mode,
 	  this option is unlikely to provide any performance gain.
 
+config ARM_PLD_64BYTE
+	bool "Use 64-bit preload size for kernel memory copy"
+	depends on CPU_V7
+	help
+	  Config preload size for memcpy, selecting this for Cortex-A15
+
+config USE_LDRDSTRD_OVER_LDMSTM
+	bool "Use 64-bit access instructions to optimize memory copy"
+	depends on CPU_V7
+	help
+	  Cortex-A15 perform better when use LDRD/STRD to access memory.
+	  Selecting this to optimize memory copy routines.
+
 config SECCOMP
 	bool
 	prompt "Enable seccomp to safely compute untrusted bytecode"
@@ -2296,6 +2313,32 @@ config ATAGS_PROC
 	help
 	  Should the atags used to boot the kernel be exported in an "atags"
 	  file in procfs. Useful with kexec.
+
+config KEXEC_HARDBOOT
+	bool "Support hard booting to a kexec kernel"
+	depends on KEXEC
+	help
+	  Allows hard booting (i.e., with a full hardware reboot) to a kernel
+	  previously loaded in memory by kexec.  This works around the problem of
+	  soft-booted kernel hangs due to improper device shutdown and/or
+	  reinitialization.  Support is comprised of two components:
+
+	  First, a "hardboot" flag is added to the kexec syscall to force a hard
+	  reboot in relocate_new_kernel() (which requires machine-specific assembly
+	  code).  This also requires the kexec userspace tool to load the kexec'd
+	  kernel in memory region left untouched by the bootloader (i.e., not
+	  explicitly cleared and not overwritten by the boot kernel).  Just prior
+	  to reboot, the kexec kernel arguments are stashed in a machine-specific
+	  memory page that must also be preserved.  Note that this hardboot page
+	  need not be reserved during regular kernel execution.
+
+	  Second, the zImage decompresor of the boot (bootloader-loaded) kernel is
+	  modified to check the hardboot page for fresh kexec arguments, and if
+	  present, attempts to jump to the kexec'd kernel preserved in memory.
+
+	  Note that hardboot support is only required in the boot kernel and any
+	  kernel capable of performing a hardboot kexec.  It is _not_ required by a
+	  kexec'd kernel.
 
 config CRASH_DUMP
 	bool "Build kdump crash kernel (EXPERIMENTAL)"

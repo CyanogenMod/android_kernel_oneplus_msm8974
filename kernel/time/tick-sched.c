@@ -347,7 +347,7 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 	 * Do not stop the tick, if we are only one off
 	 * or if the cpu is required for rcu
 	 */
-	if (!ts->tick_stopped && delta_jiffies == 1)
+	if (!ts->tick_stopped && delta_jiffies <= 1)
 		goto out;
 
 	/* Schedule the tick, if we are at least one jiffie off */

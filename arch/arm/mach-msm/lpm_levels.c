@@ -24,6 +24,7 @@
 #include <linux/tick.h>
 #include <linux/suspend.h>
 #include <linux/pm_qos.h>
+#include <linux/quickwakeup.h>
 #include <linux/of_platform.h>
 #include <mach/mpm.h>
 #include <mach/cpuidle.h>
@@ -829,6 +830,7 @@ static const struct platform_suspend_ops lpm_suspend_ops = {
 	.valid = suspend_valid_only_mem,
 	.prepare_late = lpm_suspend_prepare,
 	.wake = lpm_suspend_wake,
+	.suspend_again = quickwakeup_suspend_again,
 };
 
 static void setup_broadcast_timer(void *arg)
@@ -1117,7 +1119,7 @@ fail:
 	return -EFAULT;
 }
 
-static struct of_device_id cpu_modes_mtch_tbl[] __initdata = {
+static struct of_device_id cpu_modes_mtch_tbl[] = {
 	{.compatible = "qcom,cpu-modes"},
 	{},
 };
@@ -1131,7 +1133,7 @@ static struct platform_driver cpu_modes_driver = {
 	},
 };
 
-static struct of_device_id system_modes_mtch_tbl[] __initdata = {
+static struct of_device_id system_modes_mtch_tbl[] = {
 	{.compatible = "qcom,system-modes"},
 	{},
 };
@@ -1145,7 +1147,7 @@ static struct platform_driver system_modes_driver = {
 	},
 };
 
-static struct of_device_id lpm_levels_match_table[] __initdata = {
+static struct of_device_id lpm_levels_match_table[] = {
 	{.compatible = "qcom,lpm-levels"},
 	{},
 };
