@@ -53,14 +53,17 @@
 			29 01 00 00 01 00 07 b9 03 82 3c 10 3c 87
 			29 01 00 00 01 00 07 ba 03 78 64 10 64 b4
 			23 01 00 00 00 00 02 d6 01
+			23 01 00 00 01 00 02 b0 03
 			39 01 00 00 01 00 02 51 ff
 			15 01 00 00 01 00 02 53 2c
+			05 01 00 00 78 00 02 11 00
 			15 01 00 00 11 00 02 36 00
 			15 01 00 00 01 00 02 3a 77
-			39 01 00 00 01 00 03 44 00 00];
+			39 01 00 00 01 00 03 44 00 00
+			15 01 00 00 01 00 02 35 00];
 		qcom,mdss-dsi-off-command = [
-			05 01 00 00 11 00 02 28 00
-			05 01 00 00 32 00 02 10 00];
+			05 01 00 00 32 00 02 28 00
+			05 01 00 00 78 00 02 10 00];
 		qcom,mdss-dsi-calibration-command = [
 			23 01 00 00 01 00 02 b0 04
 			29 01 00 00 01 00 14 c8 01 0A FD 03 01 E8 00 00 03 FC F5 A1 00 00 01 FD 06 FC 00
@@ -91,7 +94,7 @@
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 		qcom,mdss-dsi-reset-sequence = <1 5>, <0 10>, <1 10>;
 		cm,mdss-livedisplay-cabc-cmd = [
-			15 01 00 00 00 00 02 55 00];
+			15 01 00 00 10 00 02 55 00];
 		cm,mdss-livedisplay-cabc-ui-value = <0x01>;
 		cm,mdss-livedisplay-cabc-image-value = <0x02>;
 		cm,mdss-livedisplay-cabc-video-value = <0x03>;
@@ -100,9 +103,7 @@
 		cm,mdss-livedisplay-sre-strong-value = <0x70>;
 		cm,mdss-livedisplay-aco-value = <0x80>;
 		cm,mdss-livedisplay-post-cmd = [
-			23 01 00 00 01 00 02 b0 03
-			05 01 00 00 64 00 02 11 00
-			05 01 00 00 11 00 02 29 00];
+			05 01 00 00 10 00 02 29 00];
 		cm,mdss-livedisplay-color-enhance-on = [23 01 00 00 01 00 02 b0 04
 			29 01 00 00 10 00 21 ca 01
 			02 9a a4 b8 b4 b0 a4 08 28 05 87 b0 50 01 ff 05 f8 0c 0c 50 40 13 13 f0 08 10 10 3f 3f 3f 3f
