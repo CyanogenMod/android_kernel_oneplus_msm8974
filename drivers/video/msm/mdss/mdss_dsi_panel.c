@@ -412,6 +412,11 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	if ((bl_level < pdata->panel_info.bl_min) && (bl_level != 0))
 		bl_level = pdata->panel_info.bl_min;
 
+	if (bl_level && !(ctrl_pdata->ctrl_state & CTRL_STATE_MDP_ACTIVE)) {
+		pr_err("%s: setting backlight while mdp not active\n", __func__);
+		bl_level = 0;
+	}
+
 	switch (ctrl_pdata->bklt_ctrl) {
 	case BL_WLED:
 		led_trigger_event(bl_led_trigger, bl_level);
