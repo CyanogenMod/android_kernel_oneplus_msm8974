@@ -41,6 +41,10 @@
 	status = "disabled";
 };
 
+&spi_7 {
+	status = "disabled";
+};
+
 &pm8941_boost {
 	regulator-min-microvolt = <4500000>;
 	regulator-max-microvolt = <4500000>;

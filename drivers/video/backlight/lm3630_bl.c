@@ -50,6 +50,11 @@
 /* OPPO 2013-10-24 yxq Add end */
 #define INT_DEBOUNCE_MSEC	10
 
+#ifdef CONFIG_MACH_OPPO
+/* liuyan@Onlinerd.driver, 2015/03/26  Add for fix low brightness flicker */
+#define FILTER_STR 0x50
+#endif /*CONFIG_MACH_OPPO*/
+
 static struct lm3630_chip_data *lm3630_pchip;
 
 struct lm3630_chip_data {
@@ -74,6 +79,10 @@ static int lm3630_chip_init(struct lm3630_chip_data *pchip)
 	unsigned int reg_val;
 	struct lm3630_platform_data *pdata = pchip->pdata;
 
+#ifdef CONFIG_MACH_OPPO
+/* liuyan@Onlinerd.driver, 2015/03/26  Add for low brightness filcker */
+	ret = regmap_update_bits(pchip->regmap, FILTER_STR, 0x03, 0x03);
+#endif /*CONFIG_MACH_OPPO*/
 	/*pwm control */
 	reg_val = ((pdata->pwm_active & 0x01) << 2) | (pdata->pwm_ctrl & 0x03);
 	ret = regmap_update_bits(pchip->regmap, REG_CONFIG, 0x07, reg_val);
@@ -547,7 +556,7 @@ static int lm3630_resume(struct device *dev)
 
 	pr_debug("%s: backlight resume.\n", __func__);
     rc = regmap_write(lm3630_pchip->regmap, REG_BRT_A, 0);
-	regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x40, 0x00);
+	regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x04, 0x00);
 	rc  = regmap_update_bits(lm3630_pchip->regmap, REG_CTRL, 0x80, 0x00);
 	if (rc  < 0)
 	{

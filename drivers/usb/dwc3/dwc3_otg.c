@@ -218,6 +218,10 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 
 		dwc3_otg_notify_host_mode(otg, on);
 		ret = regulator_enable(dotg->vbus_otg);
+		#ifdef CONFIG_MACH_OPPO /*dengnw@bsp.drv  for OTG delay  20141226*/
+		pr_err("oppo_otg able to enable vbus_otg\n");
+		msleep(500);
+		#endif
 		if (ret) {
 			dev_err(otg->phy->dev, "unable to enable vbus_otg\n");
 			dwc3_otg_notify_host_mode(otg, 0);
@@ -261,6 +265,13 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 		dev_dbg(otg->phy->dev, "%s: turn off host\n", __func__);
 
 		ret = regulator_disable(dotg->vbus_otg);
+		#ifdef CONFIG_MACH_OPPO /*dengnw@bsp.drv  for OTG delay  20141226*/
+		if (ret) {
+			msleep(10);
+			ret = regulator_disable(dotg->vbus_otg);
+			msleep(5);
+		}
+		#endif
 		if (ret) {
 			dev_err(otg->phy->dev, "unable to disable vbus_otg\n");
 			return ret;

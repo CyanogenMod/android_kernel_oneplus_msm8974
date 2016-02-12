@@ -4941,7 +4941,7 @@ static struct clk_lookup msm_clocks_8974_common[] __initdata = {
 	CLK_LOOKUP("core_clk", gcc_blsp1_qup6_i2c_apps_clk.c, "f9928000.i2c"),
 #ifdef CONFIG_MACH_OPPO
 	CLK_LOOKUP("cxo_out_d1", cxo_d1_pin.c, "6-0028"),
-	CLK_LOOKUP("core_clk", gcc_blsp2_qup3_i2c_apps_clk.c, "f9965000.spi"),
+	CLK_LOOKUP("core_clk", gcc_blsp2_qup3_spi_apps_clk.c, "f9965000.spi"),
 	CLK_LOOKUP("iface_clk", gcc_blsp2_ahb_clk.c, "f9965000.spi"),
 #endif
 
