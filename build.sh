@@ -30,12 +30,18 @@ FILE=arch/arm/configs/$DEFCONFIG
 	exit -1
 }
 
+BUILD_DTB_IMG()
+{
+	echo "Generating dtb.img..."
+	$RDIR/scripts/dtbTool/dtbTool -o build/arch/arm/boot/dtb.img build/arch/arm/boot/ -s 2048
+}
+
 echo "Cleaning build..."
 rm -rf build
 mkdir build
 
 make -C $RDIR O=build $DEFCONFIG
 echo "Starting build..."
-make -C $RDIR O=build -j"$THREADS" CONFIG_NO_ERROR_ON_MISMATCH=y
+make -C $RDIR O=build -j"$THREADS" CONFIG_NO_ERROR_ON_MISMATCH=y && BUILD_DTB_IMG
 
 echo "Done."
