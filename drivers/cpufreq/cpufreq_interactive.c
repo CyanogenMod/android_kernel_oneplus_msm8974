@@ -79,7 +79,7 @@ static unsigned long go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
 static unsigned int sampling_down_factor;
 
 /* Target load.  Lower values result in higher CPU speeds. */
-#define DEFAULT_TARGET_LOAD 90
+#define DEFAULT_TARGET_LOAD 92
 static unsigned int default_target_loads[] = {DEFAULT_TARGET_LOAD};
 static spinlock_t target_loads_lock;
 static unsigned int *target_loads = default_target_loads;
