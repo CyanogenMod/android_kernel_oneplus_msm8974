@@ -96,7 +96,6 @@
 #include "f_uac1.c"
 #endif
 #include "f_ncm.c"
-#include "f_charger.c"
 
 MODULE_AUTHOR("Mike Lockwood");
 MODULE_DESCRIPTION("Android Composite USB Driver");
@@ -1555,19 +1554,6 @@ static struct android_usb_function ccid_function = {
 	.bind_config	= ccid_function_bind_config,
 };
 
-/* Charger */
-static int charger_function_bind_config(struct android_usb_function *f,
-						struct usb_configuration *c)
-{
-	return charger_bind_config(c);
-}
-
-static struct android_usb_function charger_function = {
-	.name		= "charging",
-	.bind_config	= charger_function_bind_config,
-};
-
-
 static int
 mtp_function_init(struct android_usb_function *f,
 		struct usb_composite_dev *cdev)
@@ -2328,7 +2314,6 @@ static struct android_usb_function *supported_functions[] = {
 #ifdef CONFIG_SND_RAWMIDI
 	&midi_function,
 #endif
-	&charger_function,
 	NULL
 };
 
