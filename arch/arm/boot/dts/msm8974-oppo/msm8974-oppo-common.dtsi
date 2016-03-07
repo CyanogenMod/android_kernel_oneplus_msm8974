@@ -44,6 +44,20 @@
 		batfet-supply = <&pm8941_chg_batif>;
 	};
 
+	mdss_dsi0: qcom,mdss_dsi@fd922800 {
+		/delete-property/ vdd-supply;
+		qcom,panel-supply-entries {
+			/delete-node/ qcom,panel-supply-entry@0;
+		};
+	};
+
+	mdss_dsi1: qcom,mdss_dsi@fd922e00 {
+		/delete-property/ vdd-supply;
+		qcom,panel-supply-entries {
+			/delete-node/ qcom,panel-supply-entry@0;
+		};
+	};
+
 	qcom,hdmi_tx@fd922100 {
 		status = "disabled";
 	};
