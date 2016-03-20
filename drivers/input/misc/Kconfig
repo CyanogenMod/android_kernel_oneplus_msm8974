@@ -728,4 +728,9 @@ config BTP_FPC1021
 	tristate "FPC_BTP fingerprint sensor support"
 	depends on SPI_MASTER
 
+config HALL_MXM1120
+	default n
+	tristate "Digital hall sensor support"
+	depends on I2C
+
 endif
