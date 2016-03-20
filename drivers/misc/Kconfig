@@ -665,6 +665,15 @@ config TI_DRV2667
 	  To compile this driver as a module, choose M here: the
 	  module will be called ti_drv2667.
 
+config TI_DRV8834
+	tristate "TI's DRV8834 motor controller support"
+	depends on I2C
+	help
+	  The DRV8834 provides a flexible motor driver solution for toys,
+	  printers, cameras, and other mechatronic applications. The device
+	  has two H-bridge drivers, and is intended to drive a bipolar
+	  stepper motor or two DC motors.
+
 config UID_CPUTIME
 	tristate "Per-UID cpu time statistics"
 	depends on PROFILING
