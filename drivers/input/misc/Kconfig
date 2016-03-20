@@ -723,4 +723,9 @@ config SENSORS_CAPELLA_CM36283
 	  To compile this driver as a module, choose M here: the
 	  module will be called CM36283.
 
+config BTP_FPC1021
+	default n
+	tristate "FPC_BTP fingerprint sensor support"
+	depends on SPI_MASTER
+
 endif
