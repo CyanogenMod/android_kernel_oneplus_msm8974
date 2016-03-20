@@ -55,6 +55,26 @@ int __init board_pcb_version_init(char *s)
 		current_pcb_version_num = HW_VERSION__22;
 	else if (!strncmp(s, "23", 2))
 		current_pcb_version_num = HW_VERSION__23;
+	else if (!strncmp(s, "30", 2))
+		current_pcb_version_num = HW_VERSION__30;
+	else if (!strncmp(s, "31", 2))
+		current_pcb_version_num = HW_VERSION__31;
+	else if (!strncmp(s, "32", 2))
+		current_pcb_version_num = HW_VERSION__32;
+	else if (!strncmp(s, "33", 2))
+		current_pcb_version_num = HW_VERSION__33;
+	else if (!strncmp(s, "34", 2))
+		current_pcb_version_num = HW_VERSION__34;
+	else if (!strncmp(s, "40", 2))
+		current_pcb_version_num = HW_VERSION__40;
+	else if (!strncmp(s, "41", 2))
+		current_pcb_version_num = HW_VERSION__41;
+	else if (!strncmp(s, "42", 2))
+		current_pcb_version_num = HW_VERSION__42;
+	else if (!strncmp(s, "43", 2))
+		current_pcb_version_num = HW_VERSION__43;
+	else if (!strncmp(s, "44", 2))
+		current_pcb_version_num = HW_VERSION__44;
 
 	return 0;
 }
@@ -99,24 +119,27 @@ int __init board_rf_version_init(char *s)
 		current_rf_version_num = RF_VERSION__88;
 	else if (!strncmp(s, "89", 2))
 		current_rf_version_num = RF_VERSION__89;
+	else if (!strncmp(s, "90", 2))
+		current_rf_version_num = RF_VERSION__90_CHINA_MOBILE;
+	else if (!strncmp(s, "91", 2))
+		current_rf_version_num = RF_VERSION__91_UNICOM;
+	else if (!strncmp(s, "92", 2))
+		current_rf_version_num = RF_VERSION__92_CHINA_RESERVED1;
+	else if (!strncmp(s, "93", 2))
+		current_rf_version_num = RF_VERSION__93_CHINA_RESERVED2;
+	else if (!strncmp(s, "94", 2))
+		current_rf_version_num = RF_VERSION__94_CHINA_RESERVED3;
+	else if (!strncmp(s, "95", 2))
+		current_rf_version_num = RF_VERSION__95_EUROPE;
+	else if (!strncmp(s, "96", 2))
+		current_rf_version_num = RF_VERSION__96_AMERICA;
+	else if (!strncmp(s, "97", 2))
+		current_rf_version_num = RF_VERSION__97_TAIWAN;
 	else if (!strncmp(s, "98", 2))
-		current_rf_version_num = RF_VERSION__98;
+		current_rf_version_num = RF_VERSION__98_INDONESIA;
 	else if (!strncmp(s, "99", 2))
-		current_rf_version_num = RF_VERSION__99;
+		current_rf_version_num = RF_VERSION__99_OVERSEA_RESERVED1;
 
 	return 0;
 }
 __setup("oppo.rf_version=", board_rf_version_init);
-
-static int lcd_id = 0;
-int __init board_lcd_id_init(char *s)
-{
-	if (!strncmp(s, "4", 1)) {
-		lcd_id = 4;
-	} else {
-		lcd_id = 2;
-	}
-
-	return 0;
-}
-__setup("LCD_id=", board_lcd_id_init);

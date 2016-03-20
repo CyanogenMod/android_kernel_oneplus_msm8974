@@ -27,6 +27,8 @@ static int __init board_mfg_mode_init(char *str)
 		ftm_mode = MSM_BOOT_MODE__FACTORY;
 	else if (!strncmp(str, "ftmwifi", 5))
 		ftm_mode = MSM_BOOT_MODE__WLAN;
+	else if (!strncmp(str, "ftmmos", 5))
+		ftm_mode = MSM_BOOT_MODE__MOS;
 	else if (!strncmp(str, "ftmrf", 5))
 		ftm_mode = MSM_BOOT_MODE__RF;
 	else if (!strncmp(str, "ftmrecovery", 5))
@@ -77,4 +79,3 @@ char *get_start_reason(void)
 	return pwron_event;
 }
 EXPORT_SYMBOL(get_start_reason);
-
