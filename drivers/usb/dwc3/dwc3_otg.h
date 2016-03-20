@@ -59,7 +59,6 @@ struct dwc3_otg {
 	int			vbus_retry_count;
 #ifdef CONFIG_MACH_OPPO
 	struct delayed_work	detect_work;
-	struct delayed_work	non_standard_charger_work;
 #endif
 };
 

@@ -24,14 +24,6 @@
 #include "io.h"
 #include "xhci.h"
 
-#ifdef CONFIG_MACH_OPPO
-#include <linux/pcb_version.h>
-
-#ifdef CONFIG_MACH_FIND7
-static bool non_standard = false;
-#endif
-#endif
-
 #define VBUS_REG_CHECK_DELAY	(msecs_to_jiffies(1000))
 #define MAX_INVALID_CHRGR_RETRY 3
 static int max_chgr_retry_count = MAX_INVALID_CHRGR_RETRY;
@@ -605,12 +597,6 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 	}
 
 	power_supply_changed(dotg->psy);
-#ifdef CONFIG_MACH_OPPO
-#ifdef CONFIG_MACH_FIND7
-	if (get_pcb_version() < HW_VERSION__12 && mA == 500)
-		non_standard = false;
-#endif
-#endif
 	dotg->charger->max_power = mA;
 	return 0;
 
@@ -725,21 +711,6 @@ void dwc3_otg_init_sm(struct dwc3_otg *dotg)
 }
 
 #ifdef CONFIG_MACH_OPPO
-#ifdef CONFIG_MACH_FIND7
-static void non_standard_charger_detect_work(struct work_struct *work)
-{
-	struct delayed_work *dwork = to_delayed_work(work);
-	struct dwc3_otg *dotg = container_of(dwork,
-				struct dwc3_otg, non_standard_charger_work);
-	struct usb_phy *phy = dotg->otg.phy;
-
-	if (non_standard == true) {
-		dotg->charger->chg_type = DWC3_FLOATED_CHARGER;
-		dwc3_otg_set_power(phy, DWC3_IDEV_CHG_FLOATED);
-	}
-}
-#endif
-
 static void dwc3_otg_detect_work(struct work_struct *w)
 {
 	struct dwc3_otg *dotg = container_of(w, struct dwc3_otg,
@@ -833,30 +804,15 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					work = 1;
 					break;
 				case DWC3_SDP_CHARGER:
-#ifdef CONFIG_MACH_OPPO
-					/* hack to always power from SDP charger */
-					dwc3_otg_set_power(phy,
-							CONFIG_USB_GADGET_VBUS_DRAW);
-#endif
 					dwc3_otg_start_peripheral(&dotg->otg,
 									1);
 					phy->state = OTG_STATE_B_PERIPHERAL;
 					work = 1;
 #ifdef CONFIG_MACH_OPPO
-#ifdef CONFIG_MACH_FIND7
-					if (get_pcb_version() < HW_VERSION__12) {
-						cancel_delayed_work_sync(&dotg->non_standard_charger_work);
-						non_standard = true;
-						schedule_delayed_work(&dotg->non_standard_charger_work,
-							round_jiffies_relative(msecs_to_jiffies(5000)));
-					} else {
-						power_supply_set_online(dotg->psy, true);
-						power_supply_changed(dotg->psy);
-					}
-#else
 					power_supply_set_online(dotg->psy, true);
+					dwc3_otg_set_power(phy,
+							CONFIG_USB_GADGET_VBUS_DRAW);
 					power_supply_changed(dotg->psy);
-#endif
 #endif
 					break;
 				case DWC3_FLOATED_CHARGER:
@@ -892,8 +848,10 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					dev_dbg(phy->dev, "chg_det started\n");
 #ifdef CONFIG_MACH_OPPO
 					cancel_delayed_work_sync(&dotg->detect_work);
+
 					if (charger)
 						charger->start_detection(dotg->charger, false);
+
 					dotg->charger_retry_count = 0;
 					dwc3_otg_set_power(phy, 0);
 
@@ -922,11 +880,6 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 			}
 		} else {
 #ifdef CONFIG_MACH_OPPO
-#ifdef CONFIG_MACH_FIND7
-			if (get_pcb_version() < HW_VERSION__12) {
-				cancel_delayed_work_sync(&dotg->non_standard_charger_work);
-			}
-#endif
 			cancel_delayed_work_sync(&dotg->detect_work);
 #endif
 			if (charger)
@@ -1129,11 +1082,6 @@ int dwc3_otg_init(struct dwc3 *dwc)
 	init_completion(&dotg->dwc3_xcvr_vbus_init);
 	INIT_DELAYED_WORK(&dotg->sm_work, dwc3_otg_sm_work);
 #ifdef CONFIG_MACH_OPPO
-#ifdef CONFIG_MACH_FIND7
-	if (get_pcb_version() < HW_VERSION__12)
-		INIT_DELAYED_WORK(&dotg->non_standard_charger_work,
-				non_standard_charger_detect_work);
-#endif
 	INIT_DELAYED_WORK(&dotg->detect_work, dwc3_otg_detect_work);
 #endif
 
@@ -1151,8 +1099,6 @@ int dwc3_otg_init(struct dwc3 *dwc)
 
 err3:
 #ifdef CONFIG_MACH_OPPO
-	if (get_pcb_version() < HW_VERSION__12)
-		cancel_delayed_work_sync(&dotg->non_standard_charger_work);
 	cancel_delayed_work_sync(&dotg->detect_work);
 #endif
 	cancel_delayed_work_sync(&dotg->sm_work);
