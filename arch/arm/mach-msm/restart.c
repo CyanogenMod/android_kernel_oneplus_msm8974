@@ -303,6 +303,8 @@ static void msm_restart_prepare(const char *cmd)
 			__raw_writel(0x77665505, restart_reason);
 		} else if (!strncmp(cmd, "rf", 2)) {
 			__raw_writel(0x77665506, restart_reason);
+		} else if (!strncmp(cmd, "mos", 3)) {
+			__raw_writel(0x77665507, restart_reason);
 		} else if (!strncmp(cmd, "kernel", 6)) {
 			__raw_writel(0x7766550a, restart_reason);
 		} else if (!strncmp(cmd, "modem", 5)) {
