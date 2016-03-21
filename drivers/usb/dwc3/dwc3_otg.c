@@ -587,11 +587,6 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 		/* Enable charging */
 		if (power_supply_set_online(dotg->psy, true))
 			goto psy_error;
-#ifdef CONFIG_MACH_OPPO
-		if (power_supply_type != POWER_SUPPLY_TYPE_USB) {
-			power_supply_set_online(dotg->psy, false);
-		}
-#endif
 		if (power_supply_set_current_limit(dotg->psy, 1000*mA))
 			goto psy_error;
 	} else if (dotg->charger->max_power > 0 && (mA == 0 || mA == 2)) {
