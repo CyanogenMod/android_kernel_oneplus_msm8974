@@ -41,6 +41,11 @@
 #include "acl.h"
 
 #include <trace/events/ext4.h>
+
+#ifdef CONFIG_MACH_FIND7
+#include <linux/ctype.h>
+#endif
+
 /*
  * define how far ahead to read directories while searching them.
  */
@@ -247,6 +252,25 @@ static inline unsigned dx_node_limit(struct inode *dir)
 	unsigned entry_space = dir->i_sb->s_blocksize - EXT4_DIR_REC_LEN(0);
 	return entry_space / sizeof(struct dx_entry);
 }
+
+#ifdef CONFIG_MACH_FIND7
+int memcmp_ignore_case(const unsigned char* cs, const unsigned char* ct,
+		       int len)
+{
+	const unsigned char* ax = cs;
+	const unsigned char* bx = ct;
+	int i;
+
+	for (i = 0; i < len; i++) {
+		if (toupper(*ax) != toupper(*bx))
+			return 1;
+		ax++;
+		bx++;
+	}
+
+	return 0;
+}
+#endif
 
 /*
  * Debug
@@ -794,6 +818,18 @@ static inline int ext4_match (int len, const char * const name,
 	return !memcmp(name, de->name, len);
 }
 
+#ifdef CONFIG_MACH_FIND7
+static inline int ext4_match_ignore_case (int len, const char * const name,
+					  struct ext4_dir_entry_2 * de)
+{
+	if (len != de->name_len)
+		return 0;
+	if (!de->inode)
+		return 0;
+	return !memcmp_ignore_case(name, de->name, len);
+}
+#endif
+
 /*
  * Returns 0 if not found, -1 on failure, and 1 on success
  */
@@ -815,8 +851,15 @@ static inline int search_dirblock(struct buffer_head *bh,
 		/* this code is executed quadratically often */
 		/* do minimal checking `by hand' */
 
+#ifdef CONFIG_MACH_FIND7
+		if ((char *) de + namelen <= dlimit &&
+		    ((dir->i_ignore_case == 1) ?
+		    ext4_match_ignore_case(namelen, name, de) :
+		    ext4_match(namelen, name, de))) {
+#else
 		if ((char *) de + namelen <= dlimit &&
 		    ext4_match (namelen, name, de)) {
+#endif
 			/* found a match - just to be sure, do a full check */
 			if (ext4_check_dir_entry(dir, NULL, de, bh, offset))
 				return -1;
@@ -1285,7 +1328,13 @@ static int add_dirent_to_buf(handle_t *handle, struct dentry *dentry,
 		while ((char *) de <= top) {
 			if (ext4_check_dir_entry(dir, NULL, de, bh, offset))
 				return -EIO;
+#ifdef CONFIG_MACH_FIND7
+			if ((dir->i_ignore_case == 1) ?
+			    ext4_match_ignore_case(namelen, name, de) :
+			    ext4_match(namelen, name, de))
+#else
 			if (ext4_match(namelen, name, de))
+#endif
 				return -EEXIST;
 			nlen = EXT4_DIR_REC_LEN(de->name_len);
 			rlen = ext4_rec_len_from_disk(de->rec_len, blocksize);

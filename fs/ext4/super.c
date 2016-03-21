@@ -1194,7 +1194,7 @@ enum {
 	Opt_dioread_nolock, Opt_dioread_lock,
 	Opt_discard, Opt_nodiscard, Opt_init_itable, Opt_noinit_itable,
 #ifdef CONFIG_MACH_FIND7
-	Opt_uid, Opt_gid, Opt_dmask, Opt_fmask,
+	Opt_uid, Opt_gid, Opt_dmask, Opt_fmask, Opt_ignore_case,
 #endif
 };
 
@@ -1279,6 +1279,7 @@ static const match_table_t tokens = {
 	{Opt_gid, "gid=%u"},
 	{Opt_dmask, "dmask=%o"},
 	{Opt_fmask, "fmask=%o"},
+	{Opt_ignore_case, "ignore_case=%o"},
 #endif
 	{Opt_err, NULL},
 };
@@ -1534,6 +1535,9 @@ static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 		return 1;
 	case Opt_gid:
 		sbi->s_gid = arg;
+		return 1;
+	case Opt_ignore_case:
+		sbi->s_ignore_case = arg;
 		return 1;
 #endif
 	}
@@ -4397,6 +4401,7 @@ struct ext4_mount_options {
 	gid_t s_gid;
 	unsigned short s_dmask;
 	unsigned short s_fmask;
+	unsigned short s_ignore_case;
 #endif
 	unsigned long s_commit_interval;
 	u32 s_min_batch_time, s_max_batch_time;
@@ -4433,6 +4438,7 @@ static int ext4_remount(struct super_block *sb, int *flags, char *data)
 	old_opts.s_gid = sbi->s_gid;
 	old_opts.s_dmask = sbi->s_dmask;
 	old_opts.s_fmask = sbi->s_fmask;
+	old_opts.s_ignore_case = sbi->s_ignore_case;
 #endif
 	old_opts.s_commit_interval = sbi->s_commit_interval;
 	old_opts.s_min_batch_time = sbi->s_min_batch_time;
@@ -4611,6 +4617,7 @@ restore_opts:
 	sbi->s_gid = old_opts.s_gid;
 	sbi->s_dmask = old_opts.s_dmask;
 	sbi->s_fmask = old_opts.s_fmask;
+	sbi->s_ignore_case = old_opts.s_ignore_case;
 #endif
 	sbi->s_commit_interval = old_opts.s_commit_interval;
 	sbi->s_min_batch_time = old_opts.s_min_batch_time;

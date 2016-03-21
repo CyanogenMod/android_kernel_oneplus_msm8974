@@ -776,6 +776,10 @@ struct inode {
 	gid_t			i_gid;
 	unsigned int		i_flags;
 
+#ifdef CONFIG_MACH_FIND7
+	unsigned short		i_ignore_case;
+#endif
+
 #ifdef CONFIG_FS_POSIX_ACL
 	struct posix_acl	*i_acl;
 	struct posix_acl	*i_default_acl;

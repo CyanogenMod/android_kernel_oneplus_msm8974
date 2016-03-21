@@ -1161,6 +1161,7 @@ struct ext4_sb_info {
 	gid_t s_gid;
 	unsigned short s_dmask;
 	unsigned short s_fmask;
+	unsigned short s_ignore_case;
 #endif
 	unsigned short s_mount_state;
 	unsigned short s_pad;
@@ -2366,25 +2367,25 @@ static inline void set_bitmap_uptodate(struct buffer_head *bh)
 static inline umode_t ext4_make_mode(struct ext4_sb_info *ei, umode_t i_mode)
 {
 	umode_t mode;
-	if (S_ISDIR(i_mode) || (i_mode == 0)) {
+
+	if (S_ISDIR(i_mode) || (i_mode == 0))
 		mode = (S_IRWXUGO & ~ei->s_dmask) | S_IFDIR;
-	}
-	else {
+	else
 		mode = (S_IRWXUGO & ~ei->s_fmask) | S_IFREG;
-	}
+
 	return mode;
 }
+
 static inline void ext4_fill_inode(struct super_block *sb, struct inode *inode)
 {
-	if (EXT4_SB(sb)->s_dmask  || EXT4_SB(sb)->s_fmask) {
+	if (EXT4_SB(sb)->s_dmask  || EXT4_SB(sb)->s_fmask)
 		inode->i_mode = ext4_make_mode(EXT4_SB(sb), inode->i_mode);
-	}
-	if (EXT4_SB(sb)->s_uid) {
+	if (EXT4_SB(sb)->s_uid)
 		inode->i_uid = EXT4_SB(sb)->s_uid;
-	}
-	if (EXT4_SB(sb)->s_gid) {
+	if (EXT4_SB(sb)->s_gid)
 		inode->i_gid = EXT4_SB(sb)->s_gid;
-	}
+	if (EXT4_SB(sb)->s_ignore_case)
+		inode->i_ignore_case = EXT4_SB(sb)->s_ignore_case;
 }
 #endif
 
