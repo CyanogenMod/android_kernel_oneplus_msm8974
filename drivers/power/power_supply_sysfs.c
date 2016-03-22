@@ -190,7 +190,8 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(usb_hc),
 	POWER_SUPPLY_ATTR(usb_otg),
 	POWER_SUPPLY_ATTR(charge_enabled),
-#ifdef CONFIG_PIC1503_FASTCG_OPPO
+#ifdef CONFIG_MACH_OPPO
+	POWER_SUPPLY_ATTR(authenticate),
 	POWER_SUPPLY_ATTR(charge_timeout),
 	POWER_SUPPLY_ATTR(fastcharger),
 #endif
