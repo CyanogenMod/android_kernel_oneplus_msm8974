@@ -1105,6 +1105,29 @@ int32_t qpnp_vadc_conv_seq_request(struct qpnp_vadc_chip *vadc,
 	}
 
 	if (vadc->vadc_poll_eoc) {
+#ifdef CONFIG_MACH_OPPO
+		while (status1 != QPNP_VADC_STATUS1_EOC) {
+			rc = qpnp_vadc_read_reg(vadc, QPNP_VADC_STATUS1,
+								&status1);
+			if (rc < 0)
+				goto fail_unlock;
+			status1 &= QPNP_VADC_STATUS1_REQ_STS_EOC_MASK;
+			if (status1 == QPNP_VADC_STATUS1_EOC) {
+				break;
+			}
+			usleep_range(QPNP_VADC_CONV_TIME_MIN / 100,
+					QPNP_VADC_CONV_TIME_MAX / 100);
+			count++;
+			if (count > QPNP_VADC_ERR_COUNT * 10) {
+				pr_err("retry error exceeded\n");
+				rc = qpnp_vadc_status_debug(vadc);
+				if (rc < 0)
+					pr_err("VADC disable failed\n");
+				rc = -EINVAL;
+				goto fail_unlock;
+			}
+		}
+#else
 		while (status1 != QPNP_VADC_STATUS1_EOC) {
 			rc = qpnp_vadc_read_reg(vadc, QPNP_VADC_STATUS1,
 								&status1);
@@ -1123,6 +1146,7 @@ int32_t qpnp_vadc_conv_seq_request(struct qpnp_vadc_chip *vadc,
 				goto fail_unlock;
 			}
 		}
+#endif
 	} else {
 		rc = wait_for_completion_timeout(
 					&vadc->adc->adc_rslt_completion,
