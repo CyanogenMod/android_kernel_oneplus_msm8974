@@ -24,14 +24,6 @@ config ASHMEM
 	  It is, in theory, a good memory allocator for low-memory devices,
 	  because it can discard shared memory units when under memory pressure.
 
-config LOGCAT_SIZE
-	int "Adjust android log buffer sizes"
-	default 256
-	depends on ANDROID_LOGGER
-	help
-	  Set logger buffer size. Enter a number greater than zero.
-	  Any value less than 256 is recommended. Reduce value to save kernel static memory size.
-
 config ANDROID_PERSISTENT_RAM
 	bool
 	depends on HAVE_MEMBLOCK
