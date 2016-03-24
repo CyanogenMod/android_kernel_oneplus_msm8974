@@ -27,6 +27,12 @@
 #include <linux/regulator/consumer.h>
 #include <linux/delay.h>
 
+#ifdef CONFIG_MACH_OPPO
+#include <asm/uaccess.h>
+#include <linux/pcb_version.h>
+#include <linux/proc_fs.h>
+#endif
+
 #define WLED_MOD_EN_REG(base, n)	(base + 0x60 + n*0x10)
 #define WLED_IDAC_DLY_REG(base, n)	(WLED_MOD_EN_REG(base, n) + 0x01)
 #define WLED_FULL_SCALE_REG(base, n)	(WLED_IDAC_DLY_REG(base, n) + 0x01)
@@ -2405,10 +2411,9 @@ static ssize_t blink_store(struct device *dev,
 #ifdef CONFIG_MACH_OPPO
 static void led_flash_blink_work(struct work_struct *work)
 {
-	//int brightness;
 	struct delayed_work *dwork = to_delayed_work(work);
 	struct qpnp_led_data *led = container_of(dwork,
-			struct qpnp_led_data, dwork);
+					struct qpnp_led_data, dwork);
 
 	if (flash_blink_state) {
 		if (led->flash_cfg->torch_enable)
@@ -2423,7 +2428,9 @@ static void led_flash_blink_work(struct work_struct *work)
 
 	flash_blink_state = !flash_blink_state;
 
-	schedule_delayed_work(dwork, msecs_to_jiffies(1200));
+	if (led_flash_state == 2) {
+		schedule_delayed_work(dwork, msecs_to_jiffies(1000));
+	}
 	return;
 }
 
@@ -2434,7 +2441,7 @@ static void led_flash_blink_stop(struct qpnp_led_data *led)
 		cancel_delayed_work_sync(&led->dwork);
 		led->cdev.brightness = 0;
 		__qpnp_led_work(led, 0);
-	} else if(led_flash_state == 1) {
+	} else if (led_flash_state == 1 || led_flash_state == 3) {
 		led->cdev.brightness = 0;
 		__qpnp_led_work(led, 0);
 	} else {
@@ -2444,42 +2451,58 @@ static void led_flash_blink_stop(struct qpnp_led_data *led)
 	led_flash_state = 0;
 }
 
-static ssize_t led_flash_blink_store(struct device *dev,
-		struct device_attribute *attr,
-		const char *buf, size_t count)
+static int flash_proc_read(char *page, char **start, off_t off, int count,
+			   int *eof, void *data)
 {
-	ssize_t ret = -EINVAL;
-	struct qpnp_led_data *led;
-	unsigned long state;
-	struct led_classdev *led_cdev = dev_get_drvdata(dev);
-	led = container_of(led_cdev, struct qpnp_led_data, cdev);
+	ssize_t size = -EINVAL;
 
-	ret = kstrtoul(buf, 10, &state);
-	if (ret)
-		return ret;
+	if (!page) {
+		pr_err("page is NULL\n");
+		return -EINVAL;
+	}
+
+	if (led_flash_state >= 0)
+		size = snprintf(page, PAGE_SIZE, "%d\n", led_flash_state);
+	return size;
+}
+
+static int flash_proc_write(struct file *filp, const char __user *buff,
+			    unsigned long len, void *data)
+{
+	char temp[1] = {0};
+	int state = 0;
+	struct qpnp_led_data *led = (struct qpnp_led_data *)data;
+
+	if (!buff) {
+		pr_err("buff is NULL\n");
+		return -EINVAL;
+	}
+
+	if (copy_from_user(temp, buff, 1))
+		return -EFAULT;
+	sscanf(temp, "%d", &state);
+
+	/*stop it first*/
+	led_flash_blink_stop(led);
 
 	if (state == 2) {
 		/*blink*/
-		led_flash_blink_stop(led);
-		led_flash_state = 2;
 		flash_blink_state = true;
 		INIT_DELAYED_WORK(&led->dwork, led_flash_blink_work);
 		schedule_delayed_work(&led->dwork, msecs_to_jiffies(500));
-	} else if (state == 1) {
+	} else if (state == 1 || state == 3) {
 		/*lamp*/
-		led_flash_blink_stop(led);
-		led_flash_state = 1;
 		if (led->flash_cfg->torch_enable)
-			led->cdev.brightness = 51;
+			led->cdev.brightness = 53;
 		else
-			led->cdev.brightness = 500;
+			led->cdev.brightness = 560;
 		__qpnp_led_work(led, 0);
-	} else {
-		/*off*/
-		led_flash_blink_stop(led);
 	}
 
-	return count;
+	pr_err("%s: set led_flash_state to %d\n", __func__, state);
+	led_flash_state = state;
+
+	return len;
 }
 #endif
 
@@ -2493,14 +2516,8 @@ static DEVICE_ATTR(ramp_step_ms, 0664, NULL, ramp_step_ms_store);
 static DEVICE_ATTR(lut_flags, 0664, NULL, lut_flags_store);
 static DEVICE_ATTR(duty_pcts, 0664, NULL, duty_pcts_store);
 static DEVICE_ATTR(blink, 0664, NULL, blink_store);
-#ifdef CONFIG_MACH_OPPO
-static DEVICE_ATTR(flash_blink, 0664, NULL, led_flash_blink_store);
-#endif
 
 static struct attribute *led_attrs[] = {
-#ifdef CONFIG_MACH_OPPO
-	&dev_attr_flash_blink.attr,
-#endif
 	&dev_attr_led_mode.attr,
 	&dev_attr_strobe.attr,
 	NULL
@@ -3501,6 +3518,9 @@ static int __devinit qpnp_leds_probe(struct spmi_device *spmi)
 	int rc, i, num_leds = 0, parsed_leds = 0;
 	const char *led_label;
 	bool regulator_probe = false;
+#ifdef CONFIG_MACH_OPPO
+	struct proc_dir_entry *proc_entry = NULL;
+#endif
 
 	node = spmi->dev.of_node;
 	if (node == NULL)
@@ -3665,6 +3685,20 @@ static int __devinit qpnp_leds_probe(struct spmi_device *spmi)
 			if (rc)
 				goto fail_id_check;
 
+#ifdef CONFIG_MACH_OPPO
+			if (get_pcb_version() >= HW_VERSION__20 &&
+			    led->flash_cfg->torch_enable) {
+				proc_entry = create_proc_entry("qcom_flash",
+							       0664, NULL);
+				if (!proc_entry) {
+					pr_err("proc_entry create failed\n");
+					return rc;
+				}
+				proc_entry->data = led;
+				proc_entry->read_proc = flash_proc_read;
+				proc_entry->write_proc = flash_proc_write;
+			}
+#endif
 		}
 
 		if (led->id == QPNP_ID_LED_MPP) {
