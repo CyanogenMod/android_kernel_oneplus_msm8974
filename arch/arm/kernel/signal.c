@@ -653,7 +653,7 @@ static int do_signal(struct pt_regs *regs, int syscall)
 	if (signr > 0) {
 		sigset_t *oldset;
 
-		if (unlikely(restart) && regs->ARM_pc == restart_addr) {
+		if (unlikely(restart)) {
 			if (retval == -ERESTARTNOHAND ||
 			    retval == -ERESTART_RESTARTBLOCK
 			    || (retval == -ERESTARTSYS
@@ -661,7 +661,6 @@ static int do_signal(struct pt_regs *regs, int syscall)
 				regs->ARM_r0 = -EINTR;
 				regs->ARM_pc = continue_addr;
 			}
-			clear_thread_flag(TIF_SYSCALL_RESTARTSYS);
 		}
 
 		if (test_thread_flag(TIF_RESTORE_SIGMASK))
