@@ -32,6 +32,9 @@
 #include "synaptics_firmware_tpk_sharp_14001.h"
 #include "synaptics_firmware_tpk_truly_14001.h"
 #include "synaptics_firmware_wintek_jdi_14001.h"
+#elif defined(CONFIG_MACH_N3)
+#include "synaptics_firmware_tpk_n3.h"
+#include "synaptics_firmware_wintek_n3.h"
 #else
 #include "synaptics_firmware_tpk.h"
 #include "synaptics_firmware_tpk_find7s.h"
@@ -1447,10 +1450,14 @@ int synaptics_rmi4_get_firmware_version(int vendor, int lcd_type) {
 		return FIRMWARE_YOUNGFAST_VERSION;
 	} else if (vendor == TP_VENDOR_TPK) {
 #ifndef CONFIG_MACH_FIND7OP
+#ifdef CONFIG_MACH_N3
+	return FIRMWARE_TPK_VERSION;
+#else
 		if (get_pcb_version() >= HW_VERSION__20)
 			return FIRMWARE_TPK_FIND7S_VERSION;
 		else
 			return FIRMWARE_TPK_VERSION;
+#endif
 	} else if (vendor == TP_VENDOR_WINTEK) {
 		return FIRMWARE_WINTEK_VERSION;
 #else
@@ -1565,10 +1572,15 @@ static unsigned char* fwu_rmi4_get_firmware_data(void) {
 		firmwaredata = (unsigned char*)Syna_Firmware_Data_youngfast;
 	else if (vendor_id == TP_VENDOR_TPK) {
 #ifndef CONFIG_MACH_FIND7OP
+#ifdef CONFIG_MACH_N3
+		firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk;
+#else
 		if (get_pcb_version() >= HW_VERSION__20)
 			firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk_find7s;
 		else
 			firmwaredata = (unsigned char*)Syna_Firmware_Data_tpk;
+
+#endif
 	} else if (vendor_id == TP_VENDOR_WINTEK) {
 		firmwaredata = (unsigned char*)Syna_Firmware_Data_Wintek;
 #else
