@@ -21,6 +21,9 @@
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
 #include <linux/memory.h>
+#ifdef CONFIG_MACH_N3
+#include <linux/regulator/consumer.h>
+#endif
 #include <linux/regulator/machine.h>
 #include <linux/regulator/krait-regulator.h>
 #include <linux/msm_tsens.h>
@@ -133,7 +136,8 @@ static void __init oppo_config_display(void)
 		return;
 	}
 
-	if (get_pcb_version() >= HW_VERSION__20) {
+	if ((get_pcb_version() >= HW_VERSION__20) &&
+	    (get_pcb_version() < HW_VERSION__30)) {
 		rc = gpio_request(DISP_LCD_UNK_GPIO, "lcd_unk");
 		if (rc) {
 			pr_err("%s: request DISP_UNK GPIO failed, rc: %d",
@@ -168,6 +172,48 @@ static void __init oppo_config_ramconsole(void)
 		return;
 	}
 }
+
+#ifdef CONFIG_MACH_N3
+int __init board_sim_regulator_init(void)
+{
+	int rc = 0;
+	struct regulator *vdd_regulator_ldo9 = 0;
+	struct regulator *vdd_regulator_lvs2 = 0;
+
+	if (!vdd_regulator_ldo9) {
+		vdd_regulator_ldo9 = regulator_get(NULL, "8941_l9");
+		if (IS_ERR(vdd_regulator_ldo9)) {
+			rc = PTR_ERR(vdd_regulator_ldo9);
+			pr_err("ldo9 regulator_get failed rc=%d\n", rc);
+			return rc;
+		}
+
+		rc = regulator_set_voltage(vdd_regulator_ldo9,
+					   1800000, 1800000);
+		if (rc) {
+			pr_err("ldo9 regulator_set_voltage failed rc=%d\n", rc);
+		}
+	}
+
+	if (!vdd_regulator_lvs2) {
+		vdd_regulator_lvs2 = regulator_get(NULL, "8941_lvs2");
+		if (IS_ERR(vdd_regulator_lvs2)) {
+			rc = PTR_ERR(vdd_regulator_lvs2);
+			pr_err("lvs2 regulator_get failed rc=%d\n", rc);
+			return rc;
+		}
+
+		rc = regulator_set_voltage(vdd_regulator_lvs2,
+					   1800000, 1800000);
+		if (rc) {
+			pr_err("lvs2 regulator_set_voltage failed rc=%d\n", rc);
+		}
+	}
+	regulator_enable(vdd_regulator_lvs2);
+
+	return rc;
+}
+#endif
 
 static struct rpm_regulator* sns_reg = 0;
 static struct delayed_work sns_dwork;
@@ -272,6 +318,9 @@ void __init msm8974_init(void)
 	oppo_config_display();
 	oppo_config_ramconsole();
 	oppo_config_sns_power();
+#ifdef CONFIG_MACH_N3
+	board_sim_regulator_init();
+#endif
 }
 
 static const char *msm8974_dt_match[] __initconst = {
