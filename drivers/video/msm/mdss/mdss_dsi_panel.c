@@ -268,6 +268,11 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 				gpio_direction_output(ctrl_pdata->lcd_5v_en_gpio, 1);
 			}
 #endif
+#ifdef CONFIG_MACH_N3
+			if (gpio_is_valid(ctrl_pdata->disp_en_gpio76)) {
+				gpio_direction_output(ctrl_pdata->disp_en_gpio76, 1);
+			}
+#endif
 		}
 
 		if (gpio_is_valid(ctrl_pdata->mode_gpio)) {
@@ -289,6 +294,11 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 #ifdef CONFIG_MACH_OPPO
 		if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio)) {
 			gpio_direction_output(ctrl_pdata->lcd_5v_en_gpio, 0);
+		}
+#endif
+#ifdef CONFIG_MACH_N3
+		if (gpio_is_valid(ctrl_pdata->disp_en_gpio76)) {
+			gpio_direction_output(ctrl_pdata->disp_en_gpio76, 0);
 		}
 #endif
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {

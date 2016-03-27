@@ -298,6 +298,9 @@ struct mdss_dsi_ctrl_pdata {
 #endif
 	int rst_gpio;
 	int disp_en_gpio;
+#ifdef CONFIG_MACH_N3
+	int disp_en_gpio76;
+#endif
 	int mode_gpio;
 	int bklt_ctrl;	/* backlight ctrl */
 	int pwm_period;
