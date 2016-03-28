@@ -6678,6 +6678,40 @@ struct afe_spkr_prot_calib_get_resp {
 	struct asm_calib_res_cfg res_cfg;
 } __packed;
 
+#ifdef CONFIG_MACH_N3
+/* Structures for AFE communication */
+struct afe_custom_opalum_set_config_t {
+	struct apr_hdr hdr;
+	struct afe_port_cmd_set_param_v2 param;
+	struct afe_port_param_data_v2 data;
+} __packed;
+
+struct afe_custom_opalum_get_config_t {
+	struct afe_port_cmd_get_param_v2 param;
+	struct afe_port_param_data_v2 data;
+} __packed;
+
+struct opalum_process_enable_ctrl_t {
+	uint32_t enable_flag; /* 0 = disabled; nonzero = enabled. */
+};
+
+struct opalum_f0_calib_data_t {
+	int32_t f0;
+	int32_t ref_diff;
+};
+
+struct opalum_temp_calib_data_t {
+	int acc;
+	int count;
+};
+
+#define MODULE_ID_OPALUM_FB 0x00A1BF00
+#define MODULE_ID_OPALUM 0x00A1AF00
+#define PARAM_ID_OPALUM_GET_F0  0x00A1BF05
+#define PARAM_ID_OPALUM_GET_TEMPERATURE 0x00A1BF07
+#define PARAM_ID_OPALUM_SET_F0  0x00A1BF03
+#define PARAM_ID_OPALUM_SET_TEMPERATURE 0x00A1BF06
+#endif
 
 /* SRS TRUMEDIA start */
 /* topology */
