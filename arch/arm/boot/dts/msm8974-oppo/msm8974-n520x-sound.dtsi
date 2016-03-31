@@ -1,0 +1,64 @@
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+	slim@fe12f000 {
+		taiko_codec {
+			cdc-vdd-hpmic-switch-supply = <&pm8941_l24>;
+			qcom,cdc-vdd-hpmic-switch-voltage = <3075000 3075000>;
+			qcom,cdc-vdd-hpmic-switch-current = <25000>;
+			qcom,cdc-on-demand-supplies = "cdc-vdd-hpmic-switch";
+
+			qcom,cdc-micbias-cfilt2-mv = <2000>;
+			qcom,cdc-micbias1-ext-cap;
+			qcom,cdc-micbias2-ext-cap;
+			qcom,cdc-micbias3-ext-cap;
+			qcom,cdc-micbias4-ext-cap;
+		};
+	};
+
+	sound {
+		qcom,audio-routing =
+			"AIF4 VI", "MCLK",
+			"RX_BIAS", "MCLK",
+			"LDO_H", "MCLK",
+			"AIF4 MAD", "MCLK",
+			"AMIC1", "MIC BIAS1 Internal1",
+			"MIC BIAS1 Internal1", "Handset Mic",
+			"AMIC2", "MIC BIAS2 External",
+			"MIC BIAS2 External", "Headset Mic",
+
+			"AMIC3", "MIC BIAS1 External",
+			"MIC BIAS1 External", "Main Mic",
+			"AMIC4", "MIC BIAS1 External",
+			"MIC BIAS1 External", "Second Mic",
+			"AMIC5", "MIC BIAS1 External",
+			"MIC BIAS1 External", "ANC Mic",
+
+			"DMIC1", "MIC BIAS1 External",
+			"MIC BIAS1 External", "Digital Mic1",
+			"DMIC2", "MIC BIAS1 External",
+			"MIC BIAS1 External", "Digital Mic2",
+			"DMIC3", "MIC BIAS3 External",
+			"MIC BIAS3 External", "Digital Mic3",
+			"DMIC4", "MIC BIAS3 External",
+			"MIC BIAS3 External", "Digital Mic4",
+			"DMIC5", "MIC BIAS4 External",
+			"MIC BIAS4 External", "Digital Mic5",
+			"DMIC6", "MIC BIAS4 External",
+			"MIC BIAS4 External", "Digital Mic6",
+			"Lineout_1 amp", "LINEOUT1",
+			"Lineout_3 amp", "LINEOUT3";
+
+		qcom,mbhc-audio-jack-type = "4-pole-jack";
+	};
+};
