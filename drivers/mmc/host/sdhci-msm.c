@@ -41,6 +41,9 @@
 #include <mach/msm_bus.h>
 #include <mach/mpm.h>
 #include <linux/iopoll.h>
+#ifdef CONFIG_MACH_OPPO
+#include <linux/pcb_version.h>
+#endif
 
 #include "sdhci-pltfm.h"
 
@@ -2052,6 +2055,14 @@ static int sdhci_msm_setup_vreg(struct sdhci_msm_pltfm_data *pdata,
 		goto out;
 	}
 
+#ifdef CONFIG_MACH_N3
+	if (get_pcb_version() >= HW_VERSION__31 &&
+	    !curr_slot->vdd_data->is_always_on) {
+		if (!enable)
+			gpio_set_value(75, 0);
+	}
+#endif
+
 	vreg_table[0] = curr_slot->vdd_data;
 	vreg_table[1] = curr_slot->vdd_io_data;
 
@@ -2065,6 +2076,15 @@ static int sdhci_msm_setup_vreg(struct sdhci_msm_pltfm_data *pdata,
 				goto out;
 		}
 	}
+
+#ifdef CONFIG_MACH_N3
+	if (get_pcb_version() >= HW_VERSION__31 &&
+	    !curr_slot->vdd_data->is_always_on) {
+		if (enable)
+			gpio_set_value(75, 1);
+	}
+#endif
+
 out:
 	return ret;
 }
@@ -3082,6 +3102,17 @@ static int __devinit sdhci_msm_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "No device tree node\n");
 		goto pltfm_free;
 	}
+
+#ifdef CONFIG_MACH_N3
+	if (get_pcb_version() >= HW_VERSION__31) {
+		ret = gpio_tlmm_config(GPIO_CFG(75, 0, 1, 1, 0), 0);
+		if (ret) {
+			pr_err("%s: gpio_tlmm_config(%#x)=%d\n", __func__,
+					GPIO_CFG(75, 0, 1, 1, 0), ret);
+		}
+		gpio_set_value(75, 0);
+	}
+#endif
 
 	/* Setup Clocks */
 
