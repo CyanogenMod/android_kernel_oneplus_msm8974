@@ -188,7 +188,8 @@
 			29 01 00 00 00 00 0F BA 44 48 4F 56 5C 62 67 4E 49 47 41 50 5C 56
 			29 01 00 00 00 00 10 BB 4C 5D 74 76 8A 90 9A 9B A4 AE B8 C5 D8 F1 FF];
 		qcom,mdss-dsi-pan-enable-dynamic-fps;
-		qcom,mdss-dsi-pan-fps-update = "dfps_suspend_resume_mode";
+		qcom,mdss-dsi-pan-fps-update = "dfps_immediate_porch_mode";
+		qcom,mdss-dsi-min-refresh-rate = <45>;
 	};
 
 	dsi_jdi_1440_vid2: qcom,dsi_jdi_1440p_video_1 {
@@ -302,6 +303,7 @@
 			05 01 00 00 10 00 02 29 00
 			15 01 00 00 10 00 02 55 83];
 		qcom,mdss-dsi-pan-enable-dynamic-fps;
-		qcom,mdss-dsi-pan-fps-update = "dfps_suspend_resume_mode";
+		qcom,mdss-dsi-pan-fps-update = "dfps_immediate_porch_mode";
+		qcom,mdss-dsi-min-refresh-rate = <45>;
 	};
 };
