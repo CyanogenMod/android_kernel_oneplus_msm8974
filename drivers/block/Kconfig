@@ -555,4 +555,6 @@ config BLK_DEV_RBD
 
 	  If unsure, say N.
 
+source "drivers/block/zram/Kconfig"
+
 endif # BLK_DEV
