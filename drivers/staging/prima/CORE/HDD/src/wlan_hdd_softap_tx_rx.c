@@ -1033,6 +1033,7 @@ VOS_STATUS hdd_softap_deinit_tx_rx_sta ( hdd_adapter_t *pAdapter, v_U8_t STAId )
    status = hdd_sta_id_hash_remove_entry(pAdapter,
                 STAId, &pSapCtx->aStaInfo[STAId].macAddrSTA);
    if (status != VOS_STATUS_SUCCESS) {
+       spin_unlock_bh( &pSapCtx->staInfo_lock );
        VOS_TRACE(VOS_MODULE_ID_HDD_SAP_DATA, VOS_TRACE_LEVEL_ERROR,
                  FL("Not able to remove staid hash %d"), STAId);
        return VOS_STATUS_E_FAILURE;
