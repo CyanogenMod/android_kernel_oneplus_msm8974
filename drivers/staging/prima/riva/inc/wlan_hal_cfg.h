@@ -273,12 +273,13 @@
 #define QWLAN_HAL_CFG_LINK_FAIL_TX_CNT                       215
 #define QWLAN_HAL_CFG_TOGGLE_ARP_BDRATES                     216
 #define QWLAN_HAL_CFG_OPTIMIZE_CA_EVENT                      217
+#define QWLAN_HAL_CFG_SAR_BOFFSET_CORRECTION_ENABLE          220
 
-#define QWLAN_HAL_CFG_MAX_PARAMS                             218
+#define QWLAN_HAL_CFG_MAX_PARAMS                             219
 
 
 /* Total number of Integer CFGs. This is used while allocating the memory for TLV */
-#define QWLAN_HAL_CFG_INTEGER_PARAM                     218
+#define QWLAN_HAL_CFG_INTEGER_PARAM                     219
 
 /*-------------------------------------------------------------------------
   Configuration Parameter min, max, defaults

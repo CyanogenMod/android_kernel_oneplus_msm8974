@@ -401,3 +401,49 @@ config USE_USER_ACCESSIBLE_TIMERS
 	  architecture-specific code that will need to be enabled
 	  separately.
 
+config ZBUD
+	tristate "Low density storage for compressed pages"
+	default n
+	help
+	  A special purpose allocator for storing compressed pages.
+	  It is designed to store up to two compressed pages per physical
+	  page.  While this design limits storage density, it has simple and
+	  deterministic reclaim properties that make it preferable to a higher
+	  density approach when reclaim will be used.
+
+config ZCACHE
+	   bool "Compressed cache for file pages (EXPERIMENTAL)"
+	   depends on CRYPTO && CLEANCACHE
+	   select CRYPTO_LZO
+	   select ZBUD
+	   default n
+	   help
+		 A compressed cache for file pages.
+		 It takes active file pages that are in the process of being reclaimed
+		 and attempts to compress them into a dynamically allocated RAM-based
+		 memory pool.
+
+		 If this process is successful, when those file pages needed again, the
+		 I/O reading operation was avoided. This results in a significant performance
+		 gains under memory pressure for systems full with file pages.
+
+config BALANCE_ANON_FILE_RECLAIM
+	bool "During reclaim treat anon and file backed pages equally"
+	depends on SWAP
+	help
+	  When performing memory reclaim treat anonymous and file backed pages
+	  equally.
+	  Swapping anonymous pages out to memory can be efficient enough to justify
+	  treating anonymous and file backed pages equally.
+
+config ZSMALLOC
+	tristate "Memory allocator for compressed pages"
+	depends on MMU
+	default n
+	help
+	  zsmalloc is a slab-based memory allocator designed to store
+	  compressed RAM pages.  zsmalloc uses virtual memory mapping
+	  in order to reduce fragmentation.  However, this results in a
+	  non-standard allocator interface where a handle, not a pointer, is
+	  returned by an alloc().  This handle must be mapped in order to
+	  access the allocated space.
