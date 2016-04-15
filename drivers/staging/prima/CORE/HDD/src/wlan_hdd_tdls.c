@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -961,14 +961,24 @@ void  wlan_hdd_tdls_init(hdd_context_t *pHddCtx )
         hddLog(VOS_TRACE_LEVEL_ERROR, FL("Failed to register BT Coex TDLS callback"));
     }
 
-    if (FALSE == pHddCtx->cfg_ini->fEnableTDLSImplicitTrigger)
+    if ((TRUE == pHddCtx->cfg_ini->fEnableTDLSSupport) &&
+        (TRUE == sme_IsFeatureSupportedByFW(TDLS)))
     {
-        pHddCtx->tdls_mode = eTDLS_SUPPORT_EXPLICIT_TRIGGER_ONLY;
-        hddLog(VOS_TRACE_LEVEL_INFO, "%s TDLS Implicit trigger not enabled!", __func__);
+        if (FALSE == pHddCtx->cfg_ini->fEnableTDLSImplicitTrigger)
+        {
+            pHddCtx->tdls_mode = eTDLS_SUPPORT_EXPLICIT_TRIGGER_ONLY;
+            hddLog(LOGE, FL("TDLS Implicit trigger not enabled!"));
+            return;
+        }
+        pHddCtx->tdls_mode = eTDLS_SUPPORT_ENABLED;
     }
     else
     {
-        pHddCtx->tdls_mode = eTDLS_SUPPORT_ENABLED;
+        hddLog(LOGE,
+               FL("TDLS not enabled (%d) or FW doesn't support (%d)"),
+               pHddCtx->cfg_ini->fEnableTDLSSupport,
+               sme_IsFeatureSupportedByFW(TDLS));
+        pHddCtx->tdls_mode = eTDLS_SUPPORT_NOT_ENABLED;
     }
 }
 
@@ -1820,6 +1830,17 @@ int wlan_hdd_tdls_set_params(struct net_device *dev, tdls_config_params_t *confi
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX( pAdapter );
     tdlsCtx_t *pHddTdlsCtx = WLAN_HDD_GET_TDLS_CTX_PTR(pAdapter);
     eTDLSSupportMode req_tdls_mode;
+
+    if ((TRUE != pHddCtx->cfg_ini->fEnableTDLSSupport) &&
+        (TRUE != sme_IsFeatureSupportedByFW(TDLS)))
+    {
+        hddLog(LOGE,
+               FL("TDLS not enabled (%d) or FW doesn't support (%d)"),
+               pHddCtx->cfg_ini->fEnableTDLSSupport,
+               sme_IsFeatureSupportedByFW(TDLS));
+        pHddCtx->tdls_mode = eTDLS_SUPPORT_NOT_ENABLED;
+        return -EINVAL;
+    }
 
     if (NULL == pHddTdlsCtx)
     {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -74,6 +74,25 @@ typedef struct
    uint32 tputBpms;  //unit in Bytes per msec = (tputRateX1024x1024)/(8x10X1000) ~= (tputRate*13)
    uint32 tputBpus;  //unit in Bytes per usec: round off to integral value
 }WDTS_RateInfo;
+
+#define WDTS_MAX_NUMBER_OF_RX_PKT 5
+#define WDTS_MAX_PAGE_SIZE 4096
+#define WDTS_MAX_RXDB_DATA_SIZE 128
+
+struct WDTS_RxPktInfo
+{
+    uint8 rx_bd[WDTS_MAX_RXDB_DATA_SIZE];
+    void *pFrame_head;
+    void *pFrame_tail;
+    uint32 pFrame_len;
+};
+
+static struct WDTS_PktInfoBuff
+{
+    struct WDTS_RxPktInfo PktInfo[WDTS_MAX_NUMBER_OF_RX_PKT];
+    uint32 current_count;
+    uint8 current_position;
+}WDTS_Pkt_Data_Buff = { .current_position = 0, .current_count = 0 };
 
 #define WDTS_MAX_RATE_NUM               137
 #define WDTS_MAX_11B_RATE_NUM           8
@@ -515,6 +534,56 @@ WDTS_GetReplayCounterFromRxBD
 #endif
 }
 
+/* Store RXBD, skb lenght, skb head, and skb end offset to global buffer.
+ * This function should  be invoked when MPDU lenght + MPDU herader Offset
+ * if higher then 3872 bytes.
+ * Parameters:
+ * pFrame:Refernce to PAL frame.
+ * pBDHeader: BD header for PAL Frame.
+ * Return Value: v_VOID_t
+ *
+ */
+v_VOID_t
+WDTS_StoreMetaInfo(wpt_packet *pFrame, wpt_uint8 *pBDHeader)
+{
+    wpt_uint8  usMPDUHLen;
+    wpt_boolean usAsf, usAef, usLsf, usESF;
+    wpt_uint16 usMPDULen;
+    wpt_uint32 usPmiCmd24to25;
+    struct WDTS_RxPktInfo *current_data =
+           &WDTS_Pkt_Data_Buff.PktInfo[WDTS_Pkt_Data_Buff.current_position];
+
+    vos_mem_copy(current_data->rx_bd, (void*)wpalPacketGetRawBuf(pFrame),
+                                                       WDTS_MAX_RXDB_DATA_SIZE);
+
+    usMPDULen = (wpt_uint16)WDI_RX_BD_GET_MPDU_LEN(pBDHeader);
+    usMPDUHLen = (wpt_uint8)WDI_RX_BD_GET_MPDU_H_LEN(pBDHeader);
+    usAsf = (wpt_boolean)WDI_RX_BD_GET_ASF(pBDHeader);
+    usAef = (wpt_boolean)WDI_RX_BD_GET_AEF(pBDHeader);
+    usLsf = (wpt_boolean)WDI_RX_BD_GET_LSF(pBDHeader);
+    usESF = (wpt_boolean)WDI_RX_BD_GET_ESF(pBDHeader);
+    usPmiCmd24to25 = (wpt_uint32)WDI_RX_BD_GET_PMICMD_24TO25(pBDHeader);
+
+    current_data->pFrame_head = wpalGetOSPktHead(pFrame);
+    current_data->pFrame_tail = wpalGetOSPktend(pFrame);
+    current_data->pFrame_len = wpalPacketGetLength(pFrame);
+
+    WDTS_Pkt_Data_Buff.current_count++;
+
+    /* Dump packet info */
+    VOS_TRACE(VOS_MODULE_ID_WDI, VOS_TRACE_LEVEL_ERROR,
+                  "count: %d usMPDULen: 0x%x, usMPDUHLen: 0x%x, usAsf: %x,"
+                  "usAef: %x, usLsf: 0x%x, usESF: 0x%x, usPmiCmd24to25: 0x%x,"
+                  "skb_len: 0x%x",WDTS_Pkt_Data_Buff.current_count, usMPDULen,
+                  usMPDUHLen, usAsf, usAef, usLsf, usESF, usPmiCmd24to25,
+                  current_data->pFrame_len);
+
+    WDTS_Pkt_Data_Buff.current_position++;
+    if(WDTS_Pkt_Data_Buff.current_position >= WDTS_MAX_NUMBER_OF_RX_PKT)
+       WDTS_Pkt_Data_Buff.current_position = 0;
+
+    return;
+}
 
 /* DTS Rx packet function. 
  * This function should be invoked by the transport device to indicate 
@@ -602,18 +671,29 @@ wpt_status WDTS_RxPacket (void *pContext, wpt_packet *pFrame, WDTS_ChannelType c
   // Special handling for frames which contain logging information
   if (WDTS_CHANNEL_RX_LOG == channel)
   {
-      if(VPKT_SIZE_BUFFER_ALIGNED < (usMPDULen+ucMPDUHOffset)){
-        WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+      if (VPKT_SIZE_BUFFER_ALIGNED < (usMPDULen+ucMPDUHOffset))
+      {
+          /* Size of the packet tranferred by the DMA engine is
+           * greater than the the memory allocated for the skb
+           * Recover the SKB  case of length is in same memory page
+           */
+          WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
                    "Invalid Frame size, might memory corrupted(%d+%d/%d)",
                    usMPDULen, ucMPDUHOffset, VPKT_SIZE_BUFFER_ALIGNED);
 
-        /* Size of the packet tranferred by the DMA engine is
-         * greater than the the memory allocated for the skb
-         */
-        WPAL_BUG(0);
+          // Store RXBD,  skb head, tail and skb lenght in circular buffer
+          WDTS_StoreMetaInfo(pFrame, pBDHeader);
 
-        wpalPacketFree(pFrame);
-        return eWLAN_PAL_STATUS_SUCCESS;
+          if ((usMPDULen+ucMPDUHOffset) <= WDTS_MAX_PAGE_SIZE)
+          {
+              wpalRecoverTail(pFrame);
+              wpalPacketFree(pFrame);
+          } else {
+              //Recovery may cause adjoining buffer corruption
+              WPAL_BUG(0);
+          }
+
+          return eWLAN_PAL_STATUS_SUCCESS;
       }
 
       /* Firmware should send the Header offset as length
@@ -657,19 +737,31 @@ wpt_status WDTS_RxPacket (void *pContext, wpt_packet *pFrame, WDTS_ChannelType c
         ucMPDUHOffset = usMPDUDOffset;
       }
 
-      if(VPKT_SIZE_BUFFER_ALIGNED < (usMPDULen+ucMPDUHOffset)){
-        WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+      if (VPKT_SIZE_BUFFER_ALIGNED < (usMPDULen+ucMPDUHOffset))
+      {
+          /* Size of the packet tranferred by the DMA engine is
+           * greater than the the memory allocated for the skb
+           * Recover the SKB  case of length is in same memory page
+           */
+          WPAL_TRACE(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
                    "Invalid Frame size, might memory corrupted(%d+%d/%d)",
                    usMPDULen, ucMPDUHOffset, VPKT_SIZE_BUFFER_ALIGNED);
 
-        /* Size of the packet tranferred by the DMA engine is
-         * greater than the the memory allocated for the skb
-         */
-        WPAL_BUG(0);
+          // Store RXBD,  skb head, tail and skb lenght in circular buffer
+          WDTS_StoreMetaInfo(pFrame, pBDHeader);
 
-        wpalPacketFree(pFrame);
-        return eWLAN_PAL_STATUS_SUCCESS;
+          if ((usMPDULen+ucMPDUHOffset) <= WDTS_MAX_PAGE_SIZE)
+          {
+              wpalRecoverTail(pFrame);
+              wpalPacketFree(pFrame);
+          } else {
+              //Recovery may cause adjoining buffer corruption
+              WPAL_BUG(0);
+          }
+
+          return eWLAN_PAL_STATUS_SUCCESS;
       }
+
       if(eWLAN_PAL_STATUS_SUCCESS != wpalPacketSetRxLength(pFrame, usMPDULen+ucMPDUHOffset))
       {
           DTI_TRACE( DTI_TRACE_LEVEL_ERROR, "Invalid Frame Length, Frame dropped..");

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -133,7 +133,7 @@ static int wlan_suspend(hdd_context_t* pHddCtx)
    INIT_COMPLETION(pHddCtx->tx_sus_event_var);
 
    /* Indicate Tx Thread to Suspend */
-   set_bit(TX_SUSPEND_EVENT_MASK, &vosSchedContext->txEventFlag);
+   set_bit(TX_SUSPEND_EVENT, &vosSchedContext->txEventFlag);
 
    wake_up_interruptible(&vosSchedContext->txWaitQueue);
 
@@ -151,7 +151,7 @@ static int wlan_suspend(hdd_context_t* pHddCtx)
        * Thread then it means it is going to suspend, so do not return failure
        * from here.
        */
-      if (!test_and_clear_bit(TX_SUSPEND_EVENT_MASK,
+      if (!test_and_clear_bit(TX_SUSPEND_EVENT,
                               &vosSchedContext->txEventFlag))
       {
          VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -169,7 +169,7 @@ tx_suspend:
    INIT_COMPLETION(pHddCtx->rx_sus_event_var);
 
    /* Indicate Rx Thread to Suspend */
-   set_bit(RX_SUSPEND_EVENT_MASK, &vosSchedContext->rxEventFlag);
+   set_bit(RX_SUSPEND_EVENT, &vosSchedContext->rxEventFlag);
 
    wake_up_interruptible(&vosSchedContext->rxWaitQueue);
 
@@ -186,7 +186,7 @@ tx_suspend:
         * Thread then it means it is going to suspend, so do not return failure
         * from here.
         */
-       if (!test_and_clear_bit(RX_SUSPEND_EVENT_MASK,
+       if (!test_and_clear_bit(RX_SUSPEND_EVENT,
                                &vosSchedContext->rxEventFlag))
        {
            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -210,14 +210,15 @@ rx_suspend:
    INIT_COMPLETION(pHddCtx->mc_sus_event_var);
 
    /* Indicate MC Thread to Suspend */
-   set_bit(MC_SUSPEND_EVENT_MASK, &vosSchedContext->mcEventFlag);
+   set_bit(MC_SUSPEND_EVENT, &vosSchedContext->mcEventFlag);
 
    wake_up_interruptible(&vosSchedContext->mcWaitQueue);
 
    /* Wait for Suspend Confirmation from MC Thread */
-   rc = wait_for_completion_interruptible_timeout(&pHddCtx->mc_sus_event_var, msecs_to_jiffies(200));
+   rc = wait_for_completion_interruptible_timeout(&pHddCtx->mc_sus_event_var,
+                                                        msecs_to_jiffies(200));
 
-   if(!rc)
+   if (rc <= 0)
    {
        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
             "%s: MC Thread: timeout while suspending %ld",
@@ -228,7 +229,7 @@ rx_suspend:
         * Thread then it means it is going to suspend, so do not return failure
         * from here.
         */
-       if (!test_and_clear_bit(MC_SUSPEND_EVENT_MASK,
+       if (!test_and_clear_bit(MC_SUSPEND_EVENT,
                                &vosSchedContext->mcEventFlag))
        {
            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
