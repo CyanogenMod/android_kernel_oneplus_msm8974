@@ -181,7 +181,8 @@ static void try_to_fix_pino(struct inode *inode)
 	}
 }
 
-int f2fs_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
+static int f2fs_do_sync_file(struct file *file, loff_t start, loff_t end,
+						int datasync, bool atomic)
 {
 	struct inode *inode = file->f_mapping->host;
 	struct f2fs_inode_info *fi = F2FS_I(inode);
@@ -255,7 +256,7 @@ go_write:
 		goto out;
 	}
 sync_nodes:
-	ret = fsync_node_pages(sbi, ino, &wbc);
+	ret = fsync_node_pages(sbi, ino, &wbc, atomic);
 	if (ret)
 		goto out;
 
@@ -287,6 +288,11 @@ out:
 	trace_f2fs_sync_file_exit(inode, need_cp, datasync, ret);
 	f2fs_trace_ios(NULL, 1);
 	return ret;
+}
+
+int f2fs_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
+{
+	return f2fs_do_sync_file(file, start, end, datasync, false);
 }
 
 static pgoff_t __get_first_dirty_index(struct address_space *mapping,
@@ -1434,7 +1440,7 @@ static int f2fs_ioc_commit_atomic_write(struct file *filp)
 		}
 	}
 
-	ret = f2fs_sync_file(filp, 0, LLONG_MAX, 0);
+	ret = f2fs_do_sync_file(filp, 0, LLONG_MAX, 0, true);
 err_out:
 	mnt_drop_write_file(filp);
 	return ret;
@@ -1492,7 +1498,7 @@ static int f2fs_ioc_abort_volatile_write(struct file *filp)
 		drop_inmem_pages(inode);
 	if (f2fs_is_volatile_file(inode)) {
 		clear_inode_flag(F2FS_I(inode), FI_VOLATILE_FILE);
-		ret = f2fs_sync_file(filp, 0, LLONG_MAX, 0);
+		ret = f2fs_do_sync_file(filp, 0, LLONG_MAX, 0, true);
 	}
 
 	mnt_drop_write_file(filp);
