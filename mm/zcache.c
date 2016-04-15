@@ -541,7 +541,6 @@ static int zcache_store_zaddr(struct zcache_pool *zpool,
 	spin_lock_irqsave(&rbnode->ra_lock, flags);
 	dup_zaddr = radix_tree_delete(&rbnode->ratree, ra_index);
 	if (unlikely(dup_zaddr)) {
-		WARN_ON("duplicated, will be replaced!\n");
 		if (dup_zaddr == ZERO_HANDLE) {
 			atomic_dec(&zcache_stored_zero_pages);
 		} else {
