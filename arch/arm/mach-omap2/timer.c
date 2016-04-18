@@ -36,11 +36,12 @@
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
 #include <linux/slab.h>
+#include <linux/sched_clock.h>
 
 #include <asm/mach/time.h>
 #include <plat/dmtimer.h>
 #include <asm/smp_twd.h>
-#include <asm/sched_clock.h>
+
 #include "common.h"
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>

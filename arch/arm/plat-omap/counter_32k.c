@@ -18,8 +18,9 @@
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/clocksource.h>
+#include <linux/sched_clock.h>
 
-#include <asm/sched_clock.h>
+#include <asm/mach/time.h>
 
 #include <plat/hardware.h>
 #include <plat/common.h>

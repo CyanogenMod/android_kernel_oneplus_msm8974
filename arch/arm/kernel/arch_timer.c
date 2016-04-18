@@ -25,12 +25,12 @@
 #include <linux/irq.h>
 #include <linux/export.h>
 #include <linux/slab.h>
+#include <linux/sched_clock.h>
 
 #include <asm/cputype.h>
 #include <asm/delay.h>
 #include <asm/localtimer.h>
 #include <asm/arch_timer.h>
-#include <asm/sched_clock.h>
 #include <asm/hardware/gic.h>
 #include <asm/system_info.h>
 
@@ -377,7 +377,7 @@ static u32 arch_counter_get_cntvct32(void)
 	return (u32)(cntvct & (u32)~0);
 }
 
-static u32 notrace arch_timer_update_sched_clock(void)
+static u64 notrace arch_timer_update_sched_clock(void)
 {
 	return arch_counter_get_cntvct32();
 }
@@ -403,7 +403,7 @@ static void __init arch_timer_counter_init(void)
 {
 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
 
-	setup_sched_clock(arch_timer_update_sched_clock, 32, arch_timer_rate);
+	sched_clock_register(arch_timer_update_sched_clock, 32, arch_timer_rate);
 
 	/* Use the architected timer for the delay loop. */
 	arch_delay_timer.read_current_timer = &arch_timer_read_current_timer;
