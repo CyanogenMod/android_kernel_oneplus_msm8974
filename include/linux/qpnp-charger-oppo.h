@@ -15,6 +15,25 @@
 
 #include <linux/power_supply.h>
 
+typedef enum {
+	/*! Battery is cold               */
+	CV_BATTERY_TEMP_REGION__COLD,
+	/*! Battery is little cold        */
+	CV_BATTERY_TEMP_REGION__LITTLE_COLD,
+	/*! Battery is cool               */
+	CV_BATTERY_TEMP_REGION__COOL,
+	/*! Battery is little cool        */
+	CV_BATTERY_TEMP_REGION__LITTLE_COOL,
+	/*! Battery is normal             */
+	CV_BATTERY_TEMP_REGION__NORMAL,
+	/*! Battery is warm               */
+	CV_BATTERY_TEMP_REGION__WARM,
+	/*! Battery is hot                */
+	CV_BATTERY_TEMP_REGION__HOT,
+	/*! Invalid battery temp region   */
+	CV_BATTERY_TEMP_REGION__INVALID,
+} chg_cv_battery_temp_region_type;
+
 struct qpnp_battery_gauge {
 	int (*get_battery_mvolts) (void);
 	int (*get_battery_temperature) (void);
@@ -26,8 +45,9 @@ struct qpnp_battery_gauge {
 	int (*monitor_for_recharging) (void);
 	int (*get_battery_soc) (void);
 	int (*get_average_current) (void);
-	int (*is_battery_authenticated) (void);//wangjc add for authentication
-	//lfc add for fastchg
+	int (*is_battery_authenticated) (void);
+	int (*get_batt_cc) (void);
+	int (*get_batt_fcc) (void);
 	int (*fast_chg_started) (void);
 	int (*fast_switch_to_normal) (void);
 	int (*set_switch_to_noraml_false) (void);
@@ -38,7 +58,6 @@ struct qpnp_battery_gauge {
 	int (*get_fast_chg_ing) (void);
 	int (*get_fast_low_temp_full) (void);
 	int (*set_low_temp_full_false) (void);
-	//lfc add for fastchg end
 };
 
 struct qpnp_external_charger {
@@ -61,8 +80,9 @@ struct qpnp_external_charger {
 void qpnp_battery_gauge_register(struct qpnp_battery_gauge *batt_gauge);
 void qpnp_battery_gauge_unregister(struct qpnp_battery_gauge *batt_gauge);
 
-void qpnp_external_charger_register(struct qpnp_external_charger *external_charger);
-void qpnp_external_charger_unregister(struct qpnp_external_charger *external_charger);
-
+void qpnp_external_charger_register(
+		struct qpnp_external_charger *external_charger);
+void qpnp_external_charger_unregister(
+		struct qpnp_external_charger *external_charger);
 
 #endif /* __QPNP_CHARGER_H__ */
