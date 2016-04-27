@@ -899,6 +899,7 @@ static int f2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 		kunmap(dentry_page);
 		f2fs_put_page(dentry_page, 1);
 	}
+	err = 0;
 out:
 	fscrypt_fname_free_buffer(&fstr);
 	return err;
