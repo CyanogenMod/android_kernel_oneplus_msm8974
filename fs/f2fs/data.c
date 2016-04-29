@@ -1749,6 +1749,7 @@ void f2fs_invalidate_page(struct page *page, unsigned long offset)
 	if (IS_ATOMIC_WRITTEN_PAGE(page))
 		return;
 
+	set_page_private(page, 0);
 	ClearPagePrivate(page);
 }
 
@@ -1762,6 +1763,7 @@ int f2fs_release_page(struct page *page, gfp_t wait)
 	if (IS_ATOMIC_WRITTEN_PAGE(page))
 		return 0;
 
+	set_page_private(page, 0);
 	ClearPagePrivate(page);
 	return 1;
 }
