@@ -274,11 +274,11 @@ static void mdss_livedisplay_worker(struct work_struct *work)
 		pr_err("%s: error parsing DSI command! ret=%d", __func__, ret);
 	}
 
+out:
 	// Restore saved RGB settings
 	if (mlc->updated & MODE_RGB)
 		mdss_livedisplay_update_pcc(mlc);
 
-out:
 	mlc->updated = 0;
 	mutex_unlock(&mlc->lock);
 }
@@ -590,6 +590,7 @@ int mdss_livedisplay_parse_dt(struct device_node *np, struct mdss_panel_info *pi
 	mlc->post_cmds = of_get_property(np,
 			"cm,mdss-livedisplay-post-cmd", &mlc->post_cmds_len);
 
+	mlc->caps |= MODE_RGB;
 	mlc->r = mlc->g = mlc->b = 32768;
 	mlc->updated = 0;
 
