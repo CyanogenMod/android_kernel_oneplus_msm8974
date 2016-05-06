@@ -503,7 +503,7 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 	if (soc_temp != soc_calib) {
 		//store when soc changed
 		backup_soc_ex(soc_calib);
-		pr_info("soc:%d, soc_calib:%d\n", soc, soc_calib);
+		pr_debug("soc:%d, soc_calib:%d\n", soc, soc_calib);
 	}
 	return soc_calib;
 }
