@@ -7909,7 +7909,7 @@ static void backup_soc(struct qpnp_chg_chip *chip, int soc)
 		return;
 	}
 
-	pr_err("%s: backup_soc[%d]\n", __func__, soc);
+	pr_debug("%s: backup_soc[%d]\n", __func__, soc);
 	rc = qpnp_chg_masked_write(chip, SOC_DATA_REG_0, SOC_STORAGE_MASK,
 			(soc + 1) << 1, 1);
 	if (rc)
