@@ -85,7 +85,8 @@ static int loading_timeout = 60;	/* In seconds */
 
 static inline long firmware_loading_timeout(void)
 {
-	return loading_timeout > 0 ? loading_timeout * HZ : MAX_SCHEDULE_TIMEOUT;
+	return loading_timeout > 0 ? msecs_to_jiffies(loading_timeout * 1000) :
+	        MAX_SCHEDULE_TIMEOUT;
 }
 
 /* fw_lock could be moved to 'struct firmware_priv' but since it is just
