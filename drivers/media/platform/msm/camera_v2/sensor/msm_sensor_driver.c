@@ -277,10 +277,14 @@ static int32_t msm_sensor_fill_slave_info_init_params(
 	if (INVALID_CAMERA_B != sensor_init_params->position)
 		sensor_info->position =
 			sensor_init_params->position;
-
 	if (SENSOR_MAX_MOUNTANGLE > sensor_init_params->sensor_mount_angle) {
-		sensor_info->sensor_mount_angle =
-			sensor_init_params->sensor_mount_angle;
+        int mount_angle = sensor_init_params->sensor_mount_angle;
+// maxwen: on find7op the sensor is mounted at 270 but we
+// use the same blobs as for find7 that assume its 90 so
+// we fake change it here
+		if (sensor_info->position == 0 && mount_angle == 90)
+			mount_angle = 270;
+		sensor_info->sensor_mount_angle = mount_angle;
 		sensor_info->is_mount_angle_valid = 1;
 	}
 
@@ -290,7 +294,6 @@ static int32_t msm_sensor_fill_slave_info_init_params(
 
 	return 0;
 }
-
 
 static int32_t msm_sensor_validate_slave_info(
 	struct msm_sensor_info_t *sensor_info)
