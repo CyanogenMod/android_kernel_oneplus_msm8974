@@ -1303,13 +1303,14 @@ int ring_buffer_resize(struct ring_buffer *buffer, unsigned long size)
 	if (!buffer)
 		return size;
 
-	size = DIV_ROUND_UP(size, BUF_PAGE_SIZE);
-	size *= BUF_PAGE_SIZE;
+	nr_pages = DIV_ROUND_UP(size, BUF_PAGE_SIZE);
 	buffer_size = buffer->pages * BUF_PAGE_SIZE;
 
 	/* we need a minimum of two pages */
-	if (size < BUF_PAGE_SIZE * 2)
-		size = BUF_PAGE_SIZE * 2;
+	if (nr_pages < 2)
+		nr_pages = 2;
+
+	size = nr_pages * BUF_PAGE_SIZE;
 
 	if (size == buffer_size)
 		return size;
@@ -1321,8 +1322,6 @@ int ring_buffer_resize(struct ring_buffer *buffer, unsigned long size)
 
 	mutex_lock(&buffer->mutex);
 	get_online_cpus();
-
-	nr_pages = DIV_ROUND_UP(size, BUF_PAGE_SIZE);
 
 	if (size < buffer_size) {
 
