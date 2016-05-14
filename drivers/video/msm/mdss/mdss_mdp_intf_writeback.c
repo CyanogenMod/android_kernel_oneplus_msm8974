@@ -521,6 +521,7 @@ int mdss_mdp_writeback_start(struct mdss_mdp_ctl *ctl)
 	struct mdss_mdp_writeback_ctx *ctx;
 	u32 mem_sel;
 	int ret = 0;
+	int rotator = 0;
 
 	pr_debug("start ctl=%d\n", ctl->num);
 
@@ -528,7 +529,11 @@ int mdss_mdp_writeback_start(struct mdss_mdp_ctl *ctl)
 	if (mem_sel < MDSS_MDP_MAX_WRITEBACK) {
 		ctx = &wb_ctx_list[mem_sel];
 		if (ctx->ref_cnt) {
-			pr_err("writeback in use %d\n", mem_sel);
+			// MIXER BUG (block error message with rotator)
+			if (ctl->mixer_left)
+				rotator = ctl->mixer_left->rotator_mode;
+			if (!rotator)
+				pr_err("writeback in use %d\n", mem_sel);
 			return -EBUSY;
 		}
 		ctx->ref_cnt++;

@@ -1255,12 +1255,15 @@ struct mdss_mdp_mixer *mdss_mdp_wb_mixer_alloc(int rotator)
 			MDSS_MDP_WB_CTL_TYPE_LINE);
 	mixer->ctl = ctl;
 
-	if (ctl->start_fnc)
-		ctl->start_fnc(ctl);
+	if (mdss_mdp_writeback_start(ctl)) {
+		// MIXER BUG: mdss_mdp_writeback_start can fail
+		ctl->mixer_left = NULL;
+		goto error;
+	}
 
 	return mixer;
 error:
-	if (mixer)
+	if (mixer && mixer->ref_cnt)
 		mdss_mdp_mixer_free(mixer);
 	if (ctl)
 		mdss_mdp_ctl_free(ctl);
@@ -2335,25 +2338,30 @@ struct mdss_mdp_mixer *mdss_mdp_mixer_get(struct mdss_mdp_ctl *ctl, int mux)
 {
 	struct mdss_mdp_mixer *mixer = NULL;
 	struct mdss_overlay_private *mdp5_data = NULL;
-	if (!ctl || !ctl->mfd) {
+	bool is_mixer_swapped = false;
+
+	if (!ctl) {
 		pr_err("ctl not initialized\n");
 		return NULL;
 	}
 
-	mdp5_data = mfd_to_mdp5_data(ctl->mfd);
-	if (!mdp5_data) {
-		pr_err("ctl not initialized\n");
-		return NULL;
+	if (ctl->mfd) {
+		mdp5_data = mfd_to_mdp5_data(ctl->mfd);
+		if (!mdp5_data) {
+			pr_err("mdp5_data not initialized\n");
+			return NULL;
+		}
+		is_mixer_swapped = mdp5_data->mixer_swap;
 	}
 
 	switch (mux) {
 	case MDSS_MDP_MIXER_MUX_DEFAULT:
 	case MDSS_MDP_MIXER_MUX_LEFT:
-		mixer = mdp5_data->mixer_swap ?
+		mixer = is_mixer_swapped ?
 			ctl->mixer_right : ctl->mixer_left;
 		break;
 	case MDSS_MDP_MIXER_MUX_RIGHT:
-		mixer = mdp5_data->mixer_swap ?
+		mixer = is_mixer_swapped ?
 			ctl->mixer_left : ctl->mixer_right;
 		break;
 	}

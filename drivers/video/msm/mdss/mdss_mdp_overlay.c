@@ -2316,12 +2316,12 @@ static inline int mdss_mdp_ad_is_supported(struct msm_fb_data_type *mfd)
 	}
 
 	mixer = mdss_mdp_mixer_get(ctl, MDSS_MDP_MIXER_MUX_LEFT);
-	if (mixer && (mixer->num > ctl->mdata->nad_cfgs)) {
-		if (!mixer)
-			pr_warn("there is no mixer attached to fb\n");
-		else
-			pr_debug("mixer attached (%d) doesnt support ad\n",
-				 mixer->num);
+	if (!mixer) {
+		pr_warn("there is no mixer attached to fb\n");
+		return 0;
+	}
+	if (mixer->num > ctl->mdata->nad_cfgs) {
+		pr_debug("mixer attached (%d) doesnt support ad\n", mixer->num);
 		return 0;
 	}
 
@@ -2415,9 +2415,10 @@ static int mdss_mdp_hw_cursor_update(struct msm_fb_data_type *mfd,
 	}
 
 	mixer = mdss_mdp_mixer_get(mdp5_data->ctl, MDSS_MDP_MIXER_MUX_DEFAULT);
-	off = MDSS_MDP_REG_LM_OFFSET(mixer->num);
 	if (!mixer)
 		return -ENODEV;
+
+	off = MDSS_MDP_REG_LM_OFFSET(mixer->num);
 
 	if ((img->width > MDSS_MDP_CURSOR_WIDTH) ||
 		(img->height > MDSS_MDP_CURSOR_HEIGHT) ||

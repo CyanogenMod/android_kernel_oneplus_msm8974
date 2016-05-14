@@ -262,6 +262,8 @@ static int mdss_mdp_rotator_queue_sub(struct mdss_mdp_rotator_session *rot,
 	rot_pipe = rot->pipe;
 
 	pr_debug("queue rotator pnum=%d\n", rot_pipe->num);
+	if (!rot_pipe->mixer)
+		return -ESPIPE;
 
 	orig_ctl = rot_pipe->mixer->ctl;
 	if (orig_ctl->shared_lock)
@@ -604,6 +606,8 @@ static int mdss_mdp_rotator_finish(struct mdss_mdp_rotator_session *rot)
 	if (rot_pipe) {
 		struct mdss_mdp_mixer *mixer = rot_pipe->mixer;
 		mdss_mdp_pipe_destroy(rot_pipe);
+		if (!mixer)
+			return ret;
 		tmp = mdss_mdp_ctl_mixer_switch(mixer->ctl,
 				MDSS_MDP_WB_CTL_TYPE_BLOCK);
 		if (!tmp)
