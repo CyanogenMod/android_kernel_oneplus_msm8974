@@ -1725,12 +1725,6 @@ static inline bool f2fs_cp_error(struct f2fs_sb_info *sbi)
 	return is_set_ckpt_flags(sbi->ckpt, CP_ERROR_FLAG);
 }
 
-static inline void f2fs_stop_checkpoint(struct f2fs_sb_info *sbi)
-{
-	set_ckpt_flags(sbi->ckpt, CP_ERROR_FLAG);
-	sbi->sb->s_flags |= MS_RDONLY;
-}
-
 static inline struct inode *file_inode(struct file *f)
 {
 	return f->f_path.dentry->d_inode;
@@ -1980,6 +1974,7 @@ void destroy_segment_manager_caches(void);
 /*
  * checkpoint.c
  */
+void f2fs_stop_checkpoint(struct f2fs_sb_info *, bool);
 struct page *grab_meta_page(struct f2fs_sb_info *, pgoff_t);
 struct page *get_meta_page(struct f2fs_sb_info *, pgoff_t);
 struct page *get_tmp_page(struct f2fs_sb_info *, pgoff_t);
