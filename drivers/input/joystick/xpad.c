@@ -83,6 +83,7 @@
 #include <linux/module.h>
 #include <linux/usb/input.h>
 #include <linux/usb/quirks.h>
+#include <../drivers/leds/leds.h>
 
 #define DRIVER_AUTHOR "Marko Friedemann <mfr@bmx-chemnitz.de>"
 #define DRIVER_DESC "X-Box pad driver"
