@@ -169,7 +169,7 @@ static ssize_t dsp_read(struct file *file, char __user *buf,
 		}
 		if (copy_to_user(buf, ptr, PAGE_SIZE)) {
 			iounmap(mem_buffer);
-			pr_err("[%s:%s] copy error @ %p\n", __MM_FILE__,
+			pr_err("[%s:%s] copy error @ %pK\n", __MM_FILE__,
 					__func__, buf);
 			return -EFAULT;
 		}
