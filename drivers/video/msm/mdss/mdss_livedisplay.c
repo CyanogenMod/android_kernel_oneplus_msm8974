@@ -179,6 +179,9 @@ static void mdss_livedisplay_worker(struct work_struct *work)
 	if (mlc == NULL)
 		return;
 
+	if (mlc->mfd == NULL)
+		return;
+
 	ctrl_pdata = get_ctrl(mlc->mfd);
 	if (ctrl_pdata == NULL)
 		return;
