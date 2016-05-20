@@ -349,9 +349,6 @@ static int f2fs_unlink(struct inode *dir, struct dentry *dentry)
 	f2fs_delete_entry(de, page, dir, inode);
 	f2fs_unlock_op(sbi);
 
-	/* In order to evict this inode, we set it dirty */
-	mark_inode_dirty(inode);
-
 	if (IS_DIRSYNC(dir))
 		f2fs_sync_fs(sbi->sb, 1);
 fail:
@@ -634,11 +631,9 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		new_inode->i_ctime = CURRENT_TIME;
 		down_write(&F2FS_I(new_inode)->i_sem);
 		if (old_dir_entry)
-			drop_nlink(new_inode);
-		drop_nlink(new_inode);
+			f2fs_i_links_write(new_inode, false);
+		f2fs_i_links_write(new_inode, false);
 		up_write(&F2FS_I(new_inode)->i_sem);
-
-		mark_inode_dirty(new_inode);
 
 		if (!new_inode->i_nlink)
 			add_orphan_inode(sbi, new_inode->i_ino);
@@ -659,7 +654,7 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		}
 
 		if (old_dir_entry) {
-			inc_nlink(new_dir);
+			f2fs_i_links_write(new_dir, true);
 			update_inode_page(new_dir);
 		}
 
@@ -704,8 +699,7 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			f2fs_dentry_kunmap(old_inode, old_dir_page);
 			f2fs_put_page(old_dir_page, 0);
 		}
-		drop_nlink(old_dir);
-		mark_inode_dirty(old_dir);
+		f2fs_i_links_write(old_dir, false);
 		update_inode_page(old_dir);
 	}
 
