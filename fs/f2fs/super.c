@@ -563,7 +563,10 @@ static int f2fs_drop_inode(struct inode *inode)
 			if (f2fs_is_atomic_file(inode))
 				drop_inmem_pages(inode);
 
-			i_size_write(inode, 0);
+			/* should remain fi->extent_tree for writepage */
+			f2fs_destroy_extent_node(inode);
+
+			f2fs_i_size_write(inode, 0);
 
 			if (F2FS_HAS_BLOCKS(inode))
 				f2fs_truncate(inode, true);
