@@ -261,7 +261,7 @@ int update_inode(struct inode *inode, struct page *node_page)
 
 	__set_inode_rdev(inode, ri);
 	set_cold_node(inode, node_page);
-	clear_inode_flag(inode, FI_DIRTY_INODE);
+	f2fs_inode_synced(inode);
 
 	/* deleted inode */
 	if (inode->i_nlink == 0)
@@ -285,6 +285,7 @@ retry:
 		} else if (err != -ENOENT) {
 			f2fs_stop_checkpoint(sbi, false);
 		}
+		f2fs_inode_synced(inode);
 		return 0;
 	}
 	ret = update_inode(inode, node_page);
@@ -358,6 +359,8 @@ retry:
 		goto retry;
 	}
 
+	if (err)
+		update_inode_page(inode);
 no_delete:
 	stat_dec_inline_xattr(inode);
 	stat_dec_inline_dir(inode);
@@ -378,6 +381,7 @@ no_delete:
 		!exist_written_data(sbi, inode->i_ino, ORPHAN_INO));
 out_clear:
 	fscrypt_put_encryption_info(inode, NULL);
+	f2fs_bug_on(sbi, is_inode_flag_set(inode, FI_DIRTY_INODE));
 	end_writeback(inode);
 }
 
