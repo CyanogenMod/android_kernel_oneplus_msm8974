@@ -578,7 +578,7 @@ static int f2fs_drop_inode(struct inode *inode)
 			f2fs_i_size_write(inode, 0);
 
 			if (F2FS_HAS_BLOCKS(inode))
-				f2fs_truncate(inode, true);
+				f2fs_truncate(inode);
 
 			fscrypt_put_encryption_info(inode, NULL);
 			spin_lock(&inode->i_lock);
