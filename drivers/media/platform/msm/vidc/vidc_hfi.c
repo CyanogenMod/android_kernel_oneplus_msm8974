@@ -61,7 +61,7 @@ void vidc_hfi_deinitialize(enum msm_vidc_hfi_type hfi_type,
 			struct hfi_device *hdev)
 {
 	if (!hdev) {
-		dprintk(VIDC_ERR, "%s invalid device %p", __func__, hdev);
+		dprintk(VIDC_ERR, "%s invalid device %pK", __func__, hdev);
 		return;
 	}
 

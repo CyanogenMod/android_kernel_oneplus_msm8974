@@ -516,7 +516,7 @@ static int __devexit msm_vidc_remove(struct platform_device *pdev)
 	struct msm_vidc_core *core;
 
 	if (!pdev) {
-		dprintk(VIDC_ERR, "%s invalid input %p", __func__, pdev);
+		dprintk(VIDC_ERR, "%s invalid input %pK", __func__, pdev);
 		return -EINVAL;
 	}
 	core = pdev->dev.platform_data;

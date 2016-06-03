@@ -2575,7 +2575,7 @@ int msm_venc_s_parm(struct msm_vidc_inst *inst, struct v4l2_streamparm *a)
 		fps = fps - 1;
 
 	if (inst->prop.fps != fps) {
-		dprintk(VIDC_PROF, "reported fps changed for %p: %d->%d\n",
+		dprintk(VIDC_PROF, "reported fps changed for %pK: %d->%d\n",
 				inst, inst->prop.fps, fps);
 		inst->prop.fps = fps;
 		frame_rate.frame_rate = inst->prop.fps * (0x1<<16);
