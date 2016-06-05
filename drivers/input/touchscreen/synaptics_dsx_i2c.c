@@ -2238,7 +2238,7 @@ static struct synaptics_dsx_cap_button_map button_map = {
 };
 
 static struct synaptics_dsx_platform_data dsx_platformdata = {
-	.irq_flags = IRQF_TRIGGER_FALLING,
+	.irq_flags = IRQF_ONESHOT | IRQF_TRIGGER_FALLING,
 	.reset_delay_ms = 100,
 	.cap_button_map = &button_map,
 	.regulator_en = 1,
