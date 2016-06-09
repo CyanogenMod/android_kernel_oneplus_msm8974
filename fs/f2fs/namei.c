@@ -598,10 +598,11 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		goto out;
 
 	if (S_ISDIR(old_inode->i_mode)) {
-		err = -EIO;
 		old_dir_entry = f2fs_parent_dir(old_inode, &old_dir_page);
-		if (!old_dir_entry)
+		if (!old_dir_entry) {
+			err = PTR_ERR(old_dir_page);
 			goto out_old;
+		}
 	}
 
 	if (new_inode) {
