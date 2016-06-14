@@ -642,7 +642,7 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		up_write(&F2FS_I(new_inode)->i_sem);
 
 		if (!new_inode->i_nlink)
-			add_orphan_inode(sbi, new_inode->i_ino);
+			add_orphan_inode(new_inode);
 		else
 			release_orphan_inode(sbi);
 	} else {
