@@ -325,5 +325,6 @@ int qbuf_dynamic_buf(struct msm_vidc_inst *inst,
 			struct buffer_info *binfo);
 int unmap_and_deregister_buf(struct msm_vidc_inst *inst,
 			struct buffer_info *binfo);
+bool msm_smem_compare_buffers(void *clt, int fd, void *priv);
 void msm_vidc_fw_unload_handler(struct work_struct *work);
 #endif
