@@ -21,6 +21,13 @@
 #include <linux/delay.h>
 #include <mach/msm_bus.h>
 #include <mach/msm_bus_board.h>
+#ifdef CONFIG_LCD_KCAL
+#include <mach/kcal.h>
+extern int g_kcal_r;
+extern int g_kcal_g;
+extern int g_kcal_b;
+extern struct kcal_data kcal_value;
+#endif
 
 struct mdp_csc_cfg mdp_csc_convert[MDSS_MDP_MAX_CSC] = {
 	[MDSS_MDP_CSC_RGB2RGB] = {
@@ -1985,6 +1992,12 @@ int mdss_mdp_pp_init(struct device *dev)
 		}
 
 	}
+#ifdef CONFIG_LCD_KCAL
+	if (!ret) {
+		mdss_mdp_pp_argc();
+		update_preset_lcdc_lut();
+	}
+#endif
 	mutex_unlock(&mdss_pp_mutex);
 	return ret;
 }
