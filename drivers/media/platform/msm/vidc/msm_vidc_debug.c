@@ -216,20 +216,16 @@ static int inst_info_open(struct inode *inode, struct file *file)
 static int publish_unreleased_reference(struct msm_vidc_inst *inst)
 {
 	struct buffer_info *temp = NULL;
-	struct buffer_info *dummy = NULL;
-	struct list_head *list = NULL;
 
 	if (!inst) {
 		dprintk(VIDC_ERR, "%s: invalid param\n", __func__);
 		return -EINVAL;
 	}
 
-	list = &inst->registered_bufs;
-	mutex_lock(&inst->lock);
 	if (inst->buffer_mode_set[CAPTURE_PORT] == HAL_BUFFER_MODE_DYNAMIC) {
-		list_for_each_entry_safe(temp, dummy, list, list) {
-			if (temp && temp->type ==
-			V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
+		mutex_lock(&inst->registeredbufs.lock);
+		list_for_each_entry(temp, &inst->registeredbufs.list, list) {
+			if (temp->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
 			!temp->inactive && atomic_read(&temp->ref_count)) {
 				write_str(&dbg_buf,
 				"\tpending buffer: 0x%x fd[0] = %d ref_count = %d held by: %s\n",
@@ -239,8 +235,8 @@ static int publish_unreleased_reference(struct msm_vidc_inst *inst)
 				DYNAMIC_BUF_OWNER(temp));
 			}
 		}
+		mutex_unlock(&inst->registeredbufs.lock);
 	}
-	mutex_unlock(&inst->lock);
 	return 0;
 }
 
