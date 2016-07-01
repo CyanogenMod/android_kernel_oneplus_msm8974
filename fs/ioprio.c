@@ -144,9 +144,11 @@ static int get_task_ioprio(struct task_struct *p)
 	ret = security_task_getioprio(p);
 	if (ret)
 		goto out;
+	task_lock(p);
 	ret = IOPRIO_PRIO_VALUE(IOPRIO_CLASS_NONE, IOPRIO_NORM);
 	if (p->io_context)
 		ret = p->io_context->ioprio;
+	task_unlock(p);
 out:
 	return ret;
 }
