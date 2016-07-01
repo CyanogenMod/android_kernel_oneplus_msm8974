@@ -687,7 +687,7 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	up_write(&F2FS_I(old_inode)->i_sem);
 
 	old_inode->i_ctime = CURRENT_TIME;
-	mark_inode_dirty_sync(old_inode);
+	f2fs_mark_inode_dirty_sync(old_inode);
 
 	f2fs_delete_entry(old_entry, old_page, old_dir, NULL);
 
