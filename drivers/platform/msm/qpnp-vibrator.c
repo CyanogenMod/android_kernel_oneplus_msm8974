@@ -54,26 +54,6 @@ struct qpnp_vib {
 
 static struct qpnp_vib *vib_dev;
 
-static ssize_t qpnp_vib_min_show(struct device *dev,
-					struct device_attribute *attr,
-					char *buf)
-{
-	struct timed_output_dev *tdev = dev_get_drvdata(dev);
-	struct qpnp_vib *vib = container_of(tdev, struct qpnp_vib, timed_dev);
-
-	return scnprintf(buf, PAGE_SIZE, "%d\n", vib->vtg_min);
-}
-
-static ssize_t qpnp_vib_max_show(struct device *dev,
-					struct device_attribute *attr,
-					char *buf)
-{
-	struct timed_output_dev *tdev = dev_get_drvdata(dev);
-	struct qpnp_vib *vib = container_of(tdev, struct qpnp_vib, timed_dev);
-
-	return scnprintf(buf, PAGE_SIZE, "%d\n", vib->vtg_max);
-}
-
 static ssize_t qpnp_vib_level_show(struct device *dev,
 					struct device_attribute *attr,
 					char *buf)
@@ -112,6 +92,26 @@ static ssize_t qpnp_vib_level_store(struct device *dev,
 	vib->vtg_level = val;
 
 	return strnlen(buf, count);
+}
+
+static ssize_t qpnp_vib_min_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	struct timed_output_dev *tdev = dev_get_drvdata(dev);
+	struct qpnp_vib *vib = container_of(tdev, struct qpnp_vib, timed_dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", vib->vtg_min);
+}
+
+static ssize_t qpnp_vib_max_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	struct timed_output_dev *tdev = dev_get_drvdata(dev);
+	struct qpnp_vib *vib = container_of(tdev, struct qpnp_vib, timed_dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", vib->vtg_max);
 }
 
 static DEVICE_ATTR(vtg_level, S_IRUGO | S_IWUSR, qpnp_vib_level_show, qpnp_vib_level_store);
