@@ -343,7 +343,7 @@ static int f2fs_xattr_get_acl(struct dentry *dentry, const char *name,
 	if (!test_opt(sbi, POSIX_ACL))
 		return -EOPNOTSUPP;
 
-	acl = f2fs_get_acl(dentry->d_inode, type);
+	acl = f2fs_get_acl(d_inode(dentry), type);
 	if (IS_ERR(acl))
 		return PTR_ERR(acl);
 	if (!acl)
@@ -358,7 +358,7 @@ static int f2fs_xattr_set_acl(struct dentry *dentry, const char *name,
 		const void *value, size_t size, int flags, int type)
 {
 	struct f2fs_sb_info *sbi = F2FS_SB(dentry->d_sb);
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = d_inode(dentry);
 	struct posix_acl *acl = NULL;
 	int error;
 
