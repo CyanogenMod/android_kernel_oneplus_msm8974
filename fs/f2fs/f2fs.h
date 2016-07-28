@@ -11,6 +11,10 @@
 #ifndef _LINUX_F2FS_H
 #define _LINUX_F2FS_H
 
+#ifdef CONFIG_F2FS_FS_ENCRYPTION
+#undef CONFIG_F2FS_FS_ENCRYPTION
+#endif
+
 #include <linux/types.h>
 #include <linux/page-flags.h>
 #include <linux/buffer_head.h>
