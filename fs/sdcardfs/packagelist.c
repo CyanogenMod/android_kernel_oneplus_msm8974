@@ -20,7 +20,7 @@
 
 #include "sdcardfs.h"
 #include "strtok.h"
-#include "hashtable.h"
+#include "linux/hashtable.h"
 #include <linux/syscalls.h>
 #include <linux/kthread.h>
 #include <linux/inotify.h>
@@ -70,7 +70,7 @@ static int contain_appid_key(struct packagelist_data *pkgl_dat, void *appid) {
         struct hashtable_entry *hash_cur;
 	struct hlist_node *h_n;
 
-        hash_for_each_possible(pkgl_dat->appid_with_rw,	hash_cur, hlist, (unsigned int)appid, h_n)
+        hash_for_each_possible(pkgl_dat->appid_with_rw,	hash_cur, h_n, hlist, (unsigned int)appid)
                 if (appid == hash_cur->key)
                         return 1;
 	return 0;
@@ -104,7 +104,7 @@ appid_t get_appid(void *pkgl_id, const char *app_name)
 
 	//printk(KERN_INFO "sdcardfs: %s: %s, %u\n", __func__, (char *)app_name, hash);
 	mutex_lock(&pkgl_dat->hashtable_lock);
-	hash_for_each_possible(pkgl_dat->package_to_appid, hash_cur, hlist, hash, h_n) {
+	hash_for_each_possible(pkgl_dat->package_to_appid, hash_cur, h_n, hlist, hash) {
 		//printk(KERN_INFO "sdcardfs: %s: %s\n", __func__, (char *)hash_cur->key);
 		if (!strcasecmp(app_name, hash_cur->key)) {
 			ret_id = (appid_t)hash_cur->value;
@@ -178,7 +178,7 @@ static int insert_str_to_int(struct packagelist_data *pkgl_dat, void *key, int v
 	unsigned int hash = str_hash(key);
 
 	//printk(KERN_INFO "sdcardfs: %s: %s: %d, %u\n", __func__, (char *)key, value, hash);
-	hash_for_each_possible(pkgl_dat->package_to_appid, hash_cur, hlist, hash, h_n) {
+	hash_for_each_possible(pkgl_dat->package_to_appid, hash_cur, h_n, hlist, hash) {
 		if (!strcasecmp(key, hash_cur->key)) {
 			hash_cur->value = value;
 			return 0;
@@ -205,8 +205,8 @@ static int insert_int_to_null(struct packagelist_data *pkgl_dat, void *key, int 
 	struct hlist_node *h_n;
 
 	//printk(KERN_INFO "sdcardfs: %s: %d: %d\n", __func__, (int)key, value);
-	hash_for_each_possible(pkgl_dat->appid_with_rw,	hash_cur, hlist,
-					(unsigned int)key, h_n) {
+	hash_for_each_possible(pkgl_dat->appid_with_rw,	hash_cur, h_n, hlist,
+					(unsigned int)key) {
 		if (key == hash_cur->key) {
 			hash_cur->value = value;
 			return 0;
@@ -234,9 +234,9 @@ static void remove_all_hashentrys(struct packagelist_data *pkgl_dat)
 	struct hlist_node *h_t;
 	int i;
 
-	hash_for_each_safe(pkgl_dat->package_to_appid, i, h_t, hash_cur, hlist, h_n)
+	hash_for_each_safe(pkgl_dat->package_to_appid, i, h_t, h_n, hash_cur, hlist)
 		remove_str_to_int(hash_cur);
-	hash_for_each_safe(pkgl_dat->appid_with_rw, i, h_t, hash_cur, hlist, h_n)
+	hash_for_each_safe(pkgl_dat->appid_with_rw, i, h_t, h_n, hash_cur, hlist)
                 remove_int_to_null(hash_cur);
 
 	hash_init(pkgl_dat->package_to_appid);
