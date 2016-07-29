@@ -79,7 +79,7 @@ static int sdcardfs_inode_set(struct inode *inode, void *lower_inode)
 	return 0;
 }
 
-static struct inode *sdcardfs_iget(struct super_block *sb,
+struct inode *sdcardfs_iget(struct super_block *sb,
 				 struct inode *lower_inode)
 {
 	struct sdcardfs_inode_info *info;
@@ -214,7 +214,6 @@ static struct dentry *__sdcardfs_lookup(struct dentry *dentry,
 	struct dentry *lower_dentry;
 	const char *name;
 	struct nameidata lower_nd;
-	struct path lower_path;
 	struct qstr this;
 	struct sdcardfs_sb_info *sbi;
 
@@ -234,10 +233,10 @@ static struct dentry *__sdcardfs_lookup(struct dentry *dentry,
 	/* Use vfs_path_lookup to check if the dentry exists or not */
 	if (sbi->options.lower_fs == LOWER_FS_EXT4) {
 		err = vfs_path_lookup(lower_dir_dentry, lower_dir_mnt, name,
-				LOOKUP_CASE_INSENSITIVE, &lower_nd);
+				LOOKUP_CASE_INSENSITIVE, &lower_nd.path);
 	} else if (sbi->options.lower_fs == LOWER_FS_FAT) {
 		err = vfs_path_lookup(lower_dir_dentry, lower_dir_mnt, name, 0,
-				&lower_nd);
+				&lower_nd.path);
 	}
 
 	/* no error: handle positive dentries */
@@ -297,9 +296,9 @@ static struct dentry *__sdcardfs_lookup(struct dentry *dentry,
 	d_add(lower_dentry, NULL); /* instantiate and hash */
 
 setup_lower:
-	lower_path.dentry = lower_dentry;
-	lower_path.mnt = mntget(lower_dir_mnt);
-	sdcardfs_set_lower_path(dentry, &lower_path);
+	lower_nd.path.dentry = lower_dentry;
+	lower_nd.path.mnt = mntget(lower_dir_mnt);
+	sdcardfs_set_lower_path(dentry, &lower_nd.path);
 
 	/*
 	 * If the intent is to create a file, then don't return an error, so
