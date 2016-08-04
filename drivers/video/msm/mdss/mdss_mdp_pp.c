@@ -2536,8 +2536,8 @@ static void pcc_combine(struct mdp_pcc_cfg_data *raw,
 
 	r_ops = raw ? raw->ops : MDP_PP_OPS_DISABLE;
 	u_ops = user ? user->ops : MDP_PP_OPS_DISABLE;
-	r_en = raw && !(raw->ops & MDP_PP_OPS_DISABLE);
-	u_en = user && !(user->ops & MDP_PP_OPS_DISABLE);
+	r_en = raw && (raw->ops & MDP_PP_OPS_ENABLE);
+	u_en = user && (user->ops & MDP_PP_OPS_ENABLE);
 
 	// user configuration may change often, but the raw configuration
 	// will correspond to calibration data which should only change if
