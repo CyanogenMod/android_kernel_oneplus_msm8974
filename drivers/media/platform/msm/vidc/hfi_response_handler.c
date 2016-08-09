@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -659,7 +659,7 @@ static void hfi_process_sess_get_prop_buf_req(
 	dprintk(VIDC_DBG, "Entered ");
 	if (!prop) {
 		dprintk(VIDC_ERR,
-			"hal_process_sess_get_prop_buf_req:bad_prop: %p",
+			"hal_process_sess_get_prop_buf_req:bad_prop: %pK",
 			prop);
 		return;
 	}
@@ -837,7 +837,7 @@ static void hfi_process_session_init_done(
 		sess_close = (struct hal_session *)pkt->session_id;
 		if (sess_close) {
 			dprintk(VIDC_WARN,
-				"Sess init failed: 0x%x, 0x%p",
+				"Sess init failed: 0x%x, 0x%pK",
 				sess_close->session_id, sess_close);
 		}
 	}
