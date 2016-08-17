@@ -2035,7 +2035,7 @@ unsigned int snd_soc_read(struct snd_soc_codec *codec, unsigned int reg)
 {
 	unsigned int ret;
 
-	if (unlikely(!snd_card_is_online_state(codec->card->snd_card))) {
+	if (unlikely(!codec->read || !snd_card_is_online_state(codec->card->snd_card))) {
 		dev_err(codec->dev, "read 0x%02x while offline\n", reg);
 		return -ENODEV;
 	}
@@ -2050,7 +2050,7 @@ EXPORT_SYMBOL_GPL(snd_soc_read);
 unsigned int snd_soc_write(struct snd_soc_codec *codec,
 			   unsigned int reg, unsigned int val)
 {
-	if (unlikely(!snd_card_is_online_state(codec->card->snd_card))) {
+	if (unlikely(!codec->write || !snd_card_is_online_state(codec->card->snd_card))) {
 		dev_err(codec->dev, "write 0x%02x while offline\n", reg);
 		return -ENODEV;
 	}
