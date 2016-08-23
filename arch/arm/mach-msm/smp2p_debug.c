@@ -1,6 +1,6 @@
 /* arch/arm/mach-msm/smp2p_debug.c
  *
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013,2016 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -41,7 +41,7 @@ static void smp2p_int_stats(struct seq_file *s)
 			continue;
 
 		seq_printf(s,
-			"| %5s (%d) | %11u | %10u | %10u | %p | %08x |\n",
+			"| %5s (%d) | %11u | %10u | %10u | %pK | %08x |\n",
 			int_cfg[pid].name,
 			pid, int_cfg[pid].in_int_id,
 			int_cfg[pid].in_interrupt_count,
