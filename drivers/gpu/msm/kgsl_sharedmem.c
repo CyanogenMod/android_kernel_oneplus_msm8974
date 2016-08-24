@@ -540,7 +540,7 @@ static int kgsl_ebimem_map_kernel(struct kgsl_memdesc *memdesc)
 	if (!memdesc->hostptr) {
 		memdesc->hostptr = ioremap(memdesc->physaddr, memdesc->size);
 		if (!memdesc->hostptr) {
-			KGSL_CORE_ERR("ioremap failed, addr:0x%p, size:0x%x\n",
+			KGSL_CORE_ERR("ioremap failed, addr:0x%pK, size:0x%x\n",
 				memdesc->hostptr, memdesc->size);
 			ret = -ENOMEM;
 			goto done;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011,2013-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011,2013-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -651,8 +651,9 @@ kgsl_gpummu_unmap(struct kgsl_pagetable *pt,
 #ifdef VERBOSE_DEBUG
 		/* check if PTE exists */
 		if (!kgsl_pt_map_get(gpummu_pt, pte))
-			KGSL_CORE_ERR("pt entry %x is already "
-			"unmapped for pagetable %p\n", pte, gpummu_pt);
+			KGSL_CORE_ERR(
+			"pt entry %x is already unmapped for pagetable %pK\n",
+			pte, gpummu_pt);
 #endif
 		kgsl_pt_map_set(gpummu_pt, pte, GSL_PT_PAGE_DIRTY);
 		superpte = pte - (pte & (GSL_PT_SUPER_PTE - 1));
