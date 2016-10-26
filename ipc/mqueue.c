@@ -624,7 +624,7 @@ static struct file *do_create(struct ipc_namespace *ipc_ns, struct dentry *dir,
 	ret = mnt_want_write(ipc_ns->mq_mnt);
 	if (ret)
 		goto out;
-	ret = vfs_create(dir->d_inode, dentry, mode, NULL);
+	ret = vfs_create2(ipc_ns->mq_mnt, dir->d_inode, dentry, mode, NULL);
 	dentry->d_fsdata = NULL;
 	if (ret)
 		goto out_drop_write;
@@ -660,7 +660,7 @@ static struct file *do_open(struct ipc_namespace *ipc_ns,
 		goto err;
 	}
 
-	if (inode_permission(dentry->d_inode, oflag2acc[oflag & O_ACCMODE])) {
+	if (inode_permission2(ipc_ns->mq_mnt, dentry->d_inode, oflag2acc[oflag & O_ACCMODE])) {
 		ret = -EACCES;
 		goto err;
 	}
@@ -696,7 +696,7 @@ SYSCALL_DEFINE4(mq_open, const char __user *, u_name, int, oflag, umode_t, mode,
 		goto out_putname;
 
 	mutex_lock(&ipc_ns->mq_mnt->mnt_root->d_inode->i_mutex);
-	dentry = lookup_one_len(name, ipc_ns->mq_mnt->mnt_root, strlen(name));
+	dentry = lookup_one_len2(name, ipc_ns->mq_mnt, ipc_ns->mq_mnt->mnt_root, strlen(name));
 	if (IS_ERR(dentry)) {
 		error = PTR_ERR(dentry);
 		goto out_putfd;
@@ -760,7 +760,8 @@ SYSCALL_DEFINE1(mq_unlink, const char __user *, u_name)
 
 	mutex_lock_nested(&ipc_ns->mq_mnt->mnt_root->d_inode->i_mutex,
 			I_MUTEX_PARENT);
-	dentry = lookup_one_len(name, ipc_ns->mq_mnt->mnt_root, strlen(name));
+	dentry = lookup_one_len2(name, ipc_ns->mq_mnt, ipc_ns->mq_mnt->mnt_root,
+			       strlen(name));
 	if (IS_ERR(dentry)) {
 		err = PTR_ERR(dentry);
 		goto out_unlock;
@@ -777,7 +778,7 @@ SYSCALL_DEFINE1(mq_unlink, const char __user *, u_name)
 	err = mnt_want_write(ipc_ns->mq_mnt);
 	if (err)
 		goto out_err;
-	err = vfs_unlink(dentry->d_parent->d_inode, dentry);
+	err = vfs_unlink2(ipc_ns->mq_mnt, dentry->d_parent->d_inode, dentry);
 	mnt_drop_write(ipc_ns->mq_mnt);
 out_err:
 	dput(dentry);
