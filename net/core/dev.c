@@ -5368,6 +5368,9 @@ int __netdev_update_features(struct net_device *dev)
 		netdev_err(dev,
 			"set_features() failed (%d); wanted %pNF, left %pNF\n",
 			err, &features, &dev->features);
+		/* return non-0 since some features might have changed and
+		 * it's better to fire a spurious notification than miss it
+		 */
 		return -1;
 	}
 

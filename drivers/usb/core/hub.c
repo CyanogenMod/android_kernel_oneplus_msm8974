@@ -182,6 +182,7 @@ EXPORT_SYMBOL_GPL(ehci_cf_port_reset_rwsem);
 #define HUB_DEBOUNCE_STABLE	 100
 
 
+static void hub_release(struct kref *kref);
 static int usb_reset_and_verify_device(struct usb_device *udev);
 
 static inline char *portspeed(struct usb_hub *hub, int portstatus)
@@ -1694,10 +1695,8 @@ void usb_set_device_state(struct usb_device *udev,
 					|| new_state == USB_STATE_SUSPENDED)
 				;	/* No change to wakeup settings */
 			else if (new_state == USB_STATE_CONFIGURED)
-				wakeup = (udev->quirks &
-					USB_QUIRK_IGNORE_REMOTE_WAKEUP) ? 0 :
-					udev->actconfig->desc.bmAttributes &
-					USB_CONFIG_ATT_WAKEUP;
+				wakeup = udev->actconfig->desc.bmAttributes
+					 & USB_CONFIG_ATT_WAKEUP;
 			else
 				wakeup = 0;
 		}
