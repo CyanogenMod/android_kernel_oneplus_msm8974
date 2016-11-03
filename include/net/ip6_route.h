@@ -137,7 +137,7 @@ extern void			rt6_redirect(const struct in6_addr *dest,
 					     int on_link);
 
 extern void ip6_update_pmtu(struct sk_buff *skb, struct net *net, __be32 mtu,
-			    int oif, u32 mark);
+			    int oif, u32 mark, kuid_t uid);
 extern void ip6_sk_update_pmtu(struct sk_buff *skb, struct sock *sk,
 			       __be32 mtu);
 
