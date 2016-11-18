@@ -72,10 +72,10 @@
 #define MASK_1BIT 0x01
 
 
-#define TP_VENDOR_WINTEK	1	//Ê¤»ª
+#define TP_VENDOR_WINTEK	1	//Ê¤ï¿½ï¿½
 #define TP_VENDOR_TPK		2	//TPK
-#define TP_VENDOR_TRULY		3	//ÐÅÀû
-#define TP_VENDOR_YOUNGFAST 4   //Ñó»ª
+#define TP_VENDOR_TRULY		3	//ï¿½ï¿½ï¿½ï¿½
+#define TP_VENDOR_YOUNGFAST 4   //ï¿½ï¿½ï¿½ï¿½
 
 #define TP_TYPE_MAX		2	//we only use wintek and tpk now.
 
