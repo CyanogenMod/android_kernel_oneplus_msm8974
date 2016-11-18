@@ -1314,86 +1314,33 @@ static int synaptics_rmi4_proc_double_tap_write(struct file *filp, const char __
 	return len;
 }
 
-static int synaptics_rmi4_proc_camera_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
-{
-	return sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->camera_enable));
+#define TS_ENABLE_FOPS(type) \
+static int synaptics_rmi4_proc_##type##_read(char *page, char **start, off_t off, \
+		int count, int *eof, void *data) \
+{ \
+	return sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->type##_enable)); \
+} \
+static int synaptics_rmi4_proc_##type##_write(struct file *filp, const char __user *buff, \
+		unsigned long len, void *data) \
+{ \
+	int enable; \
+	char buf[2]; \
+	if (len > 2) \
+		return 0; \
+	if (copy_from_user(buf, buff, len)) { \
+		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n"); \
+		return -EFAULT; \
+	} \
+	enable = (buf[0] == '0') ? 0 : 1; \
+	atomic_set(&syna_rmi4_data->type##_enable, enable); \
+	return len; \
 }
 
-static int synaptics_rmi4_proc_camera_write(struct file *filp, const char __user *buff,
-		unsigned long len, void *data)
-{
-	int enable;
-	char buf[2];
-
-	if (len > 2)
-		return 0;
-
-	if (copy_from_user(buf, buff, len)) {
-		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
-	}
-
-	enable = (buf[0] == '0') ? 0 : 1;
-
-	atomic_set(&syna_rmi4_data->camera_enable, enable);
-
-	return len;
-}
-
-static int synaptics_rmi4_proc_music_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
-{
-	return sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->music_enable));
-}
-
-static int synaptics_rmi4_proc_music_write(struct file *filp, const char __user *buff,
-		unsigned long len, void *data)
-{
-	int enable;
-	char buf[2];
-
-	if (len > 2)
-		return 0;
-
-	if (copy_from_user(buf, buff, len)) {
-		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
-	}
-
-	enable = (buf[0] == '0') ? 0 : 1;
-
-	atomic_set(&syna_rmi4_data->music_enable, enable);
-
-	return len;
-}
-
-static int synaptics_rmi4_proc_flashlight_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
-{
-	return sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->flashlight_enable));
-}
-
-static int synaptics_rmi4_proc_flashlight_write(struct file *filp, const char __user *buff,
-		unsigned long len, void *data)
-{
-	int enable;
-	char buf[2];
-
-	if (len > 2)
-		return 0;
-
-	if (copy_from_user(buf, buff, len)) {
-		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
-	}
-
-	enable = (buf[0] == '0') ? 0 : 1;
-
-	atomic_set(&syna_rmi4_data->flashlight_enable, enable);
-
-	return len;
-}
+TS_ENABLE_FOPS(double_swipe);
+TS_ENABLE_FOPS(down_arrow);
+TS_ENABLE_FOPS(left_arrow);
+TS_ENABLE_FOPS(right_arrow);
+TS_ENABLE_FOPS(letter_o);
 
 //smartcover proc read function
 static int synaptics_rmi4_proc_smartcover_read(char *page, char **start, off_t off,
@@ -1646,25 +1593,39 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 		proc_entry->read_proc = synaptics_rmi4_proc_double_tap_read;
 	}
 
-	// wake to camera
-	proc_entry = create_proc_entry("camera_enable", 0664, procdir);
+	// wake to '||' gesture
+	proc_entry = create_proc_entry("double_swipe_enable", 0664, procdir);
 	if (proc_entry) {
-		proc_entry->write_proc = synaptics_rmi4_proc_camera_write;
-		proc_entry->read_proc = synaptics_rmi4_proc_camera_read;
+		proc_entry->write_proc = synaptics_rmi4_proc_double_swipe_write;
+		proc_entry->read_proc = synaptics_rmi4_proc_double_swipe_read;
 	}
 
-	// wake to music
-	proc_entry = create_proc_entry("music_enable", 0664, procdir);
+	// wake to 'V' gesture
+	proc_entry = create_proc_entry("down_arrow_enable", 0664, procdir);
 	if (proc_entry) {
-		proc_entry->write_proc = synaptics_rmi4_proc_music_write;
-		proc_entry->read_proc = synaptics_rmi4_proc_music_read;
+		proc_entry->write_proc = synaptics_rmi4_proc_down_arrow_write;
+		proc_entry->read_proc = synaptics_rmi4_proc_down_arrow_read;
 	}
 
-	// wake to flashlight
-	proc_entry = create_proc_entry("flashlight_enable", 0664, procdir);
+	// wake to '<' gesture
+	proc_entry = create_proc_entry("left_arrow_enable", 0664, procdir);
 	if (proc_entry) {
-		proc_entry->write_proc = synaptics_rmi4_proc_flashlight_write;
-		proc_entry->read_proc = synaptics_rmi4_proc_flashlight_read;
+		proc_entry->write_proc = synaptics_rmi4_proc_left_arrow_write;
+		proc_entry->read_proc = synaptics_rmi4_proc_left_arrow_read;
+	}
+
+	// wake to '>' gesture
+	proc_entry = create_proc_entry("right_arrow_enable", 0664, procdir);
+	if (proc_entry) {
+		proc_entry->write_proc = synaptics_rmi4_proc_right_arrow_write;
+		proc_entry->read_proc = synaptics_rmi4_proc_right_arrow_read;
+	}
+
+	// wake to 'O' gesture
+	proc_entry = create_proc_entry("letter_o_enable", 0664, procdir);
+	if (proc_entry) {
+		proc_entry->write_proc = synaptics_rmi4_proc_letter_o_write;
+		proc_entry->read_proc = synaptics_rmi4_proc_letter_o_read;
 	}
 
 	//for pdoze enable/disable interface
@@ -2374,7 +2335,7 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 	switch (gesture[0]) {
 		case SYNA_ONE_FINGER_CIRCLE:
 			gesturemode = Circle;
-			if (atomic_read(&syna_rmi4_data->camera_enable))
+			if (atomic_read(&syna_rmi4_data->letter_o_enable))
 				keyvalue = KEY_GESTURE_CIRCLE;
 			break;
 
@@ -2393,7 +2354,7 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 					gesturemode=UnknownGesture;
 			}
 			if (gesturemode == DouSwip) {
-				if (atomic_read(&syna_rmi4_data->music_enable))
+				if (atomic_read(&syna_rmi4_data->double_swipe_enable))
 					keyvalue = KEY_GESTURE_SWIPE_DOWN;
 			}
 			break;
@@ -2411,17 +2372,17 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 					break;
 				case 0x02:  //DOWN
 					gesturemode = UpVee;
-					if (atomic_read(&syna_rmi4_data->flashlight_enable))
+					if (atomic_read(&syna_rmi4_data->down_arrow_enable))
 						keyvalue = KEY_GESTURE_V;
 					break;
 				case 0x04:  //LEFT
 					gesturemode = RightVee;
-					if (atomic_read(&syna_rmi4_data->music_enable))
+					if (atomic_read(&syna_rmi4_data->left_arrow_enable))
 						keyvalue = KEY_GESTURE_LTR;
 					break;
 				case 0x08:  //RIGHT
 					gesturemode = LeftVee;
-					if (atomic_read(&syna_rmi4_data->music_enable))
+					if (atomic_read(&syna_rmi4_data->right_arrow_enable))
 						keyvalue = KEY_GESTURE_GTR;
 					break;
 			}
@@ -3902,9 +3863,11 @@ static int synaptics_rmi4_set_input_dev(struct synaptics_rmi4_data *rmi4_data)
 
 	atomic_set(&rmi4_data->syna_use_gesture, 0);
 	atomic_set(&rmi4_data->double_tap_enable, 1);
-	atomic_set(&rmi4_data->camera_enable, 0);
-	atomic_set(&rmi4_data->music_enable, 0);
-	atomic_set(&rmi4_data->flashlight_enable, 0);
+	atomic_set(&rmi4_data->double_swipe_enable, 0);
+	atomic_set(&rmi4_data->down_arrow_enable, 0);
+	atomic_set(&rmi4_data->left_arrow_enable, 0);
+	atomic_set(&rmi4_data->right_arrow_enable, 0);
+	atomic_set(&rmi4_data->letter_o_enable, 0);
 
 	rmi4_data->glove_enable = 0;
 	rmi4_data->pdoze_enable = 0;
@@ -4367,9 +4330,11 @@ static void synaptics_rmi4_init_work(struct work_struct *work)
 		synaptics_enable_irqwake(rmi4_data,false);
 		atomic_set(&rmi4_data->syna_use_gesture,
 			atomic_read(&rmi4_data->double_tap_enable) ||
-			atomic_read(&rmi4_data->camera_enable) ||
-			atomic_read(&rmi4_data->music_enable) ||
-			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
+			atomic_read(&rmi4_data->double_swipe_enable) ||
+			atomic_read(&rmi4_data->down_arrow_enable) ||
+			atomic_read(&rmi4_data->left_arrow_enable) ||
+			atomic_read(&rmi4_data->right_arrow_enable) ||
+			atomic_read(&rmi4_data->letter_o_enable) ? 1 : 0);
 		goto out;
 	}
 
@@ -4773,9 +4738,11 @@ static int synaptics_rmi4_suspend(struct device *dev)
 
 	atomic_set(&rmi4_data->syna_use_gesture,
 			atomic_read(&rmi4_data->double_tap_enable) ||
-			atomic_read(&rmi4_data->camera_enable) ||
-			atomic_read(&rmi4_data->music_enable) ||
-			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
+			atomic_read(&rmi4_data->double_swipe_enable) ||
+			atomic_read(&rmi4_data->down_arrow_enable) ||
+			atomic_read(&rmi4_data->left_arrow_enable) ||
+			atomic_read(&rmi4_data->right_arrow_enable) ||
+			atomic_read(&rmi4_data->letter_o_enable) ? 1 : 0);
 
 	if (atomic_read(&rmi4_data->syna_use_gesture) || rmi4_data->pdoze_enable) {
 		synaptics_enable_gesture(rmi4_data,true);
