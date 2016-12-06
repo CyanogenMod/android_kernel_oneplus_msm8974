@@ -2394,8 +2394,6 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 				(gesture[2] == 0x77 && gesture[3] == 0x00) ? Wgesture :
 				(gesture[2] == 0x6d && gesture[3] == 0x00) ? Mgesture :
 				UnknownGesture;
-
-			keyvalue = KEY_F9;
 			break;
 	}
 
