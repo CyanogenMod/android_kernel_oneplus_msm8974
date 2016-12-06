@@ -283,6 +283,7 @@ struct synaptics_rmi4_data {
 	atomic_t syna_use_gesture;
 	atomic_t double_tap_enable;
 	atomic_t double_swipe_enable;
+	atomic_t up_arrow_enable;
 	atomic_t down_arrow_enable;
 	atomic_t left_arrow_enable;
 	atomic_t right_arrow_enable;
