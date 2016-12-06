@@ -942,13 +942,13 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define SYNA_ONE_FINGER_DIRECTION		0x0a
 #define SYNA_ONE_FINGER_W_OR_M			0x0b
 
-#define KEY_F3			61   //Ë«»÷»½ĞÑÆÁÄ»,
-#define KEY_F4			62   //Æô¶¯Ïà»ú£¬»®È¦
-#define KEY_F5			63   // Æô¶¯ÊÖµçÍ²£¬ÕıV
-#define KEY_F6			64   // ÔİÍ£¸èÇú£¬Á½Ø­Ø­
-#define KEY_F7			65  // ÉÏÒ»Ê×£¬<
-#define KEY_F8			66  // ÏÂÒ»Ê×, >
-#define KEY_F9			67  // M or W
+#define KEY_F3			61
+#define KEY_F4			62
+#define KEY_F5			63
+#define KEY_F6			64
+#define KEY_F7			65
+#define KEY_F8			66
+#define KEY_F9			67
 
 #define UnknownGesture      0
 #define DouTap              1   // double tap
@@ -968,7 +968,6 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define SYNA_SMARTCOVER_MIN	0
 #define SYNA_SMARTCOVER_MAN	750
 
-//ÒÔÏÂ¼Ä´æÆ÷×ÜÊÇĞŞ¸Ä£¬Òò´Ë³é³öÀ´¶¨ÒåÔÚÕâÀï
 #define SYNA_ADDR_REPORT_FLAG        0x1b  //report mode register
 #define SYNA_ADDR_GESTURE_FLAG       0x20  //gesture enable register
 #define SYNA_ADDR_GLOVE_FLAG         0x1f  //glove enable register
@@ -1991,7 +1990,6 @@ static ssize_t synaptics_rmi4_baseline_data(char *buf, bool savefile)
 	synaptics_rmi4_i2c_write(syna_ts_data, F54_CMD_BASE_ADDR, &tmp_new, 1);
 	wait_test_cmd_finished();
 
-	//¿¿¿¿¿¿¿¿¿¿¿¿¿¿3¿WORD¿¿¿¿¿¿¿¿¿1000¿¿ Limit ¿¿¿¿¿-1,0.45¿¿¿-1,0.45¿¿¿-0.42,0.02¿
 	for (i = 0;i < 3; i++) {
 		int iTemp[2];
 		ret = i2c_smbus_read_word_data(client, F54_DATA_BASE_ADDR + 3); // is F54_DATA_BASE_ADDR+3   not F54_DATA_BASE_ADDR+i
