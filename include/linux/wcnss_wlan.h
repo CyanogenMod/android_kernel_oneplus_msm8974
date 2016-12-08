@@ -28,6 +28,8 @@ enum wcnss_hw_type {
 
 struct wcnss_wlan_config {
 	int		use_48mhz_xo;
+	int	is_pronto_v3;
+	void __iomem	*msm_wcnss_base;
 };
 
 enum {
@@ -43,6 +45,7 @@ enum {
 #define HAVE_WCNSS_RX_BUFF_COUNT 1
 #define WLAN_MAC_ADDR_SIZE (6)
 
+void wcnss_get_monotonic_boottime(struct timespec *ts);
 struct device *wcnss_wlan_get_device(void);
 struct resource *wcnss_wlan_get_memory_map(struct device *dev);
 int wcnss_wlan_get_dxe_tx_irq(struct device *dev);
@@ -76,6 +79,7 @@ void wcnss_suspend_notify(void);
 void wcnss_resume_notify(void);
 void wcnss_riva_log_debug_regs(void);
 void wcnss_pronto_log_debug_regs(void);
+int wcnss_is_hw_pronto_ver3(void);
 int wcnss_device_ready(void);
 int wcnss_device_is_shutdown(void);
 void wcnss_riva_dump_pmic_regs(void);

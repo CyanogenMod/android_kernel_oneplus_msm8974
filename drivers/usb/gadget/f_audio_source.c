@@ -826,7 +826,7 @@ static struct audio_dev _audio_dev = {
 		.set_alt = audio_set_alt,
 		.setup = audio_setup,
 		.disable = audio_disable,
-		.descriptors = fs_audio_desc,
+		.fs_descriptors = fs_audio_desc,
 		.hs_descriptors = hs_audio_desc,
 	},
 	.lock = __SPIN_LOCK_UNLOCKED(_audio_dev.lock),

@@ -32,28 +32,29 @@
 #include <linux/of.h>
 #include <linux/sysfs.h>
 #include <linux/types.h>
-#include <linux/android_alarm.h>
+#include <linux/io.h>
 #include <linux/thermal.h>
 #include <mach/rpm-regulator.h>
 #include <mach/rpm-regulator-smd.h>
 #include <linux/regulator/consumer.h>
 #include <linux/msm_thermal_ioctl.h>
+#include <mach/rpm-smd.h>
+#include <mach/scm.h>
 
 #define MAX_CURRENT_UA 1000000
 #define MAX_RAILS 5
 #define MAX_THRESHOLD 2
 #define MONITOR_ALL_TSENS -1
+#define BYTES_PER_FUSE_ROW  8
+#define MAX_EFUSE_VALUE  16
+#define THERM_SECURE_BITE_CMD 8
 
 static struct msm_thermal_data msm_thermal_info;
 static struct delayed_work check_temp_work;
 static bool core_control_enabled;
 static uint32_t cpus_offlined;
 static DEFINE_MUTEX(core_control_mutex);
-static uint32_t wakeup_ms;
-static struct alarm thermal_rtc;
-static struct kobject *tt_kobj;
 static struct kobject *cc_kobj;
-static struct work_struct timer_work;
 static struct task_struct *hotplug_task;
 static struct task_struct *freq_mitigation_task;
 static struct task_struct *thermal_monitor_task;
@@ -86,11 +87,16 @@ static bool ocr_nodes_called;
 static bool ocr_probed;
 static bool interrupt_mode_enable;
 static bool msm_thermal_probed;
+static bool therm_reset_enabled;
 static int *tsens_id_map;
 static DEFINE_MUTEX(vdd_rstr_mutex);
 static DEFINE_MUTEX(psm_mutex);
 static DEFINE_MUTEX(ocr_mutex);
 static uint32_t min_freq_limit;
+static uint32_t default_cpu_temp_limit;
+static bool default_temp_limit_enabled;
+static bool default_temp_limit_probed;
+static bool default_temp_limit_nodes_called;
 
 enum thermal_threshold {
 	HOTPLUG_THRESHOLD_HIGH,
@@ -162,6 +168,7 @@ struct psm_rail {
 };
 
 enum msm_thresh_list {
+	MSM_THERM_RESET,
 	MSM_VDD_RESTRICTION,
 	MSM_LIST_MAX_NR,
 };
@@ -175,6 +182,15 @@ static struct threshold_info *thresh;
 struct vdd_rstr_enable {
 	struct kobj_attribute ko_attr;
 	uint32_t enabled;
+};
+
+enum efuse_data {
+	EFUSE_ADDRESS = 0,
+	EFUSE_SIZE,
+	EFUSE_ROW,
+	EFUSE_START_BIT,
+	EFUSE_BIT_MASK,
+	EFUSE_DATA_MAX,
 };
 
 /* For SMPS only*/
@@ -404,6 +420,12 @@ static int psm_set_mode_all(int mode)
 	}
 
 	return fail_cnt ? (-EFAULT) : ret;
+}
+
+static ssize_t default_cpu_temp_limit_show(struct kobject *kobj,
+	struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", default_cpu_temp_limit);
 }
 
 static int vdd_rstr_en_show(
@@ -907,6 +929,73 @@ set_threshold_exit:
 	return ret;
 }
 
+static void msm_thermal_bite(int tsens_id, long temp)
+{
+	pr_err("TSENS:%d reached temperature:%ld. System reset\n",
+		tsens_id, temp);
+	scm_call_atomic1(SCM_SVC_BOOT, THERM_SECURE_BITE_CMD, 0);
+}
+
+static int do_therm_reset(void)
+{
+	int ret = 0, i;
+	long temp = 0;
+
+	if (!therm_reset_enabled)
+		return ret;
+
+	for (i = 0; i < thresh[MSM_THERM_RESET].thresh_ct; i++) {
+		ret = therm_get_temp(
+			thresh[MSM_THERM_RESET].thresh_list[i].sensor_id,
+			THERM_TSENS_ID,
+			&temp);
+		if (ret) {
+			pr_err("Unable to read TSENS sensor:%d. err:%d\n",
+			thresh[MSM_THERM_RESET].thresh_list[i].sensor_id,
+			ret);
+			continue;
+		}
+
+		if (temp >= msm_thermal_info.therm_reset_temp_degC)
+			msm_thermal_bite(
+			thresh[MSM_THERM_RESET].thresh_list[i].sensor_id, temp);
+	}
+
+	return ret;
+}
+
+static void therm_reset_notify(struct therm_threshold *thresh_data)
+{
+	long temp;
+	int ret = 0;
+
+	if (!therm_reset_enabled)
+		return;
+
+	if (!thresh_data) {
+		pr_err("Invalid input\n");
+		return;
+	}
+
+	switch (thresh_data->trip_triggered) {
+	case THERMAL_TRIP_CONFIGURABLE_HI:
+		ret = therm_get_temp(thresh_data->sensor_id,
+				THERM_TSENS_ID, &temp);
+		if (ret)
+			pr_err("Unable to read TSENS sensor:%d. err:%d\n",
+				thresh_data->sensor_id, ret);
+		msm_thermal_bite(tsens_id_map[thresh_data->sensor_id],
+					temp);
+		break;
+	case THERMAL_TRIP_CONFIGURABLE_LOW:
+		break;
+	default:
+		pr_err("Invalid trip type\n");
+		break;
+	}
+	set_threshold(thresh_data->sensor_id, thresh_data->threshold);
+}
+
 #ifdef CONFIG_SMP
 static void __ref do_core_control(long temp)
 {
@@ -1244,6 +1333,8 @@ static void check_temp(struct work_struct *work)
 	long temp = 0;
 	int ret = 0;
 
+	do_therm_reset();
+
 	ret = therm_get_temp(msm_thermal_info.sensor_id, THERM_TSENS_ID, &temp);
 	if (ret) {
 		pr_err("Unable to read TSENS sensor:%d. err:%d\n",
@@ -1294,39 +1385,6 @@ static int __ref msm_thermal_cpu_callback(struct notifier_block *nfb,
 static struct notifier_block __refdata msm_thermal_cpu_notifier = {
 	.notifier_call = msm_thermal_cpu_callback,
 };
-
-static void thermal_rtc_setup(void)
-{
-	ktime_t wakeup_time;
-	ktime_t curr_time;
-
-	curr_time = alarm_get_elapsed_realtime();
-	wakeup_time = ktime_add_us(curr_time,
-			(wakeup_ms * USEC_PER_MSEC));
-	alarm_start_range(&thermal_rtc, wakeup_time,
-			wakeup_time);
-	pr_debug("%s: Current Time: %ld %ld, Alarm set to: %ld %ld\n",
-			KBUILD_MODNAME,
-			ktime_to_timeval(curr_time).tv_sec,
-			ktime_to_timeval(curr_time).tv_usec,
-			ktime_to_timeval(wakeup_time).tv_sec,
-			ktime_to_timeval(wakeup_time).tv_usec);
-
-}
-
-static void timer_work_fn(struct work_struct *work)
-{
-	sysfs_notify(tt_kobj, NULL, "wakeup_ms");
-}
-
-static void thermal_rtc_callback(struct alarm *al)
-{
-	struct timeval ts;
-	ts = ktime_to_timeval(alarm_get_elapsed_realtime());
-	schedule_work(&timer_work);
-	pr_debug("%s: Time on alarm expiry: %ld %ld\n", KBUILD_MODNAME,
-			ts.tv_sec, ts.tv_usec);
-}
 
 static int hotplug_notify(enum thermal_trip_type type, int temp, void *data)
 {
@@ -1719,6 +1777,9 @@ static void thermal_monitor_init(void)
 		goto init_exit;
 	}
 
+	if (therm_reset_enabled)
+		therm_set_threshold(&thresh[MSM_THERM_RESET]);
+
 	if (vdd_rstr_enabled)
 		therm_set_threshold(&thresh[MSM_VDD_RESTRICTION]);
 
@@ -1972,53 +2033,6 @@ static __refdata struct attribute *cc_attrs[] = {
 static __refdata struct attribute_group cc_attr_group = {
 	.attrs = cc_attrs,
 };
-
-static ssize_t show_wakeup_ms(struct kobject *kobj,
-		struct kobj_attribute *attr, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%d\n", wakeup_ms);
-}
-
-static ssize_t store_wakeup_ms(struct kobject *kobj,
-		struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	int ret;
-	ret = kstrtouint(buf, 10, &wakeup_ms);
-
-	if (ret) {
-		pr_err("%s: Trying to set invalid wakeup timer\n",
-				KBUILD_MODNAME);
-		return ret;
-	}
-
-	if (wakeup_ms > 0) {
-		thermal_rtc_setup();
-		pr_debug("%s: Timer started for %ums\n", KBUILD_MODNAME,
-				wakeup_ms);
-	} else {
-		ret = alarm_cancel(&thermal_rtc);
-		if (ret)
-			pr_debug("%s: Timer canceled\n", KBUILD_MODNAME);
-		else
-			pr_debug("%s: No active timer present to cancel\n",
-					KBUILD_MODNAME);
-
-	}
-	return count;
-}
-
-static __refdata struct kobj_attribute timer_attr =
-__ATTR(wakeup_ms, 0644, show_wakeup_ms, store_wakeup_ms);
-
-static __refdata struct attribute *tt_attrs[] = {
-	&timer_attr.attr,
-	NULL,
-};
-
-static __refdata struct attribute_group tt_attr_group = {
-	.attrs = tt_attrs,
-};
-
 static __init int msm_thermal_add_cc_nodes(void)
 {
 	struct kobject *module_kobj = NULL;
@@ -2049,41 +2063,6 @@ static __init int msm_thermal_add_cc_nodes(void)
 done_cc_nodes:
 	if (cc_kobj)
 		kobject_del(cc_kobj);
-	return ret;
-}
-
-static __init int msm_thermal_add_timer_nodes(void)
-{
-	struct kobject *module_kobj = NULL;
-	int ret = 0;
-
-	module_kobj = kset_find_obj(module_kset, KBUILD_MODNAME);
-	if (!module_kobj) {
-		pr_err("%s: cannot find kobject for module\n",
-			KBUILD_MODNAME);
-		ret = -ENOENT;
-		goto failed;
-	}
-
-	tt_kobj = kobject_create_and_add("thermal_timer", module_kobj);
-	if (!tt_kobj) {
-		pr_err("%s: cannot create timer kobj\n",
-				KBUILD_MODNAME);
-		ret = -ENOMEM;
-		goto failed;
-	}
-
-	ret = sysfs_create_group(tt_kobj, &tt_attr_group);
-	if (ret) {
-		pr_err("%s: cannot create group\n", KBUILD_MODNAME);
-		goto failed;
-	}
-
-	return 0;
-
-failed:
-	if (tt_kobj)
-		kobject_del(tt_kobj);
 	return ret;
 }
 
@@ -2279,6 +2258,38 @@ psm_reg_exit:
 		}
 	}
 
+	return ret;
+}
+
+static struct kobj_attribute default_cpu_temp_limit_attr =
+		__ATTR_RO(default_cpu_temp_limit);
+
+static int msm_thermal_add_default_temp_limit_nodes(void)
+{
+	struct kobject *module_kobj = NULL;
+	int ret = 0;
+
+	if (!default_temp_limit_probed) {
+		default_temp_limit_nodes_called = true;
+		return ret;
+	}
+	if (!default_temp_limit_enabled)
+		return ret;
+
+	module_kobj = kset_find_obj(module_kset, KBUILD_MODNAME);
+	if (!module_kobj) {
+		pr_err("cannot find kobject\n");
+		return -ENOENT;
+	}
+
+	sysfs_attr_init(&default_cpu_temp_limit_attr.attr);
+	ret = sysfs_create_file(module_kobj, &default_cpu_temp_limit_attr.attr);
+	if (ret) {
+		pr_err(
+		"cannot create default_cpu_temp_limit attribute. err:%d\n",
+		ret);
+		return ret;
+	}
 	return ret;
 }
 
@@ -2619,6 +2630,169 @@ read_node_fail:
 	return ret;
 }
 
+static int get_efuse_temp_map(struct device_node *node,
+				int *efuse_values,
+				int *efuse_temp)
+{
+	uint32_t i, j, efuse_arr_cnt = 0;
+	int ret = 0, efuse_map_cnt = 0;
+	uint32_t data[2 * MAX_EFUSE_VALUE];
+
+	char *key = "qcom,efuse-temperature-map";
+	if (!of_get_property(node, key, &efuse_map_cnt)
+		|| efuse_map_cnt <= 0) {
+		pr_debug("Property %s not defined.\n", key);
+		return -ENODEV;
+	}
+
+	if (efuse_map_cnt % (sizeof(__be32) * 2)) {
+		pr_err("Invalid number(%d) of entry for %s\n",
+				efuse_map_cnt, key);
+		return -EINVAL;
+	}
+
+	efuse_arr_cnt = efuse_map_cnt / sizeof(__be32);
+
+	ret = of_property_read_u32_array(node, key, data, efuse_arr_cnt);
+	if (ret)
+		return -EINVAL;
+
+	efuse_map_cnt /= (sizeof(__be32) * 2);
+
+	j = 0;
+	for (i = 0; i < efuse_map_cnt; i++) {
+		efuse_values[i] = data[j++];
+		efuse_temp[i] = data[j++];
+	}
+
+	return efuse_map_cnt;
+}
+
+static int probe_thermal_efuse_read(struct device_node *node,
+			struct msm_thermal_data *data,
+			struct platform_device *pdev)
+{
+	u64 efuse_bits;
+	int ret = 0;
+	int i = 0;
+	int efuse_map_cnt = 0;
+	int efuse_data_cnt = 0;
+	char *key = NULL;
+	void __iomem *efuse_base = NULL;
+	uint32_t efuse_data[EFUSE_DATA_MAX] = {0};
+	uint32_t efuse_values[MAX_EFUSE_VALUE] = {0};
+	uint32_t efuse_temp[MAX_EFUSE_VALUE] = {0};
+	uint32_t default_temp = 0;
+	uint8_t thermal_efuse_data = 0;
+
+	if (default_temp_limit_probed)
+		goto read_efuse_exit;
+
+	key = "qcom,default-temp";
+	if (of_property_read_u32(node, key, &default_temp))
+		default_temp = 0;
+
+	default_cpu_temp_limit = default_temp;
+
+	key = "qcom,efuse-data";
+	if (!of_get_property(node, key, &efuse_data_cnt) ||
+		efuse_data_cnt <= 0) {
+		ret = -ENODEV;
+		goto read_efuse_fail;
+	}
+	efuse_data_cnt /= sizeof(__be32);
+
+	if (efuse_data_cnt != EFUSE_DATA_MAX) {
+		pr_err("Invalid number of efuse data. data cnt %d\n",
+			efuse_data_cnt);
+		ret = -EINVAL;
+		goto read_efuse_fail;
+	}
+
+	ret = of_property_read_u32_array(node, key, efuse_data,
+						efuse_data_cnt);
+	if (ret)
+		goto read_efuse_fail;
+
+	if (efuse_data[EFUSE_ADDRESS] == 0 ||
+		efuse_data[EFUSE_SIZE] == 0 ||
+		efuse_data[EFUSE_BIT_MASK] == 0) {
+		pr_err("Invalid efuse data: address:%x len:%d bitmask%x\n",
+			efuse_data[EFUSE_ADDRESS], efuse_data[EFUSE_SIZE],
+			efuse_data[EFUSE_BIT_MASK]);
+		ret = -EINVAL;
+		goto read_efuse_fail;
+	}
+
+	efuse_map_cnt = get_efuse_temp_map(node, efuse_values,
+						efuse_temp);
+	if (efuse_map_cnt <= 0 ||
+		efuse_map_cnt > (efuse_data[EFUSE_BIT_MASK] + 1)) {
+		pr_err("Invalid efuse-temperature-map. cnt%d\n",
+			efuse_map_cnt);
+		ret = -EINVAL;
+		goto read_efuse_fail;
+	}
+
+	efuse_base = ioremap(efuse_data[EFUSE_ADDRESS], efuse_data[EFUSE_SIZE]);
+	if (!efuse_base) {
+		pr_err("Unable to map efuse_addr:%x with size%d\n",
+			efuse_data[EFUSE_ADDRESS],
+			efuse_data[EFUSE_SIZE]);
+		ret = -EINVAL;
+		goto read_efuse_fail;
+	}
+
+	efuse_bits = readll_relaxed(efuse_base
+		+ efuse_data[EFUSE_ROW] * BYTES_PER_FUSE_ROW);
+
+	thermal_efuse_data = (efuse_bits >> efuse_data[EFUSE_START_BIT]) &
+						efuse_data[EFUSE_BIT_MASK];
+
+	/* Get cpu limit temp from efuse truth table */
+	for (; i < efuse_map_cnt; i++) {
+		if (efuse_values[i] == thermal_efuse_data) {
+			default_cpu_temp_limit = efuse_temp[i];
+			break;
+		}
+	}
+	if (i >= efuse_map_cnt) {
+		if (!default_temp) {
+			pr_err("No matching efuse value. value:%d\n",
+				thermal_efuse_data);
+			ret = -EINVAL;
+			goto read_efuse_fail;
+		}
+	}
+
+	pr_debug(
+	"Efuse address:0x%x [row:%d] = 0x%llx @%d:mask:0x%x = 0x%x temp:%d\n",
+		efuse_data[EFUSE_ADDRESS], efuse_data[EFUSE_ROW], efuse_bits,
+		efuse_data[EFUSE_START_BIT], efuse_data[EFUSE_BIT_MASK],
+		thermal_efuse_data, default_cpu_temp_limit);
+
+	default_temp_limit_enabled = true;
+
+read_efuse_fail:
+	if (efuse_base)
+		iounmap(efuse_base);
+	default_temp_limit_probed = true;
+	if (ret) {
+		if (!default_temp) {
+			dev_info(&pdev->dev,
+			"%s:Failed reading node=%s, key=%s. KTM continues\n",
+				__func__, node->full_name, key);
+		} else {
+			default_temp_limit_enabled = true;
+			pr_debug("Default cpu temp limit is %d\n",
+					default_cpu_temp_limit);
+			ret = 0;
+		}
+	}
+read_efuse_exit:
+	return ret;
+}
+
 static int probe_ocr(struct device_node *node, struct msm_thermal_data *data,
 		struct platform_device *pdev)
 {
@@ -2831,6 +3005,38 @@ hotplug_node_fail:
 	return ret;
 }
 
+static int probe_therm_reset(struct device_node *node,
+		struct msm_thermal_data *data,
+		struct platform_device *pdev)
+{
+	char *key = NULL;
+	int ret = 0;
+
+	key = "qcom,therm-reset-temp";
+	ret = of_property_read_u32(node, key, &data->therm_reset_temp_degC);
+	if (ret)
+		goto PROBE_RESET_EXIT;
+
+	ret = init_threshold(MSM_THERM_RESET, MONITOR_ALL_TSENS,
+		data->therm_reset_temp_degC, data->therm_reset_temp_degC - 10,
+		therm_reset_notify);
+	if (ret) {
+		pr_err("Therm reset data structure init failed\n");
+		goto PROBE_RESET_EXIT;
+	}
+
+	therm_reset_enabled = true;
+
+PROBE_RESET_EXIT:
+	if (ret) {
+		dev_info(&pdev->dev,
+		"%s:Failed reading node=%s, key=%s err=%d. KTM continues\n",
+			__func__, node->full_name, key, ret);
+		therm_reset_enabled = false;
+	}
+	return ret;
+}
+
 static int probe_freq_mitigation(struct device_node *node,
 		struct msm_thermal_data *data,
 		struct platform_device *pdev)
@@ -2916,6 +3122,8 @@ static int __devinit msm_thermal_dev_probe(struct platform_device *pdev)
 	ret = probe_cc(node, &data, pdev);
 
 	ret = probe_freq_mitigation(node, &data, pdev);
+	ret = probe_therm_reset(node, &data, pdev);
+
 	/*
 	 * Probe optional properties below. Call probe_psm before
 	 * probe_vdd_rstr because rpm_regulator_get has to be called
@@ -2933,6 +3141,7 @@ static int __devinit msm_thermal_dev_probe(struct platform_device *pdev)
 	ret = probe_ocr(node, &data, pdev);
 	if (ret == -EPROBE_DEFER)
 		goto fail;
+	probe_thermal_efuse_read(node, &data, pdev);
 
 	/*
 	 * In case sysfs add nodes get called before probe function.
@@ -2949,6 +3158,10 @@ static int __devinit msm_thermal_dev_probe(struct platform_device *pdev)
 	if (ocr_nodes_called) {
 		msm_thermal_add_ocr_nodes();
 		ocr_nodes_called = false;
+	}
+	if (default_temp_limit_nodes_called) {
+		msm_thermal_add_default_temp_limit_nodes();
+		default_temp_limit_nodes_called = false;
 	}
 	msm_thermal_ioctl_init();
 	ret = msm_thermal_init(&data);
@@ -3007,10 +3220,7 @@ int __init msm_thermal_late_init(void)
 	msm_thermal_add_psm_nodes();
 	msm_thermal_add_vdd_rstr_nodes();
 	msm_thermal_add_ocr_nodes();
-	alarm_init(&thermal_rtc, ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP,
-			thermal_rtc_callback);
-	INIT_WORK(&timer_work, timer_work_fn);
-	msm_thermal_add_timer_nodes();
+	msm_thermal_add_default_temp_limit_nodes();
 
 	interrupt_mode_init();
 	return 0;

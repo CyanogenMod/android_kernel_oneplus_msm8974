@@ -810,19 +810,18 @@ static int pp_vig_pipe_setup(struct mdss_mdp_pipe *pipe, u32 *op)
 			 * TODO: Allow pipe to be programmed whenever new CSC is
 			 * applied (i.e. dirty bit)
 			 */
-			if (pipe->play_cnt == 0)
-				mdss_mdp_csc_setup_data(MDSS_MDP_BLOCK_SSPP,
-				  pipe->num, 1, &pipe->pp_cfg.csc_cfg);
+			mdss_mdp_csc_setup_data(MDSS_MDP_BLOCK_SSPP, pipe->num,
+					1, &pipe->pp_cfg.csc_cfg);
 	} else {
-		if (pipe->src_fmt->is_yuv)
+		if (pipe->src_fmt->is_yuv) {
 			opmode |= (0 << 19) |	/* DST_DATA=RGB */
 				  (1 << 18) |	/* SRC_DATA=YCBCR */
 				  (1 << 17);	/* CSC_1_EN */
-		/*
-		 * TODO: Needs to be part of dirty bit logic: if there is a
-		 * previously configured pipe need to re-configure CSC matrix
-		 */
-		if (pipe->play_cnt == 0) {
+			/*
+			 * TODO: Needs to be part of dirty bit logic: if there
+			 * is a previously configured pipe need to re-configure
+			 * CSC matrix
+			 */
 			mdss_mdp_csc_setup(MDSS_MDP_BLOCK_SSPP, pipe->num, 1,
 					   MDSS_MDP_CSC_YUV2RGB);
 		}
@@ -1638,7 +1637,7 @@ int mdss_mdp_pp_setup(struct mdss_mdp_ctl *ctl)
 	/* TODO: have some sort of reader/writer lock to prevent unclocked
 	 * access while display power is toggled */
 	mutex_lock(&ctl->lock);
-	if (!ctl->power_on) {
+	if (!mdss_mdp_ctl_is_power_on(ctl)) {
 		ret = -EPERM;
 		goto error;
 	}
@@ -3865,7 +3864,7 @@ static struct msm_fb_data_type *mdss_get_mfd_from_index(int index)
 
 	for (i = 0; i < mdata->nctl; i++) {
 		ctl = mdata->ctl_off + i;
-		if ((ctl->power_on) && (ctl->mfd)
+		if ((mdss_mdp_ctl_is_power_on(ctl)) && (ctl->mfd)
 				&& (ctl->mfd->index == index))
 			out = ctl->mfd;
 	}

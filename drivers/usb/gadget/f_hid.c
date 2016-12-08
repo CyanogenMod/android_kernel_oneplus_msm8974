@@ -461,7 +461,6 @@ static int __init hidg_bind(struct usb_configuration *c, struct usb_function *f)
 		goto fail;
 	hidg_interface_desc.bInterfaceNumber = status;
 
-
 	/* allocate instance-specific endpoints */
 	status = -ENODEV;
 	ep = usb_ep_autoconfig(c->cdev->gadget, &hidg_fs_in_ep_desc);
@@ -492,18 +491,15 @@ static int __init hidg_bind(struct usb_configuration *c, struct usb_function *f)
 
 	hidg->set_report_buff = NULL;
 
-	/* copy descriptors */
-	f->descriptors = usb_copy_descriptors(hidg_fs_descriptors);
-	if (!f->descriptors)
-		goto fail;
+	hidg_hs_in_ep_desc.bEndpointAddress =
+		hidg_fs_in_ep_desc.bEndpointAddress;
+	hidg_hs_out_ep_desc.bEndpointAddress =
+		hidg_fs_out_ep_desc.bEndpointAddress;
 
-	if (gadget_is_dualspeed(c->cdev->gadget)) {
-		hidg_hs_in_ep_desc.bEndpointAddress =
-			hidg_fs_in_ep_desc.bEndpointAddress;
-		f->hs_descriptors = usb_copy_descriptors(hidg_hs_descriptors);
-		if (!f->hs_descriptors)
-			goto fail;
-	}
+	status = usb_assign_descriptors(f, hidg_fs_descriptors,
+			hidg_hs_descriptors, NULL);
+	if (status)
+		goto fail;
 
 	mutex_init(&hidg->lock);
 	spin_lock_init(&hidg->spinlock);
@@ -529,9 +525,7 @@ fail:
 			usb_ep_free_request(hidg->in_ep, hidg->req);
 	}
 
-	usb_free_descriptors(f->hs_descriptors);
-	usb_free_descriptors(f->descriptors);
-
+	usb_free_all_descriptors(f);
 	return status;
 }
 
@@ -548,9 +542,7 @@ static void hidg_unbind(struct usb_configuration *c, struct usb_function *f)
 	kfree(hidg->req->buf);
 	usb_ep_free_request(hidg->in_ep, hidg->req);
 
-	/* free descriptors copies */
-	usb_free_descriptors(f->hs_descriptors);
-	usb_free_descriptors(f->descriptors);
+	usb_free_all_descriptors(f);
 
 	kfree(hidg->report_desc);
 	kfree(hidg->set_report_buff);

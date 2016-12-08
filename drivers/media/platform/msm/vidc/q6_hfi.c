@@ -1033,6 +1033,11 @@ static int q6_hfi_session_set_property(void *sess,
 		dprintk(VIDC_ERR, "Invalid Params");
 		return -EINVAL;
 	}
+	if (ptype == HAL_PARAM_VDEC_CONTINUE_DATA_TRANSFER) {
+		dprintk(VIDC_WARN, "Smoothstreaming is not supported\n");
+		return -ENOTSUPP;
+	}
+
 	dev = session->device;
 	dprintk(VIDC_DBG, "in set_prop,with prop id: 0x%x", ptype);
 
@@ -1181,14 +1186,6 @@ static int q6_hfi_session_get_property(void *sess,
 	return 0;
 }
 
-static int q6_hfi_unset_ocmem(void *dev)
-{
-	(void)dev;
-
-	/* Q6 does not support ocmem */
-	return -EINVAL;
-}
-
 static int q6_hfi_iommu_get_domain_partition(void *dev, u32 flags,
 	u32 buffer_type, int *domain, int *partition)
 {
@@ -1318,24 +1315,6 @@ fail_subsystem_get:
 	return rc;
 }
 
-int q6_hfi_capability_check(u32 fourcc, u32 width,
-				u32 *max_width, u32 *max_height)
-{
-	int rc = 0;
-	if (!max_width || !max_height) {
-		dprintk(VIDC_ERR, "%s - invalid parameter\n", __func__);
-		return -EINVAL;
-	}
-
-	if (width > *max_width) {
-		dprintk(VIDC_ERR,
-			"Unsupported width = %u supported max width = %u\n",
-			width, *max_width);
-		rc = -ENOTSUPP;
-	}
-	return rc;
-}
-
 static void q6_hfi_unload_fw(void *hfi_device_data)
 {
 	struct q6_hfi_device *device = hfi_device_data;
@@ -1387,10 +1366,8 @@ static void q6_init_hfi_callbacks(struct hfi_device *hdev)
 	hdev->session_flush = q6_hfi_session_flush;
 	hdev->session_set_property = q6_hfi_session_set_property;
 	hdev->session_get_property = q6_hfi_session_get_property;
-	hdev->unset_ocmem = q6_hfi_unset_ocmem;
 	hdev->iommu_get_domain_partition = q6_hfi_iommu_get_domain_partition;
 	hdev->load_fw = q6_hfi_load_fw;
-	hdev->capability_check = q6_hfi_capability_check;
 	hdev->unload_fw = q6_hfi_unload_fw;
 	hdev->get_stride_scanline = q6_hfi_get_stride_scanline;
 }

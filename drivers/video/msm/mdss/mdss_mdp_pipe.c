@@ -303,16 +303,8 @@ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe)
 	if (pipe->mixer->type == MDSS_MDP_MIXER_TYPE_WRITEBACK)
 		wb_mixer = 1;
 
-	/*
-	 * Don't want to allow SMP changes for backend composition pipes
-	 * inorder to preserve SMPs as much as possible.
-	 * On the contrary for non backend composition pipes we should
-	 * allow SMP allocations to prevent composition failures.
-	* Also allow allocation for YUV formats for dynamic resolution
-	* change during video playback.
-	 */
-	force_alloc = (!(pipe->flags & MDP_BACKEND_COMPOSITION)) ||
-			(pipe->src_fmt->is_yuv);
+	force_alloc = pipe->flags & MDP_SMP_FORCE_ALLOC;
+
 	mutex_lock(&mdss_mdp_smp_lock);
 	for (i = (MAX_PLANES - 1); i >= ps.num_planes; i--) {
 		if (bitmap_weight(pipe->smp_map[i].allocated, SMP_MB_CNT)) {
