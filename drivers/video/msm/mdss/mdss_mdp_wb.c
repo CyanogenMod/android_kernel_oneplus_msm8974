@@ -94,7 +94,7 @@ struct mdss_mdp_data *mdss_mdp_wb_debug_buffer(struct msm_fb_data_type *mfd)
 		ihdl = ion_alloc(iclient, img_size, SZ_4K,
 				 ION_HEAP(ION_SF_HEAP_ID), 0);
 		if (IS_ERR_OR_NULL(ihdl)) {
-			pr_err("unable to alloc fbmem from ion (%p)\n", ihdl);
+			pr_err("unable to alloc fbmem from ion (%pK)\n", ihdl);
 			return NULL;
 		}
 
@@ -114,7 +114,7 @@ struct mdss_mdp_data *mdss_mdp_wb_debug_buffer(struct msm_fb_data_type *mfd)
 			img->len = img_size;
 		}
 
-		pr_debug("ihdl=%p virt=%p phys=0x%lx iova=0x%x size=%u\n",
+		pr_debug("ihdl=%pK virt=%pK phys=0x%lx iova=0x%x size=%u\n",
 			 ihdl, videomemory, mdss_wb_mem, img->addr, img_size);
 	}
 	return &mdss_wb_buffer;
@@ -491,7 +491,7 @@ static void mdss_mdp_wb_free_node(struct mdss_mdp_wb_data *node)
 
 	if (node->user_alloc) {
 		buf = &node->buf_data.p[0];
-		pr_debug("free user mem_id=%d ihdl=%p, offset=%u addr=0x%pa\n",
+		pr_debug("free user mem_id=%d ihdl=%pK, offset=%u addr=0x%pa\n",
 				node->buf_info.memory_id,
 				buf->srcp_ihdl,
 				node->buf_info.offset,
