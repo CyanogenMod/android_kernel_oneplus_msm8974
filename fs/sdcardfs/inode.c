@@ -811,8 +811,8 @@ static int sdcardfs_fillattr(struct inode *inode, struct kstat *stat)
 	stat->ino = inode->i_ino;
 	stat->mode = (inode->i_mode  & S_IFMT) | get_mode(SDCARDFS_I(top));
 	stat->nlink = inode->i_nlink;
-	stat->uid = make_kuid(&init_user_ns, SDCARDFS_I(top)->d_uid);
-	stat->gid = make_kgid(&init_user_ns, get_gid(SDCARDFS_I(top)));
+	stat->uid = SDCARDFS_I(top)->d_uid;
+	stat->gid = get_gid(SDCARDFS_I(top));
 	stat->rdev = inode->i_rdev;
 	stat->size = i_size_read(inode);
 	stat->atime = inode->i_atime;
