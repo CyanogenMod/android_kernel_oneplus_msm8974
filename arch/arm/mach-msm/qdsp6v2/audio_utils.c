@@ -495,7 +495,7 @@ ssize_t audio_in_read(struct file *file,
 			count -= bytes_to_copy;
 			buf += bytes_to_copy;
 		} else {
-			pr_err("%s:session id %d: short read data[%p] bytesavail[%d]bytesrequest[%d]\n",
+			pr_err("%s:session id %d: short read data[%pK] bytesavail[%d]bytesrequest[%d]\n",
 				__func__,
 				audio->ac->session,
 				data, size, count);

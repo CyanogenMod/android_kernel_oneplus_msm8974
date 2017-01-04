@@ -592,7 +592,7 @@ static int mdss_mdp_get_img(struct msmfb_data *img,
 		data->addr += data->offset;
 		data->len -= data->offset;
 
-		pr_debug("mem=%d ihdl=%p buf=0x%pa len=0x%u\n", img->memory_id,
+		pr_debug("mem=%d ihdl=%pK buf=0x%pa len=0x%u\n", img->memory_id,
 			 data->srcp_ihdl, &data->addr, data->len);
 	} else {
 		mdss_mdp_put_img(data);
@@ -658,7 +658,7 @@ static int mdss_mdp_map_buffer(struct mdss_mdp_img_data *data)
 		data->addr += data->offset;
 		data->len -= data->offset;
 
-		pr_debug("ihdl=%p buf=0x%pa len=0x%u\n",
+		pr_debug("ihdl=%pK buf=0x%pa len=0x%u\n",
 			 data->srcp_ihdl, &data->addr, data->len);
 	} else {
 		mdss_mdp_put_img(data);

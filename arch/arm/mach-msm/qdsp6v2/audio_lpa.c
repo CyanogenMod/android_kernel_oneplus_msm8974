@@ -441,9 +441,9 @@ static int audlpa_ion_check(struct audio *audio,
 	list_for_each_entry(region_elt, &audio->ion_region_queue, list) {
 		if (CONTAINS(region_elt, &t) || CONTAINS(&t, region_elt) ||
 		    OVERLAPS(region_elt, &t)) {
-			pr_err("%s[%p]:region (vaddr %p len %ld)"
+			pr_err("%s[%pK]:region (vaddr %pK len %ld)"
 			" clashes with registered region"
-			" (vaddr %p paddr %p len %ld)\n",
+			" (vaddr %pK paddr %pK len %ld)\n",
 			__func__, audio, vaddr, len,
 			region_elt->vaddr,
 			(void *)region_elt->paddr, region_elt->len);
@@ -465,7 +465,7 @@ static int audlpa_ion_add(struct audio *audio,
 	unsigned long ionflag;
 	void *temp_ptr;
 
-	pr_debug("%s[%p]:\n", __func__, audio);
+	pr_debug("%s[%pK]:\n", __func__, audio);
 	region = kmalloc(sizeof(*region), GFP_KERNEL);
 
 	if (!region) {
@@ -512,14 +512,14 @@ static int audlpa_ion_add(struct audio *audio,
 	region->kvaddr = kvaddr;
 	region->len = len;
 	region->ref_cnt = 0;
-	pr_debug("%s[%p]:add region paddr %lx vaddr %p, len %lu kvaddr %lx\n",
+	pr_debug("%s[%pK]:add region paddr %lx vaddr %pK, len %lu kvaddr %lx\n",
 		__func__, audio,
 		region->paddr, region->vaddr, region->len, region->kvaddr);
 	list_add_tail(&region->list, &audio->ion_region_queue);
 
 	rc = q6asm_memory_map(audio->ac, (uint32_t)paddr, IN, (uint32_t)len, 1);
 	if (rc < 0) {
-		pr_err("%s[%p]: memory map failed\n", __func__, audio);
+		pr_err("%s[%pK]: memory map failed\n", __func__, audio);
 		goto ion_error;
 	} else {
 		goto end;
@@ -549,7 +549,7 @@ static int audlpa_ion_remove(struct audio *audio,
 		if (region != NULL && (region->fd == info->fd) &&
 			(region->vaddr == info->vaddr)) {
 			if (region->ref_cnt) {
-				pr_debug("%s[%p]:region %p in use ref_cnt %d\n",
+				pr_debug("%s[%pK]:region %pK in use ref_cnt %d\n",
 					__func__, audio, region,
 					region->ref_cnt);
 				break;
@@ -557,7 +557,7 @@ static int audlpa_ion_remove(struct audio *audio,
 			rc = q6asm_memory_unmap(audio->ac,
 				(uint32_t) region->paddr, IN);
 			if (rc < 0)
-				pr_err("%s[%p]: memory unmap failed\n",
+				pr_err("%s[%pK]: memory unmap failed\n",
 					__func__, audio);
 
 			list_del(&region->list);
@@ -595,14 +595,14 @@ static int audlpa_ion_lookup_vaddr(struct audio *audio, void *addr,
 	}
 
 	if (match_count > 1) {
-		pr_err("%s[%p]:multiple hits for vaddr %p, len %ld\n",
+		pr_err("%s[%pK]:multiple hits for vaddr %pK, len %ld\n",
 			 __func__, audio, addr, len);
 		list_for_each_entry(region_elt, &audio->ion_region_queue,
 					list) {
 		if (addr >= region_elt->vaddr &&
 			addr < region_elt->vaddr + region_elt->len &&
 			addr + len <= region_elt->vaddr + region_elt->len)
-			pr_err("\t%s[%p]:%p, %ld --> %p\n",
+			pr_err("\t%s[%pK]:%pK, %ld --> %pK\n",
 				__func__, audio,
 					region_elt->vaddr,
 					region_elt->len,
@@ -620,7 +620,7 @@ static unsigned long audlpa_ion_fixup(struct audio *audio, void *addr,
 
 	ret = audlpa_ion_lookup_vaddr(audio, addr, len, &region);
 	if (ret) {
-		pr_err("%s[%p]:lookup (%p, %ld) failed\n",
+		pr_err("%s[%pK]:lookup (%pK, %ld) failed\n",
 			__func__, audio, addr, len);
 		return 0;
 	}
@@ -1101,10 +1101,10 @@ static void audlpa_unmap_ion_region(struct audio *audio)
 	struct list_head *ptr, *next;
 	int rc = -EINVAL;
 
-	pr_debug("%s[%p]:\n", __func__, audio);
+	pr_debug("%s[%pK]:\n", __func__, audio);
 	list_for_each_safe(ptr, next, &audio->ion_region_queue) {
 		region = list_entry(ptr, struct audlpa_ion_region, list);
-		pr_debug("%s[%p]: phy_address = 0x%lx\n",
+		pr_debug("%s[%pK]: phy_address = 0x%lx\n",
 			__func__, audio, region->paddr);
 		if (region != NULL) {
 			rc = q6asm_memory_unmap(audio->ac,
@@ -1386,7 +1386,7 @@ static int audio_open(struct inode *inode, struct file *file)
 		pr_err("Unable to create ION client\n");
 		goto err;
 	}
-	pr_debug("Allocating ION clinet in audio_open %p", audio->client);
+	pr_debug("Allocating ION clinet in audio_open %pK", audio->client);
 done:
 	return rc;
 err:

@@ -880,6 +880,12 @@ struct perf_event {
 	int				nr_siblings;
 	int				group_flags;
 	struct perf_event		*group_leader;
+
+	/*
+	 * Protect the pmu, attributes and context of a group leader.
+	 * Note: does not protect the pointer to the group_leader.
+	 */
+	struct mutex			group_leader_mutex;
 	struct pmu			*pmu;
 
 	enum perf_event_active_state	state;
@@ -1110,6 +1116,8 @@ perf_event_create_kernel_counter(struct perf_event_attr *attr,
 				struct task_struct *task,
 				perf_overflow_handler_t callback,
 				void *context);
+extern void perf_pmu_migrate_context(struct pmu *pmu,
+				int src_cpu, int dst_cpu);
 extern u64 perf_event_read_value(struct perf_event *event,
 				 u64 *enabled, u64 *running);
 

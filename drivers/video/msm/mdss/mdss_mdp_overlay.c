@@ -929,7 +929,7 @@ struct mdss_mdp_data *__mdp_overlay_buf_alloc(struct msm_fb_data_type *mfd,
 	list_move_tail(&buf->buf_list, &mdp5_data->bufs_used);
 	list_add_tail(&buf->pipe_list, &pipe->buf_queue);
 
-	pr_debug("buffer alloc: %p\n", buf);
+	pr_debug("buffer alloc: %pK\n", buf);
 
 	return buf;
 }
@@ -982,7 +982,7 @@ static void __mdp_overlay_buf_free(struct msm_fb_data_type *mfd,
 	buf->last_freed = local_clock();
 	buf->state = MDP_BUF_STATE_UNUSED;
 
-	pr_debug("buffer freed: %p\n", buf);
+	pr_debug("buffer freed: %pK\n", buf);
 
 	list_move_tail(&buf->buf_list, &mdp5_data->bufs_pool);
 }
@@ -1314,7 +1314,7 @@ static int __overlay_queue_pipes(struct msm_fb_data_type *mfd)
 		if (buf) {
 			switch (buf->state) {
 			case MDP_BUF_STATE_READY:
-				pr_debug("pnum=%d buf=%p first buffer ready\n",
+				pr_debug("pnum=%d buf=%pK first buffer ready\n",
 						pipe->num, buf);
 				break;
 			case MDP_BUF_STATE_ACTIVE:
@@ -1334,7 +1334,7 @@ static int __overlay_queue_pipes(struct msm_fb_data_type *mfd)
 				}
 				break;
 			default:
-				pr_err("invalid state of buf %p=%d\n",
+				pr_err("invalid state of buf %pK=%d\n",
 						buf, buf->state);
 				BUG();
 				break;
@@ -3337,7 +3337,7 @@ ctl_stop:
 	rc = mdss_mdp_ctl_stop(mdp5_data->ctl, mfd->panel_power_state);
 	if (rc == 0) {
             if (mdss_fb_is_power_off(mfd)) {
-				mutex_lock(&mdp5_data->list_lock); 
+				mutex_lock(&mdp5_data->list_lock);
                 __mdss_mdp_overlay_free_list_purge(mfd);
 				if (!mfd->ref_cnt)
 					mdss_mdp_overlay_buf_deinit(mfd);
@@ -3349,7 +3349,7 @@ ctl_stop:
 		    	    mdp5_data->borderfill_enable = false;
 			    mdss_mdp_ctl_destroy(mdp5_data->ctl);
 			    mdp5_data->ctl = NULL;
-		    }       
+		    }
 
                     if (atomic_dec_return(
 			&mdp5_data->mdata->active_intf_cnt) == 0)
