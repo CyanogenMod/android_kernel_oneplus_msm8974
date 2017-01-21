@@ -379,6 +379,9 @@ __generic_file_splice_read(struct file *in, loff_t *ppos,
 		index++;
 	}
 
+	if (unlikely(!(in->f_mode & FMODE_SPLICE_READ)))
+		return -EINVAL;
+
 	/*
 	 * Now loop over the map and see if we need to start IO on any
 	 * pages, fill in the partial map, etc.
@@ -1072,6 +1075,9 @@ static ssize_t default_file_splice_write(struct pipe_inode_info *pipe,
 					 size_t len, unsigned int flags)
 {
 	ssize_t ret;
+
+	if (unlikely(!(out->f_mode & FMODE_SPLICE_WRITE)))
+		return -EINVAL;
 
 	ret = splice_from_pipe(pipe, out, ppos, len, flags, write_pipe_buf);
 	if (ret > 0)
