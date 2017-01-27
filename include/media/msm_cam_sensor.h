@@ -65,11 +65,6 @@ typedef enum sensor_stats_type {
 	YYYY,
 } sensor_stats_type_t;
 
-typedef enum sensor_stats_type {
-	YRGB,
-	YYYY,
-} sensor_stats_type_t;
-
 enum flash_type {
 	LED_FLASH = 1,
 	STROBE_FLASH,
