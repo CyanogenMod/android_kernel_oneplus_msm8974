@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2009,2016 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -99,7 +99,7 @@ static int buffer_req(struct msm_dma_alloc_req *req)
 	if (i >= MAX_TEST_BUFFERS)
 		goto error;
 
-	buffers[i] = kmalloc(req->size, GFP_KERNEL | __GFP_DMA);
+	buffers[i] = kzalloc(req->size, GFP_KERNEL | __GFP_DMA);
 	if (buffers[i] == 0)
 		goto error;
 	sizes[i] = req->size;
