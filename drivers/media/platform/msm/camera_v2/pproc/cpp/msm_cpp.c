@@ -1525,25 +1525,28 @@ void msm_cpp_clean_queue(struct cpp_device *cpp_dev)
 long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg)
 {
-	struct cpp_device *cpp_dev = v4l2_get_subdevdata(sd);
+	struct cpp_device *cpp_dev = NULL;
 	struct msm_camera_v4l2_ioctl_t *ioctl_ptr = arg;
 	int rc = 0;
 
-	if (ioctl_ptr == NULL) {
-		pr_err("ioctl_ptr is null\n");
+	if ((sd == NULL) || (ioctl_ptr == NULL)) {
+		pr_err("Wrong ioctl_ptr %p, sd %p\n", ioctl_ptr, sd);
 		return -EINVAL;
 	}
-	if (cpp_dev == NULL) {
-		pr_err("cpp_dev is null\n");
-		return -EINVAL;
-	}
-
 	if ((ioctl_ptr->ioctl_ptr == NULL) || (ioctl_ptr->len == 0)) {
 		pr_err("ioctl_ptr OR ioctl_ptr->len is NULL  %p %d\n",
 			ioctl_ptr, ioctl_ptr->len);
 		return -EINVAL;
 	}
-
+	if (_IOC_DIR(cmd) == _IOC_NONE) {
+		pr_err("Invalid ioctl/subdev cmd %u\n", cmd);
+		return -EINVAL;
+	}
+	cpp_dev = v4l2_get_subdevdata(sd);
+	if (cpp_dev == NULL) {
+		pr_err("cpp_dev is null\n");
+		return -EINVAL;
+	}
 	mutex_lock(&cpp_dev->mutex);
 	CPP_DBG("E cmd: %d\n", cmd);
 	switch (cmd) {

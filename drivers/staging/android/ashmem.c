@@ -824,7 +824,7 @@ static struct miscdevice ashmem_misc = {
 
 static int is_ashmem_file(struct file *file)
 {
-	return (file->f_op == &ashmem_fops);
+	return file->f_op == &ashmem_fops;
 }
 
 int get_ashmem_file(int fd, struct file **filp, struct file **vm_file,
