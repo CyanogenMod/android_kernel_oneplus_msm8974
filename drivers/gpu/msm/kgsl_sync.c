@@ -194,7 +194,6 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 		ret = priv.fence_fd;
 		goto unlock;
 	}
-	sync_fence_install(fence, priv.fence_fd);
 
 	/*
 	 * If the timestamp hasn't expired yet create an event to trigger it.
@@ -221,6 +220,7 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 		ret = -EFAULT;
 		goto out;
 	}
+	sync_fence_install(fence, priv.fence_fd);
 
 	return 0;
 

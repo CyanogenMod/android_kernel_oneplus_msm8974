@@ -41,7 +41,7 @@ static void smp2p_int_stats(struct seq_file *s)
 			continue;
 
 		seq_printf(s,
-			"| %5s (%d) | %11u | %10u | %10u | %p | %08x |\n",
+			"| %5s (%d) | %11u | %10u | %10u | %pK | %08x |\n",
 			int_cfg[pid].name,
 			pid, int_cfg[pid].in_int_id,
 			int_cfg[pid].in_interrupt_count,
