@@ -769,6 +769,9 @@ static void req_crypt_dtr(struct dm_target *ti)
 {
 	DMDEBUG("dm-req-crypt Destructor.\n");
 
+	if (dev)
+		dm_put_device(ti, dev);
+
 	if (req_crypt_queue) {
 		destroy_workqueue(req_crypt_queue);
 		req_crypt_queue = NULL;
