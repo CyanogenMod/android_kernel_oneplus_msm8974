@@ -154,7 +154,7 @@ static void dbg_td(struct c67x00_hcd *c67x00, struct c67x00_td *td, char *msg)
 	struct device *dev = c67x00_hcd_dev(c67x00);
 
 	dev_dbg(dev, "### %s at 0x%04x\n", msg, td->td_addr);
-	dev_dbg(dev, "urb:      0x%p\n", td->urb);
+	dev_dbg(dev, "urb:      0x%pK\n", td->urb);
 	dev_dbg(dev, "endpoint:   %4d\n", usb_pipeendpoint(td->pipe));
 	dev_dbg(dev, "pipeout:    %4d\n", usb_pipeout(td->pipe));
 	dev_dbg(dev, "ly_base_addr: 0x%04x\n", td_ly_base_addr(td));

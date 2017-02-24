@@ -193,7 +193,7 @@ static int hwahc_op_get_frame_number(struct usb_hcd *usb_hcd)
 	struct wusbhc *wusbhc = usb_hcd_to_wusbhc(usb_hcd);
 	struct hwahc *hwahc = container_of(wusbhc, struct hwahc, wusbhc);
 
-	dev_err(wusbhc->dev, "%s (%p [%p]) UNIMPLEMENTED\n", __func__,
+	dev_err(wusbhc->dev, "%s (%pK [%pK]) UNIMPLEMENTED\n", __func__,
 		usb_hcd, hwahc);
 	return -ENOSYS;
 }

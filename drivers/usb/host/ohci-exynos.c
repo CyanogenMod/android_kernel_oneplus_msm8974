@@ -27,7 +27,7 @@ static int ohci_exynos_start(struct usb_hcd *hcd)
 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
 	int ret;
 
-	ohci_dbg(ohci, "ohci_exynos_start, ohci:%p", ohci);
+	ohci_dbg(ohci, "ohci_exynos_start, ohci:%pK", ohci);
 
 	ret = ohci_init(ohci);
 	if (ret < 0)

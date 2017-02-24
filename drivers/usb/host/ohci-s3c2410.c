@@ -157,7 +157,7 @@ static int ohci_s3c2410_hub_control(
 	u32 *data = (u32 *)buf;
 
 	dev_dbg(hcd->self.controller,
-		"s3c2410_hub_control(%p,0x%04x,0x%04x,0x%04x,%p,%04x)\n",
+		"s3c2410_hub_control(%pK,0x%04x,0x%04x,0x%04x,%pK,%04x)\n",
 		hcd, typeReq, wValue, wIndex, buf, wLength);
 
 	/* if we are only an humble host without any special capabilities

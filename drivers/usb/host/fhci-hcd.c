@@ -731,7 +731,7 @@ static int __devinit of_fhci_probe(struct platform_device *ofdev)
 		goto err_clocks;
 	}
 
-	dev_info(dev, "at 0x%p, irq %d\n", hcd->regs, usb_irq);
+	dev_info(dev, "at 0x%pK, irq %d\n", hcd->regs, usb_irq);
 
 	fhci_config_transceiver(fhci, FHCI_PORT_POWER_OFF);
 

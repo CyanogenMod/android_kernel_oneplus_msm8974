@@ -561,7 +561,7 @@ static int qh_link_periodic (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	unsigned	period = qh->period;
 
 	dev_dbg (&qh->dev->dev,
-		"link qh%d-%04x/%p start %d [%d/%d us]\n",
+		"link qh%d-%04x/%pK start %d [%d/%d us]\n",
 		period, hc32_to_cpup(ehci, &qh->hw->hw_info2)
 			& (QH_CMASK | QH_SMASK),
 		qh, qh->start, qh->usecs, qh->c_usecs);
@@ -644,7 +644,7 @@ static int qh_unlink_periodic(struct ehci_hcd *ehci, struct ehci_qh *qh)
 		: (qh->usecs * 8);
 
 	dev_dbg (&qh->dev->dev,
-		"unlink qh%d-%04x/%p start %d [%d/%d us]\n",
+		"unlink qh%d-%04x/%pK start %d [%d/%d us]\n",
 		qh->period,
 		hc32_to_cpup(ehci, &qh->hw->hw_info2) & (QH_CMASK | QH_SMASK),
 		qh, qh->start, qh->usecs, qh->c_usecs);
@@ -707,7 +707,7 @@ static void intr_deschedule (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		 * FIXME kill the now-dysfunctional queued urbs
 		 */
 		if (rc != 0)
-			ehci_err(ehci, "can't reschedule qh %p, err %d\n",
+			ehci_err(ehci, "can't reschedule qh %pK, err %d\n",
 					qh, rc);
 	}
 }
@@ -883,7 +883,7 @@ static int qh_schedule(struct ehci_hcd *ehci, struct ehci_qh *qh)
 			: cpu_to_hc32(ehci, QH_SMASK);
 		hw->hw_info2 |= c_mask;
 	} else
-		ehci_dbg (ehci, "reused qh %p schedule\n", qh);
+		ehci_dbg (ehci, "reused qh %pK schedule\n", qh);
 
 	/* stuff into the periodic schedule */
 	status = qh_link_periodic (ehci, qh);
@@ -1424,7 +1424,7 @@ iso_stream_schedule (
 	}
 
 	if (span > mod - SCHEDULE_SLOP) {
-		ehci_dbg (ehci, "iso request %p too long\n", urb);
+		ehci_dbg (ehci, "iso request %pK too long\n", urb);
 		status = -EFBIG;
 		goto fail;
 	}
@@ -1460,7 +1460,7 @@ iso_stream_schedule (
 		else
 			start = next + excess + period;
 		if (start - now >= mod) {
-			ehci_dbg(ehci, "request %p would overflow (%d+%d >= %d)\n",
+			ehci_dbg(ehci, "request %pK would overflow (%d+%d >= %d)\n",
 					urb, start - now - period, period,
 					mod);
 			status = -EFBIG;
@@ -1505,7 +1505,7 @@ iso_stream_schedule (
 
 		/* no room in the schedule */
 		if (!done) {
-			ehci_dbg(ehci, "iso resched full %p (now %d max %d)\n",
+			ehci_dbg(ehci, "iso resched full %pK (now %d max %d)\n",
 				urb, now, now + mod);
 			status = -ENOSPC;
 			goto fail;
@@ -1515,7 +1515,7 @@ iso_stream_schedule (
 	/* Tried to schedule too far into the future? */
 	if (unlikely(start - now + span - period
 				>= mod - 2 * SCHEDULE_SLOP)) {
-		ehci_dbg(ehci, "request %p would overflow (%d+%d >= %d)\n",
+		ehci_dbg(ehci, "request %pK would overflow (%d+%d >= %d)\n",
 				urb, start - now, span - period,
 				mod - 2 * SCHEDULE_SLOP);
 		status = -EFBIG;
@@ -1831,7 +1831,7 @@ static int itd_submit (struct ehci_hcd *ehci, struct urb *urb,
 
 #ifdef EHCI_URB_TRACE
 	ehci_dbg (ehci,
-		"%s %s urb %p ep%d%s len %d, %d pkts %d uframes [%p]\n",
+		"%s %s urb %pK ep%d%s len %d, %d pkts %d uframes [%pK]\n",
 		__func__, urb->dev->devpath, urb,
 		usb_pipeendpoint (urb->pipe),
 		usb_pipein (urb->pipe) ? "in" : "out",
@@ -2226,7 +2226,7 @@ static int sitd_submit (struct ehci_hcd *ehci, struct urb *urb,
 
 #ifdef EHCI_URB_TRACE
 	ehci_dbg (ehci,
-		"submit %p dev%s ep%d%s-iso len %d\n",
+		"submit %pK dev%s ep%d%s-iso len %d\n",
 		urb, urb->dev->devpath,
 		usb_pipeendpoint (urb->pipe),
 		usb_pipein (urb->pipe) ? "in" : "out",
@@ -2441,7 +2441,7 @@ restart:
 				q = *q_p;
 				break;
 			default:
-				dbg ("corrupt type %d frame %d shadow %p",
+				dbg ("corrupt type %d frame %d shadow %pK",
 					type, frame, q.ptr);
 				// BUG ();
 				q.ptr = NULL;

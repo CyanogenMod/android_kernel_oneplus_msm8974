@@ -265,7 +265,7 @@ static void usX2Y_clients_stop(struct usX2Ydev *usX2Y)
 	for (s = 0; s < 4; s++) {
 		struct snd_usX2Y_substream *subs = usX2Y->subs[s];
 		if (subs) {
-			snd_printdd("%i %p state=%i\n", s, subs, atomic_read(&subs->state));
+			snd_printdd("%i %pK state=%i\n", s, subs, atomic_read(&subs->state));
 			atomic_set(&subs->state, state_STOPPED);
 		}
 	}
@@ -373,7 +373,7 @@ static void i_usX2Y_subs_startup(struct urb *urb)
 
 static void usX2Y_subs_prepare(struct snd_usX2Y_substream *subs)
 {
-	snd_printdd("usX2Y_substream_prepare(%p) ep=%i urb0=%p urb1=%p\n",
+	snd_printdd("usX2Y_substream_prepare(%pK) ep=%i urb0=%pK urb1=%pK\n",
 		    subs, subs->endpoint, subs->urb[0], subs->urb[1]);
 	/* reset the pointer */
 	subs->hwptr = 0;
@@ -758,7 +758,7 @@ static int snd_usX2Y_pcm_hw_params(struct snd_pcm_substream *substream,
 	struct snd_card *card = substream->pstr->pcm->card;
 	struct list_head *list;
 
-	snd_printdd("snd_usX2Y_hw_params(%p, %p)\n", substream, hw_params);
+	snd_printdd("snd_usX2Y_hw_params(%pK, %pK)\n", substream, hw_params);
 	// all pcm substreams off one usX2Y have to operate at the same rate & format
 	list_for_each(list, &card->devices) {
 		struct snd_device *dev;
@@ -781,7 +781,7 @@ static int snd_usX2Y_pcm_hw_params(struct snd_pcm_substream *substream,
 		}
 	}
 	if (0 > (err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params)))) {
-		snd_printk(KERN_ERR "snd_pcm_lib_malloc_pages(%p, %i) returned %i\n",
+		snd_printk(KERN_ERR "snd_pcm_lib_malloc_pages(%pK, %i) returned %i\n",
 			   substream, params_buffer_bytes(hw_params), err);
 		return err;
 	}
@@ -796,7 +796,7 @@ static int snd_usX2Y_pcm_hw_free(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_usX2Y_substream *subs = runtime->private_data;
 	mutex_lock(&subs->usX2Y->prepare_mutex);
-	snd_printdd("snd_usX2Y_hw_free(%p)\n", substream);
+	snd_printdd("snd_usX2Y_hw_free(%pK)\n", substream);
 
 	if (SNDRV_PCM_STREAM_PLAYBACK == substream->stream) {
 		struct snd_usX2Y_substream *cap_subs = subs->usX2Y->subs[SNDRV_PCM_STREAM_CAPTURE];
@@ -831,7 +831,7 @@ static int snd_usX2Y_pcm_prepare(struct snd_pcm_substream *substream)
 	struct usX2Ydev *usX2Y = subs->usX2Y;
 	struct snd_usX2Y_substream *capsubs = subs->usX2Y->subs[SNDRV_PCM_STREAM_CAPTURE];
 	int err = 0;
-	snd_printdd("snd_usX2Y_pcm_prepare(%p)\n", substream);
+	snd_printdd("snd_usX2Y_pcm_prepare(%pK)\n", substream);
 
 	mutex_lock(&usX2Y->prepare_mutex);
 	usX2Y_subs_prepare(subs);

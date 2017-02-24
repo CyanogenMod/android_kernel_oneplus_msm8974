@@ -107,7 +107,7 @@ static int ch341_control_in(struct usb_device *dev,
 			    char *buf, unsigned bufsize)
 {
 	int r;
-	dbg("ch341_control_in(%02x,%02x,%04x,%04x,%p,%u)", USB_DIR_IN|0x40,
+	dbg("ch341_control_in(%02x,%02x,%04x,%04x,%pK,%u)", USB_DIR_IN|0x40,
 		(int)request, (int)value, (int)index, buf, (int)bufsize);
 
 	r = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0), request,

@@ -174,16 +174,16 @@ static void usblp_dump(struct usblp *usblp)
 {
 	int p;
 
-	dbg("usblp=0x%p", usblp);
-	dbg("dev=0x%p", usblp->dev);
+	dbg("usblp=0x%pK", usblp);
+	dbg("dev=0x%pK", usblp->dev);
 	dbg("present=%d", usblp->present);
-	dbg("readbuf=0x%p", usblp->readbuf);
+	dbg("readbuf=0x%pK", usblp->readbuf);
 	dbg("readcount=%d", usblp->readcount);
 	dbg("ifnum=%d", usblp->ifnum);
     for (p = USBLP_FIRST_PROTOCOL; p <= USBLP_LAST_PROTOCOL; p++) {
 	dbg("protocol[%d].alt_setting=%d", p, usblp->protocol[p].alt_setting);
-	dbg("protocol[%d].epwrite=%p", p, usblp->protocol[p].epwrite);
-	dbg("protocol[%d].epread=%p", p, usblp->protocol[p].epread);
+	dbg("protocol[%d].epwrite=%pK", p, usblp->protocol[p].epwrite);
+	dbg("protocol[%d].epread=%pK", p, usblp->protocol[p].epread);
     }
 	dbg("current_protocol=%d", usblp->current_protocol);
 	dbg("minor=%d", usblp->minor);

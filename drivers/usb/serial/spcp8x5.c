@@ -262,10 +262,10 @@ static int spcp8x5_get_msr(struct usb_device *dev, u8 *status,
 			      GET_UART_STATUS, GET_UART_STATUS_TYPE,
 			      0, GET_UART_STATUS_MSR, status_buffer, 1, 100);
 	if (ret < 0)
-		dev_dbg(&dev->dev, "Get MSR = 0x%p failed (error = %d)",
+		dev_dbg(&dev->dev, "Get MSR = 0x%pK failed (error = %d)",
 			status_buffer, ret);
 
-	dev_dbg(&dev->dev, "0xc0:0x22:0:6  %d - 0x%p ", ret, status_buffer);
+	dev_dbg(&dev->dev, "0xc0:0x22:0:6  %d - 0x%pK ", ret, status_buffer);
 	status[0] = status_buffer[0];
 	kfree(status_buffer);
 

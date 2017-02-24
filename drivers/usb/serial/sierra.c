@@ -446,7 +446,7 @@ static void sierra_release_urb(struct urb *urb)
 	struct usb_serial_port *port;
 	if (urb) {
 		port =  urb->context;
-		dev_dbg(&port->dev, "%s: %p\n", __func__, urb);
+		dev_dbg(&port->dev, "%s: %pK\n", __func__, urb);
 		kfree(urb->transfer_buffer);
 		usb_free_urb(urb);
 	}
@@ -602,7 +602,7 @@ static void sierra_indat_callback(struct urb *urb)
 	endpoint = usb_pipeendpoint(urb->pipe);
 	port = urb->context;
 
-	dev_dbg(&port->dev, "%s: %p\n", __func__, urb);
+	dev_dbg(&port->dev, "%s: %pK\n", __func__, urb);
 
 	if (status) {
 		dev_dbg(&port->dev, "%s: nonzero status: %d on"
@@ -643,7 +643,7 @@ static void sierra_instat_callback(struct urb *urb)
 	struct sierra_port_private *portdata = usb_get_serial_port_data(port);
 	struct usb_serial *serial = port->serial;
 
-	dev_dbg(&port->dev, "%s: urb %p port %p has data %p\n", __func__,
+	dev_dbg(&port->dev, "%s: urb %pK port %pK has data %pK\n", __func__,
 		urb, port, portdata);
 
 	if (status == 0) {
@@ -789,10 +789,10 @@ static struct urb *sierra_setup_urb(struct usb_serial *serial, int endpoint,
 			buf, len, callback, ctx);
 
 		/* debug */
-		dev_dbg(&serial->dev->dev, "%s %c u : %p d:%p\n", __func__,
+		dev_dbg(&serial->dev->dev, "%s %c u : %pK d:%pK\n", __func__,
 				dir == USB_DIR_IN ? 'i' : 'o', urb, buf);
 	} else {
-		dev_dbg(&serial->dev->dev, "%s %c u:%p d:%p\n", __func__,
+		dev_dbg(&serial->dev->dev, "%s %c u:%pK d:%pK\n", __func__,
 				dir == USB_DIR_IN ? 'i' : 'o', urb, buf);
 
 		sierra_release_urb(urb);

@@ -1309,7 +1309,7 @@ static int keyspan_fake_startup(struct usb_serial *serial)
 					     (unsigned char *)record->data,
 					     be16_to_cpu(record->len), 0xa0);
 		if (response < 0) {
-			dev_err(&serial->dev->dev, "ezusb_writememory failed for Keyspan firmware (%d %04X %p %d)\n",
+			dev_err(&serial->dev->dev, "ezusb_writememory failed for Keyspan firmware (%d %04X %pK %d)\n",
 				response, be32_to_cpu(record->addr),
 				record->data, be16_to_cpu(record->len));
 			break;
@@ -1391,7 +1391,7 @@ static struct urb *keyspan_setup_urb(struct usb_serial *serial, int endpoint,
 		return NULL;
 	}
 
-	dbg("%s - using urb %p for %s endpoint %x",
+	dbg("%s - using urb %pK for %s endpoint %x",
 	    __func__, urb, ep_type_name, endpoint);
 	return urb;
 }

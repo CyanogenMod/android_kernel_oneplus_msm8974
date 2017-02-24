@@ -344,7 +344,7 @@ static void done(struct pxa25x_ep *ep, struct pxa25x_request *req, int status)
 		status = req->req.status;
 
 	if (status && status != -ESHUTDOWN)
-		DBG(DBG_VERBOSE, "complete %s req %p stat %d len %u/%u\n",
+		DBG(DBG_VERBOSE, "complete %s req %pK stat %d len %u/%u\n",
 			ep->ep.name, &req->req, status,
 			req->req.actual, req->req.length);
 
@@ -410,7 +410,7 @@ write_fifo (struct pxa25x_ep *ep, struct pxa25x_request *req)
 			is_short = unlikely (max < ep->fifo_size);
 		}
 
-		DBG(DBG_VERY_NOISY, "wrote %s %d bytes%s%s %d left %p\n",
+		DBG(DBG_VERY_NOISY, "wrote %s %d bytes%s%s %d left %pK\n",
 			ep->ep.name, count,
 			is_last ? "/L" : "", is_short ? "/S" : "",
 			req->req.length - req->req.actual, req);
@@ -464,7 +464,7 @@ write_ep0_fifo (struct pxa25x_ep *ep, struct pxa25x_request *req)
 	/* last packet "must be" short (or a zlp) */
 	is_short = (count != EP0_FIFO_SIZE);
 
-	DBG(DBG_VERY_NOISY, "ep0in %d bytes %d left %p\n", count,
+	DBG(DBG_VERY_NOISY, "ep0in %d bytes %d left %pK\n", count,
 		req->req.length - req->req.actual, req);
 
 	if (unlikely (is_short)) {
@@ -538,7 +538,7 @@ read_fifo (struct pxa25x_ep *ep, struct pxa25x_request *req)
 		} else /* zlp */
 			count = 0;
 		is_short = (count < ep->ep.maxpacket);
-		DBG(DBG_VERY_NOISY, "read %s %02x, %d bytes%s req %p %d/%d\n",
+		DBG(DBG_VERY_NOISY, "read %s %02x, %d bytes%s req %pK %d/%d\n",
 			ep->ep.name, udccs, count,
 			is_short ? "/S" : "",
 			req, req->req.actual, req->req.length);
@@ -663,7 +663,7 @@ pxa25x_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 		        && req->req.length > usb_endpoint_maxp (ep->desc)))
 		return -EMSGSIZE;
 
-	DBG(DBG_NOISY, "%s queue req %p, len %d buf %p\n",
+	DBG(DBG_NOISY, "%s queue req %pK, len %d buf %pK\n",
 		_ep->name, _req, _req->length, _req->buf);
 
 	local_irq_save(flags);
@@ -1107,7 +1107,7 @@ udc_seq_show(struct seq_file *m, void *_d)
 		}
 		list_for_each_entry(req, &ep->queue, queue) {
 			seq_printf(m,
-					"\treq %p len %d/%d buf %p\n",
+					"\treq %pK len %d/%d buf %pK\n",
 					&req->req, req->req.actual,
 					req->req.length, req->req.buf);
 		}

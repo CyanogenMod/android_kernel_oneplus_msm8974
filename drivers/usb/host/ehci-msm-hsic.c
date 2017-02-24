@@ -266,7 +266,7 @@ static void dbg_log_event(struct urb *urb, char * event, unsigned extra)
 		if (!str_to_event(event)) {
 			write_lock_irqsave(&dbg_hsic_ctrl.lck, flags);
 			scnprintf(dbg_hsic_ctrl.buf[dbg_hsic_ctrl.idx],
-				DBG_MSG_LEN, "%s: [%s : %p]:[%s] "
+				DBG_MSG_LEN, "%s: [%s : %pK]:[%s] "
 				  "%02x %02x %04x %04x %04x  %u %d",
 				  get_timestamp(tbuf), event, urb,
 				  (ep_addr & USB_DIR_IN) ? "in" : "out",
@@ -284,7 +284,7 @@ static void dbg_log_event(struct urb *urb, char * event, unsigned extra)
 		} else {
 			write_lock_irqsave(&dbg_hsic_ctrl.lck, flags);
 			scnprintf(dbg_hsic_ctrl.buf[dbg_hsic_ctrl.idx],
-				DBG_MSG_LEN, "%s: [%s : %p]:[%s] %u %d",
+				DBG_MSG_LEN, "%s: [%s : %pK]:[%s] %u %d",
 				  get_timestamp(tbuf), event, urb,
 				  (ep_addr & USB_DIR_IN) ? "in" : "out",
 				  urb->actual_length, extra);
@@ -295,7 +295,7 @@ static void dbg_log_event(struct urb *urb, char * event, unsigned extra)
 	} else {
 		write_lock_irqsave(&dbg_hsic_data.lck, flags);
 		scnprintf(dbg_hsic_data.buf[dbg_hsic_data.idx], DBG_MSG_LEN,
-			  "%s: [%s : %p]:ep%d[%s]  %u %d %s",
+			  "%s: [%s : %pK]:ep%d[%s]  %u %d %s",
 			  get_timestamp(tbuf), event, urb, ep_addr & 0x0f,
 			  (ep_addr & USB_DIR_IN) ? "in" : "out",
 			  str_to_event(event) ? urb->actual_length :
@@ -327,7 +327,7 @@ static void dump_hsic_regs(struct usb_hcd *hcd)
 		return;
 
 	for (i = USB_REG_START_OFFSET; i <= USB_REG_END_OFFSET; i += 0x10)
-		pr_info("%p: %08x\t%08x\t%08x\t%08x\n", hcd->regs + i,
+		pr_info("%pK: %08x\t%08x\t%08x\t%08x\n", hcd->regs + i,
 				readl_relaxed(hcd->regs + i),
 				readl_relaxed(hcd->regs + i + 4),
 				readl_relaxed(hcd->regs + i + 8),
@@ -1622,7 +1622,7 @@ static irqreturn_t hsic_peripheral_status_change(int irq, void *dev_id)
 {
 	struct msm_hsic_hcd *mehci = dev_id;
 
-	pr_debug("%s: mehci:%p dev_id:%p\n", __func__, mehci, dev_id);
+	pr_debug("%s: mehci:%pK dev_id:%pK\n", __func__, mehci, dev_id);
 
 	if (mehci)
 		msm_hsic_config_gpios(mehci, 0);

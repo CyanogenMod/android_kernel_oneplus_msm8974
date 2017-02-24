@@ -306,7 +306,7 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	u32 *data = (u32 *)buf;
 
 	dev_dbg(hcd->self.controller,
-		"ohci_at91_hub_control(%p,0x%04x,0x%04x,0x%04x,%p,%04x)\n",
+		"ohci_at91_hub_control(%pK,0x%04x,0x%04x,0x%04x,%pK,%04x)\n",
 		hcd, typeReq, wValue, wIndex, buf, wLength);
 
 	wIndex--;

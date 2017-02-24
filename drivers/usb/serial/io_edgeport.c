@@ -775,7 +775,7 @@ static void edge_bulk_out_cmd_callback(struct urb *urb)
 	dbg("%s", __func__);
 
 	atomic_dec(&CmdUrbs);
-	dbg("%s - FREE URB %p (outstanding %d)", __func__,
+	dbg("%s - FREE URB %pK (outstanding %d)", __func__,
 					urb, atomic_read(&CmdUrbs));
 
 
@@ -2353,7 +2353,7 @@ static int write_cmd_usb(struct edgeport_port *edge_port,
 		return -ENOMEM;
 
 	atomic_inc(&CmdUrbs);
-	dbg("%s - ALLOCATE URB %p (outstanding %d)",
+	dbg("%s - ALLOCATE URB %pK (outstanding %d)",
 				__func__, urb, atomic_read(&CmdUrbs));
 
 	usb_fill_bulk_urb(urb, edge_serial->serial->dev,

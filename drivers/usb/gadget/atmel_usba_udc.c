@@ -360,7 +360,7 @@ static void next_fifo_transaction(struct usba_ep *ep, struct usba_request *req)
 	} else if (transaction_len == ep->ep.maxpacket && req->req.zero)
 		req->last_transaction = 0;
 
-	DBG(DBG_QUEUE, "%s: submit_transaction, req %p (length %d)%s\n",
+	DBG(DBG_QUEUE, "%s: submit_transaction, req %pK (length %d)%s\n",
 		ep->ep.name, req, transaction_len,
 		req->last_transaction ? ", done" : "");
 
@@ -371,7 +371,7 @@ static void next_fifo_transaction(struct usba_ep *ep, struct usba_request *req)
 
 static void submit_request(struct usba_ep *ep, struct usba_request *req)
 {
-	DBG(DBG_QUEUE, "%s: submit_request: req %p (length %d)\n",
+	DBG(DBG_QUEUE, "%s: submit_request: req %pK (length %d)\n",
 		ep->ep.name, req, req->req.length);
 
 	req->req.actual = 0;
@@ -498,7 +498,7 @@ request_complete(struct usba_ep *ep, struct usba_request *req, int status)
 	}
 
 	DBG(DBG_GADGET | DBG_REQ,
-		"%s: req %p complete: status %d, actual %u\n",
+		"%s: req %pK complete: status %d, actual %u\n",
 		ep->ep.name, req, req->req.status, req->req.actual);
 
 	spin_unlock(&udc->lock);
@@ -525,7 +525,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
 	unsigned long flags, ept_cfg, maxpacket;
 	unsigned int nr_trans;
 
-	DBG(DBG_GADGET, "%s: ep_enable: desc=%p\n", ep->ep.name, desc);
+	DBG(DBG_GADGET, "%s: ep_enable: desc=%pK\n", ep->ep.name, desc);
 
 	maxpacket = usb_endpoint_maxp(desc) & 0x7ff;
 
@@ -684,7 +684,7 @@ usba_ep_alloc_request(struct usb_ep *_ep, gfp_t gfp_flags)
 {
 	struct usba_request *req;
 
-	DBG(DBG_GADGET, "ep_alloc_request: %p, 0x%x\n", _ep, gfp_flags);
+	DBG(DBG_GADGET, "ep_alloc_request: %pK, 0x%x\n", _ep, gfp_flags);
 
 	req = kzalloc(sizeof(*req), gfp_flags);
 	if (!req)
@@ -701,7 +701,7 @@ usba_ep_free_request(struct usb_ep *_ep, struct usb_request *_req)
 {
 	struct usba_request *req = to_usba_req(_req);
 
-	DBG(DBG_GADGET, "ep_free_request: %p, %p\n", _ep, _req);
+	DBG(DBG_GADGET, "ep_free_request: %pK, %pK\n", _ep, _req);
 
 	kfree(req);
 }
@@ -773,7 +773,7 @@ usba_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 	unsigned long flags;
 	int ret;
 
-	DBG(DBG_GADGET | DBG_QUEUE | DBG_REQ, "%s: queue req %p, len %u\n",
+	DBG(DBG_GADGET | DBG_QUEUE | DBG_REQ, "%s: queue req %pK, len %u\n",
 			ep->ep.name, req, _req->length);
 
 	if (!udc->driver || udc->gadget.speed == USB_SPEED_UNKNOWN || !ep->desc)
@@ -855,7 +855,7 @@ static int usba_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 	unsigned long flags;
 	u32 status;
 
-	DBG(DBG_GADGET | DBG_QUEUE, "ep_dequeue: %s, req %p\n",
+	DBG(DBG_GADGET | DBG_QUEUE, "ep_dequeue: %s, req %pK\n",
 			ep->ep.name, req);
 
 	spin_lock_irqsave(&udc->lock, flags);
@@ -1502,7 +1502,7 @@ restart:
 			return;
 		}
 
-		DBG(DBG_FIFO, "Copying ctrl request from 0x%p:\n", ep->fifo);
+		DBG(DBG_FIFO, "Copying ctrl request from 0x%pK:\n", ep->fifo);
 		memcpy_fromio(crq.data, ep->fifo, sizeof(crq));
 
 		/* Free up one bank in the FIFO so that we can
@@ -1924,14 +1924,14 @@ static int __init usba_udc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Unable to map I/O memory, aborting.\n");
 		goto err_map_regs;
 	}
-	dev_info(&pdev->dev, "MMIO registers at 0x%08lx mapped at %p\n",
+	dev_info(&pdev->dev, "MMIO registers at 0x%08lx mapped at %pK\n",
 		 (unsigned long)regs->start, udc->regs);
 	udc->fifo = ioremap(fifo->start, resource_size(fifo));
 	if (!udc->fifo) {
 		dev_err(&pdev->dev, "Unable to map FIFO, aborting.\n");
 		goto err_map_fifo;
 	}
-	dev_info(&pdev->dev, "FIFO at 0x%08lx mapped at %p\n",
+	dev_info(&pdev->dev, "FIFO at 0x%08lx mapped at %pK\n",
 		 (unsigned long)fifo->start, udc->fifo);
 
 	device_initialize(&udc->gadget.dev);

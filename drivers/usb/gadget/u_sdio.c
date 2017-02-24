@@ -153,7 +153,7 @@ int gsdio_alloc_requests(struct usb_ep *ep, struct list_head *head,
 	int i;
 	struct usb_request *req;
 
-	pr_debug("%s: ep:%p head:%p num:%d size:%d cb:%p", __func__,
+	pr_debug("%s: ep:%pK head:%pK num:%d size:%d cb:%pK", __func__,
 			ep, head, num, size, cb);
 
 	for (i = 0; i < num; i++) {
@@ -180,7 +180,7 @@ void gsdio_start_rx(struct gsdio_port *port)
 		return;
 	}
 
-	pr_debug("%s: port:%p port#%d\n", __func__, port, port->port_num);
+	pr_debug("%s: port:%pK port#%d\n", __func__, port, port->port_num);
 
 	spin_lock_irq(&port->port_lock);
 
@@ -210,7 +210,7 @@ void gsdio_start_rx(struct gsdio_port *port)
 		spin_lock_irq(&port->port_lock);
 		if (ret) {
 			pr_err("%s: usb ep out queue failed"
-					"port:%p, port#%d\n",
+					"port:%pK, port#%d\n",
 					__func__, port, port->port_num);
 			list_add_tail(&req->list, pool);
 			port->rp_len++;
@@ -248,7 +248,7 @@ int gsdio_write(struct gsdio_port *port, struct usb_request *req)
 		return -ENODEV;
 	}
 
-	pr_debug("%s: port:%p port#%d req:%p actual:%d n_read:%d\n",
+	pr_debug("%s: port:%pK port#%d req:%pK actual:%d n_read:%d\n",
 			__func__, port, port->port_num, req,
 			req->actual, port->n_read);
 
@@ -309,7 +309,7 @@ void gsdio_rx_push(struct work_struct *w)
 	struct usb_ep		*out;
 	int ret;
 
-	pr_debug("%s: port:%p port#%d read_queue:%p", __func__,
+	pr_debug("%s: port:%pK port#%d read_queue:%pK", __func__,
 			port, port->port_num, q);
 
 	spin_lock_irq(&port->port_lock);
@@ -329,11 +329,11 @@ void gsdio_rx_push(struct work_struct *w)
 
 		switch (req->status) {
 		case -ESHUTDOWN:
-			pr_debug("%s: req status shutdown portno#%d port:%p",
+			pr_debug("%s: req status shutdown portno#%d port:%pK",
 					__func__, port->port_num, port);
 			goto rx_push_end;
 		default:
-			pr_warning("%s: port:%p port#%d"
+			pr_warning("%s: port:%pK port#%d"
 					" Unexpected Rx Status:%d\n", __func__,
 					port, port->port_num, req->status);
 			/* FALL THROUGH */
@@ -391,7 +391,7 @@ void gsdio_read_complete(struct usb_ep *ep, struct usb_request *req)
 	struct gsdio_port *port = ep->driver_data;
 	unsigned long flags;
 
-	pr_debug("%s: ep:%p port:%p\n", __func__, ep, port);
+	pr_debug("%s: ep:%pK port:%pK\n", __func__, ep, port);
 
 	if (!port) {
 		pr_err("%s: port is null\n", __func__);
@@ -412,7 +412,7 @@ void gsdio_write_complete(struct usb_ep *ep, struct usb_request *req)
 	struct gsdio_port *port = ep->driver_data;
 	unsigned long flags;
 
-	pr_debug("%s: ep:%p port:%p\n", __func__, ep, port);
+	pr_debug("%s: ep:%pK port:%pK\n", __func__, ep, port);
 
 	if (!port) {
 		pr_err("%s: port is null\n", __func__);
@@ -425,7 +425,7 @@ void gsdio_write_complete(struct usb_ep *ep, struct usb_request *req)
 
 	switch (req->status) {
 	default:
-		pr_warning("%s: port:%p port#%d unexpected %s status %d\n",
+		pr_warning("%s: port:%pK port#%d unexpected %s status %d\n",
 				__func__, port, port->port_num,
 				ep->name, req->status);
 		/* FALL THROUGH */
@@ -474,7 +474,7 @@ void gsdio_tx_pull(struct work_struct *w)
 	struct gsdio_port *port = container_of(w, struct gsdio_port, pull);
 	struct list_head *pool = &port->write_pool;
 
-	pr_debug("%s: port:%p port#%d pool:%p\n", __func__,
+	pr_debug("%s: port:%pK port#%d pool:%pK\n", __func__,
 			port, port->port_num, pool);
 
 	if (!port->port_usb) {
@@ -507,7 +507,7 @@ void gsdio_tx_pull(struct work_struct *w)
 		avail = sdio_read_avail(ch);
 		if (!avail) {
 			/* REVISIT: for ZLP */
-			pr_debug("%s: read_avail:%d port:%p port#%d\n",
+			pr_debug("%s: read_avail:%d port:%pK port#%d\n",
 					__func__, avail, port, port->port_num);
 			goto tx_pull_end;
 		}
@@ -522,7 +522,7 @@ void gsdio_tx_pull(struct work_struct *w)
 		ret = sdio_read(ch, req->buf, avail);
 		spin_lock_irq(&port->port_lock);
 		if (ret) {
-			pr_err("%s: port:%p port#%d sdio read failed err:%d",
+			pr_err("%s: port:%pK port#%d sdio read failed err:%d",
 					__func__, port, port->port_num, ret);
 
 			/* check if usb is still active */
@@ -542,7 +542,7 @@ void gsdio_tx_pull(struct work_struct *w)
 		spin_lock_irq(&port->port_lock);
 		if (ret) {
 			pr_err("%s: usb ep out queue failed"
-					"port:%p, port#%d err:%d\n",
+					"port:%pK, port#%d err:%d\n",
 					__func__, port, port->port_num, ret);
 
 			/* could be usb disconnected */
@@ -666,11 +666,11 @@ void gsdio_ctrl_notify_modem(void *gptr, u8 portno, int ctrl_bits)
 	 port->cbits_to_modem = temp;
 
 	/* TIOCM_DTR - 0x002 - bit(1) */
-	pr_debug("%s: port:%p port#%d ctrl_bits:%08x\n", __func__,
+	pr_debug("%s: port:%pK port#%d ctrl_bits:%08x\n", __func__,
 		port, port->port_num, ctrl_bits);
 
 	if (!port->sdio_open) {
-		pr_err("%s: port:%p port#%d sdio not connected\n",
+		pr_err("%s: port:%pK port#%d sdio not connected\n",
 				__func__, port, port->port_num);
 		return;
 	}
@@ -690,7 +690,7 @@ void gsdio_ctrl_modem_status(int ctrl_bits, void *_dev)
 	 * TIOCM_RI - 0x080 - bit(7)
 	 * TIOCM_DSR- 0x100 - bit(8)
 	 */
-	pr_debug("%s: port:%p port#%d event:%08x\n", __func__,
+	pr_debug("%s: port:%pK port#%d event:%08x\n", __func__,
 		port, port->port_num, ctrl_bits);
 
 	port->cbits_to_laptop = 0;
@@ -711,7 +711,7 @@ void gsdio_ch_notify(void *_dev, unsigned event)
 {
 	struct gsdio_port *port = _dev;
 
-	pr_debug("%s: port:%p port#%d event:%s\n", __func__,
+	pr_debug("%s: port:%pK port#%d event:%s\n", __func__,
 		port, port->port_num,
 		event == 1 ? "READ AVAIL" : "WRITE_AVAIL");
 
@@ -733,7 +733,7 @@ static void gsdio_open_work(struct work_struct *w)
 
 	ret = sdio_open(pi->data_ch_name, &pi->ch, port, gsdio_ch_notify);
 	if (ret) {
-		pr_err("%s: port:%p port#%d unable to open sdio ch:%s\n",
+		pr_err("%s: port:%pK port#%d unable to open sdio ch:%s\n",
 				__func__, port, port->port_num,
 				pi->data_ch_name);
 		return;
@@ -743,7 +743,7 @@ static void gsdio_open_work(struct work_struct *w)
 	ret = sdio_cmux_open(pi->ctrl_ch_id, 0, 0,
 			gsdio_ctrl_modem_status, port);
 	if (ret) {
-		pr_err("%s: port:%p port#%d unable to open ctrl ch:%d\n",
+		pr_err("%s: port:%pK port#%d unable to open ctrl ch:%d\n",
 				__func__, port, port->port_num, pi->ctrl_ch_id);
 		port->ctrl_ch_err = 1;
 	}
@@ -899,12 +899,12 @@ int gsdio_port_alloc(unsigned portno,
 	pdriver->driver.name = pi->data_ch_name;
 	pdriver->driver.owner = THIS_MODULE;
 
-	pr_debug("%s: port:%p port#%d sdio_name: %s\n", __func__,
+	pr_debug("%s: port:%pK port#%d sdio_name: %s\n", __func__,
 			port, port->port_num, pi->data_ch_name);
 
 	platform_driver_register(pdriver);
 
-	pr_debug("%s: port:%p port#%d\n", __func__, port, port->port_num);
+	pr_debug("%s: port:%pK port#%d\n", __func__, port, port->port_num);
 
 	return 0;
 }
@@ -1029,7 +1029,7 @@ static ssize_t debug_sdio_read_stats(struct file *file, char __user *ubuf,
 		port = sdio_ports[i].port;
 		spin_lock_irqsave(&port->port_lock, flags);
 		temp += scnprintf(buf + temp, PAGE_SIZE - temp,
-				"###PORT:%d port:%p###\n"
+				"###PORT:%d port:%pK###\n"
 				"nbytes_tolaptop: %lu\n"
 				"nbytes_tomodem:  %lu\n"
 				"cbits_to_modem:  %u\n"
@@ -1112,7 +1112,7 @@ int gsdio_setup(struct usb_gadget *g, unsigned count)
 	int i;
 	int ret = 0;
 
-	pr_debug("%s: gadget:(%p) count:%d\n", __func__, g, count);
+	pr_debug("%s: gadget:(%pK) count:%d\n", __func__, g, count);
 
 	if (count == 0 || count > SDIO_N_PORTS) {
 		pr_err("%s: invalid number of ports count:%d max_ports:%d\n",

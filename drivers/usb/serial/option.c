@@ -1912,7 +1912,7 @@ static void option_instat_callback(struct urb *urb)
 					usb_get_serial_port_data(port);
 
 	dbg("%s", __func__);
-	dbg("%s: urb %p port %p has data %p", __func__, urb, port, portdata);
+	dbg("%s: urb %pK port %pK has data %pK", __func__, urb, port, portdata);
 
 	if (status == 0) {
 		struct usb_ctrlrequest *req_pkt =

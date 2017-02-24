@@ -533,7 +533,7 @@ udc_alloc_request(struct usb_ep *usbep, gfp_t gfp)
 			return NULL;
 		}
 
-		VDBG(ep->dev, "udc_alloc_req: req = %p dma_desc = %p, "
+		VDBG(ep->dev, "udc_alloc_req: req = %pK dma_desc = %pK, "
 				"td_phys = %lx\n",
 				req, dma_desc,
 				(unsigned long)req->td_phys);
@@ -562,10 +562,10 @@ udc_free_request(struct usb_ep *usbep, struct usb_request *usbreq)
 
 	ep = container_of(usbep, struct udc_ep, ep);
 	req = container_of(usbreq, struct udc_request, req);
-	VDBG(ep->dev, "free_req req=%p\n", req);
+	VDBG(ep->dev, "free_req req=%pK\n", req);
 	BUG_ON(!list_empty(&req->queue));
 	if (req->td_data) {
-		VDBG(ep->dev, "req->td_data=%p\n", req->td_data);
+		VDBG(ep->dev, "req->td_data=%pK\n", req->td_data);
 
 		/* free dma chain if created */
 		if (req->chain_len > 1)
@@ -591,7 +591,7 @@ static void udc_init_bna_dummy(struct udc_request *req)
 					UDC_DMA_STP_STS_BS_DMA_DONE,
 					UDC_DMA_STP_STS_BS);
 #ifdef UDC_VERBOSE
-		pr_debug("bna desc = %p, sts = %08x\n",
+		pr_debug("bna desc = %pK, sts = %08x\n",
 			req->td_data, req->td_data->status);
 #endif
 	}
@@ -731,7 +731,7 @@ static int prep_dma(struct udc_ep *ep, struct udc_request *req, gfp_t gfp)
 	u32	tmp;
 
 	VDBG(ep->dev, "prep_dma\n");
-	VDBG(ep->dev, "prep_dma ep%d req->td_data=%p\n",
+	VDBG(ep->dev, "prep_dma ep%d req->td_data=%pK\n",
 			ep->num, req->td_data);
 
 	/* set buffer pointer */
@@ -839,7 +839,7 @@ __acquires(ep->dev->lock)
 	/* remove from ep queue */
 	list_del_init(&req->queue);
 
-	VDBG(ep->dev, "req %p => complete %d bytes at %s with sts %d\n",
+	VDBG(ep->dev, "req %pK => complete %d bytes at %s with sts %d\n",
 		&req->req, req->req.length, ep->ep.name, sts);
 
 	spin_unlock(&dev->lock);
@@ -857,7 +857,7 @@ static int udc_free_dma_chain(struct udc *dev, struct udc_request *req)
 	struct udc_data_dma	*td_last = NULL;
 	unsigned int i;
 
-	DBG(dev, "free chain req = %p\n", req);
+	DBG(dev, "free chain req = %pK\n", req);
 
 	/* do not free first desc., will be done by free for request */
 	td_last = req->td_data;
@@ -1077,13 +1077,13 @@ udc_queue(struct usb_ep *usbep, struct usb_request *usbreq, gfp_t gfp)
 
 	/* map dma (usually done before) */
 	if (ep->dma) {
-		VDBG(dev, "DMA map req %p\n", req);
+		VDBG(dev, "DMA map req %pK\n", req);
 		retval = usb_gadget_map_request(&udc->gadget, usbreq, ep->in);
 		if (retval)
 			return retval;
 	}
 
-	VDBG(dev, "%s queue req %p, len %d req->td_data=%p buf %p\n",
+	VDBG(dev, "%s queue req %pK, len %d req->td_data=%pK buf %pK\n",
 			usbep->name, usbreq, usbreq->length,
 			req->td_data, usbreq->buf);
 
@@ -2124,7 +2124,7 @@ static irqreturn_t udc_data_out_isr(struct udc *dev, int ep_ix)
 		req = NULL;
 		udc_rxfifo_pending = 1;
 	}
-	VDBG(dev, "req = %p\n", req);
+	VDBG(dev, "req = %pK\n", req);
 	/* fifo mode */
 	if (!use_dma) {
 
@@ -2175,8 +2175,8 @@ static irqreturn_t udc_data_out_isr(struct udc *dev, int ep_ix)
 				VDBG(dev, "rx bytes=%u\n", count);
 			/* packet per buffer mode - rx bytes */
 			} else {
-				VDBG(dev, "req->td_data=%p\n", req->td_data);
-				VDBG(dev, "last desc = %p\n", td);
+				VDBG(dev, "req->td_data=%pK\n", req->td_data);
+				VDBG(dev, "last desc = %pK\n", td);
 				/* received number bytes */
 				if (use_dma_ppb_du) {
 					/* every desc. counts bytes */
@@ -2397,7 +2397,7 @@ static irqreturn_t udc_data_in_isr(struct udc *dev, int ep_ix)
 				}
 			/* DMA */
 			} else if (req && !req->dma_going) {
-				VDBG(dev, "IN DMA : req=%p req->td_data=%p\n",
+				VDBG(dev, "IN DMA : req=%pK req->td_data=%pK\n",
 					req, req->td_data);
 				if (req->td_data) {
 

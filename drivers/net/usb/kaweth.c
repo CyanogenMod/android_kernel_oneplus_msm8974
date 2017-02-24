@@ -422,7 +422,7 @@ static int kaweth_download_firmware(struct kaweth_device *kaweth,
 	dbg("High: %i, Low:%i", kaweth->firmware_buf[3],
 		   kaweth->firmware_buf[2]);
 
-	dbg("Downloading firmware at %p to kaweth device at %p",
+	dbg("Downloading firmware at %pK to kaweth device at %pK",
 	    fw->data, kaweth);
 	dbg("Firmware length: %d", data_len);
 
@@ -472,7 +472,7 @@ static int kaweth_reset(struct kaweth_device *kaweth)
 {
 	int result;
 
-	dbg("kaweth_reset(%p)", kaweth);
+	dbg("kaweth_reset(%pK)", kaweth);
 	result = usb_reset_configuration(kaweth->dev);
 	mdelay(10);
 
@@ -1009,7 +1009,7 @@ static int kaweth_probe(
 		 le16_to_cpu(dev->descriptor.idProduct),
 		 le16_to_cpu(dev->descriptor.bcdDevice));
 
-	dbg("Device at %p", dev);
+	dbg("Device at %pK", dev);
 
 	dbg("Descriptor length: %x type: %x",
 		 (int)dev->descriptor.bLength,

@@ -48,7 +48,7 @@ static int snd_us428ctls_vm_fault(struct vm_area_struct *area,
 	get_page(page);
 	vmf->page = page;
 
-	snd_printdd("vaddr=%p made us428ctls_vm_fault() page %p\n",
+	snd_printdd("vaddr=%pK made us428ctls_vm_fault() page %pK\n",
 		    vaddr, page);
 
 	return 0;

@@ -261,8 +261,8 @@ static void u132_hcd_delete(struct kref *kref)
 	list_del_init(&u132->u132_list);
 	u132_instances -= 1;
 	mutex_unlock(&u132_module_lock);
-	dev_warn(&u132->platform_dev->dev, "FREEING the hcd=%p and thus the u13"
-		"2=%p going=%d pdev=%p\n", hcd, u132, u132->going, pdev);
+	dev_warn(&u132->platform_dev->dev, "FREEING the hcd=%pK and thus the u13"
+		"2=%pK going=%d pdev=%pK\n", hcd, u132, u132->going, pdev);
 	usb_put_hcd(hcd);
 }
 
@@ -641,7 +641,7 @@ static void u132_hcd_interrupt_recv(void *data, struct urb *urb, u8 *buf,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -701,7 +701,7 @@ static void u132_hcd_interrupt_recv(void *data, struct urb *urb, u8 *buf,
 				endp->toggle_bits = 0x2;
 				usb_settoggle(udev->usb_device, endp->usb_endp,
 					0, 0);
-				dev_err(&u132->platform_dev->dev, "urb=%p givin"
+				dev_err(&u132->platform_dev->dev, "urb=%pK givin"
 					"g back INTERRUPT %s\n", urb,
 					cc_to_text[condition_code]);
 			}
@@ -711,7 +711,7 @@ static void u132_hcd_interrupt_recv(void *data, struct urb *urb, u8 *buf,
 			return;
 		}
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -740,7 +740,7 @@ static void u132_hcd_bulk_output_sent(void *data, struct urb *urb, u8 *buf,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -762,7 +762,7 @@ static void u132_hcd_bulk_output_sent(void *data, struct urb *urb, u8 *buf,
 			return;
 		}
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -792,7 +792,7 @@ static void u132_hcd_bulk_input_recv(void *data, struct urb *urb, u8 *buf,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -840,7 +840,7 @@ static void u132_hcd_bulk_input_recv(void *data, struct urb *urb, u8 *buf,
 			endp->toggle_bits = toggle_bits;
 			usb_settoggle(udev->usb_device, endp->usb_endp, 0,
 				1 & toggle_bits);
-			dev_warn(&u132->platform_dev->dev, "urb=%p(SHORT NOT OK"
+			dev_warn(&u132->platform_dev->dev, "urb=%pK(SHORT NOT OK"
 				") giving back BULK IN %s\n", urb,
 				cc_to_text[condition_code]);
 			mutex_unlock(&u132->scheduler_lock);
@@ -856,7 +856,7 @@ static void u132_hcd_bulk_input_recv(void *data, struct urb *urb, u8 *buf,
 		} else {
 			endp->toggle_bits = 0x2;
 			usb_settoggle(udev->usb_device, endp->usb_endp, 0, 0);
-			dev_err(&u132->platform_dev->dev, "urb=%p giving back B"
+			dev_err(&u132->platform_dev->dev, "urb=%pK giving back B"
 				"ULK IN code=%d %s\n", urb, condition_code,
 				cc_to_text[condition_code]);
 			mutex_unlock(&u132->scheduler_lock);
@@ -865,7 +865,7 @@ static void u132_hcd_bulk_input_recv(void *data, struct urb *urb, u8 *buf,
 			return;
 		}
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -893,7 +893,7 @@ static void u132_hcd_configure_empty_sent(void *data, struct urb *urb, u8 *buf,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -902,7 +902,7 @@ static void u132_hcd_configure_empty_sent(void *data, struct urb *urb, u8 *buf,
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
 		return;
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -931,7 +931,7 @@ static void u132_hcd_configure_input_recv(void *data, struct urb *urb, u8 *buf,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -960,21 +960,21 @@ static void u132_hcd_configure_input_recv(void *data, struct urb *urb, u8 *buf,
 		} else if (condition_code == TD_CC_STALL) {
 			mutex_unlock(&u132->scheduler_lock);
 			dev_warn(&u132->platform_dev->dev, "giving back SETUP I"
-				"NPUT STALL urb %p\n", urb);
+				"NPUT STALL urb %pK\n", urb);
 			u132_hcd_giveback_urb(u132, endp, urb,
 				cc_to_error[condition_code]);
 			return;
 		} else {
 			mutex_unlock(&u132->scheduler_lock);
 			dev_err(&u132->platform_dev->dev, "giving back SETUP IN"
-				"PUT %s urb %p\n", cc_to_text[condition_code],
+				"PUT %s urb %pK\n", cc_to_text[condition_code],
 				urb);
 			u132_hcd_giveback_urb(u132, endp, urb,
 				cc_to_error[condition_code]);
 			return;
 		}
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -1002,7 +1002,7 @@ static void u132_hcd_configure_empty_recv(void *data, struct urb *urb, u8 *buf,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -1011,7 +1011,7 @@ static void u132_hcd_configure_empty_recv(void *data, struct urb *urb, u8 *buf,
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
 		return;
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -1040,7 +1040,7 @@ static void u132_hcd_configure_setup_sent(void *data, struct urb *urb, u8 *buf,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -1069,7 +1069,7 @@ static void u132_hcd_configure_setup_sent(void *data, struct urb *urb, u8 *buf,
 			return;
 		}
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -1099,7 +1099,7 @@ static void u132_hcd_enumeration_empty_recv(void *data, struct urb *urb,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -1110,7 +1110,7 @@ static void u132_hcd_enumeration_empty_recv(void *data, struct urb *urb,
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
 		return;
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -1138,7 +1138,7 @@ static void u132_hcd_enumeration_address_sent(void *data, struct urb *urb,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -1153,7 +1153,7 @@ static void u132_hcd_enumeration_address_sent(void *data, struct urb *urb,
 			u132_hcd_giveback_urb(u132, endp, urb, retval);
 		return;
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -1181,7 +1181,7 @@ static void u132_hcd_initial_empty_sent(void *data, struct urb *urb, u8 *buf,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -1190,7 +1190,7 @@ static void u132_hcd_initial_empty_sent(void *data, struct urb *urb, u8 *buf,
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
 		return;
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -1219,7 +1219,7 @@ static void u132_hcd_initial_input_recv(void *data, struct urb *urb, u8 *buf,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -1242,7 +1242,7 @@ static void u132_hcd_initial_input_recv(void *data, struct urb *urb, u8 *buf,
 			u132_hcd_giveback_urb(u132, endp, urb, retval);
 		return;
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -1271,7 +1271,7 @@ static void u132_hcd_initial_setup_sent(void *data, struct urb *urb, u8 *buf,
 		return;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, -ENODEV);
 		return;
@@ -1286,7 +1286,7 @@ static void u132_hcd_initial_setup_sent(void *data, struct urb *urb, u8 *buf,
 			u132_hcd_giveback_urb(u132, endp, urb, retval);
 		return;
 	} else {
-		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%p "
+		dev_err(&u132->platform_dev->dev, "CALLBACK called urb=%pK "
 				"unlinked=%d\n", urb, urb->unlinked);
 		mutex_unlock(&u132->scheduler_lock);
 		u132_hcd_giveback_urb(u132, endp, urb, 0);
@@ -1781,10 +1781,10 @@ static void u132_hcd_stop(struct usb_hcd *hcd)
 {
 	struct u132 *u132 = hcd_to_u132(hcd);
 	if (u132->going > 1) {
-		dev_err(&u132->platform_dev->dev, "u132 device %p(hcd=%p) has b"
+		dev_err(&u132->platform_dev->dev, "u132 device %pK(hcd=%pK) has b"
 			"een removed %d\n", u132, hcd, u132->going);
 	} else if (u132->going > 0) {
-		dev_err(&u132->platform_dev->dev, "device hcd=%p is being remov"
+		dev_err(&u132->platform_dev->dev, "device hcd=%pK is being remov"
 			"ed\n", hcd);
 	} else {
 		mutex_lock(&u132->sw_lock);
@@ -2259,7 +2259,7 @@ static int u132_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
 		return -ENODEV;
 	} else if (u132->going > 0) {
 		dev_err(&u132->platform_dev->dev, "device is being removed "
-				"urb=%p\n", urb);
+				"urb=%pK\n", urb);
 		return -ESHUTDOWN;
 	} else {
 		u8 usb_addr = usb_pipedevice(urb->pipe);
@@ -2412,7 +2412,7 @@ static int dequeue_from_overflow_chain(struct u132 *u132,
 		} else
 			continue;
 	}
-	dev_err(&u132->platform_dev->dev, "urb=%p not found in endp[%d]=%p ring"
+	dev_err(&u132->platform_dev->dev, "urb=%pK not found in endp[%d]=%pK ring"
 		"[%d] %c%c usb_endp=%d usb_addr=%d size=%d next=%04X last=%04X"
 		"\n", urb, endp->endp_number, endp, endp->ring->number,
 		endp->input ? 'I' : ' ', endp->output ? 'O' : ' ',
@@ -2434,8 +2434,8 @@ static int u132_endp_urb_dequeue(struct u132 *u132, struct u132_endp *endp,
 		return rc;
 	}
 	if (endp->queue_size == 0) {
-		dev_err(&u132->platform_dev->dev, "urb=%p not found in endp[%d]"
-			"=%p ring[%d] %c%c usb_endp=%d usb_addr=%d\n", urb,
+		dev_err(&u132->platform_dev->dev, "urb=%pK not found in endp[%d]"
+			"=%pK ring[%d] %c%c usb_endp=%d usb_addr=%d\n", urb,
 			endp->endp_number, endp, endp->ring->number,
 			endp->input ? 'I' : ' ', endp->output ? 'O' : ' ',
 			endp->usb_endp, endp->usb_addr);
@@ -2495,8 +2495,8 @@ static int u132_endp_urb_dequeue(struct u132 *u132, struct u132_endp *endp,
 			usb_hcd_giveback_urb(hcd, urb, status);
 			return 0;
 		} else if (list_empty(&endp->urb_more)) {
-			dev_err(&u132->platform_dev->dev, "urb=%p not found in "
-				"endp[%d]=%p ring[%d] %c%c usb_endp=%d usb_addr"
+			dev_err(&u132->platform_dev->dev, "urb=%pK not found in "
+				"endp[%d]=%pK ring[%d] %c%c usb_endp=%d usb_addr"
 				"=%d size=%d next=%04X last=%04X\n", urb,
 				endp->endp_number, endp, endp->ring->number,
 				endp->input ? 'I' : ' ',
@@ -2546,7 +2546,7 @@ static void u132_endpoint_disable(struct usb_hcd *hcd,
 {
 	struct u132 *u132 = hcd_to_u132(hcd);
 	if (u132->going > 2) {
-		dev_err(&u132->platform_dev->dev, "u132 device %p(hcd=%p hep=%p"
+		dev_err(&u132->platform_dev->dev, "u132 device %pK(hcd=%pK hep=%pK"
 			") has been removed %d\n", u132, hcd, hep,
 			u132->going);
 	} else {
@@ -2787,11 +2787,11 @@ static int u132_hub_status_data(struct usb_hcd *hcd, char *buf)
 {
 	struct u132 *u132 = hcd_to_u132(hcd);
 	if (u132->going > 1) {
-		dev_err(&u132->platform_dev->dev, "device hcd=%p has been remov"
+		dev_err(&u132->platform_dev->dev, "device hcd=%pK has been remov"
 			"ed %d\n", hcd, u132->going);
 		return -ENODEV;
 	} else if (u132->going > 0) {
-		dev_err(&u132->platform_dev->dev, "device hcd=%p is being remov"
+		dev_err(&u132->platform_dev->dev, "device hcd=%pK is being remov"
 			"ed\n", hcd);
 		return -ESHUTDOWN;
 	} else {

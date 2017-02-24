@@ -406,7 +406,7 @@ isp1763_register_driver(struct isp1763_driver *drv)
 	int result = -EINVAL;
 
 	hal_entry("%s: Entered\n", __FUNCTION__);
-	info("isp1763_register_driver(drv=%p)\n", drv);
+	info("isp1763_register_driver(drv=%pK)\n", drv);
 
 	if (!drv) {
 		return -EINVAL;
@@ -462,7 +462,7 @@ isp1763_unregister_driver(struct isp1763_driver *drv)
 	struct isp1763_dev *dev;
 	hal_entry("%s: Entered\n", __FUNCTION__);
 
-	info("isp1763_unregister_driver(drv=%p)\n", drv);
+	info("isp1763_unregister_driver(drv=%pK)\n", drv);
 	dev = &isp1763_loc_dev[drv->index];
 	if (dev->driver == drv) {
 		/* driver registered is same as the requestig driver */
@@ -583,7 +583,7 @@ isp1763_probe(struct platform_device *pdev)
 
 	hal_entry("%s: Entered\n", __FUNCTION__);
 
-	hal_init(("isp1763_probe(dev=%p)\n", dev));
+	hal_init(("isp1763_probe(dev=%pK)\n", dev));
 
 	loc_dev = &(isp1763_loc_dev[ISP1763_HC]);
 	loc_dev->dev = pdev;
@@ -614,7 +614,7 @@ isp1763_probe(struct platform_device *pdev)
 	loc_dev->index = ISP1763_HC;	/*zero */
 	loc_dev->length = resource_size(loc_dev->mem_res);
 
-	hal_init(("isp1763 HC MEM Base= %p irq = %d\n",
+	hal_init(("isp1763 HC MEM Base= %pK irq = %d\n",
 		loc_dev->baseaddress, loc_dev->irq));
 
 	/* Setup GPIOs and isssue RESET_N to Controller */
@@ -728,7 +728,7 @@ isp1763_remove(struct platform_device *pdev)
 	struct isp1763_dev *loc_dev;
 	struct isp1763_platform_data *pdata = pdev->dev.platform_data;
 
-	hal_init(("isp1763_pci_remove(dev=%p)\n", dev));
+	hal_init(("isp1763_pci_remove(dev=%pK)\n", dev));
 
 	loc_dev = &isp1763_loc_dev[ISP1763_HC];
 	iounmap(loc_dev->baseaddress);

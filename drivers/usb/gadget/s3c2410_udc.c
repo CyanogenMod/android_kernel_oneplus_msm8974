@@ -1171,7 +1171,7 @@ s3c2410_udc_alloc_request(struct usb_ep *_ep, gfp_t mem_flags)
 {
 	struct s3c2410_request *req;
 
-	dprintk(DEBUG_VERBOSE,"%s(%p,%d)\n", __func__, _ep, mem_flags);
+	dprintk(DEBUG_VERBOSE,"%s(%pK,%d)\n", __func__, _ep, mem_flags);
 
 	if (!_ep)
 		return NULL;
@@ -1193,7 +1193,7 @@ s3c2410_udc_free_request(struct usb_ep *_ep, struct usb_request *_req)
 	struct s3c2410_ep	*ep = to_s3c2410_ep(_ep);
 	struct s3c2410_request	*req = to_s3c2410_req(_req);
 
-	dprintk(DEBUG_VERBOSE, "%s(%p,%p)\n", __func__, _ep, _req);
+	dprintk(DEBUG_VERBOSE, "%s(%pK,%pK)\n", __func__, _ep, _req);
 
 	if (!ep || !_req || (!ep->desc && _ep->name != ep0name))
 		return;
@@ -1320,7 +1320,7 @@ static int s3c2410_udc_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 	unsigned long		flags;
 	struct s3c2410_request	*req = NULL;
 
-	dprintk(DEBUG_VERBOSE, "%s(%p,%p)\n", __func__, _ep, _req);
+	dprintk(DEBUG_VERBOSE, "%s(%pK,%pK)\n", __func__, _ep, _req);
 
 	if (!the_controller->driver)
 		return -ESHUTDOWN;
@@ -1343,7 +1343,7 @@ static int s3c2410_udc_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 
 	if (retval == 0) {
 		dprintk(DEBUG_VERBOSE,
-			"dequeued req %p from %s, len %d buf %p\n",
+			"dequeued req %pK from %s, len %d buf %pK\n",
 			req, _ep->name, _req->length, _req->buf);
 
 		s3c2410_udc_done(ep, req, -ECONNRESET);
@@ -1685,7 +1685,7 @@ static int s3c2410_udc_start(struct usb_gadget_driver *driver,
 		return -EBUSY;
 
 	if (!bind || !driver->setup || driver->max_speed < USB_SPEED_FULL) {
-		printk(KERN_ERR "Invalid driver: bind %p setup %p speed %d\n",
+		printk(KERN_ERR "Invalid driver: bind %pK setup %pK speed %d\n",
 			bind, driver->setup, driver->max_speed);
 		return -EINVAL;
 	}

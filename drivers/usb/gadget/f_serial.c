@@ -356,7 +356,7 @@ static int gport_connect(struct f_gser *gser)
 	unsigned	port_num;
 	int		ret;
 
-	pr_debug("%s: transport: %s f_gser: %p gserial: %p port_num: %d\n",
+	pr_debug("%s: transport: %s f_gser: %pK gserial: %pK port_num: %d\n",
 			__func__, xport_to_str(gser->transport),
 			gser, &gser->port, gser->port_num);
 
@@ -408,7 +408,7 @@ static int gport_disconnect(struct f_gser *gser)
 {
 	unsigned port_num;
 
-	pr_debug("%s: transport: %s f_gser: %p gserial: %p port_num: %d\n",
+	pr_debug("%s: transport: %s f_gser: %pK gserial: %pK port_num: %d\n",
 			__func__, xport_to_str(gser->transport),
 			gser, &gser->port, gser->port_num);
 

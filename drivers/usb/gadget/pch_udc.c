@@ -1814,7 +1814,7 @@ static void pch_udc_free_request(struct usb_ep *usbep,
 	req = container_of(usbreq, struct pch_udc_request, req);
 	dev = ep->dev;
 	if (!list_empty(&req->queue))
-		dev_err(&dev->pdev->dev, "%s: %s req=0x%p queue not empty\n",
+		dev_err(&dev->pdev->dev, "%s: %s req=0x%pK queue not empty\n",
 			__func__, usbep->name, req);
 	if (req->td_data != NULL) {
 		if (req->chain_len > 1)

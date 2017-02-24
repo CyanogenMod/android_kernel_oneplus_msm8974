@@ -389,7 +389,7 @@ net2272_done(struct net2272_ep *ep, struct net2272_request *req, int status)
 				ep->is_in);
 
 	if (status && status != -ESHUTDOWN)
-		dev_vdbg(dev->dev, "complete %s req %p stat %d len %u/%u buf %p\n",
+		dev_vdbg(dev->dev, "complete %s req %pK stat %d len %u/%u buf %pK\n",
 			ep->ep.name, &req->req, status,
 			req->req.actual, req->req.length, req->req.buf);
 
@@ -413,7 +413,7 @@ net2272_write_packet(struct net2272_ep *ep, u8 *buf,
 	length = min(req->req.length - req->req.actual, max);
 	req->req.actual += length;
 
-	dev_vdbg(ep->dev->dev, "write packet %s req %p max %u len %u avail %u\n",
+	dev_vdbg(ep->dev->dev, "write packet %s req %pK max %u len %u avail %u\n",
 		ep->ep.name, req, max, length,
 		(net2272_ep_read(ep, EP_AVAIL1) << 8) | net2272_ep_read(ep, EP_AVAIL0));
 
@@ -519,7 +519,7 @@ net2272_read_packet(struct net2272_ep *ep, u8 *buf,
 
 	req->req.actual += avail;
 
-	dev_vdbg(ep->dev->dev, "read packet %s req %p len %u avail %u\n",
+	dev_vdbg(ep->dev->dev, "read packet %s req %pK len %u avail %u\n",
 		ep->ep.name, req, avail,
 		(net2272_ep_read(ep, EP_AVAIL1) << 8) | net2272_ep_read(ep, EP_AVAIL0));
 
@@ -733,7 +733,7 @@ net2272_kick_dma(struct net2272_ep *ep, struct net2272_request *req)
 	if (req->req.length & 1)
 		return -EINVAL;
 
-	dev_vdbg(ep->dev->dev, "kick_dma %s req %p dma %08llx\n",
+	dev_vdbg(ep->dev->dev, "kick_dma %s req %pK dma %08llx\n",
 		ep->ep.name, req, (unsigned long long) req->req.dma);
 
 	net2272_ep_write(ep, EP_RSPSET, 1 << ALT_NAK_OUT_PACKETS);
@@ -853,7 +853,7 @@ net2272_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 			return status;
 	}
 
-	dev_vdbg(dev->dev, "%s queue req %p, len %d buf %p dma %08llx %s\n",
+	dev_vdbg(dev->dev, "%s queue req %pK, len %d buf %pK dma %08llx %s\n",
 		_ep->name, _req, _req->length, _req->buf,
 		(unsigned long long) _req->dma, _req->zero ? "zero" : "!zero");
 
@@ -1532,7 +1532,7 @@ net2272_handle_dma(struct net2272_ep *ep)
 	else
 		req = NULL;
 
-	dev_vdbg(ep->dev->dev, "handle_dma %s req %p\n", ep->ep.name, req);
+	dev_vdbg(ep->dev->dev, "handle_dma %s req %pK\n", ep->ep.name, req);
 
 	/* Ensure DREQ is de-asserted */
 	net2272_write(ep->dev, DMAREQ,
@@ -1614,7 +1614,7 @@ net2272_handle_ep(struct net2272_ep *ep)
 	stat1 = net2272_ep_read(ep, EP_STAT1);
 	ep->irqs++;
 
-	dev_vdbg(ep->dev->dev, "%s ack ep_stat0 %02x, ep_stat1 %02x, req %p\n",
+	dev_vdbg(ep->dev->dev, "%s ack ep_stat0 %02x, ep_stat1 %02x, req %pK\n",
 		ep->ep.name, stat0, stat1, req ? &req->req : 0);
 
 	net2272_ep_write(ep, EP_STAT0, stat0 &
@@ -2269,7 +2269,7 @@ net2272_probe_fin(struct net2272 *dev, unsigned int irqflags)
 
 	/* done */
 	dev_info(dev->dev, "%s\n", driver_desc);
-	dev_info(dev->dev, "irq %i, mem %p, chip rev %04x, dma %s\n",
+	dev_info(dev->dev, "irq %i, mem %pK, chip rev %04x, dma %s\n",
 		dev->irq, dev->base_addr, dev->chiprev,
 		dma_mode_string());
 	dev_info(dev->dev, "version: %s\n", driver_vers);

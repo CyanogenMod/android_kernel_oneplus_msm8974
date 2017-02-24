@@ -68,7 +68,7 @@ static void qset_print(struct seq_file *s, struct whc_qset *qset)
 	list_for_each_entry(std, &qset->stds, list_node) {
 		if (urb != std->urb) {
 			urb = std->urb;
-			seq_printf(s, "  urb %p transferred: %d bytes\n", urb,
+			seq_printf(s, "  urb %pK transferred: %d bytes\n", urb,
 				urb->actual_length);
 		}
 		if (std->qtd)

@@ -102,7 +102,7 @@ static int stream_start(struct snd_usb_caiaqdev *dev)
 {
 	int i, ret;
 
-	debug("%s(%p)\n", __func__, dev);
+	debug("%s(%pK)\n", __func__, dev);
 
 	if (dev->streaming)
 		return -EINVAL;
@@ -131,7 +131,7 @@ static void stream_stop(struct snd_usb_caiaqdev *dev)
 {
 	int i;
 
-	debug("%s(%p)\n", __func__, dev);
+	debug("%s(%pK)\n", __func__, dev);
 	if (!dev->streaming)
 		return;
 
@@ -150,7 +150,7 @@ static void stream_stop(struct snd_usb_caiaqdev *dev)
 static int snd_usb_caiaq_substream_open(struct snd_pcm_substream *substream)
 {
 	struct snd_usb_caiaqdev *dev = snd_pcm_substream_chip(substream);
-	debug("%s(%p)\n", __func__, substream);
+	debug("%s(%pK)\n", __func__, substream);
 	substream->runtime->hw = dev->pcm_info;
 	snd_pcm_limit_hw_rates(substream->runtime);
 	return 0;
@@ -160,7 +160,7 @@ static int snd_usb_caiaq_substream_close(struct snd_pcm_substream *substream)
 {
 	struct snd_usb_caiaqdev *dev = snd_pcm_substream_chip(substream);
 
-	debug("%s(%p)\n", __func__, substream);
+	debug("%s(%pK)\n", __func__, substream);
 	if (all_substreams_zero(dev->sub_playback) &&
 	    all_substreams_zero(dev->sub_capture)) {
 		/* when the last client has stopped streaming,
@@ -175,14 +175,14 @@ static int snd_usb_caiaq_substream_close(struct snd_pcm_substream *substream)
 static int snd_usb_caiaq_pcm_hw_params(struct snd_pcm_substream *sub,
 				       struct snd_pcm_hw_params *hw_params)
 {
-	debug("%s(%p)\n", __func__, sub);
+	debug("%s(%pK)\n", __func__, sub);
 	return snd_pcm_lib_malloc_pages(sub, params_buffer_bytes(hw_params));
 }
 
 static int snd_usb_caiaq_pcm_hw_free(struct snd_pcm_substream *sub)
 {
 	struct snd_usb_caiaqdev *dev = snd_pcm_substream_chip(sub);
-	debug("%s(%p)\n", __func__, sub);
+	debug("%s(%pK)\n", __func__, sub);
 	deactivate_substream(dev, sub);
 	return snd_pcm_lib_free_pages(sub);
 }
@@ -202,7 +202,7 @@ static int snd_usb_caiaq_pcm_prepare(struct snd_pcm_substream *substream)
 	struct snd_usb_caiaqdev *dev = snd_pcm_substream_chip(substream);
 	struct snd_pcm_runtime *runtime = substream->runtime;
 
-	debug("%s(%p)\n", __func__, substream);
+	debug("%s(%pK)\n", __func__, substream);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		int out_pos;
@@ -284,7 +284,7 @@ static int snd_usb_caiaq_pcm_trigger(struct snd_pcm_substream *sub, int cmd)
 {
 	struct snd_usb_caiaqdev *dev = snd_pcm_substream_chip(sub);
 
-	debug("%s(%p) cmd %d\n", __func__, sub, cmd);
+	debug("%s(%pK) cmd %d\n", __func__, sub, cmd);
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
@@ -880,7 +880,7 @@ int snd_usb_caiaq_audio_init(struct snd_usb_caiaqdev *dev)
 
 void snd_usb_caiaq_audio_free(struct snd_usb_caiaqdev *dev)
 {
-	debug("%s(%p)\n", __func__, dev);
+	debug("%s(%pK)\n", __func__, dev);
 	stream_stop(dev);
 	free_urbs(dev->data_urbs_in);
 	free_urbs(dev->data_urbs_out);

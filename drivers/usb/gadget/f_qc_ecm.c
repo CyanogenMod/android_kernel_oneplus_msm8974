@@ -491,7 +491,7 @@ static int ecm_qc_bam_connect(struct f_ecm_qc *dev)
 
 static int ecm_qc_bam_disconnect(struct f_ecm_qc *dev)
 {
-	pr_debug("dev:%p. Disconnect BAM.\n", dev);
+	pr_debug("dev:%pK. Disconnect BAM.\n", dev);
 
 	bam_data_disconnect(&dev->bam_port, 0);
 

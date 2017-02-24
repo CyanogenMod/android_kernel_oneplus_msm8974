@@ -143,7 +143,7 @@ static int usb_hcd_fsl_probe(const struct hc_driver *driver,
 		struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 
 		ehci->transceiver = usb_get_transceiver();
-		dev_dbg(&pdev->dev, "hcd=0x%p  ehci=0x%p, transceiver=0x%p\n",
+		dev_dbg(&pdev->dev, "hcd=0x%pK  ehci=0x%pK, transceiver=0x%pK\n",
 			hcd, ehci, ehci->transceiver);
 
 		if (ehci->transceiver) {

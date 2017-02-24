@@ -367,7 +367,7 @@ static void done(struct imx_ep_struct *imx_ep,
 
 	if (status && status != -ESHUTDOWN)
 		D_ERR(imx_ep->imx_usb->dev,
-			"<%s> complete %s req %p stat %d len %u/%u\n", __func__,
+			"<%s> complete %s req %pK stat %d len %u/%u\n", __func__,
 			imx_ep->ep.name, &req->req, status,
 			req->req.actual, req->req.length);
 
@@ -481,7 +481,7 @@ static int read_fifo(struct imx_ep_struct *imx_ep, struct imx_request *req)
 
 	if (completed || !req->req.length) {
 		done(imx_ep, req, 0);
-		D_REQ(imx_ep->imx_usb->dev, "<%s> %s req<%p> %s\n",
+		D_REQ(imx_ep->imx_usb->dev, "<%s> %s req<%pK> %s\n",
 			__func__, imx_ep->ep.name, req,
 			completed ? "completed" : "not completed");
 		if (!EP_NO(imx_ep))
@@ -510,7 +510,7 @@ static int write_fifo(struct imx_ep_struct *imx_ep, struct imx_request *req)
 
 		if (unlikely(completed)) {
 			done(imx_ep, req, 0);
-			D_REQ(imx_ep->imx_usb->dev, "<%s> %s req<%p> %s\n",
+			D_REQ(imx_ep->imx_usb->dev, "<%s> %s req<%pK> %s\n",
 				__func__, imx_ep->ep.name, req,
 				completed ? "completed" : "not completed");
 			if (!EP_NO(imx_ep))
@@ -823,7 +823,7 @@ static int imx_ep_queue
 
 	if (req->in_use) {
 		D_ERR(imx_usb->dev,
-			"<%s> refusing to queue req %p (already queued)\n",
+			"<%s> refusing to queue req %pK (already queued)\n",
 			__func__, req);
 		return 0;
 	}

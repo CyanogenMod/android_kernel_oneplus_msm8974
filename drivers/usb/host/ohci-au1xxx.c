@@ -31,7 +31,7 @@ static int __devinit ohci_au1xxx_start(struct usb_hcd *hcd)
 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
 	int ret;
 
-	ohci_dbg(ohci, "ohci_au1xxx_start, ohci:%p", ohci);
+	ohci_dbg(ohci, "ohci_au1xxx_start, ohci:%pK", ohci);
 
 	if ((ret = ohci_init(ohci)) < 0)
 		return ret;

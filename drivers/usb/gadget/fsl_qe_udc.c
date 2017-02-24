@@ -113,7 +113,7 @@ static void done(struct qe_ep *ep, struct qe_req *req, int status)
 				: DMA_FROM_DEVICE);
 
 	if (status && (status != -ESHUTDOWN))
-		dev_vdbg(udc->dev, "complete %s req %p stat %d len %u/%u\n",
+		dev_vdbg(udc->dev, "complete %s req %pK stat %d len %u/%u\n",
 			ep->ep.name, &req->req, status,
 			req->req.actual, req->req.length);
 

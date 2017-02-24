@@ -229,7 +229,7 @@ static inline void release_ptd_buffers(struct isp1362_ep_queue *epq, struct isp1
 	int last = ep->ptd_index + ep->num_ptds;
 
 	if (last > epq->buf_count)
-		pr_err("%s: ep %p req %d len %d %s PTD[%d] $%04x num_ptds %d buf_count %d buf_avail %d buf_map %08lx skip_map %08lx\n",
+		pr_err("%s: ep %pK req %d len %d %s PTD[%d] $%04x num_ptds %d buf_count %d buf_avail %d buf_map %08lx skip_map %08lx\n",
 		    __func__, ep, ep->num_req, ep->length, epq->name, ep->ptd_index,
 		    ep->ptd_offset, ep->num_ptds, epq->buf_count, epq->buf_avail,
 		    epq->buf_map, epq->skip_map);
@@ -269,7 +269,7 @@ static void prepare_ptd(struct isp1362_hcd *isp1362_hcd, struct urb *urb,
 	u16 len;
 	size_t buf_len = urb->transfer_buffer_length - urb->actual_length;
 
-	DBG(3, "%s: %s ep %p\n", __func__, epq->name, ep);
+	DBG(3, "%s: %s ep %pK\n", __func__, epq->name, ep);
 
 	ptd = &ep->ptd;
 
@@ -372,7 +372,7 @@ static void isp1362_read_ptd(struct isp1362_hcd *isp1362_hcd, struct isp1362_ep 
 	BUG_ON(ep->ptd_offset < 0);
 
 	list_del_init(&ep->active);
-	DBG(1, "%s: ep %p removed from active list %p\n", __func__, ep, &epq->active);
+	DBG(1, "%s: ep %pK removed from active list %pK\n", __func__, ep, &epq->active);
 
 	prefetchw(ptd);
 	isp1362_read_buffer(isp1362_hcd, ptd, ep->ptd_offset, PTD_HEADER_SIZE);
@@ -381,7 +381,7 @@ static void isp1362_read_ptd(struct isp1362_hcd *isp1362_hcd, struct isp1362_ep 
 	if (PTD_GET_DIR(ptd) != PTD_DIR_IN || act_len == 0)
 		return;
 	if (act_len > ep->length)
-		pr_err("%s: ep %p PTD $%04x act_len %d ep->length %d\n", __func__, ep,
+		pr_err("%s: ep %pK PTD $%04x act_len %d ep->length %d\n", __func__, ep,
 			 ep->ptd_offset, act_len, ep->length);
 	BUG_ON(act_len > ep->length);
 	/* Only transfer the amount of data that has actually been overwritten
@@ -405,7 +405,7 @@ static void remove_ptd(struct isp1362_hcd *isp1362_hcd, struct isp1362_ep *ep)
 	int index;
 	struct isp1362_ep_queue *epq;
 
-	DBG(1, "%s: ep %p PTD[%d] $%04x\n", __func__, ep, ep->ptd_index, ep->ptd_offset);
+	DBG(1, "%s: ep %pK PTD[%d] $%04x\n", __func__, ep, ep->ptd_index, ep->ptd_offset);
 	BUG_ON(ep->ptd_offset < 0);
 
 	epq = get_ptd_queue(isp1362_hcd, ep->ptd_offset);
@@ -488,7 +488,7 @@ static void finish_request(struct isp1362_hcd *isp1362_hcd, struct isp1362_ep *e
 
 	if (ep->interval) {
 		/* periodic deschedule */
-		DBG(1, "deschedule qh%d/%p branch %d load %d bandwidth %d -> %d\n", ep->interval,
+		DBG(1, "deschedule qh%d/%pK branch %d load %d bandwidth %d -> %d\n", ep->interval,
 		    ep, ep->branch, ep->load,
 		    isp1362_hcd->load[ep->branch],
 		    isp1362_hcd->load[ep->branch] - ep->load);
@@ -510,13 +510,13 @@ static void postproc_ep(struct isp1362_hcd *isp1362_hcd, struct isp1362_ep *ep)
 	int urbstat = -EINPROGRESS;
 	u8 cc;
 
-	DBG(2, "%s: ep %p req %d\n", __func__, ep, ep->num_req);
+	DBG(2, "%s: ep %pK req %d\n", __func__, ep, ep->num_req);
 
 	udev = urb->dev;
 	ptd = &ep->ptd;
 	cc = PTD_GET_CC(ptd);
 	if (cc == PTD_NOTACCESSED) {
-		pr_err("%s: req %d PTD %p Untouched by ISP1362\n", __func__,
+		pr_err("%s: req %d PTD %pK Untouched by ISP1362\n", __func__,
 		    ep->num_req, ptd);
 		cc = PTD_DEVNOTRESP;
 	}
@@ -648,7 +648,7 @@ static void postproc_ep(struct isp1362_hcd *isp1362_hcd, struct isp1362_ep *ep)
 
  out:
 	if (urbstat != -EINPROGRESS) {
-		DBG(2, "%s: Finishing ep %p req %d urb %p status %d\n", __func__,
+		DBG(2, "%s: Finishing ep %pK req %d urb %pK status %d\n", __func__,
 		    ep, ep->num_req, urb, urbstat);
 		finish_request(isp1362_hcd, ep, urb, urbstat);
 	}
@@ -673,17 +673,17 @@ static void finish_unlinks(struct isp1362_hcd *isp1362_hcd)
 		if (!list_empty(&ep->hep->urb_list)) {
 			struct urb *urb = get_urb(ep);
 
-			DBG(1, "%s: Finishing req %d ep %p from remove_list\n", __func__,
+			DBG(1, "%s: Finishing req %d ep %pK from remove_list\n", __func__,
 			    ep->num_req, ep);
 			finish_request(isp1362_hcd, ep, urb, -ESHUTDOWN);
 		}
 		WARN_ON(list_empty(&ep->active));
 		if (!list_empty(&ep->active)) {
 			list_del_init(&ep->active);
-			DBG(1, "%s: ep %p removed from active list\n", __func__, ep);
+			DBG(1, "%s: ep %pK removed from active list\n", __func__, ep);
 		}
 		list_del_init(&ep->remove_list);
-		DBG(1, "%s: ep %p removed from remove_list\n", __func__, ep);
+		DBG(1, "%s: ep %pK removed from remove_list\n", __func__, ep);
 	}
 	DBG(1, "%s: Done\n", __func__);
 }
@@ -733,9 +733,9 @@ static int submit_req(struct isp1362_hcd *isp1362_hcd, struct urb *urb,
 	} else
 		BUG_ON(index < 0);
 	list_add_tail(&ep->active, &epq->active);
-	DBG(1, "%s: ep %p req %d len %d added to active list %p\n", __func__,
+	DBG(1, "%s: ep %pK req %d len %d added to active list %pK\n", __func__,
 	    ep, ep->num_req, ep->length, &epq->active);
-	DBG(1, "%s: Submitting %s PTD $%04x for ep %p req %d\n", __func__, epq->name,
+	DBG(1, "%s: Submitting %s PTD $%04x for ep %pK req %d\n", __func__, epq->name,
 	    ep->ptd_offset, ep, ep->num_req);
 	isp1362_write_ptd(isp1362_hcd, ep, epq);
 	__clear_bit(ep->ptd_index, &epq->skip_map);
@@ -760,11 +760,11 @@ static void start_atl_transfers(struct isp1362_hcd *isp1362_hcd)
 		int ret;
 
 		if (!list_empty(&ep->active)) {
-			DBG(2, "%s: Skipping active %s ep %p\n", __func__, epq->name, ep);
+			DBG(2, "%s: Skipping active %s ep %pK\n", __func__, epq->name, ep);
 			continue;
 		}
 
-		DBG(1, "%s: Processing %s ep %p req %d\n", __func__, epq->name,
+		DBG(1, "%s: Processing %s ep %pK req %d\n", __func__, epq->name,
 		    ep, ep->num_req);
 
 		ret = submit_req(isp1362_hcd, urb, ep, epq);
@@ -812,12 +812,12 @@ static void start_intl_transfers(struct isp1362_hcd *isp1362_hcd)
 		int ret;
 
 		if (!list_empty(&ep->active)) {
-			DBG(1, "%s: Skipping active %s ep %p\n", __func__,
+			DBG(1, "%s: Skipping active %s ep %pK\n", __func__,
 			    epq->name, ep);
 			continue;
 		}
 
-		DBG(1, "%s: Processing %s ep %p req %d\n", __func__,
+		DBG(1, "%s: Processing %s ep %pK req %d\n", __func__,
 		    epq->name, ep, ep->num_req);
 		ret = submit_req(isp1362_hcd, urb, ep, epq);
 		if (ret == -ENOMEM)
@@ -882,7 +882,7 @@ static void start_iso_transfers(struct isp1362_hcd *isp1362_hcd)
 		struct urb *urb = get_urb(ep);
 		s16 diff = fno - (u16)urb->start_frame;
 
-		DBG(1, "%s: Processing %s ep %p\n", __func__, epq->name, ep);
+		DBG(1, "%s: Processing %s ep %pK\n", __func__, epq->name, ep);
 
 		if (diff > urb->number_of_packets) {
 			/* time frame for this URB has elapsed */
@@ -965,13 +965,13 @@ static void finish_transfers(struct isp1362_hcd *isp1362_hcd, unsigned long done
 			BUG_ON(ep->num_ptds == 0);
 			release_ptd_buffers(epq, ep);
 
-			DBG(1, "%s: ep %p req %d removed from active list\n", __func__,
+			DBG(1, "%s: ep %pK req %d removed from active list\n", __func__,
 			    ep, ep->num_req);
 			if (!list_empty(&ep->remove_list)) {
 				list_del_init(&ep->remove_list);
-				DBG(1, "%s: ep %p removed from remove list\n", __func__, ep);
+				DBG(1, "%s: ep %pK removed from remove list\n", __func__, ep);
 			}
-			DBG(1, "%s: Postprocessing %s ep %p req %d\n", __func__, epq->name,
+			DBG(1, "%s: Postprocessing %s ep %pK req %d\n", __func__, epq->name,
 			    ep, ep->num_req);
 			postproc_ep(isp1362_hcd, ep);
 		}
@@ -1001,7 +1001,7 @@ static void finish_iso_transfers(struct isp1362_hcd *isp1362_hcd, struct isp1362
 		DBG(1, "%s: Checking PTD $%04x\n", __func__, ep->ptd_offset);
 
 		isp1362_read_ptd(isp1362_hcd, ep, epq);
-		DBG(1, "%s: Postprocessing %s ep %p\n", __func__, epq->name, ep);
+		DBG(1, "%s: Postprocessing %s ep %pK\n", __func__, epq->name, ep);
 		postproc_ep(isp1362_hcd, ep);
 	}
 	WARN_ON(epq->blk_size != 0);
@@ -1232,7 +1232,7 @@ static int isp1362_urb_enqueue(struct usb_hcd *hcd,
 	unsigned long flags;
 	int retval = 0;
 
-	DBG(3, "%s: urb %p\n", __func__, urb);
+	DBG(3, "%s: urb %pK\n", __func__, urb);
 
 	if (type == PIPE_ISOCHRONOUS) {
 		pr_err("Isochronous transfers not supported\n");
@@ -1316,7 +1316,7 @@ static int isp1362_urb_enqueue(struct usb_hcd *hcd,
 	case PIPE_CONTROL:
 	case PIPE_BULK:
 		if (list_empty(&ep->schedule)) {
-			DBG(1, "%s: Adding ep %p req %d to async schedule\n",
+			DBG(1, "%s: Adding ep %pK req %d to async schedule\n",
 				__func__, ep, ep->num_req);
 			list_add_tail(&ep->schedule, &isp1362_hcd->async);
 		}
@@ -1354,14 +1354,14 @@ static int isp1362_urb_enqueue(struct usb_hcd *hcd,
 					frame += ep->interval;
 				urb->start_frame = frame;
 
-				DBG(1, "%s: Adding ep %p to isoc schedule\n", __func__, ep);
+				DBG(1, "%s: Adding ep %pK to isoc schedule\n", __func__, ep);
 				list_add_tail(&ep->schedule, &isp1362_hcd->isoc);
 			} else {
-				DBG(1, "%s: Adding ep %p to periodic schedule\n", __func__, ep);
+				DBG(1, "%s: Adding ep %pK to periodic schedule\n", __func__, ep);
 				list_add_tail(&ep->schedule, &isp1362_hcd->periodic);
 			}
 		} else
-			DBG(1, "%s: ep %p already scheduled\n", __func__, ep);
+			DBG(1, "%s: ep %pK already scheduled\n", __func__, ep);
 
 		DBG(2, "%s: load %d bandwidth %d -> %d\n", __func__,
 		    ep->load / ep->interval, isp1362_hcd->load[ep->branch],
@@ -1394,7 +1394,7 @@ static int isp1362_urb_enqueue(struct usb_hcd *hcd,
  fail_not_linked:
 	spin_unlock_irqrestore(&isp1362_hcd->lock, flags);
 	if (retval)
-		DBG(0, "%s: urb %p failed with %d\n", __func__, urb, retval);
+		DBG(0, "%s: urb %pK failed with %d\n", __func__, urb, retval);
 	return retval;
 }
 
@@ -1406,7 +1406,7 @@ static int isp1362_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 	struct isp1362_ep *ep;
 	int retval = 0;
 
-	DBG(3, "%s: urb %p\n", __func__, urb);
+	DBG(3, "%s: urb %pK\n", __func__, urb);
 
 	spin_lock_irqsave(&isp1362_hcd->lock, flags);
 	retval = usb_hcd_check_unlink_urb(hcd, urb, status);
@@ -1425,7 +1425,7 @@ static int isp1362_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 		/* In front of queue? */
 		if (ep->hep->urb_list.next == &urb->urb_list) {
 			if (!list_empty(&ep->active)) {
-				DBG(1, "%s: urb %p ep %p req %d active PTD[%d] $%04x\n", __func__,
+				DBG(1, "%s: urb %pK ep %pK req %d active PTD[%d] $%04x\n", __func__,
 				    urb, ep, ep->num_req, ep->ptd_index, ep->ptd_offset);
 				/* disable processing and queue PTD for removal */
 				remove_ptd(isp1362_hcd, ep);
@@ -1433,13 +1433,13 @@ static int isp1362_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 			}
 		}
 		if (urb) {
-			DBG(1, "%s: Finishing ep %p req %d\n", __func__, ep,
+			DBG(1, "%s: Finishing ep %pK req %d\n", __func__, ep,
 			    ep->num_req);
 			finish_request(isp1362_hcd, ep, urb, status);
 		} else
-			DBG(1, "%s: urb %p active; wait4irq\n", __func__, urb);
+			DBG(1, "%s: urb %pK active; wait4irq\n", __func__, urb);
 	} else {
-		pr_warning("%s: No EP in URB %p\n", __func__, urb);
+		pr_warning("%s: No EP in URB %pK\n", __func__, urb);
 		retval = -EINVAL;
 	}
 done:
@@ -1456,13 +1456,13 @@ static void isp1362_endpoint_disable(struct usb_hcd *hcd, struct usb_host_endpoi
 	struct isp1362_hcd *isp1362_hcd = hcd_to_isp1362_hcd(hcd);
 	unsigned long flags;
 
-	DBG(1, "%s: ep %p\n", __func__, ep);
+	DBG(1, "%s: ep %pK\n", __func__, ep);
 	if (!ep)
 		return;
 	spin_lock_irqsave(&isp1362_hcd->lock, flags);
 	if (!list_empty(&hep->urb_list)) {
 		if (!list_empty(&ep->active) && list_empty(&ep->remove_list)) {
-			DBG(1, "%s: Removing ep %p req %d PTD[%d] $%04x\n", __func__,
+			DBG(1, "%s: Removing ep %pK req %d PTD[%d] $%04x\n", __func__,
 			    ep, ep->num_req, ep->ptd_index, ep->ptd_offset);
 			remove_ptd(isp1362_hcd, ep);
 			pr_info("%s: Waiting for Interrupt to clean up\n", __func__);
@@ -1473,7 +1473,7 @@ static void isp1362_endpoint_disable(struct usb_hcd *hcd, struct usb_host_endpoi
 	while (!list_empty(&ep->active))
 		msleep(1);
 
-	DBG(1, "%s: Freeing EP %p\n", __func__, ep);
+	DBG(1, "%s: Freeing EP %pK\n", __func__, ep);
 
 	usb_put_dev(ep->udev);
 	kfree(ep);
@@ -2108,7 +2108,7 @@ static int proc_isp1362_show(struct seq_file *s, void *unused)
 	list_for_each_entry(ep, &isp1362_hcd->async, schedule) {
 		struct urb *urb;
 
-		seq_printf(s, "%p, ep%d%s, maxpacket %d:\n", ep, ep->epnum,
+		seq_printf(s, "%pK, ep%d%s, maxpacket %d:\n", ep, ep->epnum,
 			   ({
 				   char *s;
 				   switch (ep->nextpid) {
@@ -2130,7 +2130,7 @@ static int proc_isp1362_show(struct seq_file *s, void *unused)
 				   };
 				   s;}), ep->maxpacket) ;
 		list_for_each_entry(urb, &ep->hep->urb_list, urb_list) {
-			seq_printf(s, "  urb%p, %d/%d\n", urb,
+			seq_printf(s, "  urb%pK, %d/%d\n", urb,
 				   urb->actual_length,
 				   urb->transfer_buffer_length);
 		}
@@ -2145,7 +2145,7 @@ static int proc_isp1362_show(struct seq_file *s, void *unused)
 		seq_printf(s, "branch:%2d load:%3d PTD[%d] $%04x:\n", ep->branch,
 			   isp1362_hcd->load[ep->branch], ep->ptd_index, ep->ptd_offset);
 
-		seq_printf(s, "   %d/%p (%sdev%d ep%d%s max %d)\n",
+		seq_printf(s, "   %d/%pK (%sdev%d ep%d%s max %d)\n",
 			   ep->interval, ep,
 			   (ep->udev->speed == USB_SPEED_FULL) ? "" : "ls ",
 			   ep->udev->devnum, ep->epnum,
@@ -2158,7 +2158,7 @@ static int proc_isp1362_show(struct seq_file *s, void *unused)
 	seq_printf(s, "ISO:\n");
 
 	list_for_each_entry(ep, &isp1362_hcd->isoc, schedule) {
-		seq_printf(s, "   %d/%p (%sdev%d ep%d%s max %d)\n",
+		seq_printf(s, "   %d/%pK (%sdev%d ep%d%s max %d)\n",
 			   ep->interval, ep,
 			   (ep->udev->speed == USB_SPEED_FULL) ? "" : "ls ",
 			   ep->udev->devnum, ep->epnum,
@@ -2655,11 +2655,11 @@ static int __devexit isp1362_remove(struct platform_device *pdev)
 	DBG(0, "%s: Removing HCD\n", __func__);
 	usb_remove_hcd(hcd);
 
-	DBG(0, "%s: Unmapping data_reg @ %p\n", __func__,
+	DBG(0, "%s: Unmapping data_reg @ %pK\n", __func__,
 	    isp1362_hcd->data_reg);
 	iounmap(isp1362_hcd->data_reg);
 
-	DBG(0, "%s: Unmapping addr_reg @ %p\n", __func__,
+	DBG(0, "%s: Unmapping addr_reg @ %pK\n", __func__,
 	    isp1362_hcd->addr_reg);
 	iounmap(isp1362_hcd->addr_reg);
 
@@ -2785,16 +2785,16 @@ static int __devinit isp1362_probe(struct platform_device *pdev)
 	return 0;
 
  err6:
-	DBG(0, "%s: Freeing dev %p\n", __func__, isp1362_hcd);
+	DBG(0, "%s: Freeing dev %pK\n", __func__, isp1362_hcd);
 	usb_put_hcd(hcd);
  err5:
-	DBG(0, "%s: Unmapping data_reg @ %p\n", __func__, data_reg);
+	DBG(0, "%s: Unmapping data_reg @ %pK\n", __func__, data_reg);
 	iounmap(data_reg);
  err4:
 	DBG(0, "%s: Releasing mem region %08lx\n", __func__, (long unsigned int)data->start);
 	release_mem_region(data->start, resource_size(data));
  err3:
-	DBG(0, "%s: Unmapping addr_reg @ %p\n", __func__, addr_reg);
+	DBG(0, "%s: Unmapping addr_reg @ %pK\n", __func__, addr_reg);
 	iounmap(addr_reg);
  err2:
 	DBG(0, "%s: Releasing mem region %08lx\n", __func__, (long unsigned int)addr->start);

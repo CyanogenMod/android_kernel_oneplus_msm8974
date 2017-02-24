@@ -715,7 +715,7 @@ static void isp1362_read_fifo(struct isp1362_hcd *isp1362_hcd, void *buf, u16 le
 
 	_BUG_ON(!irqs_disabled());
 
-	RDBG("%s: Reading %d byte from fifo to mem @ %p\n", __func__, len, buf);
+	RDBG("%s: Reading %d byte from fifo to mem @ %pK\n", __func__, len, buf);
 #if USE_32BIT
 	if (len >= 4) {
 		RDBG("%s: Using readsl for %d dwords\n", __func__, len >> 2);
@@ -762,7 +762,7 @@ static void isp1362_write_fifo(struct isp1362_hcd *isp1362_hcd, void *buf, u16 l
 
 	_BUG_ON(!irqs_disabled());
 
-	RDBG("%s: Writing %d byte to fifo from memory @%p\n", __func__, len, buf);
+	RDBG("%s: Writing %d byte to fifo from memory @%pK\n", __func__, len, buf);
 #if USE_32BIT
 	if (len >= 4) {
 		RDBG("%s: Using writesl for %d dwords\n", __func__, len >> 2);
@@ -940,7 +940,7 @@ static void isp1362_read_buffer(struct isp1362_hcd *isp1362_hcd, void *buf, u16 
 
 	isp1362_write_diraddr(isp1362_hcd, offset, len);
 
-	DBG(3, "%s: Reading %d byte from buffer @%04x to memory @ %p\n",
+	DBG(3, "%s: Reading %d byte from buffer @%04x to memory @ %pK\n",
 	    __func__, len, offset, buf);
 
 	isp1362_write_reg16(isp1362_hcd, HCuPINT, HCuPINT_EOT);
@@ -960,7 +960,7 @@ static void isp1362_write_buffer(struct isp1362_hcd *isp1362_hcd, void *buf, u16
 
 	isp1362_write_diraddr(isp1362_hcd, offset, len);
 
-	DBG(3, "%s: Writing %d byte to buffer @%04x from memory @ %p\n",
+	DBG(3, "%s: Writing %d byte to buffer @%04x from memory @ %pK\n",
 	    __func__, len, offset, buf);
 
 	isp1362_write_reg16(isp1362_hcd, HCuPINT, HCuPINT_EOT);
@@ -1006,7 +1006,7 @@ static void __attribute__((unused)) dump_data(char *buf, int len)
 
 static void dump_ptd(struct ptd *ptd)
 {
-	DBG(0, "EP %p: CC=%x EP=%d DIR=%x CNT=%d LEN=%d MPS=%d TGL=%x ACT=%x FA=%d SPD=%x SF=%x PR=%x LST=%x\n",
+	DBG(0, "EP %pK: CC=%x EP=%d DIR=%x CNT=%d LEN=%d MPS=%d TGL=%x ACT=%x FA=%d SPD=%x SF=%x PR=%x LST=%x\n",
 	    container_of(ptd, struct isp1362_ep, ptd),
 	    PTD_GET_CC(ptd), PTD_GET_EP(ptd), PTD_GET_DIR(ptd),
 	    PTD_GET_COUNT(ptd), PTD_GET_LEN(ptd), PTD_GET_MPS(ptd),

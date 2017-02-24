@@ -383,7 +383,7 @@ int wusbhc_rh_control(struct usb_hcd *usb_hcd, u16 reqntype, u16 wValue,
 
 	case SetHubFeature:
 	default:
-		dev_err(wusbhc->dev, "%s (%p [%p], %x, %x, %x, %p, %x) "
+		dev_err(wusbhc->dev, "%s (%pK [%pK], %x, %x, %x, %pK, %x) "
 			"UNIMPLEMENTED\n", __func__, usb_hcd, wusbhc, reqntype,
 			wValue, wIndex, buf, wLength);
 		/* dump_stack(); */
@@ -396,7 +396,7 @@ EXPORT_SYMBOL_GPL(wusbhc_rh_control);
 int wusbhc_rh_suspend(struct usb_hcd *usb_hcd)
 {
 	struct wusbhc *wusbhc = usb_hcd_to_wusbhc(usb_hcd);
-	dev_err(wusbhc->dev, "%s (%p [%p]) UNIMPLEMENTED\n", __func__,
+	dev_err(wusbhc->dev, "%s (%pK [%pK]) UNIMPLEMENTED\n", __func__,
 		usb_hcd, wusbhc);
 	/* dump_stack(); */
 	return -ENOSYS;
@@ -406,7 +406,7 @@ EXPORT_SYMBOL_GPL(wusbhc_rh_suspend);
 int wusbhc_rh_resume(struct usb_hcd *usb_hcd)
 {
 	struct wusbhc *wusbhc = usb_hcd_to_wusbhc(usb_hcd);
-	dev_err(wusbhc->dev, "%s (%p [%p]) UNIMPLEMENTED\n", __func__,
+	dev_err(wusbhc->dev, "%s (%pK [%pK]) UNIMPLEMENTED\n", __func__,
 		usb_hcd, wusbhc);
 	/* dump_stack(); */
 	return -ENOSYS;
@@ -416,7 +416,7 @@ EXPORT_SYMBOL_GPL(wusbhc_rh_resume);
 int wusbhc_rh_start_port_reset(struct usb_hcd *usb_hcd, unsigned port_idx)
 {
 	struct wusbhc *wusbhc = usb_hcd_to_wusbhc(usb_hcd);
-	dev_err(wusbhc->dev, "%s (%p [%p], port_idx %u) UNIMPLEMENTED\n",
+	dev_err(wusbhc->dev, "%s (%pK [%pK], port_idx %u) UNIMPLEMENTED\n",
 		__func__, usb_hcd, wusbhc, port_idx);
 	WARN_ON(1);
 	return -ENOSYS;

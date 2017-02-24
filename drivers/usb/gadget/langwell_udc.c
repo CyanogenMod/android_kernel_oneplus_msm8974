@@ -404,7 +404,7 @@ static void done(struct langwell_ep *ep, struct langwell_request *req,
 
 	if (status != -ESHUTDOWN)
 		dev_dbg(&dev->pdev->dev,
-				"complete %s, req %p, stat %d, len %u/%u\n",
+				"complete %s, req %pK, stat %d, len %u/%u\n",
 				ep->ep.name, &req->req, status,
 				req->req.actual, req->req.length);
 
@@ -566,7 +566,7 @@ static int queue_dtd(struct langwell_ep *ep, struct langwell_request *req)
 		/* ep0 */
 		dev_vdbg(&dev->pdev->dev, "%s-%s\n", ep->name, DIR_STRING(ep));
 
-	dev_vdbg(&dev->pdev->dev, "ep_dqh[%d] addr: 0x%p\n",
+	dev_vdbg(&dev->pdev->dev, "ep_dqh[%d] addr: 0x%pK\n",
 			i, &(dev->ep_dqh[i]));
 
 	bit_mask = is_in(ep) ?
@@ -774,7 +774,7 @@ static int langwell_ep_queue(struct usb_ep *_ep, struct usb_request *_req,
 		return ret;
 
 	dev_dbg(&dev->pdev->dev,
-			"%s queue req %p, len %u, buf %p, dma 0x%08x\n",
+			"%s queue req %pK, len %u, buf %pK, dma 0x%08x\n",
 			_ep->name,
 			_req, _req->length, _req->buf, (int)_req->dma);
 
@@ -1376,7 +1376,7 @@ static int langwell_udc_reset(struct langwell_udc *dev)
 	writel(endpointlistaddr, &dev->op_regs->endpointlistaddr);
 
 	dev_vdbg(&dev->pdev->dev,
-		"dQH base (vir: %p, phy: 0x%08x), endpointlistaddr=0x%08x\n",
+		"dQH base (vir: %pK, phy: 0x%08x), endpointlistaddr=0x%08x\n",
 		dev->ep_dqh, endpointlistaddr,
 		readl(&dev->op_regs->endpointlistaddr));
 	dev_dbg(&dev->pdev->dev, "<--- %s()\n", __func__);
@@ -1728,7 +1728,7 @@ static ssize_t show_langwell_udc(struct device *_dev,
 	} else {
 		list_for_each_entry(req, &ep->queue, queue) {
 			t = scnprintf(next, size,
-				"req %p actual 0x%x length 0x%x  buf %p\n",
+				"req %pK actual 0x%x length 0x%x  buf %pK\n",
 				&req->req, req->req.actual,
 				req->req.length, req->req.buf);
 			size -= t;
@@ -1754,8 +1754,8 @@ static ssize_t show_langwell_udc(struct device *_dev,
 			} else {
 				list_for_each_entry(req, &ep->queue, queue) {
 					t = scnprintf(next, size,
-						"req %p actual 0x%x length "
-						"0x%x  buf %p\n",
+						"req %pK actual 0x%x length "
+						"0x%x  buf %pK\n",
 						&req->req, req->req.actual,
 						req->req.length, req->req.buf);
 					size -= t;
@@ -3046,10 +3046,10 @@ static int langwell_udc_probe(struct pci_dev *pdev,
 	}
 
 	dev->cap_regs = (struct langwell_cap_regs __iomem *) base;
-	dev_vdbg(&dev->pdev->dev, "dev->cap_regs: %p\n", dev->cap_regs);
+	dev_vdbg(&dev->pdev->dev, "dev->cap_regs: %pK\n", dev->cap_regs);
 	dev->op_regs = (struct langwell_op_regs __iomem *)
 		(base + OP_REG_OFFSET);
-	dev_vdbg(&dev->pdev->dev, "dev->op_regs: %p\n", dev->op_regs);
+	dev_vdbg(&dev->pdev->dev, "dev->op_regs: %pK\n", dev->op_regs);
 
 	/* irq setup after old hardware is cleaned up */
 	if (!pdev->irq) {
@@ -3067,7 +3067,7 @@ static int langwell_udc_probe(struct pci_dev *pdev,
 		sram_init(dev);
 
 	dev_info(&dev->pdev->dev,
-			"irq %d, io mem: 0x%08lx, len: 0x%08lx, pci mem 0x%p\n",
+			"irq %d, io mem: 0x%08lx, len: 0x%08lx, pci mem 0x%pK\n",
 			pdev->irq, resource, len, base);
 	/* enables bus-mastering for device dev */
 	pci_set_master(pdev);
@@ -3191,7 +3191,7 @@ static int langwell_udc_probe(struct pci_dev *pdev,
 
 	/* done */
 	dev_info(&dev->pdev->dev, "%s\n", driver_desc);
-	dev_info(&dev->pdev->dev, "irq %d, pci mem %p\n", pdev->irq, base);
+	dev_info(&dev->pdev->dev, "irq %d, pci mem %pK\n", pdev->irq, base);
 	dev_info(&dev->pdev->dev, "Driver version: " DRIVER_VERSION "\n");
 	dev_info(&dev->pdev->dev, "Support (max) %d endpoints\n", dev->ep_max);
 	dev_info(&dev->pdev->dev, "Device interface version: 0x%04x\n",
