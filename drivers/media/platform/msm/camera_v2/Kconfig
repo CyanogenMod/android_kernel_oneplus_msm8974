@@ -200,15 +200,6 @@ config OV12830
 		snapshot config = 4224 * 3000 at 15 fps.
 		2 lanes max fps is 18, 4 lanes max fps is 24.
 
-config IMX214
-        bool "Sensor IMX214 (BAYER 12M)"
-        depends on MSMB_CAMERA
-        ---help---
-                Sony 12 MP Bayer Sensor with auto focus, uses
-                4 mipi lanes, preview config = 2104 x 1560 at 49 fps,
-                snapshot config = 4208 x 3120 at 24 fps,
-                Video HDR support.
-
 config MSM_V4L2_VIDEO_OVERLAY_DEVICE
 	tristate "Qualcomm MSM V4l2 video overlay device"
 	---help---
@@ -231,11 +222,3 @@ config MSM_GEMINI
 	depends on MSMB_CAMERA && (ARCH_MSM7X30 || ARCH_MSM8X60 || ARCH_MSM8960)
 	---help---
 	  Enables support for the Gemini JPEG encoder engine for 8x60.
-
-config MSM_CAMERA_LED_CCI
-	bool "led flash use cci"
-	depends on MSMB_CAMERA && MACH_OPPO
-	default n
-	---help---
-	  led flash driver for third party driver IC
-
