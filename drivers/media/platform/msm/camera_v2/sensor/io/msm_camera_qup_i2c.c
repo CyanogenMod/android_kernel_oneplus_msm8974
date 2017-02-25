@@ -580,3 +580,4 @@ int32_t msm_camera_qup_i2c_write_conf_tbl(
 	}
 	return rc;
 }
+
