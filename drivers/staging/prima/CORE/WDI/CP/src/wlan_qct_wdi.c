@@ -18420,8 +18420,12 @@ WDI_ProcessStartOemDataRsp
     return WDI_STATUS_E_FAILURE;
   }
 
+  wpalMemoryZero(wdiOemDataRspParams->oemDataRsp, OEM_DATA_RSP_SIZE);
+
   /* Populate WDI structure members */
-  wpalMemoryCopy(wdiOemDataRspParams->oemDataRsp, halStartOemDataRspParams->oemDataRsp, OEM_DATA_RSP_SIZE);
+  wpalMemoryCopy(wdiOemDataRspParams->oemDataRsp,
+                 halStartOemDataRspParams->oemDataRsp,
+                 pEventData->uEventDataSize);
 
   /*Notify UMAC*/
   wdiOemDataRspCb(wdiOemDataRspParams, pWDICtx->pRspCBUserData);

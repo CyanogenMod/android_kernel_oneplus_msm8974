@@ -2699,6 +2699,7 @@ tSirRetStatus pmmUapsdSendChangePwrSaveMsg (tpAniSirGlobal pMac, tANI_U8 mode)
         {
             limLog(pMac, LOGW, FL("No Need to enter UAPSD since Trigger "
                  "Enabled and Delivery Enabled Mask is zero for all ACs"));
+            vos_mem_free(pUapsdParams);
             retStatus = eSIR_PMM_INVALID_REQ;
             return retStatus;
         }
