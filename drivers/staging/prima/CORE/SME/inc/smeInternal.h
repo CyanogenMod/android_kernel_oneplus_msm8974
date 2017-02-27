@@ -76,6 +76,8 @@ typedef enum eSmeCommandType
     eSmeCommandMacSpoofRequest,
     eSmeCommandGetFrameLogRequest,
     eSmeCommandSetMaxTxPower,
+    eSmeCommandSetMaxTxPowerPerBand,
+    eSmeCommandUpdateChannelList,
 #ifdef FEATURE_WLAN_TDLS
     //eSmeTdlsCommandMask = 0x80000,  //To identify TDLS commands <TODO>
     //These can be considered as csr commands. 

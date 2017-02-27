@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2379,7 +2379,7 @@ static void hdd_mon_add_rx_radiotap_hdr (struct sk_buff *skb,
     if( rateIdx >= 218 && rateIdx <= 225 )
        rateIdx-=210;
 
-    if(rateIdx > (sizeof(gRatefromIdx)/ sizeof(int))) {
+    if(rateIdx >= (sizeof(gRatefromIdx)/ sizeof(int))) {
        VOS_TRACE( VOS_MODULE_ID_HDD_DATA, VOS_TRACE_LEVEL_ERROR,
                   "%s: invalid rateIdx %d make it 0", __func__, rateIdx);
        rateIdx = 0;

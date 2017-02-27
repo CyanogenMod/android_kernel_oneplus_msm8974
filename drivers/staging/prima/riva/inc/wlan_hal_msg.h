@@ -568,6 +568,9 @@ typedef enum
    WLAN_HAL_FW_LOGGING_DXE_DONE_IND         = 311,
    WLAN_HAL_LOST_LINK_PARAMETERS_IND        = 312,
    WLAN_HAL_SEND_FREQ_RANGE_CONTROL_IND     = 313,
+
+   WLAN_HAL_SET_ALLOWED_ACTION_FRAMES_IND    = 333,
+
    WLAN_HAL_MSG_MAX = WLAN_HAL_MSG_TYPE_MAX_ENUM_SIZE
 }tHalHostMsgType;
 
@@ -7889,6 +7892,22 @@ typedef PACKED_PRE struct PACKED_POST
    tHalMsgHeader header;
    tHalBcnMissRateRspParams bcnMissRateRspParams;
 }tHalBcnMissRateRspMsg, *tpHalBcnMissRateRspMsg;
+
+/*---------------------------------------------------------------------------
+ * WLAN_HAL_SET_ALLOWED_ACTION_FRAMES_IND
+ *-------------------------------------------------------------------------*/
+
+typedef PACKED_PRE struct PACKED_POST
+{
+   tANI_U32  actionFramesBitMask;
+   tANI_U32  reserved;
+}tHalAllowedActionFrames, *tpHalAllowedActionFrames;
+
+typedef PACKED_PRE struct PACKED_POST
+{
+   tHalMsgHeader header;
+   tHalAllowedActionFrames allowedActionFrames;
+}tHalAllowedActionFramesReqInd, *tpHalAllowedActionFramesReqInd;
 
 /*--------------------------------------------------------------------------
 * WLAN_HAL_LL_SET_STATS_REQ

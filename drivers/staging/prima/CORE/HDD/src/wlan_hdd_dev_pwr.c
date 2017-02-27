@@ -108,6 +108,7 @@ static bool suspend_notify_sent;
 static int wlan_suspend(hdd_context_t* pHddCtx)
 {
    long rc = 0;
+   VOS_STATUS status = VOS_STATUS_SUCCESS;
 
    pVosSchedContext vosSchedContext = NULL;
 
@@ -118,10 +119,36 @@ static int wlan_suspend(hdd_context_t* pHddCtx)
       VOS_TRACE(VOS_MODULE_ID_HDD,VOS_TRACE_LEVEL_FATAL,"%s: Global VOS_SCHED context is Null",__func__);
       return 0;
    }
-   if(!vos_is_apps_power_collapse_allowed(pHddCtx))
+
+   if (!pHddCtx->last_suspend_success)
+     pHddCtx->last_suspend_success = vos_timer_get_system_time();
+
+   if (!vos_is_apps_power_collapse_allowed(pHddCtx))
    {
        /* Fail this suspend */
-       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, "%s: Fail wlan suspend: not in IMPS/BMPS", __func__);
+       pHddCtx->continuous_suspend_fail_cnt++;
+       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+        FL("Fail wlan suspend: not in IMPS/BMPS, continuous Failcnt %d"),
+        pHddCtx->continuous_suspend_fail_cnt);
+
+       /*
+        * call vos_wlanRestart() if power collapse fails for
+        * WLAN_POWER_COLLAPSE_FAIL_THRESHOLD time.
+        */
+       if ((vos_timer_get_system_time() - pHddCtx->last_suspend_success) >=
+                                         WLAN_POWER_COLLAPSE_FAIL_THRESHOLD)
+       {
+           pHddCtx->last_suspend_success = 0;
+
+           if (!(vos_isLoadUnloadInProgress() ||
+                 vos_is_logp_in_progress(VOS_MODULE_ID_SME, NULL)))
+           {
+              pHddCtx->continuous_suspend_fail_cnt = 0;
+              status = vos_wlanRestart();
+              VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                    FL("Triggering SSR, SSR status = %d"),status);
+           }
+       }
        return -EPERM;
    }
 
@@ -159,6 +186,24 @@ static int wlan_suspend(hdd_context_t* pHddCtx)
          goto tx_suspend;
       }
 
+      /*
+       * call vos_wlanRestart() if suspend for
+       * WLAN_POWER_COLLAPSE_FAIL_THRESHOLD time.
+       */
+      if ((vos_timer_get_system_time() - pHddCtx->last_suspend_success) >=
+                                         WLAN_POWER_COLLAPSE_FAIL_THRESHOLD)
+      {
+           pHddCtx->last_suspend_success = 0;
+
+           if (!(vos_isLoadUnloadInProgress() ||
+                 vos_is_logp_in_progress(VOS_MODULE_ID_SME, NULL)))
+           {
+              status = vos_wlanRestart();
+              VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                    FL("Triggering SSR, SSR status = %d"),status);
+              pHddCtx->continuous_suspend_fail_cnt = 0;
+           }
+      }
       return -ETIME;
    }
 
@@ -199,6 +244,25 @@ tx_suspend:
 
        /* Set the Tx Thread as Resumed */
        pHddCtx->isTxThreadSuspended = FALSE;
+
+       /*
+        * call vos_wlanRestart() if suspend for
+        * WLAN_POWER_COLLAPSE_FAIL_THRESHOLD time.
+        */
+       if ((vos_timer_get_system_time() - pHddCtx->last_suspend_success) >=
+                                          WLAN_POWER_COLLAPSE_FAIL_THRESHOLD)
+       {
+           pHddCtx->last_suspend_success = 0;
+
+           if (!(vos_isLoadUnloadInProgress() ||
+                 vos_is_logp_in_progress(VOS_MODULE_ID_SME, NULL)))
+           {
+              status = vos_wlanRestart();
+              VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                    FL("Triggering SSR, SSR status = %d"),status);
+              pHddCtx->continuous_suspend_fail_cnt = 0;
+           }
+       }
 
        return -ETIME;
    }
@@ -249,6 +313,25 @@ rx_suspend:
        /* Set the Tx Thread as Resumed */
        pHddCtx->isTxThreadSuspended = FALSE;
 
+       /*
+        * call vos_wlanRestart() if suspend for
+        * WLAN_POWER_COLLAPSE_FAIL_THRESHOLD time.
+        */
+       if ((vos_timer_get_system_time() - pHddCtx->last_suspend_success) >=
+                                          WLAN_POWER_COLLAPSE_FAIL_THRESHOLD)
+       {
+           pHddCtx->last_suspend_success = 0;
+
+           if (!(vos_isLoadUnloadInProgress() ||
+                 vos_is_logp_in_progress(VOS_MODULE_ID_SME, NULL)))
+           {
+              status = vos_wlanRestart();
+              VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                    FL("Triggering SSR, SSR status = %d"),status);
+              pHddCtx->continuous_suspend_fail_cnt = 0;
+           }
+       }
+
        return -ETIME;
    }
 
@@ -258,6 +341,7 @@ mc_suspend:
    
    /* Set the Station state as Suspended */
    pHddCtx->isWlanSuspended = TRUE;
+   pHddCtx->last_suspend_success = 0;
 
    return 0;
 }

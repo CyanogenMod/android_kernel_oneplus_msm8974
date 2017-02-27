@@ -325,7 +325,8 @@ int wlan_hdd_tdls_set_peer_caps(hdd_adapter_t *pAdapter,
 #endif
                                 tCsrStaParams *StaParams,
                                 tANI_BOOLEAN isBufSta,
-                                tANI_BOOLEAN isOffChannelSupported);
+                                tANI_BOOLEAN isOffChannelSupported,
+                                tANI_BOOLEAN isQosWmmSta);
 
 int wlan_hdd_tdls_set_rssi(hdd_adapter_t *pAdapter,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))
