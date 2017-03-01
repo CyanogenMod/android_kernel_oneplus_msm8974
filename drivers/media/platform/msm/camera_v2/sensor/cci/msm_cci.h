@@ -16,6 +16,9 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/platform_device.h>
+#ifdef CONFIG_MACH_OPPO
+#include <linux/wakelock.h>
+#endif
 #include <media/v4l2-subdev.h>
 #include <media/msm_cam_sensor.h>
 #include <mach/camera2.h>
@@ -138,6 +141,9 @@ struct cci_device {
 	struct msm_cci_clk_params_t cci_clk_params[MASTER_MAX];
 	struct gpio *cci_gpio_tbl;
 	uint8_t cci_gpio_tbl_size;
+#ifdef CONFIG_MACH_OPPO
+	struct wake_lock cci_wakelock;
+#endif
 };
 
 enum msm_cci_i2c_cmd_type {
