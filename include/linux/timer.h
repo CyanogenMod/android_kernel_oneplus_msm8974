@@ -23,11 +23,6 @@ struct timer_list {
 
 	int slack;
 
-#ifdef CONFIG_TIMER_STATS
-	int start_pid;
-	void *start_site;
-	char start_comm[16];
-#endif
 #ifdef CONFIG_LOCKDEP
 	struct lockdep_map lockdep_map;
 #endif
@@ -228,49 +223,6 @@ extern void set_timer_slack(struct timer_list *time, int slack_hz);
  * jiffie.
  */
 extern unsigned long get_next_timer_interrupt(unsigned long now);
-
-/*
- * Timer-statistics info:
- */
-#ifdef CONFIG_TIMER_STATS
-
-extern int timer_stats_active;
-
-#define TIMER_STATS_FLAG_DEFERRABLE	0x1
-
-extern void init_timer_stats(void);
-
-extern void timer_stats_update_stats(void *timer, pid_t pid, void *startf,
-				     void *timerf, char *comm,
-				     unsigned int timer_flag);
-
-extern void __timer_stats_timer_set_start_info(struct timer_list *timer,
-					       void *addr);
-
-static inline void timer_stats_timer_set_start_info(struct timer_list *timer)
-{
-	if (likely(!timer_stats_active))
-		return;
-	__timer_stats_timer_set_start_info(timer, __builtin_return_address(0));
-}
-
-static inline void timer_stats_timer_clear_start_info(struct timer_list *timer)
-{
-	timer->start_site = NULL;
-}
-#else
-static inline void init_timer_stats(void)
-{
-}
-
-static inline void timer_stats_timer_set_start_info(struct timer_list *timer)
-{
-}
-
-static inline void timer_stats_timer_clear_start_info(struct timer_list *timer)
-{
-}
-#endif
 
 extern void add_timer(struct timer_list *timer);
 

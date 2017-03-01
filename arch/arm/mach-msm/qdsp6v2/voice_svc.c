@@ -200,8 +200,8 @@ static int voice_svc_send_req(struct voice_svc_cmd_request *apr_request,
 	    MAX(sizeof(apr_request->svc_name), sizeof(VOICE_SVC_MVM_STR)))) {
 		apr_handle = prtd->apr_q6_mvm;
 	} else {
-		pr_err("%s: Invalid service %s\n", __func__,
-			apr_request->svc_name);
+		pr_err("%s: Invalid service %.*s\n", __func__,
+			MAX_APR_SERVICE_NAME_LEN, apr_request->svc_name);
 
 		ret = -EINVAL;
 		goto done;
@@ -301,8 +301,8 @@ static int process_reg_cmd(struct voice_svc_register apr_reg_svc,
 		svc = VOICE_SVC_CVS_STR;
 		handle = &prtd->apr_q6_cvs;
 	} else {
-		pr_err("%s: Invalid Service: %s\n", __func__,
-				apr_reg_svc.svc_name);
+		pr_err("%s: Invalid Service: %.*s\n", __func__,
+				MAX_APR_SERVICE_NAME_LEN, apr_reg_svc.svc_name);
 		ret = -EINVAL;
 		goto done;
 	}

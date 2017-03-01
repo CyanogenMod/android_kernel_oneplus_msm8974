@@ -1156,8 +1156,6 @@ int queue_delayed_work_on(int cpu, struct workqueue_struct *wq,
 		WARN_ON_ONCE(timer_pending(timer));
 		WARN_ON_ONCE(!list_empty(&work->entry));
 
-		timer_stats_timer_set_start_info(&dwork->timer);
-
 		/*
 		 * This stores cwq for the moment, for the timer_fn.
 		 * Note that the work's gcwq is preserved to allow
