@@ -1,7 +1,3 @@
-#ifdef CONFIG_OPPO_CAMERA_50
-#include <media/msmb_pproc_oppo_50.h>
-#else
-
 #ifndef __MSMB_PPROC_H
 #define __MSMB_PPROC_H
 
@@ -254,5 +250,3 @@ struct msm_camera_v4l2_ioctl_t {
 };
 
 #endif /* __MSMB_PPROC_H */
-
-#endif

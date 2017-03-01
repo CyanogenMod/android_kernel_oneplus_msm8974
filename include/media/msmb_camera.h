@@ -1,7 +1,3 @@
-#ifdef CONFIG_OPPO_CAMERA_50
-#include <media/msmb_camera_oppo_50.h>
-#else
-
 #ifndef __LINUX_MSMB_CAMERA_H
 #define __LINUX_MSMB_CAMERA_H
 
@@ -173,5 +169,3 @@ struct msm_v4l2_format_data {
 #define MSM_V4L2_PIX_FMT_STATS_BHST v4l2_fourcc('B', 'H', 'S', 'T')
 
 #endif /* __LINUX_MSMB_CAMERA_H */
-
-#endif

@@ -1,7 +1,3 @@
-#ifdef CONFIG_OPPO_CAMERA_50
-#include <media/msm_jpeg_oppo_50.h>
-#else
-
 #ifndef __LINUX_MSM_JPEG_H
 #define __LINUX_MSM_JPEG_H
 
@@ -126,5 +122,3 @@ struct msm_jpeg_hw_cmds {
 };
 
 #endif /* __LINUX_MSM_JPEG_H */
-
-#endif

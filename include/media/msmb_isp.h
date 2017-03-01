@@ -9,11 +9,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
 #ifdef CONFIG_OPPO_CAMERA
 #include <media/msmb_isp_oppo.h>
-#elif defined(CONFIG_OPPO_CAMERA_50)
-#include <media/msmb_isp_oppo_50.h>
 #else
 
 #ifndef __MSMB_ISP__
@@ -444,4 +441,4 @@ struct msm_isp_event_data {
 
 #endif /* __MSMB_ISP__ */
 
-#endif
+#endif // CONFIG_OPPO_CAMERA

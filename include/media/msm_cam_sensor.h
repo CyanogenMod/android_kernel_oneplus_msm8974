@@ -1,7 +1,5 @@
 #ifdef CONFIG_OPPO_CAMERA
 #include <media/msm_cam_sensor_oppo.h>
-#elif defined(CONFIG_OPPO_CAMERA_50)
-#include <media/msm_cam_sensor_oppo_50.h>
 #else
 
 #ifndef __LINUX_MSM_CAM_SENSOR_H
@@ -702,5 +700,4 @@ struct sensor_init_cfg_data {
 #define MSM_V4L2_PIX_FMT_META v4l2_fourcc('M', 'E', 'T', 'A') /* META */
 
 #endif /* __LINUX_MSM_CAM_SENSOR_H */
-
 #endif
