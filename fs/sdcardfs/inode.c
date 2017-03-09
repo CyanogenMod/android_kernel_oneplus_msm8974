@@ -571,7 +571,7 @@ static int sdcardfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	get_derived_permission_new(new_dentry->d_parent, old_dentry, &new_dentry->d_name);
 	fixup_tmp_permissions(old_dentry->d_inode);
 	fixup_lower_ownership(old_dentry, new_dentry->d_name.name);
-	drop_recursive(old_dentry); /* Can't fixup ownership recursively :( */
+	d_invalidate(old_dentry); /* Can't fixup ownership recursively :( */
 
 out_err:
 	mnt_drop_write(lower_new_path.mnt);
