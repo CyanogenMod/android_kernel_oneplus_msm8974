@@ -1591,6 +1591,11 @@ static int do_execve_common(const char *filename,
 	if (retval < 0)
 		goto out;
 
+	if (d_is_su(file->f_dentry) && capable(CAP_SYS_ADMIN)) {
+		current->flags |= PF_SU;
+		su_exec();
+	}
+
 	/* execve succeeded */
 	current->fs->in_exec = 0;
 	current->in_execve = 0;
