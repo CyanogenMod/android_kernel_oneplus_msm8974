@@ -668,7 +668,7 @@ static int venus_hfi_unvote_bus(void *dev,
 	struct venus_hfi_device *device = dev;
 
 	if (!device) {
-		dprintk(VIDC_ERR, "%s invalid device handle %p",
+		dprintk(VIDC_ERR, "%s invalid device handle %pK",
 			__func__, device);
 		return -EINVAL;
 	}
@@ -765,7 +765,7 @@ static int venus_hfi_scale_bus(void *dev, int load,
 	int bus_vector = 0;
 
 	if (!device) {
-		dprintk(VIDC_ERR, "%s invalid device handle %p",
+		dprintk(VIDC_ERR, "%s invalid device handle %pK",
 			__func__, device);
 		return -EINVAL;
 	}
@@ -2513,7 +2513,7 @@ static int venus_hfi_session_clean(void *session)
 	}
 	sess_close = session;
 	device = sess_close->device;
-	dprintk(VIDC_DBG, "deleted the session: 0x%p",
+	dprintk(VIDC_DBG, "deleted the session: 0x%pK",
 			sess_close);
 	mutex_lock(&device->session_lock);
 	list_del(&sess_close->list);
