@@ -371,8 +371,8 @@ static int32_t msm_actuator_move_focus(
 		}
 		a_ctrl->curr_step_pos = target_step_pos;
 #ifdef CONFIG_MACH_OPPO
-	a_ctrl->current_lens_pos = a_ctrl->step_position_table[a_ctrl->curr_step_pos];
-	a_ctrl->hw_params = ringing_params_kernel.hw_params;
+		a_ctrl->current_lens_pos = a_ctrl->step_position_table[a_ctrl->curr_step_pos];
+		a_ctrl->hw_params = ringing_params_kernel.hw_params;
 #endif
 	}
 
