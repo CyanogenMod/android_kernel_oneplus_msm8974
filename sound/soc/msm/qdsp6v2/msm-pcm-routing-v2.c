@@ -1429,6 +1429,11 @@ static int msm_routing_ec_ref_rx_put(struct snd_kcontrol *kcontrol,
 	int mux = ucontrol->value.enumerated.item[0];
 	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
 
+	if (mux >= e->max) {
+		pr_err("%s: Invalid mux value %d\n", __func__, mux);
+		return -EINVAL;
+	}
+
 	mutex_lock(&routing_lock);
 	switch (ucontrol->value.integer.value[0]) {
 	case 0:
@@ -4290,11 +4295,6 @@ static int msm_pcm_routing_hw_params(struct snd_pcm_substream *substream,
 
 	if (be_id >= MSM_BACKEND_DAI_MAX) {
 		pr_err("%s: unexpected be_id %d\n", __func__, be_id);
-		return -EINVAL;
-	}
-
-	if (mux >= e->max) {
-		pr_err("%s: Invalid mux value %d\n", __func__, mux);
 		return -EINVAL;
 	}
 
