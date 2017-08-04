@@ -1541,7 +1541,7 @@ static int msm_routing_ext_ec_put(struct snd_kcontrol *kcontrol,
 		 __func__, msm_route_ext_ec_ref,
 		 ucontrol->value.integer.value[0]);
 
-	if (mux >= e->items) {
+	if (mux >= e->max) {
 		pr_err("%s: Invalid mux value %d\n", __func__, mux);
 		return -EINVAL;
 	}
@@ -4293,7 +4293,7 @@ static int msm_pcm_routing_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
-	if (mux >= e->items) {
+	if (mux >= e->max) {
 		pr_err("%s: Invalid mux value %d\n", __func__, mux);
 		return -EINVAL;
 	}
