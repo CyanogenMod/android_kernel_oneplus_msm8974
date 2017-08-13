@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014, 2016-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -43,6 +43,12 @@ struct voice_svc_prvt {
 	struct list_head response_queue;
 	wait_queue_head_t response_wait;
 	spinlock_t response_lock;
+	/*
+	 * This mutex ensures responses are processed in sequential order and
+	 * that no two threads access and free the same response at the same
+	 * time.
+	 */
+	struct mutex response_mutex_lock;
 };
 
 struct apr_data {
@@ -100,6 +106,7 @@ static int32_t qdsp_apr_callback(struct apr_client_data *data, void *priv)
 		}
 	}
 
+	mutex_lock(&prtd->response_mutex_lock);
 	spin_lock_irqsave(&prtd->response_lock, spin_flags);
 
 	if (prtd->response_count < APR_MAX_RESPONSE) {
@@ -470,7 +477,7 @@ static long voice_svc_ioctl(struct file *file, unsigned int cmd,
 				if (ret == 0) {
 					pr_debug("%s: Read timeout\n", __func__);
 					ret = -ETIMEDOUT;
-					goto done;
+					goto unlock;
 				} else if (ret > 0 &&
 					!list_empty(&prtd->response_queue)) {
 					pr_debug("%s: Interrupt recieved for response\n",
@@ -479,7 +486,7 @@ static long voice_svc_ioctl(struct file *file, unsigned int cmd,
 				} else if (ret < 0) {
 					pr_debug("%s: Interrupted by SIGNAL %d\n",
 						__func__, ret);
-					goto done;
+					goto unlock;
 				}
 			}
 		} while(!apr_response);
@@ -489,6 +496,8 @@ static long voice_svc_ioctl(struct file *file, unsigned int cmd,
 		ret = -EINVAL;
 	}
 
+unlock:
+	mutex_unlock(&prtd->response_mutex_lock);
 done:
 	if (apr_request != NULL)
 		kfree(apr_request);
@@ -547,7 +556,7 @@ static int voice_svc_open(struct inode *inode, struct file *file)
 	INIT_LIST_HEAD(&prtd->response_queue);
 	init_waitqueue_head(&prtd->response_wait);
 	spin_lock_init(&prtd->response_lock);
-
+	mutex_init(&prtd->response_mutex_lock);
 	file->private_data = (void*)prtd;
 
 	/* Current APR implementation doesn't support session based
@@ -565,6 +574,15 @@ static int voice_svc_open(struct inode *inode, struct file *file)
 
 static int voice_svc_release(struct inode *inode, struct file *file)
 {
+	struct voice_svc_prvt *prtd = NULL;
+
+	prtd = (struct voice_svc_prvt *)file->private_data;
+	if (prtd == NULL) {
+		pr_err("%s: prtd is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	mutex_destroy(&prtd->response_mutex_lock);
 	kfree(file->private_data);
 	return 0;
 }

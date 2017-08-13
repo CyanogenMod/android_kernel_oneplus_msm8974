@@ -1005,13 +1005,14 @@ static int digi_write(struct tty_struct *tty, struct usb_serial_port *port,
 
 static void digi_write_bulk_callback(struct urb *urb)
 {
-
+	struct device *dev = &serial->interface->dev;
 	struct usb_serial_port *port = urb->context;
 	struct usb_serial *serial;
 	struct digi_port *priv;
 	struct digi_serial *serial_priv;
 	int ret = 0;
 	int status = urb->status;
+	int i;
 
 	dbg("digi_write_bulk_callback: TOP, status=%d", status);
 
@@ -1027,6 +1028,23 @@ static void digi_write_bulk_callback(struct urb *urb)
 			"%s: serial or serial->private is NULL, status=%d\n",
 			__func__, status);
 		return;
+	}
+
+	/* check whether the device has the expected number of endpoints */
+	if (serial->num_port_pointers < serial->type->num_ports + 1) {
+		dev_err(dev, "OOB endpoints missing\n");
+		return -ENODEV;
+	}
+
+	for (i = 0; i < serial->type->num_ports + 1 ; i++) {
+		if (!serial->port[i]->read_urb) {
+			dev_err(dev, "bulk-in endpoint missing\n");
+			return -ENODEV;
+		}
+		if (!serial->port[i]->write_urb) {
+			dev_err(dev, "bulk-out endpoint missing\n");
+			return -ENODEV;
+		}
 	}
 
 	/* handle oob callback */

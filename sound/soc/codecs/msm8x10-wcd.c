@@ -1677,10 +1677,10 @@ static int msm8x10_wcd_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 
 	dev_dbg(codec->dev, "%s %d\n", __func__, event);
 
-	if ((strnstr(w->name, internal1_text, 30)) ||
-	    (strnstr(w->name, internal2_text, 30)) ||
-	    (strnstr(w->name, internal3_text, 30)) ||
-	    (strnstr(w->name, external_text, 30))) {
+	if ((strnstr(w->name, internal1_text, strlen(w->name))) ||
+	    (strnstr(w->name, internal2_text, strlen(w->name))) ||
+	    (strnstr(w->name, internal3_text, strlen(w->name))) ||
+	    (strnstr(w->name, external_text, strlen(w->name)))) {
 		micb_int_reg = MSM8X10_WCD_A_MICB_1_INT_RBIAS;
 		e_pre_on = WCD9XXX_EVENT_PRE_MICBIAS_1_ON;
 		e_post_on = WCD9XXX_EVENT_POST_MICBIAS_1_ON;
@@ -1696,11 +1696,11 @@ static int msm8x10_wcd_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 		/* Let MBHC module know micbias is about to turn ON */
 		wcd9xxx_resmgr_notifier_call(&msm8x10_wcd->resmgr, e_pre_on);
 
-		if (strnstr(w->name, internal1_text, 30))
+		if (strnstr(w->name, internal1_text, strlen(w->name)))
 			snd_soc_update_bits(codec, micb_int_reg, 0x80, 0x80);
-		else if (strnstr(w->name, internal2_text, 30))
+		else if (strnstr(w->name, internal2_text, strlen(w->name)))
 			snd_soc_update_bits(codec, micb_int_reg, 0x10, 0x10);
-		else if (strnstr(w->name, internal3_text, 30))
+		else if (strnstr(w->name, internal3_text, strlen(w->name)))
 			snd_soc_update_bits(codec, micb_int_reg, 0x2, 0x2);
 
 		/* Always pull up TxFe for TX2 to Micbias */
@@ -1725,11 +1725,11 @@ static int msm8x10_wcd_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 		/* Let MBHC module know so micbias switch to be off */
 		wcd9xxx_resmgr_notifier_call(&msm8x10_wcd->resmgr, e_post_off);
 
-		if (strnstr(w->name, internal1_text, 30))
+		if (strnstr(w->name, internal1_text, strlen(w->name)))
 			snd_soc_update_bits(codec, micb_int_reg, 0x80, 0x00);
-		else if (strnstr(w->name, internal2_text, 30))
+		else if (strnstr(w->name, internal2_text, strlen(w->name)))
 			snd_soc_update_bits(codec, micb_int_reg, 0x10, 0x00);
-		else if (strnstr(w->name, internal3_text, 30))
+		else if (strnstr(w->name, internal3_text, strlen(w->name)))
 			snd_soc_update_bits(codec, micb_int_reg, 0x2, 0x0);
 
 		/* Disable pull up TxFe for TX2 to Micbias */
