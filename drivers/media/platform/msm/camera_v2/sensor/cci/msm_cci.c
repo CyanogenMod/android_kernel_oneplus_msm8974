@@ -49,17 +49,10 @@
 
 static struct v4l2_subdev *g_cci_subdev;
 
-static int32_t msm_cci_set_clk_param(struct cci_device *cci_dev)
+static void msm_cci_set_clk_param(struct cci_device *cci_dev)
 {
 	struct msm_cci_clk_params_t *clk_params = NULL;
 	uint8_t count = 0;
-	int32_t rc = 0;
-
-	if ((i2c_freq_mode >= I2C_MAX_MODES) || (i2c_freq_mode < 0)) {
-		pr_err("%s:%d Invalid i2c_freq_mode =%d\n",
-			__func__, __LINE__, i2c_freq_mode);
-		return -EINVAL;
-	}
 
 	for (count = 0; count < MASTER_MAX; count++) {
 		if (MASTER_0 == count) {
@@ -96,7 +89,7 @@ static int32_t msm_cci_set_clk_param(struct cci_device *cci_dev)
 				cci_dev->base + CCI_I2C_M1_MISC_CTL_ADDR);
 		}
 	}
-	return rc;
+	return;
 }
 
 static void msm_cci_flush_queue(struct cci_device *cci_dev,
@@ -742,12 +735,7 @@ static int32_t msm_cci_init(struct v4l2_subdev *sd,
 			rc = -ETIMEDOUT;
 		goto reset_complete_failed;
 	}
-	rc = msm_cci_set_clk_param(cci_dev);
-	if (rc < 0) {
-		pr_err("%s:%d msm_cci_set_clk_parm failed rc = %d\n",
-			__func__, __LINE__, rc);
-		return rc;
-	}
+	msm_cci_set_clk_param(cci_dev);
 	msm_camera_io_w(CCI_IRQ_MASK_0_RMSK,
 		cci_dev->base + CCI_IRQ_MASK_0_ADDR);
 	msm_camera_io_w(CCI_IRQ_MASK_0_RMSK,
