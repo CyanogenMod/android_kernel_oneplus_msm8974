@@ -82,7 +82,7 @@ static int f2fs_xattr_generic_get(struct dentry *dentry, const char *name,
 	}
 	if (strcmp(name, "") == 0)
 		return -EINVAL;
-	return f2fs_getxattr(dentry->d_inode, type, name, buffer, size, NULL);
+	return f2fs_getxattr(d_inode(dentry), type, name, buffer, size, NULL);
 }
 
 static int f2fs_xattr_generic_set(struct dentry *dentry, const char *name,
@@ -107,7 +107,7 @@ static int f2fs_xattr_generic_set(struct dentry *dentry, const char *name,
 	if (strcmp(name, "") == 0)
 		return -EINVAL;
 
-	return f2fs_setxattr(dentry->d_inode, type, name,
+	return f2fs_setxattr(d_inode(dentry), type, name,
 					value, size, NULL, flags);
 }
 
@@ -129,7 +129,7 @@ static size_t f2fs_xattr_advise_list(struct dentry *dentry, char *list,
 static int f2fs_xattr_advise_get(struct dentry *dentry, const char *name,
 		void *buffer, size_t size, int type)
 {
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = d_inode(dentry);
 
 	if (strcmp(name, "") != 0)
 		return -EINVAL;
@@ -142,7 +142,7 @@ static int f2fs_xattr_advise_get(struct dentry *dentry, const char *name,
 static int f2fs_xattr_advise_set(struct dentry *dentry, const char *name,
 		const void *value, size_t size, int flags, int type)
 {
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = d_inode(dentry);
 
 	if (strcmp(name, "") != 0)
 		return -EINVAL;
@@ -152,7 +152,7 @@ static int f2fs_xattr_advise_set(struct dentry *dentry, const char *name,
 		return -EINVAL;
 
 	F2FS_I(inode)->i_advise |= *(char *)value;
-	mark_inode_dirty(inode);
+	f2fs_mark_inode_dirty_sync(inode);
 	return 0;
 }
 
@@ -347,6 +347,7 @@ static inline int write_all_xattrs(struct inode *inode, __u32 hsize,
 		if (ipage) {
 			inline_addr = inline_xattr_addr(ipage);
 			f2fs_wait_on_page_writeback(ipage, NODE, true);
+			set_page_dirty(ipage);
 		} else {
 			page = get_node_page(sbi, inode->i_ino);
 			if (IS_ERR(page)) {
@@ -443,7 +444,7 @@ cleanup:
 
 ssize_t f2fs_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size)
 {
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = d_inode(dentry);
 	struct f2fs_xattr_entry *entry;
 	void *base_addr;
 	int error = 0;
@@ -482,13 +483,12 @@ static int __f2fs_setxattr(struct inode *inode, int index,
 			const char *name, const void *value, size_t size,
 			struct page *ipage, int flags)
 {
-	struct f2fs_inode_info *fi = F2FS_I(inode);
 	struct f2fs_xattr_entry *here, *last;
 	void *base_addr;
 	int found, newsize;
 	size_t len;
 	__u32 new_hsize;
-	int error = -ENOMEM;
+	int error = 0;
 
 	if (name == NULL)
 		return -EINVAL;
@@ -506,7 +506,7 @@ static int __f2fs_setxattr(struct inode *inode, int index,
 
 	base_addr = read_all_xattrs(inode, ipage);
 	if (!base_addr)
-		goto exit;
+		return -ENOMEM;
 
 	/* find entry with wanted name. */
 	here = __find_xattr(base_addr, index, len, name);
@@ -580,19 +580,15 @@ static int __f2fs_setxattr(struct inode *inode, int index,
 	if (error)
 		goto exit;
 
-	if (is_inode_flag_set(fi, FI_ACL_MODE)) {
-		inode->i_mode = fi->i_acl_mode;
+	if (is_inode_flag_set(inode, FI_ACL_MODE)) {
+		inode->i_mode = F2FS_I(inode)->i_acl_mode;
 		inode->i_ctime = CURRENT_TIME;
-		clear_inode_flag(fi, FI_ACL_MODE);
+		clear_inode_flag(inode, FI_ACL_MODE);
 	}
 	if (index == F2FS_XATTR_INDEX_ENCRYPTION &&
 			!strcmp(name, F2FS_XATTR_NAME_ENCRYPTION_CONTEXT))
 		f2fs_set_encrypted_inode(inode);
-
-	if (ipage)
-		update_inode(inode, ipage);
-	else
-		update_inode_page(inode);
+	f2fs_mark_inode_dirty_sync(inode);
 exit:
 	kzfree(base_addr);
 	return error;

@@ -11,6 +11,10 @@
 #ifndef _LINUX_F2FS_FS_H
 #define _LINUX_F2FS_FS_H
 
+#ifdef CONFIG_F2FS_FS_ENCRYPTION
+#undef CONFIG_F2FS_FS_ENCRYPTION
+#endif
+
 #include <linux/pagemap.h>
 #include <linux/types.h>
 
