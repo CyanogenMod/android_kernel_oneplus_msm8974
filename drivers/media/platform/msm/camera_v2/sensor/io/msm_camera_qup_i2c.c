@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011, 2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -142,13 +142,11 @@ int32_t msm_camera_qup_i2c_read_seq(struct msm_camera_i2c_client *client,
 		pr_err("%s: integer overflow prevented\n", __func__);
 		return rc;
 	}
-
 	buf = kzalloc(client->addr_type+num_byte, GFP_KERNEL);
 	if (!buf) {
 		pr_err("%s:%d no memory\n", __func__, __LINE__);
 		return -ENOMEM;
 	}
-
 	if (client->addr_type == MSM_CAMERA_I2C_BYTE_ADDR) {
 		buf[0] = addr;
 	} else if (client->addr_type == MSM_CAMERA_I2C_WORD_ADDR) {
@@ -329,7 +327,6 @@ int32_t msm_camera_qup_i2c_write_seq_table(struct msm_camera_i2c_client *client,
 		__func__, reg_setting->reg_data_size, I2C_SEQ_REG_DATA_MAX);
 		return rc;
 	}
-
 	for (i = 0; i < write_setting->size; i++) {
 		rc = msm_camera_qup_i2c_write_seq(client, reg_setting->reg_addr,
 			reg_setting->reg_data, reg_setting->reg_data_size);
@@ -583,3 +580,4 @@ int32_t msm_camera_qup_i2c_write_conf_tbl(
 	}
 	return rc;
 }
+
