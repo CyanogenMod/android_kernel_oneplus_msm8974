@@ -40,6 +40,8 @@ struct lsm_priv {
 	wait_queue_head_t event_wait;
 	unsigned long event_avail;
 	atomic_t event_wait_stop;
+
+	struct mutex lsm_api_lock;
 };
 
 static void lsm_event_handler(uint32_t opcode, uint32_t token,
@@ -137,10 +139,18 @@ static int msm_lsm_ioctl_shared(struct snd_pcm_substream *substream,
 	case SNDRV_LSM_EVENT_STATUS:
 		pr_debug("%s: Get event status\n", __func__);
 		atomic_set(&prtd->event_wait_stop, 0);
+
+		/*
+		 * Release the api lock before wait to allow
+		 * other IOCTLs to be invoked while waiting
+		 * for event
+		 */
+		mutex_unlock(&prtd->lsm_api_lock);
 		rc = wait_event_freezable(prtd->event_wait,
 				(cmpxchg(&prtd->event_avail, 1, 0) ||
 				 (xchg = atomic_cmpxchg(&prtd->event_wait_stop,
 							1, 0))));
+		mutex_lock(&prtd->lsm_api_lock);
 		pr_debug("%s: wait_event_freezable %d event_wait_stop %d\n",
 			 __func__, rc, xchg);
 		if (!rc && !xchg) {
@@ -212,19 +222,27 @@ static int msm_lsm_ioctl_shared(struct snd_pcm_substream *substream,
 static int msm_lsm_ioctl(struct snd_pcm_substream *substream,
 			 unsigned int cmd, void *arg)
 {
+	struct snd_pcm_runtime *runtime;
+	struct lsm_priv *prtd;
+	struct snd_soc_pcm_runtime *rtd;
 	int err = 0;
 	u32 size = 0;
 
-	if (!substream) {
+	if (!substream || !substream->private_data) {
 		pr_err("%s: Invalid params\n", __func__);
 		return -EINVAL;
 	}
+	runtime = substream->runtime;
+	rtd = substream->private_data;
+	prtd = runtime->private_data;
+	mutex_lock(&prtd->lsm_api_lock);
 	switch (cmd) {
 	case SNDRV_LSM_REG_SND_MODEL: {
 		struct snd_lsm_sound_model snd_model;
 		if (!arg) {
 			pr_err("%s: Invalid params snd_model\n", __func__);
-			return -EINVAL;
+			err = -EINVAL;
+			goto done;
 		}
 		if (copy_from_user(&snd_model, arg, sizeof(snd_model))) {
 			err = -EFAULT;
@@ -236,18 +254,20 @@ static int msm_lsm_ioctl(struct snd_pcm_substream *substream,
 		if (err)
 			pr_err("%s REG_SND_MODEL failed err %d\n",
 			__func__, err);
-		return err;
+		goto done;
 	}
 	case SNDRV_LSM_EVENT_STATUS: {
 		struct snd_lsm_event_status *user = NULL, userarg;
 		if (!arg) {
 			pr_err("%s: Invalid params event status\n", __func__);
-			return -EINVAL;
+			err = -EINVAL;
+			goto done;
 		}
 		if (copy_from_user(&userarg, arg, sizeof(userarg))) {
 			pr_err("%s: err copyuser event_status\n",
 			__func__);
-			return -EFAULT;
+			err = -EFAULT;
+			goto done;
 		}
 		size = sizeof(struct snd_lsm_event_status) +
 		userarg.payload_size;
@@ -275,12 +295,14 @@ static int msm_lsm_ioctl(struct snd_pcm_substream *substream,
 		kfree(user);
 		if (err)
 			pr_err("%s: lsmevent failed %d", __func__, err);
-		return err;
+		goto done;
 	}
 	default:
 		err = msm_lsm_ioctl_shared(substream, cmd, arg);
 	break;
 	}
+done:
+	mutex_unlock(&prtd->lsm_api_lock);
 	return err;
 }
 
@@ -315,6 +337,7 @@ static int msm_lsm_open(struct snd_pcm_substream *substream)
 
 	pr_debug("%s: Session ID %d\n", __func__, prtd->lsm_client->session);
 	prtd->lsm_client->started = false;
+	mutex_init(&prtd->lsm_api_lock);
 	spin_lock_init(&prtd->event_lock);
 	init_waitqueue_head(&prtd->event_wait);
 	runtime->private_data = prtd;
@@ -365,6 +388,7 @@ static int msm_lsm_close(struct snd_pcm_substream *substream)
 	kfree(prtd->event_status);
 	prtd->event_status = NULL;
 	spin_unlock_irqrestore(&prtd->event_lock, flags);
+	mutex_destroy(&prtd->lsm_api_lock);
 	kfree(prtd);
 	runtime->private_data = NULL;
 
