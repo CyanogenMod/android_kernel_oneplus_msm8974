@@ -263,9 +263,9 @@ kgsl_mem_entry_create(void)
 	if (!entry)
 		KGSL_CORE_ERR("kzalloc(%d) failed\n", sizeof(*entry));
 	else {
+		kref_init(&entry->refcount);
 		/* put this ref in the caller functions after init */
 		kref_get(&entry->refcount);
-		kref_init(&entry->refcount);
 	}
 
 	return entry;
