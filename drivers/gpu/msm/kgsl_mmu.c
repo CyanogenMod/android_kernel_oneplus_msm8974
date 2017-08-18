@@ -1,4 +1,5 @@
-/* Copyright (c) 2002,2007-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2002,2007-2014,2016, The Linux Foundation. All rights
+ * reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -875,7 +876,7 @@ int kgsl_mmu_map_global(struct kgsl_pagetable *pagetable,
 
 	/*global mappings must have the same gpu address in all pagetables*/
 	if (gpuaddr && gpuaddr != memdesc->gpuaddr) {
-		KGSL_CORE_ERR("pt %p addr mismatch phys %pa gpu 0x%0x 0x%08x",
+		KGSL_CORE_ERR("pt %pK addr mismatch phys %pa gpu 0x%0x 0x%08x",
 		     pagetable, &memdesc->physaddr, gpuaddr, memdesc->gpuaddr);
 		goto error_unmap;
 	}

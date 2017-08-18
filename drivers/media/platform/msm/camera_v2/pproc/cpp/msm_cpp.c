@@ -968,16 +968,12 @@ static int cpp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 
 	CPP_DBG("open %d %p\n", i, &fh->vfh);
 	cpp_dev->cpp_open_cnt++;
-/*Added by jianbo.sun@Camera 2013-12-27 start for add quick start*/
-#ifndef CONFIG_MACH_OPPO
 	if (cpp_dev->cpp_open_cnt == 1) {
 		cpp_init_hardware(cpp_dev);
 		iommu_attach_device(cpp_dev->domain, cpp_dev->iommu_ctx);
 		cpp_init_mem(cpp_dev);
 		cpp_dev->state = CPP_STATE_IDLE;
 	}
-#endif
-/*Added by jianbo.sun@Camera 2013-12-27 end*/
 	mutex_unlock(&cpp_dev->mutex);
 	return 0;
 }
@@ -1537,25 +1533,28 @@ void msm_cpp_clean_queue(struct cpp_device *cpp_dev)
 long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg)
 {
-	struct cpp_device *cpp_dev = v4l2_get_subdevdata(sd);
+	struct cpp_device *cpp_dev = NULL;
 	struct msm_camera_v4l2_ioctl_t *ioctl_ptr = arg;
 	int rc = 0;
 
-	if (ioctl_ptr == NULL) {
-		pr_err("ioctl_ptr is null\n");
+	if ((sd == NULL) || (ioctl_ptr == NULL)) {
+		pr_err("Wrong ioctl_ptr %p, sd %p\n", ioctl_ptr, sd);
 		return -EINVAL;
 	}
-	if (cpp_dev == NULL) {
-		pr_err("cpp_dev is null\n");
-		return -EINVAL;
-	}
-
 	if ((ioctl_ptr->ioctl_ptr == NULL) || (ioctl_ptr->len == 0)) {
 		pr_err("ioctl_ptr OR ioctl_ptr->len is NULL  %p %d\n",
 			ioctl_ptr, ioctl_ptr->len);
 		return -EINVAL;
 	}
-
+	if (_IOC_DIR(cmd) == _IOC_NONE) {
+		pr_err("Invalid ioctl/subdev cmd %u\n", cmd);
+		return -EINVAL;
+	}
+	cpp_dev = v4l2_get_subdevdata(sd);
+	if (cpp_dev == NULL) {
+		pr_err("cpp_dev is null\n");
+		return -EINVAL;
+	}
 	mutex_lock(&cpp_dev->mutex);
 	CPP_DBG("E cmd: %d\n", cmd);
 	switch (cmd) {
@@ -1884,34 +1883,6 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 
 		break;
 	}
-/*Added by jianbo.sun@Camera 2013-12-27 start for add quick start*/
-#ifdef CONFIG_MACH_OPPO
-	case VIDIOC_MSM_CPP_INIT_HW: {
-		if (cpp_dev->cpp_open_cnt == 1) {
-			rc = cpp_init_hardware(cpp_dev);
-			if (rc < 0) {
-				pr_err("error in hw init\n");
-				rc = -EINVAL;
-				break;
-			}
-			rc = iommu_attach_device(cpp_dev->domain, cpp_dev->iommu_ctx);
-			if (rc < 0) {
-				pr_err("error in attach device\n");
-				rc = -EINVAL;
-				break;
-			}
-			rc = cpp_init_mem(cpp_dev);
-			if (rc < 0) {
-				pr_err("error in mem init\n");
-				rc = -EINVAL;
-				break;
-			}
-			cpp_dev->state = CPP_STATE_IDLE;
-		}
-		break;
-	}
-#endif
-/*Added by jianbo.sun@Camera 2013-12-27 end*/
 	}
 	mutex_unlock(&cpp_dev->mutex);
 	CPP_DBG("X\n");

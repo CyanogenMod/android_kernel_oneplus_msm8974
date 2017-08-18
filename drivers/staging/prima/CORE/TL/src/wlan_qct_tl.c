@@ -1740,6 +1740,12 @@ WLANTL_UpdateTdlsSTAClient
 
   pClientSTA->wSTADesc.ucQosEnabled = pwSTADescType->ucQosEnabled;
 
+  TLLOGE(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO,
+         "WLAN TL: %s: ucQosEnabled of pwSTADescType: %d"
+          "pClientSTA->wSTADesc: %d",
+          __func__, pwSTADescType->ucQosEnabled,
+          pClientSTA->wSTADesc.ucQosEnabled));
+
   return VOS_STATUS_SUCCESS;
 
 }

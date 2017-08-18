@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -87,6 +87,9 @@ enum log_event_type {
 	WLAN_LOG_TYPE_NON_FATAL,
 	WLAN_LOG_TYPE_FATAL,
 };
+
+/* 15 Min */
+#define WLAN_POWER_COLLAPSE_FAIL_THRESHOLD  (1000 * 60 * 15)
 
 /**
  * enum log_event_indicator - Module triggering bug report

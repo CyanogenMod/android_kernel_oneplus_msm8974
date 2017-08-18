@@ -858,7 +858,8 @@ static tSirRetStatus limSendTdlsDisRspFrame(tpAniSirGlobal pMac,
 
     /* populate supported rate and ext supported rate IE */
     if (eSIR_FAILURE == PopulateDot11fRatesTdls(pMac, &tdlsDisRsp.SuppRates,
-                               &tdlsDisRsp.ExtSuppRates))
+                               &tdlsDisRsp.ExtSuppRates,
+                               psessionEntry->currentOperChannel))
         limLog(pMac, LOGE, FL("could not populate supported data rates"));
 
     /* Populate extended capability IE */
@@ -1124,9 +1125,14 @@ tSirRetStatus limSendTdlsLinkSetupReqFrame(tpAniSirGlobal pMac,
 
     swapBitField16(caps, ( tANI_U16* )&tdlsSetupReq.Capabilities );
 
+    limLog(pMac, LOG1, FL("Sending operating channel %d and dotl11mode %d\n"),
+           psessionEntry->currentOperChannel,
+           psessionEntry->dot11mode);
+
     /* populate supported rate and ext supported rate IE */
     PopulateDot11fRatesTdls(pMac, &tdlsSetupReq.SuppRates,
-                               &tdlsSetupReq.ExtSuppRates);
+                               &tdlsSetupReq.ExtSuppRates,
+                               psessionEntry->currentOperChannel);
 
     /* Populate extended capability IE */
     PopulateDot11fTdlsExtCapability( pMac, &tdlsSetupReq.ExtCap );
@@ -1604,7 +1610,8 @@ static tSirRetStatus limSendTdlsSetupRspFrame(tpAniSirGlobal pMac,
 
     /* populate supported rate and ext supported rate IE */
     PopulateDot11fRatesTdls(pMac, &tdlsSetupRsp.SuppRates,
-                                &tdlsSetupRsp.ExtSuppRates);
+                                &tdlsSetupRsp.ExtSuppRates,
+                                psessionEntry->currentOperChannel);
 
     /* Populate extended capability IE */
     PopulateDot11fTdlsExtCapability( pMac, &tdlsSetupRsp.ExtCap );
@@ -2517,7 +2524,20 @@ static void limTdlsUpdateHashNodeInfo(tpAniSirGlobal pMac, tDphHashNode *pStaDs,
          * base channel should be less than or equal to channel width of
          * STA-AP link. So take this setting from the psessionEntry.
          */
-        pStaDs->htSupportedChannelWidthSet = psessionEntry->htSupportedChannelWidthSet ;
+        limLog(pMac, LOG1,
+               FL("supportedChannelWidthSet %x htSupportedChannelWidthSet %x"),
+               htCaps->supportedChannelWidthSet,
+               psessionEntry->htSupportedChannelWidthSet);
+
+        pStaDs->htSupportedChannelWidthSet =
+                (htCaps->supportedChannelWidthSet <
+                  psessionEntry->htSupportedChannelWidthSet) ?
+                      htCaps->supportedChannelWidthSet :
+                      psessionEntry->htSupportedChannelWidthSet;
+
+        limLog(pMac, LOG1, FL("pStaDs->htSupportedChannelWidthSet %x"),
+               pStaDs->htSupportedChannelWidthSet);
+
         pStaDs->htMIMOPSState =             htCaps->mimoPowerSave ;
         pStaDs->htMaxAmsduLength =  htCaps->maximalAMSDUsize;
         pStaDs->htAMpduDensity =    htCaps->mpduDensity;
@@ -2543,27 +2563,11 @@ static void limTdlsUpdateHashNodeInfo(tpAniSirGlobal pMac, tDphHashNode *pStaDs,
     {
         pStaDs->mlmStaContext.vhtCapability = 1 ;
 
-        if (psessionEntry->currentOperChannel <= SIR_11B_CHANNEL_END)
-        {
-            /* if the channel is 2G then update the min channel widthset in
-             * pStaDs. These values are used when sending a AddSta request to
-             * firmware
-             * 11.21.1 General: The channel width of the TDLS direct link on the
-             * base channel shall not exceed the channel width of the BSS to which
-             * the TDLS peer STAs are associated.*/
-            pStaDs->vhtSupportedChannelWidthSet = WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
-            pStaDs->htSupportedChannelWidthSet = eHT_CHANNEL_WIDTH_20MHZ;
-            limLog(pMac, LOG1,
-                    FL("vhtSupportedChannelWidthSet = %hu,"
-                        " htSupportedChannelWidthSet %hu"),
-                    pStaDs->vhtSupportedChannelWidthSet,
-                    pStaDs->htSupportedChannelWidthSet) ;
-        }
-        else
-        {
-            pStaDs->vhtSupportedChannelWidthSet =  WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
-            pStaDs->htSupportedChannelWidthSet = eHT_CHANNEL_WIDTH_40MHZ ;
-        }
+        pStaDs->vhtSupportedChannelWidthSet =
+                    psessionEntry->vhtTxChannelWidthSet;
+
+        limLog(pMac, LOG1, FL("Vht supported channel width is set to = %d"),
+               pStaDs->vhtSupportedChannelWidthSet);
 
         pStaDs->vhtLdpcCapable = pVhtCaps->ldpcCodingCap;
         pStaDs->vhtBeamFormerCapable= pVhtCaps->suBeamFormerCap;

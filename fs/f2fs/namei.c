@@ -60,10 +60,14 @@ static struct inode *f2fs_new_inode(struct inode *dir, umode_t mode)
 	if (f2fs_encrypted_inode(dir) && f2fs_may_encrypt(inode))
 		f2fs_set_encrypted_inode(inode);
 
+	set_inode_flag(inode, FI_NEW_INODE);
+
+	if (test_opt(sbi, INLINE_XATTR))
+		set_inode_flag(inode, FI_INLINE_XATTR);
 	if (test_opt(sbi, INLINE_DATA) && f2fs_may_inline_data(inode))
-		set_inode_flag(F2FS_I(inode), FI_INLINE_DATA);
+		set_inode_flag(inode, FI_INLINE_DATA);
 	if (f2fs_may_inline_dentry(inode))
-		set_inode_flag(F2FS_I(inode), FI_INLINE_DENTRY);
+		set_inode_flag(inode, FI_INLINE_DENTRY);
 
 	f2fs_init_extent_tree(inode, NULL);
 
@@ -72,14 +76,13 @@ static struct inode *f2fs_new_inode(struct inode *dir, umode_t mode)
 	stat_inc_inline_dir(inode);
 
 	trace_f2fs_new_inode(inode, 0);
-	mark_inode_dirty(inode);
 	return inode;
 
 fail:
 	trace_f2fs_new_inode(inode, err);
 	make_bad_inode(inode);
 	if (nid_free)
-		set_inode_flag(F2FS_I(inode), FI_FREE_NID);
+		set_inode_flag(inode, FI_FREE_NID);
 	iput(inode);
 	return ERR_PTR(err);
 }
@@ -164,7 +167,7 @@ out:
 static int f2fs_link(struct dentry *old_dentry, struct inode *dir,
 		struct dentry *dentry)
 {
-	struct inode *inode = old_dentry->d_inode;
+	struct inode *inode = d_inode(old_dentry);
 	struct f2fs_sb_info *sbi = F2FS_I_SB(dir);
 	int err;
 
@@ -177,7 +180,7 @@ static int f2fs_link(struct dentry *old_dentry, struct inode *dir,
 	inode->i_ctime = CURRENT_TIME;
 	ihold(inode);
 
-	set_inode_flag(F2FS_I(inode), FI_INC_LINK);
+	set_inode_flag(inode, FI_INC_LINK);
 	f2fs_lock_op(sbi);
 	err = f2fs_add_link(dentry, inode);
 	if (err)
@@ -190,7 +193,7 @@ static int f2fs_link(struct dentry *old_dentry, struct inode *dir,
 		f2fs_sync_fs(sbi->sb, 1);
 	return 0;
 out:
-	clear_inode_flag(F2FS_I(inode), FI_INC_LINK);
+	clear_inode_flag(inode, FI_INC_LINK);
 	iput(inode);
 	f2fs_unlock_op(sbi);
 	return err;
@@ -199,17 +202,21 @@ out:
 struct dentry *f2fs_get_parent(struct dentry *child)
 {
 	struct qstr dotdot = {.len = 2, .name = ".."};
-	unsigned long ino = f2fs_inode_by_name(child->d_inode, &dotdot);
-	if (!ino)
+	struct page *page;
+	unsigned long ino = f2fs_inode_by_name(d_inode(child), &dotdot, &page);
+	if (!ino) {
+		if (IS_ERR(page))
+			return ERR_CAST(page);
 		return ERR_PTR(-ENOENT);
-	return d_obtain_alias(f2fs_iget(child->d_inode->i_sb, ino));
+	}
+	return d_obtain_alias(f2fs_iget(child->d_sb, ino));
 }
 
 static int __recover_dot_dentries(struct inode *dir, nid_t pino)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(dir);
-	struct qstr dot = {.len = 1, .name = "."};
-	struct qstr dotdot = {.len = 2, .name = ".."};
+	struct qstr dot = QSTR_INIT(".", 1);
+	struct qstr dotdot = QSTR_INIT("..", 2);
 	struct f2fs_dir_entry *de;
 	struct page *page;
 	int err = 0;
@@ -229,6 +236,9 @@ static int __recover_dot_dentries(struct inode *dir, nid_t pino)
 	if (de) {
 		f2fs_dentry_kunmap(dir, page);
 		f2fs_put_page(page, 0);
+	} else if (IS_ERR(page)) {
+		err = PTR_ERR(page);
+		goto out;
 	} else {
 		err = __f2fs_add_link(dir, &dot, NULL, dir->i_ino, S_IFDIR);
 		if (err)
@@ -239,14 +249,14 @@ static int __recover_dot_dentries(struct inode *dir, nid_t pino)
 	if (de) {
 		f2fs_dentry_kunmap(dir, page);
 		f2fs_put_page(page, 0);
+	} else if (IS_ERR(page)) {
+		err = PTR_ERR(page);
 	} else {
 		err = __f2fs_add_link(dir, &dotdot, NULL, pino, S_IFDIR);
 	}
 out:
-	if (!err) {
-		clear_inode_flag(F2FS_I(dir), FI_INLINE_DOTS);
-		mark_inode_dirty(dir);
-	}
+	if (!err)
+		clear_inode_flag(dir, FI_INLINE_DOTS);
 
 	f2fs_unlock_op(sbi);
 	return err;
@@ -281,8 +291,11 @@ static struct dentry *f2fs_lookup(struct inode *dir, struct dentry *dentry,
 		return ERR_PTR(-ENAMETOOLONG);
 
 	de = f2fs_find_entry(dir, &dentry->d_name, &page);
-	if (!de)
+	if (!de) {
+		if (IS_ERR(page))
+			return (struct dentry *)page;
 		return d_splice_alias(inode, dentry);
+	}
 
 	ino = le32_to_cpu(de->ino);
 	f2fs_dentry_kunmap(dir, page);
@@ -321,7 +334,7 @@ err_out:
 static int f2fs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(dir);
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = d_inode(dentry);
 	struct f2fs_dir_entry *de;
 	struct page *page;
 	int err = -ENOENT;
@@ -329,8 +342,11 @@ static int f2fs_unlink(struct inode *dir, struct dentry *dentry)
 	trace_f2fs_unlink_enter(dir, dentry);
 
 	de = f2fs_find_entry(dir, &dentry->d_name, &page);
-	if (!de)
+	if (!de) {
+		if (IS_ERR(page))
+			err = PTR_ERR(page);
 		goto fail;
+	}
 
 	f2fs_balance_fs(sbi, true);
 
@@ -344,9 +360,6 @@ static int f2fs_unlink(struct inode *dir, struct dentry *dentry)
 	}
 	f2fs_delete_entry(de, page, dir, inode);
 	f2fs_unlock_op(sbi);
-
-	/* In order to evict this inode, we set it dirty */
-	mark_inode_dirty(inode);
 
 	if (IS_DIRSYNC(dir))
 		f2fs_sync_fs(sbi->sb, 1);
@@ -410,6 +423,7 @@ static int f2fs_symlink(struct inode *dir, struct dentry *dentry,
 		inode->i_op = &f2fs_encrypted_symlink_inode_operations;
 	else
 		inode->i_op = &f2fs_symlink_inode_operations;
+	inode_nohighmem(inode);
 	inode->i_mapping->a_ops = &f2fs_dblock_aops;
 
 	f2fs_balance_fs(sbi, true);
@@ -499,7 +513,7 @@ static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 
 	f2fs_balance_fs(sbi, true);
 
-	set_inode_flag(F2FS_I(inode), FI_INC_LINK);
+	set_inode_flag(inode, FI_INC_LINK);
 	f2fs_lock_op(sbi);
 	err = f2fs_add_link(dentry, inode);
 	if (err)
@@ -516,14 +530,14 @@ static int f2fs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	return 0;
 
 out_fail:
-	clear_inode_flag(F2FS_I(inode), FI_INC_LINK);
+	clear_inode_flag(inode, FI_INC_LINK);
 	handle_failed_inode(inode);
 	return err;
 }
 
 static int f2fs_rmdir(struct inode *dir, struct dentry *dentry)
 {
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = d_inode(dentry);
 	if (f2fs_empty_dir(inode))
 		return f2fs_unlink(dir, dentry);
 	return -ENOTEMPTY;
@@ -571,8 +585,8 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			struct inode *new_dir, struct dentry *new_dentry)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(old_dir);
-	struct inode *old_inode = old_dentry->d_inode;
-	struct inode *new_inode = new_dentry->d_inode;
+	struct inode *old_inode = d_inode(old_dentry);
+	struct inode *new_inode = d_inode(new_dentry);
 	struct page *old_dir_page;
 	struct page *old_page, *new_page;
 	struct f2fs_dir_entry *old_dir_entry = NULL;
@@ -588,14 +602,19 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	}
 
 	old_entry = f2fs_find_entry(old_dir, &old_dentry->d_name, &old_page);
-	if (!old_entry)
+	if (!old_entry) {
+		if (IS_ERR(old_page))
+			err = PTR_ERR(old_page);
 		goto out;
+	}
 
 	if (S_ISDIR(old_inode->i_mode)) {
-		err = -EIO;
 		old_dir_entry = f2fs_parent_dir(old_inode, &old_dir_page);
-		if (!old_dir_entry)
+		if (!old_dir_entry) {
+			if (IS_ERR(old_dir_page))
+				err = PTR_ERR(old_dir_page);
 			goto out_old;
+		}
 	}
 
 	if (new_inode) {
@@ -607,8 +626,11 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		err = -ENOENT;
 		new_entry = f2fs_find_entry(new_dir, &new_dentry->d_name,
 						&new_page);
-		if (!new_entry)
+		if (!new_entry) {
+			if (IS_ERR(new_page))
+				err = PTR_ERR(new_page);
 			goto out_dir;
+		}
 
 		f2fs_balance_fs(sbi, true);
 
@@ -630,19 +652,14 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		new_inode->i_ctime = CURRENT_TIME;
 		down_write(&F2FS_I(new_inode)->i_sem);
 		if (old_dir_entry)
-			drop_nlink(new_inode);
-		drop_nlink(new_inode);
+			f2fs_i_links_write(new_inode, false);
+		f2fs_i_links_write(new_inode, false);
 		up_write(&F2FS_I(new_inode)->i_sem);
 
-		mark_inode_dirty(new_inode);
-
 		if (!new_inode->i_nlink)
-			add_orphan_inode(sbi, new_inode->i_ino);
+			add_orphan_inode(new_inode);
 		else
 			release_orphan_inode(sbi);
-
-		update_inode_page(old_inode);
-		update_inode_page(new_inode);
 	} else {
 		f2fs_balance_fs(sbi, true);
 
@@ -654,10 +671,8 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			goto out_dir;
 		}
 
-		if (old_dir_entry) {
-			inc_nlink(new_dir);
-			update_inode_page(new_dir);
-		}
+		if (old_dir_entry)
+			f2fs_i_links_write(new_dir, true);
 
 		/*
 		 * old entry and new entry can locate in the same inline
@@ -673,7 +688,9 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			old_entry = f2fs_find_entry(old_dir,
 						&old_dentry->d_name, &old_page);
 			if (!old_entry) {
-				err = -EIO;
+				err = -ENOENT;
+				if (IS_ERR(old_page))
+					err = PTR_ERR(old_page);
 				f2fs_unlock_op(sbi);
 				goto out_dir;
 			}
@@ -687,7 +704,7 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	up_write(&F2FS_I(old_inode)->i_sem);
 
 	old_inode->i_ctime = CURRENT_TIME;
-	mark_inode_dirty(old_inode);
+	f2fs_mark_inode_dirty_sync(old_inode);
 
 	f2fs_delete_entry(old_entry, old_page, old_dir, NULL);
 
@@ -695,14 +712,11 @@ static int f2fs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		if (old_dir != new_dir) {
 			f2fs_set_link(old_inode, old_dir_entry,
 						old_dir_page, new_dir);
-			update_inode_page(old_inode);
 		} else {
 			f2fs_dentry_kunmap(old_inode, old_dir_page);
 			f2fs_put_page(old_dir_page, 0);
 		}
-		drop_nlink(old_dir);
-		mark_inode_dirty(old_dir);
-		update_inode_page(old_dir);
+		f2fs_i_links_write(old_dir, false);
 	}
 
 	f2fs_unlock_op(sbi);
@@ -735,7 +749,7 @@ static void *f2fs_encrypted_follow_link(struct dentry *dentry,
 	struct fscrypt_str cstr = FSTR_INIT(NULL, 0);
 	struct fscrypt_str pstr = FSTR_INIT(NULL, 0);
 	struct fscrypt_symlink_data *sd;
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = d_inode(dentry);
 	loff_t size = min_t(loff_t, i_size_read(inode), PAGE_SIZE - 1);
 	u32 max_size = inode->i_sb->s_blocksize;
 	int res;

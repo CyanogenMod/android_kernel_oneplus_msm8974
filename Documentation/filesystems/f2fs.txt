@@ -102,14 +102,16 @@ background_gc=%s       Turn on/off cleaning operations, namely garbage
                        collection, triggered in background when I/O subsystem is
                        idle. If background_gc=on, it will turn on the garbage
                        collection and if background_gc=off, garbage collection
-                       will be truned off. If background_gc=sync, it will turn
+                       will be turned off. If background_gc=sync, it will turn
                        on synchronous garbage collection running in background.
                        Default value for this option is on. So garbage
                        collection is on by default.
 disable_roll_forward   Disable the roll-forward recovery routine
 norecovery             Disable the roll-forward recovery routine, mounted read-
                        only (i.e., -o ro,disable_roll_forward)
-discard                Issue discard/TRIM commands when a segment is cleaned.
+discard/nodiscard      Enable/disable real-time discard in f2fs, if discard is
+                       enabled, f2fs will issue discard/TRIM commands when a
+		       segment is cleaned.
 no_heap                Disable heap-style segment allocation which finds free
                        segments for data from the beginning of main area, while
 		       for node from the end of main area.
@@ -151,6 +153,9 @@ noinline_data          Disable the inline data feature, inline data feature is
                        enabled by default.
 data_flush             Enable data flushing before checkpoint in order to
                        persist data of regular and symlink.
+mode=%s                Control block allocation mode which supports "adaptive"
+                       and "lfs". In "lfs" mode, there should be no random
+                       writes towards main area.
 
 ================================================================================
 DEBUGFS ENTRIES
