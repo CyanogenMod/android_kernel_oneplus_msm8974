@@ -2282,6 +2282,13 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 #ifdef CONFIG_MACH_OPPO
 		if (qpnp_charger_type_get(chip) != POWER_SUPPLY_TYPE_USB_DCP)
 			chip->aicl_interrupt = false;
+
+		if (!usb_present && !chip->aicl_interrupt) {
+			power_supply_set_online(chip->usb_psy, 0);
+			power_supply_set_current_limit(chip->usb_psy, 0);
+			power_supply_set_online(&chip->dc_psy, 0);
+			power_supply_set_current_limit(&chip->dc_psy, 0);
+		}
 #endif
 #ifdef CONFIG_BQ24196_CHARGER_OPPO
 		if (is_work_struct_init && !chip->aicl_interrupt)
