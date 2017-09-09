@@ -1035,7 +1035,7 @@ static int l2cap_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct ms
 
 		l2cap_pi(sk)->conf_state |= L2CAP_CONF_REQ_SENT;
 		l2cap_send_cmd(conn, l2cap_get_ident(conn), L2CAP_CONF_REQ,
-				l2cap_build_conf_req(sk, buf), buf);
+				l2cap_build_conf_req(sk, buf, sizeof(buf)), buf);
 		l2cap_pi(sk)->num_conf_req++;
 
 		release_sock(sk);
