@@ -2879,9 +2879,6 @@ static enum power_supply_property pm_power_props_mains[] = {
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
-#ifdef CONFIG_PIC1503_FASTCG_OPPO
-	POWER_SUPPLY_PROP_FASTCHARGER,
-#endif
 };
 
 static enum power_supply_property msm_batt_power_props[] = {
@@ -2912,12 +2909,8 @@ static enum power_supply_property msm_batt_power_props[] = {
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 #ifdef CONFIG_MACH_OPPO
 	POWER_SUPPLY_PROP_CHARGE_NOW,
-	POWER_SUPPLY_PROP_CHARGE_TIMEOUT,
 #else
 	POWER_SUPPLY_PROP_VOLTAGE_OCV,
-#endif
-#ifdef CONFIG_BATTERY_BQ27541_OPPO
-	POWER_SUPPLY_PROP_AUTHENTICATE,
 #endif
 };
 
@@ -2974,11 +2967,6 @@ qpnp_power_get_property_mains(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		val->intval = chip->maxinput_dc_ma * 1000;
 		break;
-#ifdef CONFIG_PIC1503_FASTCG_OPPO
-	case POWER_SUPPLY_PROP_FASTCHARGER:
-		val->intval = get_prop_fast_chg_started(chip);
-		break;
-#endif
 	default:
 		return -EINVAL;
 	}
@@ -3743,14 +3731,6 @@ qpnp_batt_power_get_property(struct power_supply *psy,
 #ifdef CONFIG_MACH_OPPO
 	case POWER_SUPPLY_PROP_CHARGE_NOW:
 		val->intval = get_prop_charger_voltage_now(chip);
-		break;
-	case POWER_SUPPLY_PROP_CHARGE_TIMEOUT:
-		val->intval = (int)chip->time_out;
-		break;
-#endif
-#ifdef CONFIG_BATTERY_BQ27541_OPPO
-	case POWER_SUPPLY_PROP_AUTHENTICATE:
-		val->intval = get_prop_authenticate(chip);
 		break;
 #endif
 	default:
