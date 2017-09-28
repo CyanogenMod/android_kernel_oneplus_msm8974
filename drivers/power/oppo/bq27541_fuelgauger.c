@@ -181,8 +181,6 @@ struct bq27541_device_info {
 	 */
 	struct  delayed_work		hw_config;
 #ifdef CONFIG_MACH_OPPO
-	int				cc_pre;
-	int				fcc_pre;
 	int				soc_pre;
 	int				temp_pre;
 	int				batt_vol_pre;
@@ -271,51 +269,6 @@ static int bq27541_battery_temperature(struct bq27541_device_info *di)
 }
 
 #ifdef CONFIG_MACH_OPPO
-#define BQ27541_REG_CC		0x2a
-static int bq27541_battery_cc(struct bq27541_device_info *di)
-{
-	int ret;
-	int cc = 0;
-
-	if (atomic_read(&di->suspended) == 1)
-		return di->cc_pre;
-
-	if (di->allow_reading) {
-		ret = bq27541_read(BQ27541_REG_CC, &cc, 0, di);
-		if (ret) {
-			dev_err(di->dev, "error reading cc.\n");
-			return ret;
-		}
-	} else {
-		return di->cc_pre;
-	}
-
-	di->cc_pre = cc;
-	return cc;
-}
-
-static int bq27541_battery_fcc(struct bq27541_device_info *di)
-{
-	int ret;
-	int fcc = 0;
-
-	if (atomic_read(&di->suspended) == 1)
-		return di->fcc_pre;
-
-	if (di->allow_reading) {
-		ret = bq27541_read(BQ27541_REG_FCC, &fcc, 0, di);
-		if (ret) {
-			dev_err(di->dev, "error reading fcc.\n");
-			return ret;
-		}
-	} else {
-		return di->fcc_pre;
-	}
-
-	di->fcc_pre = fcc;
-	return fcc;
-}
-
 static int bq27541_remaining_capacity(struct bq27541_device_info *di)
 {
 	int ret;
@@ -741,16 +694,6 @@ static int bq27541_is_battery_id_valid(void)
 }
 
 #ifdef CONFIG_MACH_OPPO
-static int bq27541_get_batt_cc(void)
-{
-	return bq27541_battery_cc(bq27541_di);
-}
-
-static int bq27541_get_batt_fcc(void)
-{
-	return bq27541_battery_fcc(bq27541_di);
-}
-
 static int bq27541_get_batt_remaining_capacity(void)
 {
 	return bq27541_remaining_capacity(bq27541_di);
@@ -857,8 +800,6 @@ static struct qpnp_battery_gauge bq27541_batt_gauge = {
 	.is_battery_present		= bq27541_is_battery_present,
 	.is_battery_temp_within_range	= bq27541_is_battery_temp_within_range,
 	.is_battery_id_valid		= bq27541_is_battery_id_valid,
-	.get_batt_cc			= bq27541_get_batt_cc,
-	.get_batt_fcc			= bq27541_get_batt_fcc,
 	.get_batt_remaining_capacity	= bq27541_get_batt_remaining_capacity,
 	.get_battery_soc		= bq27541_get_battery_soc,
 	.get_average_current		= bq27541_get_average_current,
@@ -1706,8 +1647,6 @@ static int bq27541_battery_probe(struct i2c_client *client,
 	di->retry_count = MAX_RETRY_COUNT;
 	di->saltate_counter = 0;
 	atomic_set(&di->suspended, 0);
-	di->cc_pre = bq27541_battery_cc(di);
-	di->fcc_pre = bq27541_battery_fcc(di);
 #endif
 
 #ifdef CONFIG_BQ27541_TEST_ENABLE

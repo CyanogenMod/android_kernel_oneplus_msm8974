@@ -46,8 +46,6 @@ struct qpnp_battery_gauge {
 	int (*get_battery_soc) (void);
 	int (*get_average_current) (void);
 	int (*is_battery_authenticated) (void);
-	int (*get_batt_cc) (void);
-	int (*get_batt_fcc) (void);
 	int (*fast_chg_started) (void);
 	int (*fast_switch_to_normal) (void);
 	int (*set_switch_to_noraml_false) (void);
