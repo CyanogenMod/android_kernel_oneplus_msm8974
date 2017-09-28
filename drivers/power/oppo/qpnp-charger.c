@@ -2475,18 +2475,8 @@ qpnp_chg_dc_dcin_valid_irq_handler(int irq, void *_chip)
 #endif
 		if (!dc_present && (!qpnp_chg_is_usb_chg_plugged_in(chip) ||
 					qpnp_chg_is_otg_en_set(chip))) {
-#ifdef CONFIG_MACH_OPPO
-			chip->delta_vddmax_mv = 0;
-			qpnp_chg_set_appropriate_vddmax(chip);
-#endif
 			chip->chg_done = false;
 		} else {
-#ifdef CONFIG_MACH_OPPO
-			if (!qpnp_chg_is_usb_chg_plugged_in(chip)) {
-				chip->delta_vddmax_mv = 0;
-				qpnp_chg_set_appropriate_vddmax(chip);
-			}
-#endif
 			schedule_delayed_work(&chip->eoc_work,
 				msecs_to_jiffies(EOC_CHECK_PERIOD_MS));
 			schedule_work(&chip->soc_check_work);
@@ -4804,8 +4794,6 @@ qpnp_eoc_work(struct work_struct *work)
 					bat_status = qpnp_ext_charger->chg_get_system_status();
 				if ((bat_status & 0x30) == 0x30) {
 					pr_info("End of Charging when ibat>=0\n");
-					chip->delta_vddmax_mv = 0;
-					qpnp_chg_set_appropriate_vddmax(chip);
 					chip->chg_done = true;
 					chip->chg_display_full = true;
 					qpnp_chg_charge_en(chip, 0);
@@ -4824,8 +4812,6 @@ qpnp_eoc_work(struct work_struct *work)
 		} else {
 			if (count == CONSECUTIVE_COUNT) {
 				pr_info("End of Charging\n");
-				chip->delta_vddmax_mv = 0;
-				qpnp_chg_set_appropriate_vddmax(chip);
 				chip->chg_done = true;
 				chip->chg_display_full = true;
 				qpnp_chg_charge_en(chip, 0);
