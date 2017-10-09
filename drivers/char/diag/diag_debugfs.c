@@ -28,6 +28,7 @@ static int diag_dbgfs_finished;
 static int diag_dbgfs_dci_data_index;
 static int diag_dbgfs_dci_finished;
 
+static struct mutex diag_dci_dbgfs_mutex;
 static ssize_t diag_dbgfs_read_status(struct file *file, char __user *ubuf,
 				      size_t count, loff_t *ppos)
 {
@@ -215,6 +216,7 @@ static ssize_t diag_dbgfs_read_dcistats(struct file *file,
 	buf_size = ksize(buf);
 	bytes_remaining = buf_size;
 
+	mutex_lock(&diag_dci_dbgfs_mutex);
 	if (diag_dbgfs_dci_data_index == 0) {
 		bytes_written =
 			scnprintf(buf, buf_size,
@@ -269,6 +271,7 @@ static ssize_t diag_dbgfs_read_dcistats(struct file *file,
 	}
 
 	diag_dbgfs_dci_data_index = (i >= DIAG_DCI_DEBUG_CNT) ? 0 : i + 1;
+	mutex_unlock(&diag_dci_dbgfs_mutex);
 	bytes_written = simple_read_from_buffer(ubuf, count, ppos, buf,
 								bytes_in_buf);
 	kfree(buf);
@@ -712,6 +715,7 @@ void diag_debugfs_init(void)
 		pr_warn("diag: could not allocate memory for dci debug info\n");
 
 	mutex_init(&dci_stat_mutex);
+	mutex_init(&diag_dci_dbgfs_mutex);
 }
 
 void diag_debugfs_cleanup(void)
@@ -723,6 +727,7 @@ void diag_debugfs_cleanup(void)
 
 	kfree(dci_data_smd);
 	mutex_destroy(&dci_stat_mutex);
+	mutex_destroy(&diag_dci_dbgfs_mutex);
 }
 #else
 void diag_debugfs_init(void) { }
