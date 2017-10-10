@@ -194,7 +194,6 @@ static int sdcardfs_unlink(struct inode *dir, struct dentry *dentry)
 	sdcardfs_get_lower_path(dentry, &lower_path);
 	lower_dentry = lower_path.dentry;
 	lower_mnt = lower_path.mnt;
-	dget(lower_dentry);
 	lower_dir_dentry = lock_parent(lower_dentry);
 
 	err = mnt_want_write(lower_path.mnt);
@@ -223,7 +222,6 @@ out:
 	mnt_drop_write(lower_path.mnt);
 out_unlock:
 	unlock_dir(lower_dir_dentry);
-	dput(lower_dentry);
 	sdcardfs_put_lower_path(dentry, &lower_path);
 	REVERT_CRED(saved_cred);
 out_eacces:
