@@ -10809,7 +10809,8 @@ int __wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
      * Becasue of this, driver is assuming that this is not wildcard scan and so
      * is not aging out the scan results.
      */
-    if (request->ssids && '\0' == request->ssids->ssid[0])
+    if ((request->ssids) && (request->n_ssids == 1) &&
+        ('\0' == request->ssids->ssid[0]))
     {
         request->n_ssids = 0;
     }
