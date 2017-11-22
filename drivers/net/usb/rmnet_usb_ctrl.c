@@ -1181,12 +1181,13 @@ int rmnet_usb_ctrl_init(int no_rmnet_devs, int no_rmnet_insts_per_dev)
 						     "%s%d", rmnet_dev_names[i],
 						     n);
 			if (IS_ERR(dev->devicep)) {
+				long status = PTR_ERR(dev->devicep);
 				pr_err("%s: device_create() returned %ld\n",
-					__func__, PTR_ERR(dev->devicep));
+					__func__, status);
 				cdev_del(&dev->cdev);
 				destroy_workqueue(dev->wq);
 				kfree(dev);
-				return PTR_ERR(dev->devicep);
+				return status;
 			}
 
 			/*create /sys/class/hsicctl/hsicctlx/modem_wait*/
