@@ -1505,9 +1505,8 @@ out:
 	return err;
 }
 
-static int lo_release(struct gendisk *disk, fmode_t mode)
+static int __lo_release(struct loop_device *lo)
 {
-	struct loop_device *lo = disk->private_data;
 	int err;
 
 	mutex_lock(&lo->lo_ctl_mutex);
@@ -1535,6 +1534,15 @@ out:
 	mutex_unlock(&lo->lo_ctl_mutex);
 out_unlocked:
 	return 0;
+}
+
+static int lo_release(struct gendisk *disk, fmode_t mode)
+{
+	int err;
+	mutex_lock(&loop_index_mutex);
+	err =__lo_release(disk->private_data);
+	mutex_unlock(&loop_index_mutex);
+	return err;
 }
 
 static const struct block_device_operations lo_fops = {
