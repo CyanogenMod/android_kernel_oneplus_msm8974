@@ -788,6 +788,13 @@ void security_transfer_creds(struct cred *new, const struct cred *old)
 	security_ops->cred_transfer(new, old);
 }
 
+void security_cred_getsecid(const struct cred *c, u32 *secid)
+{
+	*secid = 0;
+	security_ops->cred_getsecid(c, secid);
+}
+EXPORT_SYMBOL(security_cred_getsecid);
+
 int security_kernel_act_as(struct cred *new, u32 secid)
 {
 	return security_ops->kernel_act_as(new, secid);
