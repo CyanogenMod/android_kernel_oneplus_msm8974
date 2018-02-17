@@ -22,6 +22,7 @@
 /include/ "msm8974-oppo-sound.dtsi"
 /include/ "msm8974-a0001-sound.dtsi"
 /include/ "msm8974-oppo-leds.dtsi"
+/include/ "msm8974-a0001-leds.dtsi"
 
 &soc {
 	i2c@f9924000 {
