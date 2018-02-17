@@ -4886,14 +4886,14 @@ static struct clk_lookup msm_clocks_8974pro_only[] __initdata = {
 #endif
 	CLK_LOOKUP("cam_clk", camss_mclk1_clk.c, "90.qcom,camera"),
 	CLK_LOOKUP("cam_src_clk", mclk0_clk_src.c, "0.qcom,camera"),
-#if defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_N3)
+#ifdef CONFIG_MACH_OPPO
 	CLK_LOOKUP("cam_src_clk", mclk2_clk_src.c, "1.qcom,camera"),
 #else
 	CLK_LOOKUP("cam_src_clk", mclk1_clk_src.c, "1.qcom,camera"),
 #endif
 	CLK_LOOKUP("cam_src_clk", mclk2_clk_src.c, "2.qcom,camera"),
 	CLK_LOOKUP("cam_clk", camss_mclk0_clk.c, "0.qcom,camera"),
-#if defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_N3)
+#ifdef CONFIG_MACH_OPPO
 	CLK_LOOKUP("cam_clk", camss_mclk2_clk.c, "1.qcom,camera"),
 #else
 	CLK_LOOKUP("cam_clk", camss_mclk1_clk.c, "1.qcom,camera"),
