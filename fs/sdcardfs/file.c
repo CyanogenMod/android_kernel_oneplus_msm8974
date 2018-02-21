@@ -62,6 +62,7 @@ static ssize_t sdcardfs_write(struct file *file, const char __user *buf,
 	int err = 0;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry;
+	struct inode *inode = dentry->d_inode;
 
 	/* check disk space */
 	if (!check_min_free_space(dentry, count, 0)) {
@@ -73,10 +74,12 @@ static ssize_t sdcardfs_write(struct file *file, const char __user *buf,
 	err = vfs_write(lower_file, buf, count, ppos);
 	/* update our inode times+sizes upon a successful lower write */
 	if (err >= 0) {
-		fsstack_copy_inode_size(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
-		fsstack_copy_attr_times(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
+		if (sizeof(loff_t) > sizeof(long))
+			mutex_lock(&inode->i_mutex);
+		fsstack_copy_inode_size(inode, lower_file->f_path.dentry->d_inode);
+		fsstack_copy_attr_times(inode, lower_file->f_path.dentry->d_inode);
+		if (sizeof(loff_t) > sizeof(long))
+			mutex_unlock(&inode->i_mutex);
 	}
 
 	return err;
