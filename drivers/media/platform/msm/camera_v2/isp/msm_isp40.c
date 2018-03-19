@@ -84,7 +84,7 @@
 #define VFE40_CLK_IDX 1
 static struct msm_cam_clk_info msm_vfe40_clk_info[] = {
 	{"camss_top_ahb_clk", -1},
-#ifdef CONFIG_MACH_FIND7
+#if defined(CONFIG_MACH_FIND7) || defined(CONFIG_MACH_FIND7OP)
 	{"vfe_clk_src", 465000000},
 #else
 	{"vfe_clk_src", 266670000},
