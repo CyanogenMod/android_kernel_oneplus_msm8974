@@ -1417,6 +1417,7 @@ int sanity_check_ckpt(struct f2fs_sb_info *sbi)
 	struct f2fs_super_block *raw_super = F2FS_RAW_SUPER(sbi);
 	struct f2fs_checkpoint *ckpt = F2FS_CKPT(sbi);
 	unsigned int main_segs, blocks_per_seg;
+	unsigned int cp_pack_start_sum, cp_payload;
 	int i;
 
 	total = le32_to_cpu(raw_super->segment_count);
@@ -1443,6 +1444,17 @@ int sanity_check_ckpt(struct f2fs_sb_info *sbi)
 		    le16_to_cpu(ckpt->cur_data_blkoff[i]) >= blocks_per_seg) {
 			return 1;
 		}
+	}
+
+	cp_pack_start_sum = __start_sum_addr(sbi);
+	cp_payload = __cp_payload(sbi);
+	if (cp_pack_start_sum < cp_payload + 1 ||
+		cp_pack_start_sum > blocks_per_seg - 1 -
+			NR_CURSEG_TYPE) {
+		f2fs_msg(sbi->sb, KERN_ERR,
+			"Wrong cp_pack_start_sum: %u",
+			cp_pack_start_sum);
+		return 1;
 	}
 
 	if (unlikely(f2fs_cp_error(sbi))) {
