@@ -164,7 +164,7 @@ phci_hcd_qtd_fill(struct urb *urb,
 	qtd->hw_token =	cpu_to_le32((count << 16) | token);
 	qtd->length = count;
 
-	pehci_print("%s:qtd %p,	token %8x bytes	%d dma %x\n",
+	pehci_print("%s:qtd %pK,	token %8x bytes	%d dma %x\n",
 		__FUNCTION__, qtd, le32_to_cpu(qtd->hw_token), count,
 		qtd->hw_buf[0]);
 
@@ -529,7 +529,7 @@ phci_hcd_qh_link_async(phci_hcd	* hcd, struct ehci_qh *qh, int *status)
 	qh->hw_token &=	~__constant_cpu_to_le32(QTD_STS_HALT);
 	qh->qh_state = QH_STATE_LINKED;
 	qh->qh_state |=	QH_STATE_TAKE_NEXT;
-	pehci_entry("--	%s: Exit , qh %p\n", __FUNCTION__, qh);
+	pehci_entry("--	%s: Exit , qh %pK\n", __FUNCTION__, qh);
 
 
 }
@@ -707,7 +707,7 @@ phci_hcd_make_qh(phci_hcd * hcd,
 		break;
 
 	default:
-		pehci_print("bogus dev %p speed	%d", urb->dev, urb->dev->speed);
+		pehci_print("bogus dev %pK speed	%d", urb->dev, urb->dev->speed);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	done:
 #else
@@ -730,7 +730,7 @@ phci_hcd_make_qh(phci_hcd * hcd,
 		usb_settoggle(urb->dev,	usb_pipeendpoint(urb->pipe), !is_input,
 			1);
 	}
-	pehci_entry("--	%s: Exit, qh %p\n", __FUNCTION__, qh);
+	pehci_entry("--	%s: Exit, qh %pK\n", __FUNCTION__, qh);
 	return qh;
 }
 
@@ -791,7 +791,7 @@ phci_hcd_qh_append_tds(phci_hcd	* hcd,
 	qh = (struct ehci_qh *)	*ptr;
 	if (likely(qh != 0)) {
 		u32 hw_next = QTD_NEXT(qtd->qtd_dma);
-		pehci_print("%Queue head already %p\n",	qh);
+		pehci_print("%Queue head already %pK\n",	qh);
 
 		ptd_map_buff = &(td_ptd_map_buff[qh->type]);
 		td_ptd_map = &ptd_map_buff->map_list[qh->qtd_ptd_index];
@@ -847,7 +847,7 @@ phci_hcd_qh_append_tds(phci_hcd	* hcd,
 		qh = phci_hcd_make_qh(hcd, urb,	qtd_list, status);
 		*ptr = qh;
 	}
-	pehci_entry("--	%s: Exit qh %p\n", __FUNCTION__, qh);
+	pehci_entry("--	%s: Exit qh %pK\n", __FUNCTION__, qh);
 	return qh;
 }
 
@@ -1309,7 +1309,7 @@ phci_hcd_qha_from_qtd(phci_hcd * hcd,
 	printk("SDW3: 0x%08x\n",qha->td_info4);
 #endif
 	pehci_print("%s: fourt word 0x%08x\n", __FUNCTION__, qha->td_info4);
-	pehci_entry("--	%s: Exit, qha %p\n", __FUNCTION__, qha);
+	pehci_entry("--	%s: Exit, qha %pK\n", __FUNCTION__, qha);
 	return qha;
 
 }

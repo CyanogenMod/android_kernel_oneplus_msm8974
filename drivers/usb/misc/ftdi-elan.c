@@ -197,7 +197,7 @@ static struct usb_driver ftdi_elan_driver;
 static void ftdi_elan_delete(struct kref *kref)
 {
         struct usb_ftdi *ftdi = kref_to_usb_ftdi(kref);
-        dev_warn(&ftdi->udev->dev, "FREEING ftdi=%p\n", ftdi);
+        dev_warn(&ftdi->udev->dev, "FREEING ftdi=%pK\n", ftdi);
         usb_put_dev(ftdi->udev);
         ftdi->disconnected += 1;
         mutex_lock(&ftdi_module_lock);
@@ -579,8 +579,8 @@ static void ftdi_elan_status_work(struct work_struct *work)
                 } else if (ftdi->controlreg & 0x00400000) {
                         if (ftdi->gone_away > 0) {
                                 dev_err(&ftdi->udev->dev, "PCI device eject con"
-                                        "firmed platform_dev.dev.parent=%p plat"
-                                        "form_dev.dev=%p\n",
+                                        "firmed platform_dev.dev.parent=%pK plat"
+                                        "form_dev.dev=%pK\n",
                                         ftdi->platform_dev.dev.parent,
                                         &ftdi->platform_dev.dev);
                                 platform_device_unregister(&ftdi->platform_dev);
@@ -729,7 +729,7 @@ static void ftdi_elan_write_bulk_callback(struct urb *urb)
 
 	if (status && !(status == -ENOENT || status == -ECONNRESET ||
 	    status == -ESHUTDOWN)) {
-                dev_err(&ftdi->udev->dev, "urb=%p write bulk status received: %"
+                dev_err(&ftdi->udev->dev, "urb=%pK write bulk status received: %"
                         "d\n", urb, status);
         }
         usb_free_coherent(urb->dev, urb->transfer_buffer_length,
@@ -824,7 +824,7 @@ static int ftdi_elan_command_engine(struct usb_ftdi *ftdi)
         }
         retval = usb_submit_urb(urb, GFP_KERNEL);
         if (retval) {
-                dev_err(&ftdi->udev->dev, "failed %d to submit urb %p to write "
+                dev_err(&ftdi->udev->dev, "failed %d to submit urb %pK to write "
                         "%d commands totaling %d bytes to the Uxxx\n", retval,
                         urb, command_size, total_size);
                 usb_free_coherent(ftdi->udev, total_size, buf, urb->transfer_dma);
@@ -2816,7 +2816,7 @@ static int ftdi_elan_probe(struct usb_interface *interface,
                         goto error;
                 } else {
                         ftdi->class = &ftdi_elan_jtag_class;
-                        dev_info(&ftdi->udev->dev, "USB FDTI=%p JTAG interface "
+                        dev_info(&ftdi->udev->dev, "USB FDTI=%pK JTAG interface "
                                 "%d now attached to ftdi%d\n", ftdi,
                                 iface_desc->desc.bInterfaceNumber,
                                 interface->minor);
@@ -2826,7 +2826,7 @@ static int ftdi_elan_probe(struct usb_interface *interface,
                 ftdi->bulk_in_endpointAddr == 0x83 &&
                 ftdi->bulk_out_endpointAddr == 0x04) {
                 ftdi->class = NULL;
-                dev_info(&ftdi->udev->dev, "USB FDTI=%p ELAN interface %d now a"
+                dev_info(&ftdi->udev->dev, "USB FDTI=%pK ELAN interface %d now a"
                         "ctivated\n", ftdi, iface_desc->desc.bInterfaceNumber);
                 INIT_DELAYED_WORK(&ftdi->status_work, ftdi_elan_status_work);
                 INIT_DELAYED_WORK(&ftdi->command_work, ftdi_elan_command_work);

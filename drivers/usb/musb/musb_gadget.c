@@ -197,11 +197,11 @@ __acquires(ep->musb->lock)
 	spin_unlock(&musb->lock);
 	unmap_dma_buffer(req, musb);
 	if (request->status == 0)
-		dev_dbg(musb->controller, "%s done request %p,  %d/%d\n",
+		dev_dbg(musb->controller, "%s done request %pK,  %d/%d\n",
 				ep->end_point.name, request,
 				req->request.actual, req->request.length);
 	else
-		dev_dbg(musb->controller, "%s request %p, %d/%d fault %d\n",
+		dev_dbg(musb->controller, "%s request %pK, %d/%d fault %d\n",
 				ep->end_point.name, request,
 				req->request.actual, req->request.length,
 				request->status);
@@ -529,7 +529,7 @@ void musb_g_tx(struct musb *musb, u8 epnum)
 		csr |=	 MUSB_TXCSR_P_WZC_BITS;
 		csr &= ~(MUSB_TXCSR_P_UNDERRUN | MUSB_TXCSR_TXPKTRDY);
 		musb_writew(epio, MUSB_TXCSR, csr);
-		dev_vdbg(musb->controller, "underrun on ep%d, req %p\n",
+		dev_vdbg(musb->controller, "underrun on ep%d, req %pK\n",
 				epnum, request);
 	}
 
@@ -554,7 +554,7 @@ void musb_g_tx(struct musb *musb, u8 epnum)
 			/* Ensure writebuffer is empty. */
 			csr = musb_readw(epio, MUSB_TXCSR);
 			request->actual += musb_ep->dma->actual_len;
-			dev_dbg(musb->controller, "TXCSR%d %04x, DMA off, len %zu, req %p\n",
+			dev_dbg(musb->controller, "TXCSR%d %04x, DMA off, len %zu, req %pK\n",
 				epnum, csr, musb_ep->dma->actual_len, request);
 		}
 
@@ -933,7 +933,7 @@ void musb_g_rx(struct musb *musb, u8 epnum)
 	csr = musb_readw(epio, MUSB_RXCSR);
 	dma = is_dma_capable() ? musb_ep->dma : NULL;
 
-	dev_dbg(musb->controller, "<== %s, rxcsr %04x%s %p\n", musb_ep->end_point.name,
+	dev_dbg(musb->controller, "<== %s, rxcsr %04x%s %pK\n", musb_ep->end_point.name,
 			csr, dma ? " (dma)" : "", request);
 
 	if (csr & MUSB_RXCSR_P_SENTSTALL) {
@@ -948,7 +948,7 @@ void musb_g_rx(struct musb *musb, u8 epnum)
 		csr &= ~MUSB_RXCSR_P_OVERRUN;
 		musb_writew(epio, MUSB_RXCSR, csr);
 
-		dev_dbg(musb->controller, "%s iso overrun on %p\n", musb_ep->name, request);
+		dev_dbg(musb->controller, "%s iso overrun on %pK\n", musb_ep->name, request);
 		if (request->status == -EINPROGRESS)
 			request->status = -EOVERFLOW;
 	}
@@ -973,7 +973,7 @@ void musb_g_rx(struct musb *musb, u8 epnum)
 
 		request->actual += musb_ep->dma->actual_len;
 
-		dev_dbg(musb->controller, "RXCSR%d %04x, dma off, %04x, len %zu, req %p\n",
+		dev_dbg(musb->controller, "RXCSR%d %04x, dma off, %04x, len %zu, req %pK\n",
 			epnum, csr,
 			musb_readw(epio, MUSB_RXCSR),
 			musb_ep->dma->actual_len, request);
@@ -1308,7 +1308,7 @@ struct free_record {
  */
 void musb_ep_restart(struct musb *musb, struct musb_request *req)
 {
-	dev_dbg(musb->controller, "<== %s request %p len %u on hw_ep%d\n",
+	dev_dbg(musb->controller, "<== %s request %pK len %u on hw_ep%d\n",
 		req->tx ? "TX/IN" : "RX/OUT",
 		&req->request, req->request.length, req->epnum);
 
@@ -1342,7 +1342,7 @@ static int musb_gadget_queue(struct usb_ep *ep, struct usb_request *req,
 	if (request->ep != musb_ep)
 		return -EINVAL;
 
-	dev_dbg(musb->controller, "<== to %s request=%p\n", ep->name, req);
+	dev_dbg(musb->controller, "<== to %s request=%pK\n", ep->name, req);
 
 	/* request is mine now... */
 	request->request.actual = 0;
@@ -1356,7 +1356,7 @@ static int musb_gadget_queue(struct usb_ep *ep, struct usb_request *req,
 
 	/* don't queue if the ep is down */
 	if (!musb_ep->desc) {
-		dev_dbg(musb->controller, "req %p queued to %s while ep %s\n",
+		dev_dbg(musb->controller, "req %pK queued to %s while ep %s\n",
 				req, ep->name, "disabled");
 		status = -ESHUTDOWN;
 		goto cleanup;
@@ -1393,7 +1393,7 @@ static int musb_gadget_dequeue(struct usb_ep *ep, struct usb_request *request)
 			break;
 	}
 	if (r != req) {
-		dev_dbg(musb->controller, "request %p not queued to %s\n", request, ep->name);
+		dev_dbg(musb->controller, "request %pK not queued to %s\n", request, ep->name);
 		status = -EINVAL;
 		goto done;
 	}

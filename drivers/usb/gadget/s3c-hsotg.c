@@ -693,7 +693,7 @@ static void s3c_hsotg_start_req(struct s3c_hsotg *hsotg,
 
 	if (0)
 		dev_dbg(hsotg->dev,
-			"REQ buf %p len %d dma 0x%08x noi=%d zp=%d snok=%d\n",
+			"REQ buf %pK len %d dma 0x%08x noi=%d zp=%d snok=%d\n",
 			ureq->buf, length, ureq->dma,
 			ureq->no_interrupt, ureq->zero, ureq->short_not_ok);
 
@@ -844,7 +844,7 @@ static int s3c_hsotg_map_dma(struct s3c_hsotg *hsotg,
 	return 0;
 
 dma_error:
-	dev_err(hsotg->dev, "%s: failed to map buffer %p, %d bytes\n",
+	dev_err(hsotg->dev, "%s: failed to map buffer %pK, %d bytes\n",
 		__func__, req->buf, req->length);
 
 	return -EIO;
@@ -859,7 +859,7 @@ static int s3c_hsotg_ep_queue(struct usb_ep *ep, struct usb_request *req,
 	unsigned long irqflags;
 	bool first;
 
-	dev_dbg(hs->dev, "%s: req %p: %d@%p, noi=%d, zero=%d, snok=%d\n",
+	dev_dbg(hs->dev, "%s: req %pK: %d@%pK, noi=%d, zero=%d, snok=%d\n",
 		ep->name, req, req->length, req->buf, req->no_interrupt,
 		req->zero, req->short_not_ok);
 
@@ -910,7 +910,7 @@ static void s3c_hsotg_complete_oursetup(struct usb_ep *ep,
 	struct s3c_hsotg_ep *hs_ep = our_ep(ep);
 	struct s3c_hsotg *hsotg = hs_ep->parent;
 
-	dev_dbg(hsotg->dev, "%s: ep %p, req %p\n", __func__, ep, req);
+	dev_dbg(hsotg->dev, "%s: ep %pK, req %pK\n", __func__, ep, req);
 
 	s3c_hsotg_ep_free_request(ep, req);
 }
@@ -960,7 +960,7 @@ static int s3c_hsotg_send_reply(struct s3c_hsotg *hsotg,
 	struct usb_request *req;
 	int ret;
 
-	dev_dbg(hsotg->dev, "%s: buff %p, len %d\n", __func__, buff, length);
+	dev_dbg(hsotg->dev, "%s: buff %pK, len %d\n", __func__, buff, length);
 
 	req = s3c_hsotg_ep_alloc_request(&ep->ep, GFP_ATOMIC);
 	hsotg->ep0_reply = req;
@@ -1309,7 +1309,7 @@ static void s3c_hsotg_complete_request(struct s3c_hsotg *hsotg,
 		return;
 	}
 
-	dev_dbg(hsotg->dev, "complete: ep %p %s, req %p, %d => %p\n",
+	dev_dbg(hsotg->dev, "complete: ep %pK %s, req %pK, %d => %pK\n",
 		hs_ep, hs_ep->ep.name, hs_req, result, hs_req->req.complete);
 
 	/* only replace the status if we've not already set an error
@@ -2393,7 +2393,7 @@ static int s3c_hsotg_ep_disable(struct usb_ep *ep)
 	u32 epctrl_reg;
 	u32 ctrl;
 
-	dev_info(hsotg->dev, "%s(ep %p)\n", __func__, ep);
+	dev_info(hsotg->dev, "%s(ep %pK)\n", __func__, ep);
 
 	if (ep == &hsotg->eps[0].ep) {
 		dev_err(hsotg->dev, "%s: called for ep0\n", __func__);
@@ -2446,7 +2446,7 @@ static int s3c_hsotg_ep_dequeue(struct usb_ep *ep, struct usb_request *req)
 	struct s3c_hsotg *hs = hs_ep->parent;
 	unsigned long flags;
 
-	dev_info(hs->dev, "ep_dequeue(%p,%p)\n", ep, req);
+	dev_info(hs->dev, "ep_dequeue(%pK,%pK)\n", ep, req);
 
 	spin_lock_irqsave(&hs_ep->lock, flags);
 
@@ -2471,7 +2471,7 @@ static int s3c_hsotg_ep_sethalt(struct usb_ep *ep, int value)
 	u32 epctl;
 	u32 xfertype;
 
-	dev_info(hs->dev, "%s(ep %p %s, %d)\n", __func__, ep, ep->name, value);
+	dev_info(hs->dev, "%s(ep %pK %s, %d)\n", __func__, ep, ep->name, value);
 
 	spin_lock_irqsave(&hs_ep->lock, irqflags);
 
@@ -3158,7 +3158,7 @@ static int ep_show(struct seq_file *seq, void *v)
 	seq_printf(seq, "mps %d\n", ep->ep.maxpacket);
 	seq_printf(seq, "total_data=%ld\n", ep->total_data);
 
-	seq_printf(seq, "request list (%p,%p):\n",
+	seq_printf(seq, "request list (%pK,%pK):\n",
 		   ep->queue.next, ep->queue.prev);
 
 	spin_lock_irqsave(&ep->lock, flags);
@@ -3169,7 +3169,7 @@ static int ep_show(struct seq_file *seq, void *v)
 			break;
 		}
 
-		seq_printf(seq, "%c req %p: %d bytes @%p, ",
+		seq_printf(seq, "%c req %pK: %d bytes @%pK, ",
 			   req == ep->req ? '*' : ' ',
 			   req, req->req.length, req->req.buf);
 		seq_printf(seq, "%d done, res %d\n",
@@ -3359,7 +3359,7 @@ static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
 		goto err_regs;
 	}
 
-	dev_info(dev, "regs %p, irq %d\n", hsotg->regs, hsotg->irq);
+	dev_info(dev, "regs %pK, irq %d\n", hsotg->regs, hsotg->irq);
 
 	device_initialize(&hsotg->gadget.dev);
 

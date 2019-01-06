@@ -45,7 +45,7 @@ void musb_write_fifo(struct musb_hw_ep *hw_ep, u16 len, const u8 *src)
 
 	musb_writew(epio, MUSB_TXCOUNT, len);
 
-	dev_dbg(musb->controller, "TX ep%d fifo %p count %d buf %p, epio %p\n",
+	dev_dbg(musb->controller, "TX ep%d fifo %pK count %d buf %pK, epio %pK\n",
 			hw_ep->epnum, fifo, len, src, epio);
 
 	dump_fifo_data(src, len);
@@ -157,7 +157,7 @@ void musb_read_fifo(struct musb_hw_ep *hw_ep, u16 len, u8 *dst)
 				*(dst + len - 1) = (u8)inw((unsigned long)fifo + 4);
 		}
 	}
-	dev_dbg(musb->controller, "%cX ep%d fifo %p count %d buf %p\n",
+	dev_dbg(musb->controller, "%cX ep%d fifo %pK count %d buf %pK\n",
 			'R', hw_ep->epnum, fifo, len, dst);
 
 	dump_fifo_data(dst, len);

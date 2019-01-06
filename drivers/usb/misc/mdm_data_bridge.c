@@ -395,7 +395,7 @@ int data_bridge_open(struct bridge *brdg)
 
 	dev = __dev[ch_id];
 
-	dev_dbg(&dev->intf->dev, "%s: dev:%p\n", __func__, dev);
+	dev_dbg(&dev->intf->dev, "%s: dev:%pK\n", __func__, dev);
 
 	dev->brdg = brdg;
 	dev->err = 0;
@@ -503,7 +503,7 @@ static void data_bridge_write_cb(struct urb *urb)
 	struct bridge		*brdg = dev->brdg;
 	int			pending;
 
-	pr_debug("%s: dev:%p\n", __func__, dev);
+	pr_debug("%s: dev:%pK\n", __func__, dev);
 
 	switch (urb->status) {
 	case 0: /*success*/
@@ -763,7 +763,7 @@ static void dbg_timestamp(char *event, struct sk_buff * skb)
 	write_lock_irqsave(&dbg_data.lck, flags);
 
 	scnprintf(dbg_data.buf[dbg_data.idx], DBG_DATA_MSG,
-		  "%p %u[%s] %u %u %u %u %u %u\n",
+		  "%pK %u[%s] %u %u %u %u %u %u\n",
 		  skb, skb->len, event, info->created, info->rx_queued,
 		  info->rx_done, info->rx_done_sent, info->tx_queued,
 		  get_timestamp());
@@ -832,7 +832,7 @@ static ssize_t data_bridge_read_stats(struct file *file, char __user *ubuf,
 			continue;
 
 		temp += scnprintf(buf + temp, DEBUG_BUF_SIZE - temp,
-				"\nName#%s dev %p\n"
+				"\nName#%s dev %pK\n"
 				"pending tx urbs:    %u\n"
 				"tx urb drp cnt:     %u\n"
 				"to host:            %lu\n"

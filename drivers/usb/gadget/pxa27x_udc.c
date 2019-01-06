@@ -161,7 +161,7 @@ static int queues_dbg_show(struct seq_file *s, void *p)
 		}
 
 		list_for_each_entry(req, &ep->queue, queue) {
-			pos += seq_printf(s,  "\treq %p len %d/%d buf %p\n",
+			pos += seq_printf(s,  "\treq %pK len %d/%d buf %pK\n",
 					&req->req, req->req.actual,
 					req->req.length, req->req.buf);
 		}
@@ -636,7 +636,7 @@ static __init void pxa_eps_setup(struct pxa_udc *dev)
 {
 	unsigned int i;
 
-	dev_dbg(dev->dev, "%s: dev=%p\n", __func__, dev);
+	dev_dbg(dev->dev, "%s: dev=%pK\n", __func__, dev);
 
 	for (i = 1; i < NR_PXA_ENDPOINTS; i++)
 		pxa_ep_setup(&dev->pxa_ep[i]);
@@ -697,7 +697,7 @@ static void ep_add_request(struct pxa_ep *ep, struct pxa27x_request *req)
 {
 	if (unlikely(!req))
 		return;
-	ep_vdbg(ep, "req:%p, lg=%d, udccsr=0x%03x\n", req,
+	ep_vdbg(ep, "req:%pK, lg=%d, udccsr=0x%03x\n", req,
 		req->req.length, udc_ep_readl(ep, UDCCSR));
 
 	req->in_use = 1;
@@ -720,7 +720,7 @@ static void ep_del_request(struct pxa_ep *ep, struct pxa27x_request *req)
 {
 	if (unlikely(!req))
 		return;
-	ep_vdbg(ep, "req:%p, lg=%d, udccsr=0x%03x\n", req,
+	ep_vdbg(ep, "req:%pK, lg=%d, udccsr=0x%03x\n", req,
 		req->req.length, udc_ep_readl(ep, UDCCSR));
 
 	list_del_init(&req->queue);
@@ -752,7 +752,7 @@ static void req_done(struct pxa_ep *ep, struct pxa27x_request *req, int status,
 		status = req->req.status;
 
 	if (status && status != -ESHUTDOWN)
-		ep_dbg(ep, "complete req %p stat %d len %u/%u\n",
+		ep_dbg(ep, "complete req %pK stat %d len %u/%u\n",
 			&req->req, status,
 			req->req.actual, req->req.length);
 
@@ -958,7 +958,7 @@ static int read_fifo(struct pxa_ep *ep, struct pxa27x_request *req)
 		inc_ep_stats_bytes(ep, count, !USB_DIR_IN);
 
 		is_short = (count < ep->fifo_size);
-		ep_dbg(ep, "read udccsr:%03x, count:%d bytes%s req %p %d/%d\n",
+		ep_dbg(ep, "read udccsr:%03x, count:%d bytes%s req %pK %d/%d\n",
 			udc_ep_readl(ep, UDCCSR), count, is_short ? "/S" : "",
 			&req->req, req->req.actual, req->req.length);
 
@@ -1034,7 +1034,7 @@ static int write_fifo(struct pxa_ep *ep, struct pxa27x_request *req)
 		}
 	} while (!ep_is_full(ep));
 
-	ep_dbg(ep, "wrote count:%d bytes%s%s, left:%d req=%p\n",
+	ep_dbg(ep, "wrote count:%d bytes%s%s, left:%d req=%pK\n",
 			totcount, is_last ? "/L" : "", is_short ? "/S" : "",
 			req->req.length - req->req.actual, &req->req);
 
@@ -1062,7 +1062,7 @@ static int read_ep0_fifo(struct pxa_ep *ep, struct pxa27x_request *req)
 		inc_ep_stats_bytes(ep, count, !USB_DIR_IN);
 
 		is_short = (count < ep->fifo_size);
-		ep_dbg(ep, "read udccsr:%03x, count:%d bytes%s req %p %d/%d\n",
+		ep_dbg(ep, "read udccsr:%03x, count:%d bytes%s req %pK %d/%d\n",
 			udc_ep_readl(ep, UDCCSR), count, is_short ? "/S" : "",
 			&req->req, req->req.actual, req->req.length);
 
@@ -1105,7 +1105,7 @@ static int write_ep0_fifo(struct pxa_ep *ep, struct pxa27x_request *req)
 	if (unlikely(is_short))
 		ep_write_UDCCSR(ep, UDCCSR0_IPR);
 
-	ep_dbg(ep, "in %d bytes%s%s, %d left, req=%p, udccsr0=0x%03x\n",
+	ep_dbg(ep, "in %d bytes%s%s, %d left, req=%pK, udccsr0=0x%03x\n",
 		count, is_short ? "/S" : "", is_last ? "/L" : "",
 		req->req.length - req->req.actual,
 		&req->req, udc_ep_readl(ep, UDCCSR));
@@ -1169,7 +1169,7 @@ static int pxa_ep_queue(struct usb_ep *_ep, struct usb_request *_req,
 	recursion_detected = ep->in_handle_ep;
 
 	is_first_req = list_empty(&ep->queue);
-	ep_dbg(ep, "queue req %p(first=%s), len %d buf %p\n",
+	ep_dbg(ep, "queue req %pK(first=%s), len %d buf %pK\n",
 			_req, is_first_req ? "yes" : "no",
 			_req->length, _req->buf);
 
@@ -1180,7 +1180,7 @@ static int pxa_ep_queue(struct usb_ep *_ep, struct usb_request *_req,
 	}
 
 	if (req->in_use) {
-		ep_err(ep, "refusing to queue req %p (already queued)\n", req);
+		ep_err(ep, "refusing to queue req %pK (already queued)\n", req);
 		goto out_locked;
 	}
 
@@ -2045,7 +2045,7 @@ static void handle_ep0(struct pxa_udc *udc, int fifo_irq, int opc_irq)
 		req = list_entry(ep->queue.next, struct pxa27x_request, queue);
 
 	udccsr0 = udc_ep_readl(ep, UDCCSR);
-	ep_dbg(ep, "state=%s, req=%p, udccsr0=0x%03x, udcbcr=%d, irq_msk=%x\n",
+	ep_dbg(ep, "state=%s, req=%pK, udccsr0=0x%03x, udcbcr=%d, irq_msk=%x\n",
 		EP0_STNAME(udc), req, udccsr0, udc_ep_readl(ep, UDCBCR),
 		(fifo_irq << 1 | opc_irq));
 
@@ -2143,7 +2143,7 @@ static void handle_ep(struct pxa_ep *ep)
 		else
 			req = NULL;
 
-		ep_dbg(ep, "req:%p, udccsr 0x%03x loop=%d\n",
+		ep_dbg(ep, "req:%pK, udccsr 0x%03x loop=%d\n",
 				req, udccsr, loop++);
 
 		if (unlikely(udccsr & (UDCCSR_SST | UDCCSR_TRN)))

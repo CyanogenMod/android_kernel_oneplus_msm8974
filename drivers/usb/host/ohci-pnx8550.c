@@ -151,7 +151,7 @@ ohci_pnx8550_start (struct usb_hcd *hcd)
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 	int		ret;
 
-	ohci_dbg (ohci, "ohci_pnx8550_start, ohci:%p", ohci);
+	ohci_dbg (ohci, "ohci_pnx8550_start, ohci:%pK", ohci);
 
 	if ((ret = ohci_init(ohci)) < 0)
 		return ret;

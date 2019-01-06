@@ -322,7 +322,7 @@ done(struct omap_ep *ep, struct omap_req *req, int status)
 #ifndef	USB_TRACE
 	if (status && status != -ESHUTDOWN)
 #endif
-		VDBG("complete %s req %p stat %d len %u/%u\n",
+		VDBG("complete %s req %pK stat %d len %u/%u\n",
 			ep->ep.name, &req->req, status,
 			req->req.actual, req->req.length);
 
@@ -859,7 +859,7 @@ static void dma_channel_release(struct omap_ep *ep)
 
 	active = omap_get_dma_active_status(ep->lch);
 
-	DBG("%s release %s %cxdma%d %p\n", ep->ep.name,
+	DBG("%s release %s %cxdma%d %pK\n", ep->ep.name,
 			active ? "active" : "idle",
 			(ep->bEndpointAddress & USB_DIR_IN) ? 't' : 'r',
 			ep->dma_channel - 1, req);
@@ -966,7 +966,7 @@ omap_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 		}
 	}
 
-	VDBG("%s queue req %p, len %d buf %p\n",
+	VDBG("%s queue req %pK, len %d buf %pK\n",
 		ep->ep.name, _req, _req->length, _req->buf);
 
 	spin_lock_irqsave(&udc->lock, flags);
@@ -2285,7 +2285,7 @@ static void proc_ep_show(struct seq_file *s, struct omap_ep *ep)
 					(ep, req->req.dma + length);
 				buf[0] = 0;
 			}
-			seq_printf(s, "\treq %p len %d/%d buf %p\n",
+			seq_printf(s, "\treq %pK len %d/%d buf %pK\n",
 					&req->req, length,
 					req->req.length, req->req.buf);
 		}

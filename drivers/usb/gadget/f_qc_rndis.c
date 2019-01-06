@@ -454,7 +454,7 @@ static int rndis_qc_bam_connect(struct f_rndis_qc *dev)
 
 static int rndis_qc_bam_disconnect(struct f_rndis_qc *dev)
 {
-	pr_debug("dev:%p. %s Disconnect BAM.\n", dev, __func__);
+	pr_debug("dev:%pK. %s Disconnect BAM.\n", dev, __func__);
 
 	bam_data_disconnect(&dev->bam_port, 0);
 

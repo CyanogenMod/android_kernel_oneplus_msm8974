@@ -359,7 +359,7 @@ static int snd_usX2Y_usbpcm_hw_free(struct snd_pcm_substream *substream)
 	struct snd_usX2Y_substream *subs = runtime->private_data,
 		*cap_subs2 = subs->usX2Y->subs[SNDRV_PCM_STREAM_CAPTURE + 2];
 	mutex_lock(&subs->usX2Y->prepare_mutex);
-	snd_printdd("snd_usX2Y_usbpcm_hw_free(%p)\n", substream);
+	snd_printdd("snd_usX2Y_usbpcm_hw_free(%pK)\n", substream);
 
 	if (SNDRV_PCM_STREAM_PLAYBACK == substream->stream) {
 		struct snd_usX2Y_substream *cap_subs = subs->usX2Y->subs[SNDRV_PCM_STREAM_CAPTURE];
@@ -486,7 +486,7 @@ static int snd_usX2Y_usbpcm_prepare(struct snd_pcm_substream *substream)
 	struct usX2Ydev *usX2Y = subs->usX2Y;
 	struct snd_usX2Y_substream *capsubs = subs->usX2Y->subs[SNDRV_PCM_STREAM_CAPTURE];
 	int err = 0;
-	snd_printdd("snd_usX2Y_pcm_prepare(%p)\n", substream);
+	snd_printdd("snd_usX2Y_pcm_prepare(%pK)\n", substream);
 
 	if (NULL == usX2Y->hwdep_pcm_shm) {
 		if (NULL == (usX2Y->hwdep_pcm_shm = snd_malloc_pages(sizeof(struct snd_usX2Y_hwdep_pcm_shm), GFP_KERNEL)))

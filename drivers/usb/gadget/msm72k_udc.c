@@ -535,7 +535,7 @@ static void config_ept(struct msm_endpoint *ept)
 
 	if (ept->ep.maxpacket)
 		dev_dbg(&ui->pdev->dev,
-			"ept #%d %s max:%d head:%p bit:%d\n",
+			"ept #%d %s max:%d head:%pK bit:%d\n",
 		       ept->num,
 		       (ept->flags & EPT_FLAG_IN) ? "in" : "out",
 		       ept->ep.maxpacket, ept->head, ept->bit);
@@ -745,7 +745,7 @@ int usb_ept_queue_xfer(struct msm_endpoint *ept, struct usb_request *_req)
 			if (printk_ratelimit())
 				dev_err(&ui->pdev->dev,
 				"%s: cannot queue as bus is suspended "
-				"ept #%d %s max:%d head:%p bit:%d\n",
+				"ept #%d %s max:%d head:%pK bit:%d\n",
 				__func__, ept->num,
 				(ept->flags & EPT_FLAG_IN) ? "in" : "out",
 				ept->ep.maxpacket, ept->head, ept->bit);
@@ -864,7 +864,7 @@ static void ep0_queue_ack_complete(struct usb_ep *ep,
 	struct usb_info *ui = ept->ui;
 	struct usb_request *req = ui->setup_req;
 
-	pr_debug("%s: _req:%p actual:%d length:%d zero:%d\n",
+	pr_debug("%s: _req:%pK actual:%d length:%d zero:%d\n",
 			__func__, _req, _req->actual,
 			_req->length, _req->zero);
 
@@ -1158,7 +1158,7 @@ static void handle_endpoint(struct usb_info *ui, unsigned bit)
 	unsigned info;
 
 	/*
-	INFO("handle_endpoint() %d %s req=%p(%08x)\n",
+	INFO("handle_endpoint() %d %s req=%pK(%08x)\n",
 		ept->num, (ept->flags & EPT_FLAG_IN) ? "in" : "out",
 		ept->req, ept->req ? ept->req->item_dma : 0);
 	*/

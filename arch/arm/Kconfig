@@ -1701,6 +1701,14 @@ config ARM_ARCH_TIMER
 	help
 	  This option enables support for the ARM architected timer
 
+config ARM_ARCH_TIMER_VCT_ACCESS
+	bool "Support for ARM architected timer virtual counter access in userspace"
+	default n
+	depends on ARM_ARCH_TIMER
+	help
+	  This option enables support for reading the ARM architected timer's
+	  virtual counter in userspace.
+
 config HAVE_ARM_TWD
 	bool
 	depends on SMP

@@ -267,7 +267,7 @@ static int adb_create_bulk_endpoints(struct adb_dev *dev,
 	struct usb_ep *ep;
 	int i;
 
-	DBG(cdev, "create_bulk_endpoints dev: %p\n", dev);
+	DBG(cdev, "create_bulk_endpoints dev: %pK\n", dev);
 
 	ep = usb_ep_autoconfig(cdev->gadget, in_desc);
 	if (!ep) {
@@ -350,12 +350,12 @@ requeue_req:
 	dev->rx_done = 0;
 	ret = usb_ep_queue(dev->ep_out, req, GFP_ATOMIC);
 	if (ret < 0) {
-		pr_debug("adb_read: failed to queue req %p (%d)\n", req, ret);
+		pr_debug("adb_read: failed to queue req %pK (%d)\n", req, ret);
 		r = -EIO;
 		atomic_set(&dev->error, 1);
 		goto done;
 	} else {
-		pr_debug("rx %p queue\n", req);
+		pr_debug("rx %pK queue\n", req);
 	}
 
 	/* wait for a request to complete */
@@ -373,7 +373,7 @@ requeue_req:
 		if (req->actual == 0)
 			goto requeue_req;
 
-		pr_debug("rx %p %d\n", req, req->actual);
+		pr_debug("rx %pK %d\n", req, req->actual);
 		xfer = (req->actual < count) ? req->actual : count;
 		if (copy_to_user(buf, req->buf, xfer))
 			r = -EFAULT;
@@ -538,7 +538,7 @@ adb_function_bind(struct usb_configuration *c, struct usb_function *f)
 	int			ret;
 
 	dev->cdev = cdev;
-	DBG(cdev, "adb_function_bind dev: %p\n", dev);
+	DBG(cdev, "adb_function_bind dev: %pK\n", dev);
 
 	/* allocate interface ID(s) */
 	id = usb_interface_id(c, f);
@@ -640,7 +640,7 @@ static void adb_function_disable(struct usb_function *f)
 	struct adb_dev	*dev = func_to_adb(f);
 	struct usb_composite_dev	*cdev = dev->cdev;
 
-	DBG(cdev, "adb_function_disable cdev %p\n", cdev);
+	DBG(cdev, "adb_function_disable cdev %pK\n", cdev);
 	/*
 	 * Bus reset happened or cable disconnected.  No
 	 * need to disable the configuration now.  We will

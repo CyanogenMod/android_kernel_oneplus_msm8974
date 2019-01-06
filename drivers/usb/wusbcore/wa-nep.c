@@ -182,7 +182,7 @@ static int wa_nep_queue(struct wahc *wa, size_t size)
 	struct device *dev = &wa->usb_iface->dev;
 	struct wa_notif_work *nw;
 
-	/* dev_fnstart(dev, "(wa %p, size %zu)\n", wa, size); */
+	/* dev_fnstart(dev, "(wa %pK, size %zu)\n", wa, size); */
 	BUG_ON(size > wa->nep_buffer_size);
 	if (size == 0)
 		goto out;
@@ -205,7 +205,7 @@ static int wa_nep_queue(struct wahc *wa, size_t size)
 	atomic_inc(&wa->notifs_queued);		/* Throttling ctl */
 	queue_work(wusbd, &nw->work);
 out:
-	/* dev_fnend(dev, "(wa %p, size %zu) = result\n", wa, size, result); */
+	/* dev_fnend(dev, "(wa %pK, size %zu) = result\n", wa, size, result); */
 	return result;
 }
 

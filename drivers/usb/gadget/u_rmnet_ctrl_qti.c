@@ -62,7 +62,7 @@ static void rmnet_ctrl_queue_notify(struct rmnet_ctrl_qti_port *port)
 
 	spin_lock_irqsave(&port->lock, flags);
 	if (!port->is_open) {
-		pr_err("%s: rmnet ctrl file handler %p is not open",
+		pr_err("%s: rmnet ctrl file handler %pK is not open",
 			   __func__, port);
 		spin_unlock_irqrestore(&port->lock, flags);
 		return;
@@ -109,7 +109,7 @@ static int grmnet_ctrl_qti_send_cpkt_tomodem(u8 portno,
 
 	/* drop cpkt if port is not open */
 	if (!port->is_open) {
-		pr_err("rmnet file handler %p is not open", port);
+		pr_err("rmnet file handler %pK is not open", port);
 		spin_unlock_irqrestore(&port->lock, flags);
 		free_rmnet_ctrl_pkt(cpkt);
 		return 0;
@@ -141,7 +141,7 @@ int gqti_ctrl_connect(struct grmnet *gr)
 	struct rmnet_ctrl_qti_port	*port;
 	unsigned long		flags;
 
-	pr_debug("%s: grmnet:%p\n", __func__, gr);
+	pr_debug("%s: grmnet:%pK\n", __func__, gr);
 
 	if (!gr) {
 		pr_err("%s: grmnet port is null\n", __func__);
@@ -171,7 +171,7 @@ void gqti_ctrl_disconnect(struct grmnet *gr)
 	unsigned long		flags;
 	struct rmnet_ctrl_pkt	*cpkt;
 
-	pr_debug("%s: grmnet:%p\n", __func__, gr);
+	pr_debug("%s: grmnet:%pK\n", __func__, gr);
 
 	if (!gr) {
 		pr_err("%s: grmnet port is null\n", __func__);

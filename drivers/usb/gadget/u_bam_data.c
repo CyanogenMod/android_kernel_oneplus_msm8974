@@ -364,7 +364,7 @@ static int bam2bam_data_port_alloc(int portno)
 	d->port = port;
 	bam2bam_data_ports[portno] = port;
 
-	pr_debug("port:%p portno:%d\n", port, portno);
+	pr_debug("port:%pK portno:%d\n", port, portno);
 
 	return 0;
 }
@@ -374,7 +374,7 @@ void bam_data_disconnect(struct data_port *gr, u8 port_num)
 	struct bam_data_port	*port;
 	struct bam_data_ch_info	*d;
 
-	pr_debug("dev:%p port#%d\n", gr, port_num);
+	pr_debug("dev:%pK port#%d\n", gr, port_num);
 
 	if (port_num >= n_bam2bam_data_ports) {
 		pr_err("invalid bam2bam portno#%d\n", port_num);
@@ -419,7 +419,7 @@ int bam_data_connect(struct data_port *gr, u8 port_num,
 	struct bam_data_ch_info	*d;
 	int			ret;
 
-	pr_debug("dev:%p port#%d\n", gr, port_num);
+	pr_debug("dev:%pK port#%d\n", gr, port_num);
 
 	if (port_num >= n_bam2bam_data_ports) {
 		pr_err("invalid portno#%d\n", port_num);
@@ -437,14 +437,14 @@ int bam_data_connect(struct data_port *gr, u8 port_num,
 
 	ret = usb_ep_enable(gr->in);
 	if (ret) {
-		pr_err("usb_ep_enable failed eptype:IN ep:%p", gr->in);
+		pr_err("usb_ep_enable failed eptype:IN ep:%pK", gr->in);
 		return ret;
 	}
 	gr->in->driver_data = port;
 
 	ret = usb_ep_enable(gr->out);
 	if (ret) {
-		pr_err("usb_ep_enable failed eptype:OUT ep:%p", gr->out);
+		pr_err("usb_ep_enable failed eptype:OUT ep:%pK", gr->out);
 		gr->in->driver_data = 0;
 		return ret;
 	}

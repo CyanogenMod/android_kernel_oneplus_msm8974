@@ -569,7 +569,7 @@ static struct usbhsh_device *usbhsh_device_attach(struct usbhsh_hpriv *hpriv,
 		upphub	= usbhsh_device_number(hpriv, parent);
 		hubport	= usbhsh_device_hubport(udev);
 
-		dev_dbg(dev, "%s connecte to Hub [%d:%d](%p)\n", __func__,
+		dev_dbg(dev, "%s connecte to Hub [%d:%d](%pK)\n", __func__,
 			upphub, hubport, parent);
 	}
 
@@ -577,7 +577,7 @@ static struct usbhsh_device *usbhsh_device_attach(struct usbhsh_hpriv *hpriv,
 			       usbhsh_device_number(hpriv, udev),
 			       upphub, hubport, usbv->speed);
 
-	dev_dbg(dev, "%s [%d](%p)\n", __func__,
+	dev_dbg(dev, "%s [%d](%pK)\n", __func__,
 		usbhsh_device_number(hpriv, udev), udev);
 
 	return udev;
@@ -592,7 +592,7 @@ static void usbhsh_device_detach(struct usbhsh_hpriv *hpriv,
 	struct usb_device *usbv = usbhsh_udev_to_usbv(udev);
 	unsigned long flags;
 
-	dev_dbg(dev, "%s [%d](%p)\n", __func__,
+	dev_dbg(dev, "%s [%d](%pK)\n", __func__,
 		usbhsh_device_number(hpriv, udev), udev);
 
 	if (usbhsh_device_has_endpoint(udev)) {

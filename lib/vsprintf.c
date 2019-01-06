@@ -810,7 +810,7 @@ char *netdev_feature_string(char *buf, char *end, const u8 *addr,
 	return number(buf, end, *(const netdev_features_t *)addr, spec);
 }
 
-int kptr_restrict __read_mostly;
+int kptr_restrict __read_mostly = 4;
 
 /*
  * Show a '%p' thing.  A kernel extension is that the '%p' is followed

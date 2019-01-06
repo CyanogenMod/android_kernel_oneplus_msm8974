@@ -169,7 +169,7 @@ static int gbam_alloc_requests(struct usb_ep *ep, struct list_head *head,
 	int i;
 	struct usb_request *req;
 
-	pr_debug("%s: ep:%p head:%p num:%d cb:%p", __func__,
+	pr_debug("%s: ep:%pK head:%pK num:%d cb:%pK", __func__,
 			ep, head, num, cb);
 
 	for (i = 0; i < num; i++) {
@@ -263,7 +263,7 @@ void gbam_data_recv_cb(void *p, struct sk_buff *skb)
 	if (!skb)
 		return;
 
-	pr_debug("%s: p:%p#%d d:%p skb_len:%d\n", __func__,
+	pr_debug("%s: p:%pK#%d d:%pK skb_len:%d\n", __func__,
 			port, port->port_num, d, skb->len);
 
 	spin_lock_irqsave(&port->port_lock_dl, flags);
@@ -304,7 +304,7 @@ void gbam_data_write_done(void *p, struct sk_buff *skb)
 
 	d->pending_with_bam--;
 
-	pr_debug("%s: port:%p d:%p tom:%lu pbam:%u, pno:%d\n", __func__,
+	pr_debug("%s: port:%pK d:%pK tom:%lu pbam:%u, pno:%d\n", __func__,
 			port, d, d->to_modem,
 			d->pending_with_bam, port->port_num);
 
@@ -339,7 +339,7 @@ static void gbam_data_write_tobam(struct work_struct *w)
 		d->pending_with_bam++;
 		d->to_modem++;
 
-		pr_debug("%s: port:%p d:%p tom:%lu pbam:%u pno:%d\n", __func__,
+		pr_debug("%s: port:%pK d:%pK tom:%lu pbam:%u pno:%d\n", __func__,
 				port, d, d->to_modem, d->pending_with_bam,
 				port->port_num);
 
@@ -660,7 +660,7 @@ static void gbam_start_io(struct gbam_port *port)
 	int			ret;
 	struct bam_ch_info	*d;
 
-	pr_debug("%s: port:%p\n", __func__, port);
+	pr_debug("%s: port:%pK\n", __func__, port);
 
 	spin_lock_irqsave(&port->port_lock_ul, flags);
 	if (!port->port_usb) {
@@ -1010,7 +1010,7 @@ reenable_eps:
 	if (reenable_eps) {
 		ret = usb_ep_enable(port->port_usb->in);
 		if (ret) {
-			pr_err("%s: usb_ep_enable failed eptype:IN ep:%p",
+			pr_err("%s: usb_ep_enable failed eptype:IN ep:%pK",
 				__func__, port->port_usb->in);
 			return ret;
 		}
@@ -1018,7 +1018,7 @@ reenable_eps:
 
 		ret = usb_ep_enable(port->port_usb->out);
 		if (ret) {
-			pr_err("%s: usb_ep_enable failed eptype:OUT ep:%p",
+			pr_err("%s: usb_ep_enable failed eptype:OUT ep:%pK",
 				__func__, port->port_usb->out);
 			port->port_usb->in->driver_data = 0;
 			return ret;
@@ -1172,7 +1172,7 @@ static int gbam_port_alloc(int portno)
 	pdrv->driver.owner = THIS_MODULE;
 
 	platform_driver_register(pdrv);
-	pr_debug("%s: port:%p portno:%d\n", __func__, port, portno);
+	pr_debug("%s: port:%pK portno:%d\n", __func__, port, portno);
 
 	return 0;
 }
@@ -1202,7 +1202,7 @@ static int gbam2bam_port_alloc(int portno)
 	d->port = port;
 	bam2bam_ports[portno] = port;
 
-	pr_debug("%s: port:%p portno:%d\n", __func__, port, portno);
+	pr_debug("%s: port:%pK portno:%d\n", __func__, port, portno);
 
 	return 0;
 }
@@ -1234,7 +1234,7 @@ static ssize_t gbam_read_stats(struct file *file, char __user *ubuf,
 		d = &port->data_ch;
 
 		temp += scnprintf(buf + temp, DEBUG_BUF_SIZE - temp,
-				"#PORT:%d port:%p data_ch:%p#\n"
+				"#PORT:%d port:%pK data_ch:%pK#\n"
 				"dpkts_to_usbhost: %lu\n"
 				"dpkts_to_modem:  %lu\n"
 				"dpkts_pwith_bam: %u\n"
@@ -1342,7 +1342,7 @@ void gbam_disconnect(struct grmnet *gr, u8 port_num, enum transport_type trans)
 	unsigned long		flags;
 	struct bam_ch_info	*d;
 
-	pr_debug("%s: grmnet:%p port#%d\n", __func__, gr, port_num);
+	pr_debug("%s: grmnet:%pK port#%d\n", __func__, gr, port_num);
 
 	if (trans == USB_GADGET_XPORT_BAM &&
 		port_num >= n_bam_ports) {
@@ -1410,7 +1410,7 @@ int gbam_connect(struct grmnet *gr, u8 port_num,
 	int			ret;
 	unsigned long		flags;
 
-	pr_debug("%s: grmnet:%p port#%d\n", __func__, gr, port_num);
+	pr_debug("%s: grmnet:%pK port#%d\n", __func__, gr, port_num);
 
 	if (trans == USB_GADGET_XPORT_BAM && port_num >= n_bam_ports) {
 		pr_err("%s: invalid portno#%d\n", __func__, port_num);
@@ -1438,7 +1438,7 @@ int gbam_connect(struct grmnet *gr, u8 port_num,
 
 	ret = usb_ep_enable(gr->in);
 	if (ret) {
-		pr_err("%s: usb_ep_enable failed eptype:IN ep:%p",
+		pr_err("%s: usb_ep_enable failed eptype:IN ep:%pK",
 			__func__, gr->in);
 		return ret;
 	}
@@ -1446,7 +1446,7 @@ int gbam_connect(struct grmnet *gr, u8 port_num,
 
 	ret = usb_ep_enable(gr->out);
 	if (ret) {
-		pr_err("%s: usb_ep_enable failed eptype:OUT ep:%p",
+		pr_err("%s: usb_ep_enable failed eptype:OUT ep:%pK",
 			__func__, gr->out);
 		gr->in->driver_data = 0;
 		return ret;

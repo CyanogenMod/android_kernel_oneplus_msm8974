@@ -473,7 +473,7 @@ write_fifo (struct net2280_ep *ep, struct usb_request *req)
 	if (count > total)	/* min() cannot be used on a bitfield */
 		count = total;
 
-	VDEBUG (ep->dev, "write %s fifo (IN) %d bytes%s req %p\n",
+	VDEBUG (ep->dev, "write %s fifo (IN) %d bytes%s req %pK\n",
 			ep->ep.name, count,
 			(count != ep->ep.maxpacket) ? " (short)" : "",
 			req);
@@ -600,7 +600,7 @@ read_fifo (struct net2280_ep *ep, struct net2280_request *req)
 
 	is_short = (count == 0) || ((count % ep->ep.maxpacket) != 0);
 
-	VDEBUG (ep->dev, "read %s fifo (OUT) %d bytes%s%s%s req %p %d/%d\n",
+	VDEBUG (ep->dev, "read %s fifo (OUT) %d bytes%s%s%s req %pK %d/%d\n",
 			ep->ep.name, count, is_short ? " (short)" : "",
 			cleanup ? " flush" : "", prevent ? " nak" : "",
 			req, req->req.actual, req->req.length);
@@ -809,7 +809,7 @@ done (struct net2280_ep *ep, struct net2280_request *req, int status)
 		usb_gadget_unmap_request(&dev->gadget, &req->req, ep->is_in);
 
 	if (status && status != -ESHUTDOWN)
-		VDEBUG (dev, "complete %s req %p stat %d len %u/%u\n",
+		VDEBUG (dev, "complete %s req %pK stat %d len %u/%u\n",
 			ep->ep.name, &req->req, status,
 			req->req.actual, req->req.length);
 
@@ -862,7 +862,7 @@ net2280_queue (struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 	}
 
 #if 0
-	VDEBUG (dev, "%s queue req %p, len %d buf %p\n",
+	VDEBUG (dev, "%s queue req %pK, len %d buf %pK\n",
 			_ep->name, _req, _req->length, _req->buf);
 #endif
 
@@ -1038,7 +1038,7 @@ static void restart_dma (struct net2280_ep *ep)
 		struct net2280_request	*entry, *prev = NULL;
 		int			reqmode, done = 0;
 
-		DEBUG (ep->dev, "%s dma hiccup td %p\n", ep->ep.name, req->td);
+		DEBUG (ep->dev, "%s dma hiccup td %pK\n", ep->ep.name, req->td);
 		ep->in_fifo_validate = likely (req->req.zero
 			|| (req->req.length % ep->ep.maxpacket) != 0);
 		if (ep->in_fifo_validate)
@@ -1652,14 +1652,14 @@ show_queues (struct device *_dev, struct device_attribute *attr, char *buf)
 		list_for_each_entry (req, &ep->queue, queue) {
 			if (ep->dma && req->td_dma == readl (&ep->dma->dmadesc))
 				t = scnprintf (next, size,
-					"\treq %p len %d/%d "
-					"buf %p (dmacount %08x)\n",
+					"\treq %pK len %d/%d "
+					"buf %pK (dmacount %08x)\n",
 					&req->req, req->req.actual,
 					req->req.length, req->req.buf,
 					readl (&ep->dma->dmacount));
 			else
 				t = scnprintf (next, size,
-					"\treq %p len %d/%d buf %p\n",
+					"\treq %pK len %d/%d buf %pK\n",
 					&req->req, req->req.actual,
 					req->req.length, req->req.buf);
 			if (t <= 0 || t > size)
@@ -1987,7 +1987,7 @@ static void handle_ep_small (struct net2280_ep *ep)
 	t = readl (&ep->regs->ep_stat);
 	ep->irqs++;
 #if 0
-	VDEBUG (ep->dev, "%s ack ep_stat %08x, req %p\n",
+	VDEBUG (ep->dev, "%s ack ep_stat %08x, req %pK\n",
 			ep->ep.name, t, req ? &req->req : 0);
 #endif
 	if (!ep->is_in || ep->dev->pdev->device == 0x2280)
@@ -2805,7 +2805,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* done */
 	INFO (dev, "%s\n", driver_desc);
-	INFO (dev, "irq %d, pci mem %p, chip rev %04x\n",
+	INFO (dev, "irq %d, pci mem %pK, chip rev %04x\n",
 			pdev->irq, base, dev->chiprev);
 	INFO (dev, "version: " DRIVER_VERSION "; dma %s\n",
 			use_dma

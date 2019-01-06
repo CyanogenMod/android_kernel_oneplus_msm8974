@@ -255,7 +255,7 @@ static void done(struct mv_ep *ep, struct mv_req *req, int status)
 				DMA_TO_DEVICE : DMA_FROM_DEVICE));
 
 	if (status && (status != -ESHUTDOWN))
-		dev_info(&udc->dev->dev, "complete %s req %p stat %d len %u/%u",
+		dev_info(&udc->dev->dev, "complete %s req %pK stat %d len %u/%u",
 			ep->ep.name, &req->req, status,
 			req->req.actual, req->req.length);
 

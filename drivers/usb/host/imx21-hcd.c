@@ -460,7 +460,7 @@ static void free_epdmem(struct imx21 *imx21, struct usb_host_endpoint *ep)
 	list_for_each_entry_safe(area, tmp, &imx21->dmem_list, list) {
 		if (area->ep == ep) {
 			dev_err(imx21->dev,
-				"Active DMEM %d for disabled ep=%p\n",
+				"Active DMEM %d for disabled ep=%pK\n",
 				area->offset, ep);
 			list_del(&area->list);
 			kfree(area);
@@ -521,7 +521,7 @@ __acquires(imx21->lock)
 	struct urb_priv *urb_priv = urb->hcpriv;
 
 	debug_urb_completed(imx21, urb, status);
-	dev_vdbg(imx21->dev, "urb %p done %d\n", urb, status);
+	dev_vdbg(imx21->dev, "urb %pK done %d\n", urb, status);
 
 	kfree(urb_priv->isoc_td);
 	kfree(urb->hcpriv);
@@ -546,7 +546,7 @@ static void nonisoc_urb_completed_for_etd(
 		struct urb *urb = list_first_entry(
 					&ep->urb_list, struct urb, urb_list);
 
-		dev_vdbg(imx21->dev, "next URB %p\n", urb);
+		dev_vdbg(imx21->dev, "next URB %pK\n", urb);
 		schedule_nonisoc_etd(imx21, urb);
 	}
 }
@@ -658,7 +658,7 @@ static void isoc_etd_done(struct usb_hcd *hcd, int etd_num)
 		urb_priv->isoc_status = -EXDEV;
 		dev_dbg(imx21->dev,
 			"bad iso cc=0x%X frame=%d sched frame=%d "
-			"cnt=%d len=%d urb=%p etd=%d index=%d\n",
+			"cnt=%d len=%d urb=%pK etd=%d index=%d\n",
 			cc,  imx21_hc_get_frame(hcd), td->frame,
 			bytes_xfrd, td->len, urb, etd_num, isoc_index);
 	}
@@ -884,7 +884,7 @@ static void dequeue_isoc_urb(struct imx21 *imx21,
 
 	list_for_each_entry_safe(td, tmp, &ep_priv->td_list, list) {
 		if (td->urb == urb) {
-			dev_vdbg(imx21->dev, "removing td %p\n", td);
+			dev_vdbg(imx21->dev, "removing td %pK\n", td);
 			list_del(&td->list);
 		}
 	}
@@ -1159,8 +1159,8 @@ static int imx21_hc_urb_enqueue(struct usb_hcd *hcd,
 	unsigned long flags;
 
 	dev_vdbg(imx21->dev,
-		"enqueue urb=%p ep=%p len=%d "
-		"buffer=%p dma=%08X setupBuf=%p setupDma=%08X\n",
+		"enqueue urb=%pK ep=%pK len=%d "
+		"buffer=%pK dma=%08X setupBuf=%pK setupDma=%08X\n",
 		urb, ep,
 		urb->transfer_buffer_length,
 		urb->transfer_buffer, urb->transfer_dma,
@@ -1209,7 +1209,7 @@ static int imx21_hc_urb_enqueue(struct usb_hcd *hcd,
 	if (ep_priv->etd[0] < 0) {
 		if (ep_priv->waiting_etd) {
 			dev_dbg(imx21->dev,
-				"no ETD available already queued %p\n",
+				"no ETD available already queued %pK\n",
 				ep_priv);
 			debug_urb_queued_for_etd(imx21, urb);
 			goto out;
@@ -1217,7 +1217,7 @@ static int imx21_hc_urb_enqueue(struct usb_hcd *hcd,
 		ep_priv->etd[0] = alloc_etd(imx21);
 		if (ep_priv->etd[0] < 0) {
 			dev_dbg(imx21->dev,
-				"no ETD available queueing %p\n", ep_priv);
+				"no ETD available queueing %pK\n", ep_priv);
 			debug_urb_queued_for_etd(imx21, urb);
 			list_add_tail(&ep_priv->queue, &imx21->queue_for_etd);
 			ep_priv->waiting_etd = 1;
@@ -1253,7 +1253,7 @@ static int imx21_hc_urb_dequeue(struct usb_hcd *hcd, struct urb *urb,
 	struct urb_priv *urb_priv = urb->hcpriv;
 	int ret = -EINVAL;
 
-	dev_vdbg(imx21->dev, "dequeue urb=%p iso=%d status=%d\n",
+	dev_vdbg(imx21->dev, "dequeue urb=%pK iso=%d status=%d\n",
 		urb, usb_pipeisoc(urb->pipe), status);
 
 	spin_lock_irqsave(&imx21->lock, flags);
@@ -1371,7 +1371,7 @@ static void process_etds(struct usb_hcd *hcd, struct imx21 *imx21, int sof)
 		if (etd->ep == NULL || etd->urb == NULL) {
 			dev_dbg(imx21->dev,
 				"Interrupt for unexpected etd %d"
-				" ep=%p urb=%p\n",
+				" ep=%pK urb=%pK\n",
 				etd_num, etd->ep, etd->urb);
 			disactivate_etd(imx21, etd_num);
 			continue;
@@ -1424,7 +1424,7 @@ static void imx21_hc_endpoint_disable(struct usb_hcd *hcd,
 
 	spin_lock_irqsave(&imx21->lock, flags);
 	ep_priv = ep->hcpriv;
-	dev_vdbg(imx21->dev, "disable ep=%p, ep->hcpriv=%p\n", ep, ep_priv);
+	dev_vdbg(imx21->dev, "disable ep=%pK, ep->hcpriv=%pK\n", ep, ep_priv);
 
 	if (!list_empty(&ep->urb_list))
 		dev_dbg(imx21->dev, "ep's URB list is not empty\n");
@@ -1444,7 +1444,7 @@ static void imx21_hc_endpoint_disable(struct usb_hcd *hcd,
 	for (i = 0; i < USB_NUM_ETD; i++) {
 		if (imx21->etd[i].alloc && imx21->etd[i].ep == ep) {
 			dev_err(imx21->dev,
-				"Active etd %d for disabled ep=%p!\n", i, ep);
+				"Active etd %d for disabled ep=%pK!\n", i, ep);
 			free_etd(imx21, i);
 		}
 	}

@@ -1048,7 +1048,7 @@ static int cdc_ncm_rx_fixup(struct usbnet *dev, struct sk_buff *skb_in)
 		if (((offset + len) > skb_in->len) ||
 				(len > ctx->rx_max) || (len < ETH_HLEN)) {
 			pr_debug("invalid frame detected (ignored)"
-					"offset[%u]=%u, length=%u, skb=%p\n",
+					"offset[%u]=%u, length=%u, skb=%pK\n",
 					x, offset, len, skb_in);
 			if (!x)
 				goto error;

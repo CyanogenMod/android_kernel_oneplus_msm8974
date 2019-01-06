@@ -200,7 +200,7 @@ static void done(struct fsl_ep *ep, struct fsl_req *req, int status)
 				: DMA_FROM_DEVICE);
 
 	if (status && (status != -ESHUTDOWN))
-		VDBG("complete %s req %p stat %d len %u/%u",
+		VDBG("complete %s req %pK stat %d len %u/%u",
 			ep->ep.name, &req->req, status,
 			req->req.actual, req->req.length);
 
@@ -307,7 +307,7 @@ static int dr_controller_setup(struct fsl_udc *udc)
 	tmp &= USB_EP_LIST_ADDRESS_MASK;
 	fsl_writel(tmp, &dr_regs->endpointlistaddr);
 
-	VDBG("vir[qh_base] is %p phy[qh_base] is 0x%8x reg is 0x%8x",
+	VDBG("vir[qh_base] is %pK phy[qh_base] is 0x%8x reg is 0x%8x",
 		udc->ep_qh, (int)tmp,
 		fsl_readl(&dr_regs->endpointlistaddr));
 
@@ -2252,7 +2252,7 @@ static int fsl_proc_read(char *page, char **start, off_t off, int count,
 	} else {
 		list_for_each_entry(req, &ep->queue, queue) {
 			t = scnprintf(next, size,
-				"req %p actual 0x%x length 0x%x buf %p\n",
+				"req %pK actual 0x%x length 0x%x buf %pK\n",
 				&req->req, req->req.actual,
 				req->req.length, req->req.buf);
 			size -= t;
@@ -2278,8 +2278,8 @@ static int fsl_proc_read(char *page, char **start, off_t off, int count,
 			} else {
 				list_for_each_entry(req, &ep->queue, queue) {
 					t = scnprintf(next, size,
-						"req %p actual 0x%x length "
-						"0x%x  buf %p\n",
+						"req %pK actual 0x%x length "
+						"0x%x  buf %pK\n",
 						&req->req, req->req.actual,
 						req->req.length, req->req.buf);
 					size -= t;

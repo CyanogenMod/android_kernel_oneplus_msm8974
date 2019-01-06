@@ -322,7 +322,7 @@ cppi_channel_allocate(struct dma_controller *c,
 	 * with the other DMA engine too
 	 */
 	if (cppi_ch->hw_ep)
-		dev_dbg(musb->controller, "re-allocating DMA%d %cX channel %p\n",
+		dev_dbg(musb->controller, "re-allocating DMA%d %cX channel %pK\n",
 				index, transmit ? 'T' : 'R', cppi_ch);
 	cppi_ch->hw_ep = ep;
 	cppi_ch->channel.status = MUSB_DMA_STATUS_FREE;
@@ -344,7 +344,7 @@ static void cppi_channel_release(struct dma_channel *channel)
 	tibase = c->controller->tibase;
 	if (!c->hw_ep)
 		dev_dbg(c->controller->musb->controller,
-			"releasing idle DMA channel %p\n", c);
+			"releasing idle DMA channel %pK\n", c);
 	else if (!c->transmit)
 		core_rxirq_enable(tibase, c->index + 1);
 
@@ -661,7 +661,7 @@ cppi_next_tx_segment(struct musb *musb, struct cppi_channel *tx)
 				bd->hw_options |= CPPI_ZERO_SET;
 		}
 
-		dev_dbg(musb->controller, "TXBD %p: nxt %08x buf %08x len %04x opt %08x\n",
+		dev_dbg(musb->controller, "TXBD %pK: nxt %08x buf %08x len %04x opt %08x\n",
 				bd, bd->hw_next, bd->hw_bufp,
 				bd->hw_off_len, bd->hw_options);
 
@@ -1120,7 +1120,7 @@ static bool cppi_rx_scan(struct cppi *cppi, unsigned ch)
 		musb_ep_select(cppi->mregs, rx->index + 1);
 		csr = musb_readw(regs, MUSB_RXCSR);
 		if (csr & MUSB_RXCSR_DMAENAB) {
-			dev_dbg(musb->controller, "list%d %p/%p, last %llx%s, csr %04x\n",
+			dev_dbg(musb->controller, "list%d %pK/%pK, last %llx%s, csr %04x\n",
 				rx->index,
 				rx->head, rx->tail,
 				rx->last_processed
@@ -1226,7 +1226,7 @@ irqreturn_t cppi_interrupt(int irq, void *dev_id)
 			if (bd->hw_options & CPPI_OWN_SET)
 				break;
 
-			dev_dbg(musb->controller, "C/TXBD %p n %x b %x off %x opt %x\n",
+			dev_dbg(musb->controller, "C/TXBD %pK n %x b %x off %x opt %x\n",
 					bd, bd->hw_next, bd->hw_bufp,
 					bd->hw_off_len, bd->hw_options);
 

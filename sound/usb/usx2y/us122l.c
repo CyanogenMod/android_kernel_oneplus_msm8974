@@ -192,7 +192,7 @@ static int usb_stream_hwdep_open(struct snd_hwdep *hw, struct file *file)
 {
 	struct us122l	*us122l = hw->private_data;
 	struct usb_interface *iface;
-	snd_printdd(KERN_DEBUG "%p %p\n", hw, file);
+	snd_printdd(KERN_DEBUG "%pK %pK\n", hw, file);
 	if (hw->used >= 2)
 		return -EBUSY;
 
@@ -213,7 +213,7 @@ static int usb_stream_hwdep_release(struct snd_hwdep *hw, struct file *file)
 {
 	struct us122l	*us122l = hw->private_data;
 	struct usb_interface *iface;
-	snd_printdd(KERN_DEBUG "%p %p\n", hw, file);
+	snd_printdd(KERN_DEBUG "%pK %pK\n", hw, file);
 
 	if (us122l->dev->descriptor.idProduct == USB_ID_US144 ||
 	    us122l->dev->descriptor.idProduct == USB_ID_US144MKII) {
@@ -612,7 +612,7 @@ static int snd_us122l_probe(struct usb_interface *intf,
 		return -ENODEV;
 	}
 
-	snd_printdd(KERN_DEBUG"%p:%i\n",
+	snd_printdd(KERN_DEBUG"%pK:%i\n",
 		    intf, intf->cur_altsetting->desc.bInterfaceNumber);
 	if (intf->cur_altsetting->desc.bInterfaceNumber != 1)
 		return 0;

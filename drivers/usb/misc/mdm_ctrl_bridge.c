@@ -582,7 +582,7 @@ static ssize_t ctrl_bridge_read_stats(struct file *file, char __user *ubuf,
 			continue;
 
 		temp += scnprintf(buf + temp, DEBUG_BUF_SIZE - temp,
-				"\nName#%s dev %p\n"
+				"\nName#%s dev %pK\n"
 				"snd encap cmd cnt: %u\n"
 				"get encap res cnt: %u\n"
 				"res available cnt: %u\n"

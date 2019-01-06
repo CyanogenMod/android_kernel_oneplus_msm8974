@@ -1014,7 +1014,7 @@ static ssize_t rmnet_usb_ctrl_read_stats(struct file *file, char __user *ubuf,
 		for (n = 0; n < insts_per_dev; n++) {
 			dev = &ctrl_devs[i][n];
 			temp += scnprintf(buf + temp, DEBUG_BUF_SIZE - temp,
-					"\n#ctrl_dev: %p     Name: %s#\n"
+					"\n#ctrl_dev: %pK     Name: %s#\n"
 					"snd encap cmd cnt         %u\n"
 					"resp avail cnt:           %u\n"
 					"get encap resp cnt:       %u\n"
@@ -1181,12 +1181,13 @@ int rmnet_usb_ctrl_init(int no_rmnet_devs, int no_rmnet_insts_per_dev)
 						     "%s%d", rmnet_dev_names[i],
 						     n);
 			if (IS_ERR(dev->devicep)) {
+				long status = PTR_ERR(dev->devicep);
 				pr_err("%s: device_create() returned %ld\n",
-					__func__, PTR_ERR(dev->devicep));
+					__func__, status);
 				cdev_del(&dev->cdev);
 				destroy_workqueue(dev->wq);
 				kfree(dev);
-				return PTR_ERR(dev->devicep);
+				return status;
 			}
 
 			/*create /sys/class/hsicctl/hsicctlx/modem_wait*/

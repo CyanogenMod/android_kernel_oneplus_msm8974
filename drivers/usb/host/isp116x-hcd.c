@@ -320,7 +320,7 @@ __releases(isp116x->lock) __acquires(isp116x->lock)
 	}
 
 	/* periodic deschedule */
-	DBG("deschedule qh%d/%p branch %d\n", ep->period, ep, ep->branch);
+	DBG("deschedule qh%d/%pK branch %d\n", ep->period, ep, ep->branch);
 	for (i = ep->branch; i < PERIODIC_SIZE; i += ep->period) {
 		struct isp116x_ep *temp;
 		struct isp116x_ep **prev = &isp116x->periodic[i];
@@ -791,7 +791,7 @@ static int isp116x_urb_enqueue(struct usb_hcd *hcd,
 		/* sort each schedule branch by period (slow before fast)
 		   to share the faster parts of the tree without needing
 		   dummy/placeholder nodes */
-		DBG("schedule qh%d/%p branch %d\n", ep->period, ep, ep->branch);
+		DBG("schedule qh%d/%pK branch %d\n", ep->period, ep, ep->branch);
 		for (i = ep->branch; i < PERIODIC_SIZE; i += ep->period) {
 			struct isp116x_ep **prev = &isp116x->periodic[i];
 			struct isp116x_ep *here = *prev;
@@ -857,7 +857,7 @@ static int isp116x_urb_dequeue(struct usb_hcd *hcd, struct urb *urb,
 		for (ep_act = isp116x->atl_active; ep_act;
 		     ep_act = ep_act->active)
 			if (ep_act == ep) {
-				VDBG("dequeue, urb %p active; wait for irq\n",
+				VDBG("dequeue, urb %pK active; wait for irq\n",
 				     urb);
 				urb = NULL;
 				break;
@@ -883,7 +883,7 @@ static void isp116x_endpoint_disable(struct usb_hcd *hcd,
 	for (i = 0; i < 100 && !list_empty(&hep->urb_list); i++)
 		msleep(3);
 	if (!list_empty(&hep->urb_list))
-		WARNING("ep %p not empty?\n", ep);
+		WARNING("ep %pK not empty?\n", ep);
 
 	kfree(ep);
 	hep->hcpriv = NULL;

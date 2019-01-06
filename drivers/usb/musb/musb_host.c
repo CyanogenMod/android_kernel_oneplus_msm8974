@@ -241,7 +241,7 @@ musb_start_urb(struct musb *musb, int is_in, struct musb_qh *qh)
 		len = urb->transfer_buffer_length - urb->actual_length;
 	}
 
-	dev_dbg(musb->controller, "qh %p urb %p dev%d ep%d%s%s, hw_ep %d, %p/%d\n",
+	dev_dbg(musb->controller, "qh %pK urb %pK dev%d ep%d%s%s, hw_ep %d, %pK/%d\n",
 			qh, urb, address, qh->epnum,
 			is_in ? "in" : "out",
 			({char *s; switch (qh->type) {
@@ -303,7 +303,7 @@ __releases(musb->lock)
 __acquires(musb->lock)
 {
 	dev_dbg(musb->controller,
-			"complete %p %pF (%d), dev%d ep%d%s, %d/%d\n",
+			"complete %pK %pF (%d), dev%d ep%d%s, %d/%d\n",
 			urb, urb->complete, status,
 			usb_pipedevice(urb->pipe),
 			usb_pipeendpoint(urb->pipe),
@@ -413,7 +413,7 @@ static void musb_advance_schedule(struct musb *musb, struct urb *urb,
 	}
 
 	if (qh != NULL && qh->is_ready) {
-		dev_dbg(musb->controller, "... next ep%d %cX urb %p\n",
+		dev_dbg(musb->controller, "... next ep%d %cX urb %pK\n",
 		    hw_ep->epnum, is_in ? 'R' : 'T', next_urb(qh));
 		musb_start_urb(musb, is_in, qh);
 	}
@@ -458,7 +458,7 @@ musb_host_packet_rx(struct musb *musb, struct urb *urb, u8 epnum, u8 iso_err)
 
 	/* musb_ep_select(mbase, epnum); */
 	rx_count = musb_readw(epio, MUSB_RXCOUNT);
-	dev_dbg(musb->controller, "RX%d count %d, buffer %p len %d/%d\n", epnum, rx_count,
+	dev_dbg(musb->controller, "RX%d count %d, buffer %pK len %d/%d\n", epnum, rx_count,
 			urb->transfer_buffer, qh->offset,
 			urb->transfer_buffer_length);
 
@@ -684,7 +684,7 @@ static void musb_ep_program(struct musb *musb, u8 epnum,
 	struct musb_qh		*qh = musb_ep_get_qh(hw_ep, !is_out);
 	u16			packet_sz = qh->maxpacket;
 
-	dev_dbg(musb->controller, "%s hw%d urb %p spd%d dev%d ep%d%s "
+	dev_dbg(musb->controller, "%s hw%d urb %pK spd%d dev%d ep%d%s "
 				"h_addr%02x h_port%02x bytes %d\n",
 			is_out ? "-->" : "<--",
 			epnum, urb, urb->dev->speed,
@@ -929,7 +929,7 @@ static bool musb_h_ep0_continue(struct musb *musb, u16 len, struct urb *urb)
 		if (fifo_count) {
 			fifo_dest = (u8 *) (urb->transfer_buffer
 					+ urb->actual_length);
-			dev_dbg(musb->controller, "Sending %d byte%s to ep0 fifo %p\n",
+			dev_dbg(musb->controller, "Sending %d byte%s to ep0 fifo %pK\n",
 					fifo_count,
 					(fifo_count == 1) ? "" : "s",
 					fifo_dest);
@@ -974,7 +974,7 @@ irqreturn_t musb_h_ep0_irq(struct musb *musb)
 			? musb_readb(epio, MUSB_COUNT0)
 			: 0;
 
-	dev_dbg(musb->controller, "<== csr0 %04x, qh %p, count %d, urb %p, stage %d\n",
+	dev_dbg(musb->controller, "<== csr0 %04x, qh %pK, count %d, urb %pK, stage %d\n",
 		csr, qh, len, urb, musb->ep0_stage);
 
 	/* if we just did status stage, we are done */
@@ -1867,7 +1867,7 @@ static int musb_schedule(
 	idle = 1;
 	qh->mux = 0;
 	hw_ep = musb->endpoints + best_end;
-	dev_dbg(musb->controller, "qh %p periodic slot %d\n", qh, best_end);
+	dev_dbg(musb->controller, "qh %pK periodic slot %d\n", qh, best_end);
 success:
 	if (head) {
 		idle = list_empty(head);
@@ -2090,7 +2090,7 @@ static int musb_cleanup_urb(struct urb *urb, struct musb_qh *qh)
 		if (dma) {
 			status = ep->musb->dma_controller->channel_abort(dma);
 			dev_dbg(musb->controller,
-				"abort %cX%d DMA for urb %p --> %d\n",
+				"abort %cX%d DMA for urb %pK --> %d\n",
 				is_in ? 'R' : 'T', ep->epnum,
 				urb, status);
 			urb->actual_length += dma->actual_len;
@@ -2136,7 +2136,7 @@ static int musb_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 	int			is_in  = usb_pipein(urb->pipe);
 	int			ret;
 
-	dev_dbg(musb->controller, "urb=%p, dev%d ep%d%s\n", urb,
+	dev_dbg(musb->controller, "urb=%pK, dev%d ep%d%s\n", urb,
 			usb_pipedevice(urb->pipe),
 			usb_pipeendpoint(urb->pipe),
 			is_in ? "in" : "out");

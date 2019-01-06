@@ -79,7 +79,7 @@ static void snd_usb_caiaq_midi_send(struct snd_usb_caiaqdev *dev,
 
 	ret = usb_submit_urb(&dev->midi_out_urb, GFP_ATOMIC);
 	if (ret < 0)
-		log("snd_usb_caiaq_midi_send(%p): usb_submit_urb() failed,"
+		log("snd_usb_caiaq_midi_send(%pK): usb_submit_urb() failed,"
 		    "ret=%d, len=%d\n",
 		    substream, ret, len);
 	else

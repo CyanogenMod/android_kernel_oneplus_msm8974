@@ -721,7 +721,7 @@ static int keyspan_pda_fake_startup(struct usb_serial *serial)
 					     be16_to_cpu(record->len), 0xa0);
 		if (response < 0) {
 			dev_err(&serial->dev->dev, "ezusb_writememory failed "
-				"for Keyspan PDA firmware (%d %04X %p %d)\n",
+				"for Keyspan PDA firmware (%d %04X %pK %d)\n",
 				response, be32_to_cpu(record->addr),
 				record->data, be16_to_cpu(record->len));
 			break;

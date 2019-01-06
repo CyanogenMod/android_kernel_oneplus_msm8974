@@ -671,7 +671,7 @@ pehci_hcd_schedule_pending_ptds(phci_hcd * hcd, u16 donemap, u8 bufftype,
 
 		/*if we	processed all the tds in ths transfer */
 		if (td_ptd_map->lasttd)	{
-			err("should not	show  map %x,qtd %p\n",
+			err("should not	show  map %x,qtd %pK\n",
 			td_ptd_map->ptd_bitmap, td_ptd_map->qtd);
 			/*this can happen in case the transfer is not being
 			 * procesed by the host	, tho the transfer is there
@@ -788,7 +788,7 @@ pehci_hcd_schedule_pending_ptds(phci_hcd * hcd, u16 donemap, u8 bufftype,
 			continue;
 		}
 
-		pehci_check("qtd being scheduled %p, device %d,map %x\n", qtd,
+		pehci_check("qtd being scheduled %pK, device %d,map %x\n", qtd,
 			    urb->dev->devnum, td_ptd_map->ptd_bitmap);
 
 
@@ -2397,7 +2397,7 @@ pehci_hcd_iso_worker(phci_hcd * hcd)
 						break;
 					case INT_EXACT:
 						iso_dbg(ISO_DBG_ERR,
-							"[pehci_hcd_iso_worker Error]: %p Transaction error\n",
+							"[pehci_hcd_iso_worker Error]: %pK Transaction error\n",
 							urb);
 						urb->iso_frame_desc[itd->index +
 							uframe_cnt].
@@ -3347,7 +3347,7 @@ pehci_hcd_intl_worker(phci_hcd * hcd)
 			ormask |= td_ptd_map->ptd_bitmap;
 			ptd_map_buff->active_ptds++;
 			pehci_check
-				("inter	schedule next qtd %p, active tds %d\n",
+				("inter	schedule next qtd %pK, active tds %d\n",
 				 qtd, ptd_map_buff->active_ptds);
 			pehci_hcd_qtd_schedule(hcd, qtd, qh, td_ptd_map);
 		}
@@ -3948,7 +3948,7 @@ pehci_hcd_init_map_buffers(phci_hcd * phci)
 	u32 bitmap;
 
 	pehci_entry("++	%s: Entered\n",	__FUNCTION__);
-	pehci_print("phci_init_map_buffers(phci	= 0x%p)\n", phci);
+	pehci_print("phci_init_map_buffers(phci	= 0x%pK)\n", phci);
 	/* initialize for each buffer type */
 	for (buff_type = 0; buff_type <	TD_PTD_TOTAL_BUFF_TYPES; buff_type++) {
 		ptd_map_buff = &(td_ptd_map_buff[buff_type]);
@@ -5094,7 +5094,7 @@ pehci_hcd_urb_dequeue(struct usb_hcd *usb_hcd, struct urb *urb, int status)
 			urb_priv->length, urb->transfer_buffer_length,
 			urb->dev->devnum);
 
-		pehci_check("remove first qtd address %p\n", urb_priv->qtd[0]);
+		pehci_check("remove first qtd address %pK\n", urb_priv->qtd[0]);
 		pehci_check("length of the urb %d, completed %d\n",
 			urb->transfer_buffer_length, urb->actual_length);
 		qtd = urb_priv->qtd[urb_priv->length - 1];

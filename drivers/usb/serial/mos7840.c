@@ -1142,7 +1142,7 @@ static int mos7840_open(struct tty_struct *tty, struct usb_serial_port *port)
 	mos7840_port->icount.tx = 0;
 	mos7840_port->icount.rx = 0;
 
-	dbg("usb_serial serial:%p       mos7840_port:%p\n      usb_serial_port port:%p",
+	dbg("usb_serial serial:%pK       mos7840_port:%pK\n      usb_serial_port port:%pK",
 				serial, mos7840_port, port);
 
 	dbg ("%s leave", __func__);
@@ -2385,7 +2385,7 @@ static int mos7840_startup(struct usb_serial *serial)
 	dev = serial->dev;
 
 	dbg("%s", "Entering...");
-	dbg ("mos7840_startup: serial = %p", serial);
+	dbg ("mos7840_startup: serial = %pK", serial);
 
 	/* we set up the pointers to the endpoints in the mos7840_open *
 	 * function, as the structures aren't created yet.             */
@@ -2626,7 +2626,7 @@ static void mos7840_disconnect(struct usb_serial *serial)
 
 	for (i = 0; i < serial->num_ports; ++i) {
 		mos7840_port = mos7840_get_port_private(serial->port[i]);
-		dbg ("mos7840_port %d = %p", i, mos7840_port);
+		dbg ("mos7840_port %d = %pK", i, mos7840_port);
 		if (mos7840_port) {
 			usb_kill_urb(mos7840_port->control_urb);
 		}
@@ -2659,7 +2659,7 @@ static void mos7840_release(struct usb_serial *serial)
 
 	for (i = 0; i < serial->num_ports; ++i) {
 		mos7840_port = mos7840_get_port_private(serial->port[i]);
-		dbg("mos7840_port %d = %p", i, mos7840_port);
+		dbg("mos7840_port %d = %pK", i, mos7840_port);
 		if (mos7840_port) {
 			usb_free_urb(mos7840_port->control_urb);
 			kfree(mos7840_port->ctrl_buf);
