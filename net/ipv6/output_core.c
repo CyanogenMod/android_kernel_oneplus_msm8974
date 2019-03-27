@@ -11,8 +11,6 @@
  */
 void ipv6_proxy_select_ident(struct net *net, struct sk_buff *skb)
 {
-	static u32 ip6_proxy_idents_hashrnd __read_mostly;
-	static bool hashrnd_initialized = false;
 	struct in6_addr buf[2];
 	struct in6_addr *addrs;
 	u32 hash, id;
@@ -21,19 +19,25 @@ void ipv6_proxy_select_ident(struct net *net, struct sk_buff *skb)
 				   skb_network_offset(skb) +
 				   offsetof(struct ipv6hdr, saddr),
 				   sizeof(buf), buf);
-	if (!addrs)
-		return;
+	if (addrs)
+	{
+		const struct {
+			struct in6_addr dst;
+			struct in6_addr src;
+		} __aligned(SIPHASH_ALIGNMENT) combined = {
+			.dst = addrs[1],
+			.src = addrs[0],
+		};
 
-	if (unlikely(!hashrnd_initialized)) {
-		hashrnd_initialized = true;
-		get_random_bytes(&ip6_proxy_idents_hashrnd,
-				 sizeof(ip6_proxy_idents_hashrnd));
+		/* Note the following code is not safe, but this is okay. */
+		if (unlikely(siphash_key_is_zero(&net->ipv4.ip_id_key)))
+			get_random_bytes(&net->ipv4.ip_id_key,
+					 sizeof(net->ipv4.ip_id_key));
+
+		hash = siphash(&combined, sizeof(combined), &net->ipv4.ip_id_key);
+
+		id = ip_idents_reserve(hash, 1);
+		skb_shinfo(skb)->ip6_frag_id = htonl(id);
 	}
-	hash = __ipv6_addr_jhash(&addrs[1], ip6_proxy_idents_hashrnd);
-	hash = __ipv6_addr_jhash(&addrs[0], hash);
-	hash ^= net_hash_mix(net);
-
-	id = ip_idents_reserve(hash, 1);
-	skb_shinfo(skb)->ip6_frag_id = htonl(id);
 }
 EXPORT_SYMBOL_GPL(ipv6_proxy_select_ident);

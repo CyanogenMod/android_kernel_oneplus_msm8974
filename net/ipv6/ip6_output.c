@@ -601,17 +601,21 @@ int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
 
 void ipv6_select_ident(struct net *net, struct frag_hdr *fhdr, struct rt6_info *rt)
 {
-	static u32 ip6_idents_hashrnd __read_mostly;
-	static bool hashrnd_initialized = false;
+	const struct {
+		struct in6_addr dst;
+		struct in6_addr src;
+	} __aligned(SIPHASH_ALIGNMENT) combined = {
+		.dst = rt->rt6i_dst.addr,
+		.src = rt->rt6i_src.addr,
+	};
 	u32 hash, id;
 
-	if (unlikely(!hashrnd_initialized)) {
-		hashrnd_initialized = true;
-		get_random_bytes(&ip6_idents_hashrnd, sizeof(ip6_idents_hashrnd));
-	}
-	hash = __ipv6_addr_jhash(&rt->rt6i_dst.addr, ip6_idents_hashrnd);
-	hash = __ipv6_addr_jhash(&rt->rt6i_src.addr, hash);
-	hash ^= net_hash_mix(net);
+	/* Note the following code is not safe, but this is okay. */
+	if (unlikely(siphash_key_is_zero(&net->ipv4.ip_id_key)))
+		get_random_bytes(&net->ipv4.ip_id_key,
+				 sizeof(net->ipv4.ip_id_key));
+
+	hash = siphash(&combined, sizeof(combined), &net->ipv4.ip_id_key);
 
 	id = ip_idents_reserve(hash, 1);
 	fhdr->identification = htonl(id);
