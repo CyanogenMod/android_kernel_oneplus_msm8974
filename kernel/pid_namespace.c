@@ -308,12 +308,19 @@ static int pidns_install(struct nsproxy *nsproxy, void *ns)
 	return 0;
 }
 
+static unsigned int pidns_inum(void *ns)
+{
+	struct pid_namespace *pid_ns = ns;
+	return pid_ns->proc_inum;
+}
+
 const struct proc_ns_operations pidns_operations = {
 	.name		= "pid",
 	.type		= CLONE_NEWPID,
 	.get		= pidns_get,
 	.put		= pidns_put,
 	.install	= pidns_install,
+	.inum		= pidns_inum,
 };
 
 static __init int pid_namespaces_init(void)
