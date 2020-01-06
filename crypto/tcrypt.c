@@ -1081,7 +1081,6 @@ static int do_test(int m)
 		break;
 
 	case 28:
-
 		ret += tcrypt_test("tgr160");
 		break;
 
@@ -1101,6 +1100,7 @@ static int do_test(int m)
 		ret += tcrypt_test("ecb(camellia)");
 		ret += tcrypt_test("cbc(camellia)");
 		break;
+
 	case 33:
 		ret += tcrypt_test("sha224");
 		break;
@@ -1193,6 +1193,7 @@ static int do_test(int m)
 		ret += tcrypt_test("vmac(aes)");
 		break;
 
+
 	case 150:
 		ret += tcrypt_test("ansi_cprng");
 		break;
@@ -1201,6 +1202,14 @@ static int do_test(int m)
 		ret += tcrypt_test("rfc4106(gcm(aes))");
 		break;
 
+		break;
+
+	case 153:
+		ret += tcrypt_test("cmac(aes)");
+		break;
+
+	case 154:
+		ret += tcrypt_test("cmac(des3_ede)");
 	case 200:
 		test_cipher_speed("ecb(aes)", ENCRYPT, sec, NULL, 0,
 				speed_template_16_24_32);
