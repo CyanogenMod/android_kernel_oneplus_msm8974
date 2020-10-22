@@ -402,8 +402,10 @@ static void *smp2p_get_remote_smem_item(int remote_pid,
 		smem_id = smp2p_get_smem_item_id(remote_pid, SMP2P_APPS_PROC);
 		if (smem_id >= 0)
 			item_ptr = smem_get_entry(smem_id, &size);
+#ifdef CONFIG_MSM_SMP2P_TEST
 	} else if (remote_pid == SMP2P_REMOTE_MOCK_PROC) {
 		item_ptr = msm_smp2p_get_remote_mock_smem_item(&size);
+#endif
 	}
 	item_ptr = out_item->ops_ptr->validate_size(remote_pid, item_ptr, size);
 
@@ -1518,8 +1520,10 @@ static void smp2p_send_interrupt(int remote_pid)
 		wmb();
 		writel_relaxed(smp2p_int_cfgs[remote_pid].out_int_mask,
 			smp2p_int_cfgs[remote_pid].out_int_ptr);
+#ifdef CONFIG_MSM_SMP2P_TEST
 	} else {
 		smp2p_remote_mock_rx_interrupt();
+#endif
 	}
 }
 
