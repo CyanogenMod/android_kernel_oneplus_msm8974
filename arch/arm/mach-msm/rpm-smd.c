@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
+#include <linux/err.h>
 #include <linux/bug.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
