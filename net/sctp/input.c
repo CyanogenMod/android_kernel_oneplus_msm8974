@@ -1073,7 +1073,7 @@ static struct sctp_association *__sctp_rcv_walk_lookup(struct sk_buff *skb,
 
 		ch = (sctp_chunkhdr_t *) ch_end;
 		chunk_num++;
-	} while (ch_end < skb_tail_pointer(skb));
+	} while (ch_end + sizeof(*ch) < skb_tail_pointer(skb));
 
 	return asoc;
 }
