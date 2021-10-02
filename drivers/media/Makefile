@@ -9,6 +9,7 @@ ifeq ($(CONFIG_MEDIA_CONTROLLER),y)
 endif
 
 obj-y += common/ platform/ rc/ video/
+obj-$(CONFIG_VIDEO_DEV) += v4l2loopback/
 
 obj-$(CONFIG_VIDEO_DEV) += radio/
 obj-$(CONFIG_DVB_CORE)  += dvb/
