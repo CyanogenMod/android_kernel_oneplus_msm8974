@@ -1371,6 +1371,29 @@ static void binder_send_failed_reply(struct binder_transaction *t,
 }
 
 /**
+ * struct binder_proc_ext - binder process bookkeeping
+ * @proc:            element for binder_procs list
+ * @cred                  struct cred associated with the `struct file`
+ *                        in binder_open()
+ *                        (invariant after initialized)
+ *
+ * Extended binder_proc -- needed to add the "cred" field without
+ * changing the KMI for binder_proc.
+ */
+struct binder_proc_ext {
+	struct binder_proc proc;
+	const struct cred *cred;
+};
+
+static inline const struct cred *binder_get_cred(struct binder_proc *proc)
+{
+	struct binder_proc_ext *eproc;
+
+	eproc = container_of(proc, struct binder_proc_ext, proc);
+	return eproc->cred;
+}
+
+/**
  * binder_validate_object() - checks for a valid metadata object in a buffer.
  * @buffer:	binder_buffer that we're parsing.
  * @offset:	offset in the buffer at which to validate an object.
@@ -3573,16 +3596,19 @@ err_bad_arg:
 static int binder_open(struct inode *nodp, struct file *filp)
 {
 	struct binder_proc *proc;
+	struct binder_proc_ext *eproc;
 	struct binder_device *binder_dev;
 
 	binder_debug(BINDER_DEBUG_OPEN_CLOSE, "binder_open: %d:%d\n",
 		     current->group_leader->pid, current->pid);
 
-	proc = kzalloc(sizeof(*proc), GFP_KERNEL);
+	eproc = kzalloc(sizeof(*eproc), GFP_KERNEL);
+	proc = &eproc->proc;
 	if (proc == NULL)
 		return -ENOMEM;
 	get_task_struct(current->group_leader);
 	proc->tsk = current->group_leader;
+	eproc->cred = get_cred(filp->f_cred);
 	INIT_LIST_HEAD(&proc->todo);
 	init_waitqueue_head(&proc->wait);
 	proc->default_priority = task_nice(current);
