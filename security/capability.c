@@ -12,22 +12,22 @@
 
 #include <linux/security.h>
 
-static int cap_binder_set_context_mgr(struct task_struct *mgr)
+static int cap_binder_set_context_mgr(const struct cred *mgr)
 {
 	return 0;
 }
 
-static int cap_binder_transaction(struct task_struct *from, struct task_struct *to)
+static int cap_binder_transaction(const struct cred *from, const struct cred *to)
 {
 	return 0;
 }
 
-static int cap_binder_transfer_binder(struct task_struct *from, struct task_struct *to)
+static int cap_binder_transfer_binder(const struct cred *from, const struct cred *to)
 {
 	return 0;
 }
 
-static int cap_binder_transfer_file(struct task_struct *from, struct task_struct *to, struct file *file)
+static int cap_binder_transfer_file(const struct cred *from, const struct cred *to, struct file *file)
 {
 	return 0;
 }

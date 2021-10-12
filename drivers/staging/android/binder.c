@@ -1698,7 +1698,8 @@ static int binder_translate_binder(struct flat_binder_object *fp,
 				  (u64)node->cookie);
 		return -EINVAL;
 	}
-	if (security_binder_transfer_binder(proc->tsk, target_proc->tsk))
+	if (security_binder_transfer_binder(binder_get_cred(proc),
+					    binder_get_cred(target_proc)))
 		return -EPERM;
 
 	ref = binder_get_ref_for_node(target_proc, node);
@@ -1738,7 +1739,8 @@ static int binder_translate_handle(struct flat_binder_object *fp,
 				  proc->pid, thread->pid, fp->handle);
 		return -EINVAL;
 	}
-	if (security_binder_transfer_binder(proc->tsk, target_proc->tsk))
+	if (security_binder_transfer_binder(binder_get_cred(proc),
+					    binder_get_cred(target_proc)))
 		return -EPERM;
 
 	if (ref->node->proc == target_proc) {
@@ -1808,7 +1810,8 @@ static int binder_translate_fd(int fd,
 		ret = -EBADF;
 		goto err_fget;
 	}
-	ret = security_binder_transfer_file(proc->tsk, target_proc->tsk, file);
+	ret = security_binder_transfer_file(binder_get_cred(proc),
+					    binder_get_cred(target_proc), file);
 	if (ret < 0) {
 		ret = -EPERM;
 		goto err_security;
@@ -2034,7 +2037,8 @@ static void binder_transaction(struct binder_proc *proc,
 			return_error = BR_DEAD_REPLY;
 			goto err_dead_binder;
 		}
-		if (security_binder_transaction(proc->tsk, target_proc->tsk) < 0) {
+		if (security_binder_transaction(binder_get_cred(proc),
+					binder_get_cred(target_proc)) < 0) {
 			return_error = BR_FAILED_REPLY;
 			goto err_invalid_target_handle;
 		}
@@ -3304,7 +3308,7 @@ static int binder_ioctl_set_ctx_mgr(struct file *filp,
 		ret = -EBUSY;
 		goto out;
 	}
-	ret = security_binder_set_context_mgr(proc->tsk);
+	ret = security_binder_set_context_mgr(binder_get_cred(proc));
 	if (ret < 0)
 		goto out;
 	if (context->binder_context_mgr_uid != -1) {
