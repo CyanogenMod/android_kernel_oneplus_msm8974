@@ -1,0 +1,21 @@
+menu "Anbox"
+
+config ANBOX
+	bool "Anbox Drivers"
+	default N
+	---help---
+	  Enable support for various drivers needed for Anbox
+
+if ANBOX
+
+config ANBOX_BINDER_IPC
+	bool "Anbox Binder IPC Driver"
+	default n
+	
+config ANBOX_BINDER_IPC_32BIT
+    bool "32bit Anbox binder"
+    default n
+
+endif # if ANBOX
+
+endmenu
