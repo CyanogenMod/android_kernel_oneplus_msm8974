@@ -429,14 +429,6 @@ static void disable_bms_irq_nosync(struct bms_irq *irq)
 	}
 }
 
-static void disable_bms_irq_nosync(struct bms_irq *irq)
-{
-	if (!__test_and_set_bit(0, &irq->disabled)) {
-		disable_irq_nosync(irq->irq);
-		pr_debug("disabled irq %d\n", irq->irq);
-	}
-}
-
 #define HOLD_OREG_DATA		BIT(0)
 static int lock_output_data(struct qpnp_bms_chip *chip)
 {
