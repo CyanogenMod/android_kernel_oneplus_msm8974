@@ -31,7 +31,7 @@
 
 DEFINE_LED_TRIGGER(bl_led_trigger);
 
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_BACKLIGHT_LM3630
 extern int lm3630_bank_a_update_status(u32 bl_level);
 #endif
 
@@ -447,7 +447,7 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 			__func__);
 		break;
 	}
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_BACKLIGHT_LM3630
 	lm3630_bank_a_update_status(bl_level);
 #endif
 }
