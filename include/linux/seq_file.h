@@ -179,6 +179,7 @@ static inline void seq_show_option(struct seq_file *m, const char *name,
 	strncpy(val_buf, value, length);		\
 	val_buf[length] = '\0';				\
 	seq_show_option(m, name, val_buf);		\
+}
 static inline struct user_namespace *seq_user_ns(struct seq_file *seq)
 {
 #ifdef CONFIG_USER_NS
