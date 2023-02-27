@@ -16,7 +16,7 @@
 
 #include "util.h"
 
-static struct ipc_namespace *create_ipc_ns(struct task_struct *tsk,
+static struct ipc_namespace *create_ipc_ns(struct user_namespace *user_ns,
 					   struct ipc_namespace *old_ns)
 {
 	struct ipc_namespace *ns;
@@ -53,19 +53,17 @@ static struct ipc_namespace *create_ipc_ns(struct task_struct *tsk,
 	ipcns_notify(IPCNS_CREATED);
 	register_ipcns_notifier(ns);
 
-	ns->user_ns = get_user_ns(task_cred_xxx(tsk, user_ns));
+	ns->user_ns = get_user_ns(user_ns);
 
 	return ns;
 }
 
 struct ipc_namespace *copy_ipcs(unsigned long flags,
-				struct task_struct *tsk)
+	struct user_namespace *user_ns, struct ipc_namespace *ns)
 {
-	struct ipc_namespace *ns = tsk->nsproxy->ipc_ns;
-
 	if (!(flags & CLONE_NEWIPC))
 		return get_ipc_ns(ns);
-	return create_ipc_ns(tsk, ns);
+	return create_ipc_ns(user_ns, ns);
 }
 
 /*
@@ -169,8 +167,13 @@ static void ipcns_put(void *ns)
 	return put_ipc_ns(ns);
 }
 
-static int ipcns_install(struct nsproxy *nsproxy, void *ns)
+static int ipcns_install(struct nsproxy *nsproxy, void *new)
 {
+	struct ipc_namespace *ns = new;
+	if (!ns_capable(ns->user_ns, CAP_SYS_ADMIN) ||
+	    !nsown_capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
 	/* Ditch state from the old ipc namespace */
 	exit_sem(current);
 	put_ipc_ns(nsproxy->ipc_ns);
