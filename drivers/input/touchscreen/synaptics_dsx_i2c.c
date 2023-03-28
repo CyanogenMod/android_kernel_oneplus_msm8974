@@ -2640,9 +2640,10 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #else
 			if (y > rmi4_data->sensor_max_y- rmi4_data->snap_top - rmi4_data->snap_bottom) {
 #endif
-				if (!atomic_read(&rmi4_data->keypad_enable)) {
+				// UBPorts hack, Ignore input from keypad to make swiping up from bottom easier
+				// if (!atomic_read(&rmi4_data->keypad_enable)) {
 					continue;
-				}
+				// }
 			}
 			if (get_virtual_key_button(x, y) == TP_VKEY_NONE) {
 				continue;
